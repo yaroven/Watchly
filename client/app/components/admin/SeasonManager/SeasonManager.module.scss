@@ -1,0 +1,104 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  border-right: 1px solid #333;
+  padding-right: 16px;
+  height: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: #fff;
+  }
+}
+
+.addButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #ca563f;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+
+  &:hover {
+    background-color: #b84430;
+  }
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background-color: #1f1f1f;
+  border-radius: 6px;
+  cursor: pointer;
+  color: white;
+  border: 1px solid transparent;
+
+  &:hover {
+    background-color: #2a2a2a;
+  }
+
+  &.selected {
+    border-color: #ca563f;
+    background-color: #2a2a2a;
+  }
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+
+  .number {
+    font-size: 0.8rem;
+    color: #888;
+  }
+
+  .name {
+    font-weight: 500;
+  }
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.iconBtn {
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  padding: 4px;
+
+  &:hover {
+    color: #fff;
+  }
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 300px;
+}

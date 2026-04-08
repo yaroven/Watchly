@@ -1,0 +1,15 @@
+.episodeContainer {
+  width: 100px;
+  border: #ca563f 1px solid;
+  color: #fff;
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: "PT Sans", "Arial";
+  font-weight: 400;
+  font-size: 13;
+
+  &.active {
+    background: #ca563f;
+  }
+}

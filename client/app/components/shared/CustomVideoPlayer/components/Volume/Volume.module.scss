@@ -1,0 +1,17 @@
+.volumeIcon {
+  transition: all ease-in-out 0.1s;
+  &:hover {
+    transform: scale(1.1);
+  }
+}
+
+.volumeContainer {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.hidden {
+  display: none;
+}

@@ -1,0 +1,26 @@
+{
+  "name": "watchly",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "workspaces": [
+    "api",
+    "client"
+  ],
+  "scripts": {
+    "commitlint": "commitlint",
+    "docker:build": "docker compose build",
+    "dev:up": "docker compose up -d",
+    "dev:down": "docker compose down",
+    "lint:api": "yarn workspace api precommit",
+    "lint:client": "yarn workspace client precommit",
+    "lint": "yarn lint:api && yarn lint:client",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.3.0",
+    "@commitlint/config-conventional": "^20.3.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2"
+  }
+}

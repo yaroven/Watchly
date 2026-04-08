@@ -1,0 +1,10 @@
+node_modules/
+.pnp.*
+
+api/.git-backup/
+client/.git-backup/
+
+.codex
+.next
+
+.env

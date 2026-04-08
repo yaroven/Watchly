@@ -1,0 +1,17 @@
+.tab {
+  width: 20%;
+  border: 1px solid #1f2123;
+  padding: 5px 10px;
+  background: #131415;
+  color: #9f9f9f;
+  text-align: center;
+  cursor: pointer;
+  font-family: "PT Sans", "Arial";
+  font-weight: 400;
+
+  &.active {
+    background: #ca563f;
+    color: #fff;
+    font-weight: 700;
+  }
+}

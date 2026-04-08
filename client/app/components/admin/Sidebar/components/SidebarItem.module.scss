@@ -1,0 +1,15 @@
+.item {
+  padding-left: 10px;
+  width: fit-content;
+  cursor: pointer;
+  .text {
+    color: white;
+    transition: all ease-in-out 0.3s;
+    user-select: none;
+    text-decoration: none;
+    &:hover {
+      transform: translateX(3px);
+      color: #ca563f;
+    }
+  }
+}

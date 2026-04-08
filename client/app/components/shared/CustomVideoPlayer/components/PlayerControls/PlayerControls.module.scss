@@ -1,0 +1,51 @@
+.controlBar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px;
+  box-sizing: border-box;
+  background: rgb(0, 0, 0, 0.1);
+
+  .topPart {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    .timeline {
+      padding-left: 4px;
+    }
+  }
+
+  .bottomPart {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  &.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease-in-out;
+  }
+}
+
+.playAndVolume {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+}
+
+.rightControls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}

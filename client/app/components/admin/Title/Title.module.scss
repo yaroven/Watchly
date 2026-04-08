@@ -1,0 +1,69 @@
+.title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 150px;
+  width: fit-content;
+  margin: 10px 1% 40px;
+}
+
+.name {
+  font-size: 15px;
+  max-width: 100%;
+  padding: 0 10px;
+  word-break: normal;
+  text-align: center;
+  font-weight: 600;
+  text-decoration: none;
+  color: #9f9f9f;
+  cursor: pointer;
+  transition: color ease-in-out 0.3s;
+  &:hover {
+    color: #ca563f;
+  }
+}
+
+.poster {
+  padding: 0;
+  margin: 0;
+  display: block;
+  width: 150px;
+  height: 225px;
+  object-fit: cover;
+  cursor: pointer;
+}
+
+.posterConteiner {
+  position: relative;
+  line-height: 0;
+  box-sizing: border-box;
+  transition: all 0.3s ease-in-out;
+
+  &:hover {
+    transform: translateY(-10px);
+  }
+
+  .transcodingBadge {
+    position: absolute;
+    top: 20%;
+    left: 0;
+    font-size: 8px;
+    color: white;
+    padding: 2px 6px;
+    font-weight: 600;
+    line-height: 1;
+
+    &.pending {
+      background-color: #6c757d;
+    }
+    &.completed {
+      background-color: #28a745;
+    }
+    &.processing {
+      background-color: #ffc107;
+    }
+    &.failed {
+      background-color: #dc3545;
+    }
+  }
+}
