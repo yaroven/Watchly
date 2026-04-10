@@ -1,10 +1,5 @@
 "use client";
 
-import {
-  createEpisodeAction,
-  deleteEpisodeAction,
-  updateEpisodeAction,
-} from "@/app/actions/episode.actions";
 import { EpisodeService } from "@/app/services/episode.service";
 import { CreateEpisodeDto, Episode, UpdateEpisodeDto } from "@/app/types/episode";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -38,28 +33,25 @@ export const useEpisodeManager = ({ titleId, seasonId, episodes }: UseEpisodeMan
   } = useForm<CreateEpisodeDto>();
 
   const createMutation = useMutation({
-    mutationFn: async (data: CreateEpisodeDto) => {
-      const { videoFile, ...payload } = data;
-      const episode = await createEpisodeAction(titleId, { ...payload, seasonId });
+    mutationFn: async ({ videoFile, ...payload }: CreateEpisodeDto) => {
+      const episode = await EpisodeService.create({ ...payload, seasonId });
 
-      if (videoFile && videoFile[0]) {
-        const file = videoFile[0];
-        const uploadUrl = await EpisodeService.getUploadUrl(episode.id);
+      if (!videoFile || !videoFile[0]) return episode;
 
-        let finalUploadUrl = uploadUrl;
-        if (finalUploadUrl.includes("localstack"))
-          finalUploadUrl = finalUploadUrl.replace("localstack", "localhost");
+      const file = videoFile[0];
+      let uploadUrl = await EpisodeService.getUploadUrl(episode.id);
 
-        await axios.put(finalUploadUrl, file, {
-          headers: { "Content-Type": file.type },
-          onUploadProgress: (progressEvent) => {
-            const total = progressEvent.total || file.size;
-            const percent = Math.round((progressEvent.loaded * 100) / total);
-            setUploadProgress(percent);
-          },
-        });
-      }
-      return episode;
+      if (uploadUrl.includes("localstack"))
+        uploadUrl = uploadUrl.replace("localstack", "localhost");
+
+      await axios.put(uploadUrl, file, {
+        headers: { "Content-Type": file.type },
+        onUploadProgress: (progressEvent) => {
+          const total = progressEvent.total || file.size;
+          const percent = Math.round((progressEvent.loaded * 100) / total);
+          setUploadProgress(percent);
+        },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["episodes", seasonId] });
@@ -70,8 +62,8 @@ export const useEpisodeManager = ({ titleId, seasonId, episodes }: UseEpisodeMan
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { id: string; payload: UpdateEpisodeDto }) => {
-      await updateEpisodeAction(titleId, data.id, data.payload);
+    mutationFn: async ({ payload }: { id: string; payload: UpdateEpisodeDto }) => {
+      await EpisodeService.update(titleId, payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["episodes", seasonId] });
@@ -82,7 +74,7 @@ export const useEpisodeManager = ({ titleId, seasonId, episodes }: UseEpisodeMan
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteEpisodeAction(titleId, id),
+    mutationFn: (id: string) => EpisodeService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["episodes", seasonId] });
       setIsDeleteModalOpen(false);
@@ -91,8 +83,8 @@ export const useEpisodeManager = ({ titleId, seasonId, episodes }: UseEpisodeMan
   });
 
   const onSubmit = (data: CreateEpisodeDto) => {
-    if (editingEpisode) updateMutation.mutate({ id: editingEpisode.id, payload: data });
-    else createMutation.mutate(data);
+    if (editingEpisode) return updateMutation.mutate({ id: editingEpisode.id, payload: data });
+    return createMutation.mutate(data);
   };
 
   const openEdit = (episode: Episode) => {
@@ -121,9 +113,8 @@ export const useEpisodeManager = ({ titleId, seasonId, episodes }: UseEpisodeMan
   };
 
   const handleConfirmDelete = () => {
-    if (episodeToDelete) {
-      deleteMutation.mutate(episodeToDelete.id);
-    }
+    if (!episodeToDelete) return;
+    deleteMutation.mutate(episodeToDelete.id);
   };
 
   const handlePreview = async (episode: Episode) => {

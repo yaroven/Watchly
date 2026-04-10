@@ -1,6 +1,5 @@
 "use client";
 
-import { deleteTitleAction } from "@/app/actions/title.actions";
 import EpisodeManager from "@/app/components/admin/EpisodeManager";
 import SeasonManager from "@/app/components/admin/SeasonManager";
 import TitleForm from "@/app/components/admin/TitleForm";
@@ -55,7 +54,7 @@ export default function TitleDetailsContent({ title, initialSeasons }: TitleDeta
   const handleDelete = () => {
     startTransition(async () => {
       try {
-        await deleteTitleAction(title.id);
+        await TitleService.delete(title.id);
         queryClient.invalidateQueries({ queryKey: ["adminTitles"] });
         queryClient.invalidateQueries({ queryKey: ["adminStats"] });
         queryClient.invalidateQueries({ queryKey: ["adminRecent"] });

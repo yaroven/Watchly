@@ -8,3 +8,5 @@ client/.git-backup/
 .next
 
 .env
+
+dist

@@ -1,6 +1,5 @@
 "use client";
 
-import { createTitleAction, updateTitleAction } from "@/app/actions/title.actions";
 import { TitleService } from "@/app/services/title.service";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -32,13 +31,13 @@ export default function TitleForm({ initialData }: TitleFormProps) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
 
-  const defaultValues: any = initialData
+  const defaultValues = initialData
     ? {
-      name: initialData.name,
-      description: initialData.description,
-      posterUrl: initialData.posterUrl,
-      type: initialData.type,
-    }
+        name: initialData.name,
+        description: initialData.description,
+        posterUrl: initialData.posterUrl,
+        type: initialData.type,
+      }
     : undefined;
 
   const isEditing = !!initialData;
@@ -64,10 +63,10 @@ export default function TitleForm({ initialData }: TitleFormProps) {
       let title: Title;
 
       if (initialData) {
-        title = await updateTitleAction(initialData.id, data);
+        title = await TitleService.update(initialData.id, data);
       } else {
         const { videoFile, ...payload } = data;
-        title = await createTitleAction(payload);
+        title = await TitleService.createTitle(payload);
 
         if (data.type === TitleType.MOVIE && videoFile?.[0]) {
           const file = videoFile[0];

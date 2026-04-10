@@ -1,5 +1,8 @@
-import Dashboard from "@/app/components/admin/Dashboard";
+"use client";
+import { useRouter } from "next/navigation";
 
 export default function Page() {
-  return <Dashboard />;
+  const router = useRouter();
+
+  return router.replace("/admin/dashboard");
 }

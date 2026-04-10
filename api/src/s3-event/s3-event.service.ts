@@ -33,7 +33,7 @@ export class S3EventService implements OnModuleInit {
   private sqsClient: SQSClient;
   private s3Client: S3Client;
   private config: S3Config;
-  private queueUrl: string;
+  private queueUrl?: string;
 
   constructor(
     private readonly configService: ConfigService,

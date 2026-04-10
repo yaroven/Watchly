@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  createSeasonAction,
-  deleteSeasonAction,
-  updateSeasonAction,
-} from "@/app/actions/season.actions";
+import { SeasonService } from "@/app/services/season.service";
 import { CreateSeasonDto, Season, UpdateSeasonDto } from "@/app/types/season";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -30,7 +26,7 @@ export const useSeasonManager = ({ titleId, seasons }: UseSeasonManagerProps) =>
   } = useForm<CreateSeasonDto>();
 
   const createMutation = useMutation({
-    mutationFn: (data: CreateSeasonDto) => createSeasonAction({ ...data, titleId }),
+    mutationFn: (data: CreateSeasonDto) => SeasonService.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["seasons", titleId] });
       setIsModalOpen(false);
@@ -39,8 +35,8 @@ export const useSeasonManager = ({ titleId, seasons }: UseSeasonManagerProps) =>
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: { id: string; payload: UpdateSeasonDto }) =>
-      updateSeasonAction(data.id, titleId, data.payload),
+    mutationFn: ({ id, payload }: { id: string; payload: UpdateSeasonDto }) =>
+      SeasonService.update(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["seasons", titleId] });
       setIsModalOpen(false);
@@ -50,7 +46,7 @@ export const useSeasonManager = ({ titleId, seasons }: UseSeasonManagerProps) =>
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteSeasonAction(id, titleId),
+    mutationFn: (id: string) => SeasonService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["seasons", titleId] });
       setIsDeleteModalOpen(false);
@@ -59,11 +55,8 @@ export const useSeasonManager = ({ titleId, seasons }: UseSeasonManagerProps) =>
   });
 
   const onSubmit = (data: CreateSeasonDto) => {
-    if (editingSeason) {
-      updateMutation.mutate({ id: editingSeason.id, payload: data });
-    } else {
-      createMutation.mutate(data);
-    }
+    if (editingSeason) return updateMutation.mutate({ id: editingSeason.id, payload: data });
+    return createMutation.mutate(data);
   };
 
   const openEdit = (season: Season) => {
@@ -94,9 +87,8 @@ export const useSeasonManager = ({ titleId, seasons }: UseSeasonManagerProps) =>
   };
 
   const handleConfirmDelete = () => {
-    if (seasonToDelete) {
-      deleteMutation.mutate(seasonToDelete.id);
-    }
+    if (!seasonToDelete) return;
+    return deleteMutation.mutate(seasonToDelete.id);
   };
 
   return {
