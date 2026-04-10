@@ -1,4 +1,5 @@
 "use client";
+import { ADMIN } from "@/app/constants/routes";
 import { TitleService } from "@/app/services/title.service";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
@@ -21,7 +22,7 @@ export default function RecentAdditions() {
             <div
               key={id}
               className={styles.recentItem}
-              onClick={() => router.push(`/admin/titles/${id}`)}
+              onClick={() => router.push(ADMIN.TITLES_EDIT(id))}
             >
               <div className={styles.itemInfo}>
                 <span className={styles.itemType}>{type}</span>
