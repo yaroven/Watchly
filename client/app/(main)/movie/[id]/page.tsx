@@ -1,7 +1,8 @@
-import CustomVideoPlayer from "@/app/components/shared/CustomVideoPlayer";
-import JsonLd from "@/app/components/shared/JsonLd";
-import TitleInfo from "@/app/components/ui/TitleInfo";
-import { TitleService } from "@/app/services/title.service";
+import CustomVideoPlayer from "@/features/player/components/CustomVideoPlayer";
+import TitleService from "@/features/title/api/title.service";
+import TitleInfo from "@/features/title/components/TitleInfo";
+import { normalizeStreamUrl } from "@/shared/lib/normalize-stream-url";
+import JsonLd from "@/shared/ui/JsonLd";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import styles from "./page.module.scss";
@@ -33,7 +34,7 @@ export default async function Page({ params }: PageProps) {
   try {
     title = await TitleService.getById(id);
     const movieUrl = await TitleService.getStreamUrl(id);
-    fixedUrl = movieUrl.replace("localstack", "localhost");
+    fixedUrl = normalizeStreamUrl(movieUrl);
   } catch (error) {
     console.error("Failed to fetch movie details", error);
     return notFound();
@@ -43,7 +44,9 @@ export default async function Page({ params }: PageProps) {
     <div className={styles.container}>
       <JsonLd data={title} />
       <TitleInfo id={id} initialData={title} />
-      <CustomVideoPlayer src={fixedUrl} />
+      <div className={styles.playerShell}>
+        <CustomVideoPlayer src={fixedUrl} />
+      </div>
     </div>
   );
 }

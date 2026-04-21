@@ -1,6 +1,6 @@
 "use client";
 
-import { ADMIN } from "@/app/constants/routes";
+import { ADMIN } from "@/shared/lib/routes";
 import { LayoutDashboard, PlusCircle, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
 import styles from "./QuickActions.module.scss";

@@ -1,19 +1,20 @@
 "use client";
 
-import EpisodeManager from "@/app/components/admin/EpisodeManager";
-import SeasonManager from "@/app/components/admin/SeasonManager";
-import TitleForm from "@/app/components/admin/TitleForm";
-import VideoPreviewModal from "@/app/components/shared/VideoPreviewModal";
-import { EpisodeService } from "@/app/services/episode.service";
-import { SeasonService } from "@/app/services/season.service";
-import { TitleService } from "@/app/services/title.service";
-import { Episode } from "@/app/types/episode";
-import { Season } from "@/app/types/season";
-import { Title, TitleType } from "@/app/types/title";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Play } from "lucide-react";
+import useEpisodes from "@/features/episodes/api/use-episodes";
+import EpisodeManager from "@/features/episodes/components/EpisodeManager";
+import VideoPreviewModal from "@/features/player/components/VideoPreviewModal";
+import useSeasons from "@/features/season/api/use-seasons";
+import SeasonManager from "@/features/season/components/SeasonManager";
+import { Season } from "@/features/season/schemas/season";
+import useTitle from "@/features/title/api/use-title";
+import { useDeleteTitle, useTranscodeTitle } from "@/features/title/api/use-title-mutations";
+import useTitleStreamUrl from "@/features/title/api/use-title-stream-url";
+import TitleForm from "@/features/title/components/TitleForm";
+import { Title, TitleType } from "@/features/title/schemas/title";
+import TranscodingStatus from "@/types/transcoding-status";
+import { Play, RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import DeleteModal from "./components/DeleteModal";
 import styles from "./page.module.scss";
 
@@ -23,84 +24,74 @@ interface TitleDetailsContentProps {
 }
 
 export default function TitleDetailsContent({ title, initialSeasons }: TitleDetailsContentProps) {
-  const queryClient = useQueryClient();
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const [selectedSeasonId, setSelectedSeasonId] = useState<string | undefined>();
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
-  const [previewStreamUrl, setPreviewStreamUrl] = useState<string | undefined>();
-  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
-  const { data: titleData } = useQuery<Title>({
-    queryKey: ["title", title.id],
-    queryFn: () => TitleService.getById(title.id),
-    initialData: title,
-  });
+  const { data: titleData } = useTitle(title.id, { initialData: title });
 
-  const { data: seasons } = useQuery<Season[]>({
-    queryKey: ["seasons", title.id],
-    queryFn: () => SeasonService.getAll(title.id),
+  const { data: seasons } = useSeasons(title.id, {
     enabled: titleData?.type === TitleType.SERIES,
     initialData: initialSeasons,
   });
 
-  const { data: episodes } = useQuery<Episode[]>({
-    queryKey: ["episodes", selectedSeasonId],
-    queryFn: () => EpisodeService.getAll(selectedSeasonId!),
-    enabled: !!selectedSeasonId,
+  const { data: episodes } = useEpisodes(selectedSeasonId!, { enabled: !!selectedSeasonId });
+
+  const currentTranscodingStatus = titleData?.transcodingStatus ?? title.transcodingStatus;
+
+  const { isPending: isTranscoding, mutateAsync: restartTranscoding } = useTranscodeTitle();
+
+  const { isPending: isDeleting, mutateAsync: deleteTitle } = useDeleteTitle({
+    onSuccess: () => {
+      setIsDeleteModalOpen(false);
+      router.push("/admin/titles");
+    },
   });
 
-  const handleDelete = () => {
-    startTransition(async () => {
-      try {
-        await TitleService.delete(title.id);
-        queryClient.invalidateQueries({ queryKey: ["adminTitles"] });
-        queryClient.invalidateQueries({ queryKey: ["adminStats"] });
-        queryClient.invalidateQueries({ queryKey: ["adminRecent"] });
-        router.push("/admin/titles");
-      } catch (err) {
-        console.error("Failed to delete title", err);
-        setIsDeleteModalOpen(false);
-      }
-    });
-  };
+  const openPreviewModal = () => setIsPreviewModalOpen(true);
+  const closePreviewModal = () => setIsPreviewModalOpen(false);
+  const openDeleteModal = () => setIsDeleteModalOpen(true);
+  const closeDeleteModal = () => setIsDeleteModalOpen(false);
 
-  const handlePreview = async () => {
-    setPreviewStreamUrl(undefined);
-    setIsPreviewLoading(true);
-    setIsPreviewModalOpen(true);
-    try {
-      const url = await TitleService.getStreamUrl(title.id);
-      const fixedUrl = url.replace("localstack", "localhost");
-      setPreviewStreamUrl(fixedUrl);
-    } catch (err) {
-      console.error("Failed to fetch stream URL", err);
-    } finally {
-      setIsPreviewLoading(false);
-    }
-  };
+  const { data: streamUrl } = useTitleStreamUrl(title.id, {
+    enabled: isPreviewModalOpen && currentTranscodingStatus === TranscodingStatus.COMPLETED,
+  });
 
   return (
     <div className={styles.container}>
-      <div className={styles.header}>
+      <div className={styles.hero}>
         <div className={styles.headerTitleGroup}>
           <h1 className={styles.pageTitle}>Manage Title</h1>
+          <p className={styles.pageSubtitle}>
+            Update metadata, review the stream, and manage seasons or episodes from one screen.
+          </p>
         </div>
 
         <div className={styles.headerActions}>
-          <button
-            onClick={() => setIsDeleteModalOpen(true)}
-            className={styles.deleteButton}
-            disabled={isPending}
-          >
+          <button onClick={openDeleteModal} className={styles.deleteButton} disabled={isDeleting}>
             Delete Title
           </button>
 
           {titleData?.type === TitleType.MOVIE && (
-            <button onClick={handlePreview} className={styles.previewButton}>
-              <Play size={16} /> Preview Movie
-            </button>
+            <>
+              {currentTranscodingStatus === TranscodingStatus.FAILED && (
+                <button
+                  onClick={() => restartTranscoding(title.id)}
+                  className={styles.transcodeButton}
+                  disabled={isTranscoding}
+                >
+                  <RotateCcw size={16} />
+                  {isTranscoding ? "Restarting..." : "Restart Transcoding"}
+                </button>
+              )}
+
+              {currentTranscodingStatus === TranscodingStatus.COMPLETED && (
+                <button onClick={openPreviewModal} className={styles.previewButton}>
+                  <Play size={16} /> Preview
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -108,7 +99,10 @@ export default function TitleDetailsContent({ title, initialSeasons }: TitleDeta
       <div className={styles.grid}>
         <div className={styles.mainColumn}>
           <div className={styles.card}>
-            <h2>Details</h2>
+            <div className={styles.cardHeader}>
+              <h2>Details</h2>
+              <p>Edit the primary metadata for this title.</p>
+            </div>
             <TitleForm initialData={titleData} />
           </div>
         </div>
@@ -116,9 +110,13 @@ export default function TitleDetailsContent({ title, initialSeasons }: TitleDeta
         {titleData?.type === TitleType.SERIES && (
           <div className={styles.contentColumn}>
             <div className={styles.card}>
+              <div className={styles.cardHeader}>
+                <h2>Seasons</h2>
+                <p>Organize the structure of your series before managing episodes.</p>
+              </div>
               <SeasonManager
-                titleId={title.id}
                 seasons={seasons || []}
+                titleId={title.id}
                 selectedSeasonId={selectedSeasonId}
                 onSelectSeason={setSelectedSeasonId}
               />
@@ -126,11 +124,11 @@ export default function TitleDetailsContent({ title, initialSeasons }: TitleDeta
 
             {selectedSeasonId && (
               <div className={styles.card}>
-                <EpisodeManager
-                  titleId={title.id}
-                  seasonId={selectedSeasonId}
-                  episodes={episodes || []}
-                />
+                <div className={styles.cardHeader}>
+                  <h2>Episodes</h2>
+                  <p>Manage the episode list and uploads for the selected season.</p>
+                </div>
+                <EpisodeManager seasonId={selectedSeasonId} episodes={episodes || []} />
               </div>
             )}
           </div>
@@ -138,19 +136,19 @@ export default function TitleDetailsContent({ title, initialSeasons }: TitleDeta
       </div>
 
       <DeleteModal
-        isDeleteModalOpen={isDeleteModalOpen}
-        setIsDeleteModalOpen={setIsDeleteModalOpen}
-        title={titleData || title}
-        isDeleting={isPending}
-        handleDelete={async () => handleDelete()}
+        isOpen={isDeleteModalOpen}
+        onClose={closeDeleteModal}
+        titleName={(titleData || title).name}
+        isDeleting={isDeleting}
+        onConfirm={async () => deleteTitle(title.id)}
       />
 
       <VideoPreviewModal
         isOpen={isPreviewModalOpen}
-        onClose={() => setIsPreviewModalOpen(false)}
-        streamUrl={previewStreamUrl}
+        onClose={closePreviewModal}
+        streamUrl={streamUrl}
         title={titleData?.name || title.name}
-        isLoading={isPreviewLoading}
+        isLoading={isPreviewModalOpen && !streamUrl}
       />
     </div>
   );

@@ -1,12 +1,11 @@
 "use client";
 
-import CustomVideoPlayer from "@/app/components/shared/CustomVideoPlayer";
-import EpisodeList from "@/app/components/ui/EpisodeList";
-import SeasonTabs from "@/app/components/ui/SeasonTabs";
-import { Episode } from "@/app/types/episode";
-import { Season } from "@/app/types/season";
+import EpisodeList from "@/features/episodes/components/EpisodeList";
+import { Episode } from "@/features/episodes/schemas/episode";
+import CustomVideoPlayer from "@/features/player/components/CustomVideoPlayer";
+import SeasonTabs from "@/features/season/components/SeasonTabs";
+import { Season } from "@/features/season/schemas/season";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useTransition } from "react";
 import styles from "./page.module.scss";
 
 interface SeriesDetailsClientProps {
@@ -27,43 +26,58 @@ export default function SeriesDetailsClient({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [, startTransition] = useTransition();
 
   const handleEpisodeChange = (id: string) => {
     const newParams = new URLSearchParams(searchParams.toString());
     newParams.set("episode", id);
-    startTransition(() => {
-      router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
-    });
+    router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
   };
 
   const handleSeasonChange = (id: string) => {
     const newParams = new URLSearchParams(searchParams.toString());
     newParams.set("season", id);
     newParams.delete("episode");
-    startTransition(() => {
-      router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
-    });
+    router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
   };
 
   return (
     <>
-      <CustomVideoPlayer src={episodeUrl} />
-      {episodes?.length ? (
-        <EpisodeList
-          episodes={episodes}
-          onClick={handleEpisodeChange}
-          currentEpisodeId={currentEpisodeId}
-        />
-      ) : (
-        <div className={styles.noContent}>Episodes for this season not added yet</div>
-      )}
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <div>
+            <h3>Now playing</h3>
+            <p>Switch episodes without leaving the page.</p>
+          </div>
+        </div>
+        <CustomVideoPlayer src={episodeUrl} />
+      </section>
+
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <h3>Episodes</h3>
+        </div>
+        {episodes?.length ? (
+          <EpisodeList
+            episodes={episodes}
+            onClick={handleEpisodeChange}
+            currentEpisodeId={currentEpisodeId}
+          />
+        ) : (
+          <div className={styles.noContent}>Episodes for this season have not been added yet.</div>
+        )}
+      </section>
+
       {seasons?.length > 0 && (
-        <SeasonTabs
-          onClick={handleSeasonChange}
-          seasons={seasons}
-          currentSeasonId={currentSeasonId}
-        />
+        <section className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <h3>Seasons</h3>
+          </div>
+          <SeasonTabs
+            onClick={handleSeasonChange}
+            seasons={seasons}
+            currentSeasonId={currentSeasonId}
+          />
+        </section>
       )}
     </>
   );

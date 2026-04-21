@@ -1,6 +1,7 @@
-import { SeasonService } from "@/app/services/season.service";
-import { TitleService } from "@/app/services/title.service";
-import { TitleType } from "@/app/types/title";
+import SeasonService from "@/features/season/api/season.service";
+import type { Season } from "@/features/season/schemas/season";
+import TitleService from "@/features/title/api/title.service";
+import { TitleType } from "@/features/title/schemas/title";
 import { notFound } from "next/navigation";
 import TitleDetailsContent from "./TitleDetailsContent";
 
@@ -11,7 +12,7 @@ interface PageProps {
 export default async function Page({ params }: PageProps) {
   const { id } = await params;
   let title: Awaited<ReturnType<typeof TitleService.getById>>;
-  let seasons: import("@/app/types/season").Season[] = [];
+  let seasons: Season[] = [];
 
   try {
     title = await TitleService.getById(id);

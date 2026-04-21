@@ -1,9 +1,9 @@
 import { BadRequestException, forwardRef, Inject, Injectable } from "@nestjs/common";
 import { Episode } from "@prisma/client";
-import { PrismaService } from "src/prisma/prisma.service";
-import { S3Service } from "src/S3/S3.service";
-import { VideoType } from "src/video-transcoder/enums/video-type.enum";
-import { VideoTranscoderService } from "src/video-transcoder/video-transcoder.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { S3Service } from "../S3/S3.service";
+import { VideoType } from "../video-transcoder/enums/video-type.enum";
+import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
 import { CreateEpisodeDto } from "./dto/request/create-episode.dto";
 import { UpdateEpisodeDto } from "./dto/request/update-episode.dto";
 
@@ -83,6 +83,8 @@ export class EpisodeService {
 
     const seasonId = episode.seasonId;
     const titleId = episode.season.titleId;
+
+    await this.videoTranscoderService.cancelScheduledTranscodes(id, VideoType.EPISODE);
 
     await this.s3Service.deleteRaw(id);
 

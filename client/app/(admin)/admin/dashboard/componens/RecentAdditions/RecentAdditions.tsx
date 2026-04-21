@@ -1,17 +1,14 @@
 "use client";
-import { ADMIN } from "@/app/constants/routes";
-import { TitleService } from "@/app/services/title.service";
-import { useQuery } from "@tanstack/react-query";
+
+import useTitles from "@/features/title/api/use-titles";
+import { ADMIN } from "@/shared/lib/routes";
 import { useRouter } from "next/navigation";
 import styles from "./RecentAdditions.module.scss";
 
 export default function RecentAdditions() {
   const router = useRouter();
 
-  const { data: recentTitles } = useQuery({
-    queryKey: ["adminRecent", 1],
-    queryFn: () => TitleService.getAll({ limit: 5, page: 1 }),
-  });
+  const { data: recentTitles } = useTitles({ limit: 5, page: 1 });
 
   return (
     <div className={styles.container}>

@@ -9,10 +9,10 @@ import {
 } from "@aws-sdk/client-sqs";
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { S3Config, S3ConfigName } from "src/config/s3.config";
-import { PrismaService } from "src/prisma/prisma.service";
-import { VideoType } from "src/video-transcoder/enums/video-type.enum";
-import { VideoTranscoderService } from "src/video-transcoder/video-transcoder.service";
+import { S3Config, S3ConfigName } from "../config/s3.config";
+import { PrismaService } from "../prisma/prisma.service";
+import { VideoType } from "../video-transcoder/enums/video-type.enum";
+import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
 
 interface S3EventRecord {
   eventName: string;

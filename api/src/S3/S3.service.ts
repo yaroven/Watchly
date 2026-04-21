@@ -17,7 +17,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { sdkStreamMixin } from "@aws-sdk/util-stream-node";
 import { Injectable, InternalServerErrorException, Logger, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { S3Config, S3ConfigName } from "src/config/s3.config";
+import { S3Config, S3ConfigName } from "../config/s3.config";
 import { Readable } from "stream";
 
 @Injectable()
