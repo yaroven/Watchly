@@ -1,6 +1,18 @@
 .adminLayout {
   display: flex;
   min-height: 100vh;
-  gap: 10px;
   flex-direction: row;
+  background-color: #020617;
+}
+
+.adminContent {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.adminMain {
+  flex: 1;
+  min-width: 0;
 }

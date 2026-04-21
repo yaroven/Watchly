@@ -1,9 +1,9 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
-import s3Config from "src/config/s3.config";
-import { PrismaModule } from "src/prisma/prisma.module";
-import { S3Module } from "src/S3/S3.module";
-import { VideoTranscoderModule } from "src/video-transcoder/video-transcoder.module";
+import s3Config from "../config/s3.config";
+import { PrismaModule } from "../prisma/prisma.module";
+import { S3Module } from "../S3/S3.module";
+import { VideoTranscoderModule } from "../video-transcoder/video-transcoder.module";
 import { S3EventService } from "./s3-event.service";
 
 @Module({

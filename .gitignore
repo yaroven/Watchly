@@ -8,3 +8,8 @@ client/.git-backup/
 .next
 
 .env
+.fttemplates
+
+dist
+*.code-workspace
+tsconfig.build.tsbuildinfo

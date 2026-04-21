@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "commitlint": "commitlint",
-    "dev": "next dev -p 4000",
+    "dev": "next dev --hostname 0.0.0.0 -p 4000",
     "build": "next build",
     "prepare": "husky",
     "start": "next start -p 4000",
@@ -36,8 +36,6 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@commitlint/cli": "^20.3.0",
-    "@commitlint/config-conventional": "^20.3.0",
     "@types/hls.js": "^1.0.0",
     "@types/node": "^20",
     "@types/react": "^19",

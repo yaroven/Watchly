@@ -1,15 +1,23 @@
 import { InjectQueue } from "@nestjs/bullmq";
-import { BadRequestException, forwardRef, Inject, Injectable, Logger } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { TranscodingStatus } from "@prisma/client";
 import { Queue } from "bullmq";
-import * as ffmpeg from "fluent-ffmpeg";
+import ffmpeg from "fluent-ffmpeg";
 import * as fs from "fs-extra";
 import * as path from "path";
-import { EpisodeService } from "src/episode/episode.service";
-import { PrismaService } from "src/prisma/prisma.service";
-import { S3Service } from "src/S3/S3.service";
+import { Readable } from "stream";
+
+import { PrismaService } from "../prisma/prisma.service";
+import { S3Service } from "../S3/S3.service";
 import { TranscodeVideoDto } from "./dto/request/transcode-video.dto";
 import { VideoType } from "./enums/video-type.enum";
+
+export class TranscodeAbortedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TranscodeAbortedError";
+  }
+}
 
 @Injectable()
 export class VideoTranscoderService {
@@ -25,8 +33,6 @@ export class VideoTranscoderService {
     @InjectQueue("video-transcode") private readonly queue: Queue,
     private readonly s3Service: S3Service,
     private readonly prisma: PrismaService,
-    @Inject(forwardRef(() => EpisodeService))
-    private readonly episodeService: EpisodeService,
   ) {}
 
   async scheduleTranscodeVideo(payload: TranscodeVideoDto) {
@@ -40,14 +46,35 @@ export class VideoTranscoderService {
     });
   }
 
+  async cancelScheduledTranscodes(id: string, type: VideoType) {
+    const jobs = await this.queue.getJobs([
+      "waiting",
+      "delayed",
+      "prioritized",
+      "waiting-children",
+    ]);
+
+    await Promise.all(
+      jobs
+        .filter((job) => {
+          const data = job.data as TranscodeVideoDto;
+          return data.id === id && data.type === type;
+        })
+        .map((job) => job.remove()),
+    );
+  }
+
   async transcodeVideo(id: string, inputPath: string, outputDir: string, type: VideoType) {
+    await this.ensureEntityExists(id, type);
     const uploadTo = await this.uploadPath(id, type);
     await this.downloadRawVideo(id, inputPath);
+    await this.ensureEntityExists(id, type);
     const metadata: ffmpeg.FfprobeData = await this.getMetadata(inputPath);
     const width: number = metadata.streams[0].width || 0;
     this.logger.log(`Starting HLS Transcoding for ${id}`);
     await this.runHlsTranscode(id, type, inputPath, outputDir, width);
-    await this.uploadFilesToDb(uploadTo, outputDir);
+    await this.ensureEntityExists(id, type);
+    await this.uploadFilesToDb(id, type, uploadTo, outputDir);
   }
 
   private async runHlsTranscode(
@@ -116,17 +143,35 @@ export class VideoTranscoderService {
 
   private async downloadRawVideo(key: string, writePath: string) {
     this.logger.log(`Downloading ${key} to ${writePath}`);
-    const downloadStream = await this.s3Service.getRaw(key);
+    let downloadStream: Readable;
+    try {
+      downloadStream = await this.s3Service.getRaw(key);
+    } catch (error) {
+      if (
+        !(await this.entityExists(key, VideoType.MOVIE)) &&
+        !(await this.entityExists(key, VideoType.EPISODE))
+      )
+        throw new TranscodeAbortedError(`Source entity ${key} was deleted during transcoding`);
+
+      throw error;
+    }
+
     const writeStream = fs.createWriteStream(writePath);
     return new Promise<void>((res, rej) => {
       downloadStream.pipe(writeStream).on("finish", res).on("error", rej);
     });
   }
 
-  private async uploadFilesToDb(key: string, outputDir: string) {
+  private async uploadFilesToDb(id: string, type: VideoType, key: string, outputDir: string) {
+    await this.ensureEntityExists(id, type);
     this.logger.log(`Uploading processed files to Object DB...`);
     const files = await fs.readdir(outputDir, { recursive: true });
     for (const file of files as string[]) {
+      if (!(await this.entityExists(id, type)))
+        throw new TranscodeAbortedError(
+          `Entity ${id} was deleted before processed upload finished`,
+        );
+
       const localFilePath = path.join(outputDir, file);
       if ((await fs.stat(localFilePath)).isDirectory()) continue;
 
@@ -143,7 +188,10 @@ export class VideoTranscoderService {
 
   private async uploadPath(id: string, type: VideoType): Promise<string> {
     if (type === VideoType.EPISODE) {
-      const episode = await this.episodeService.findOneDetailed(id);
+      const episode = await this.prisma.episode.findUnique({
+        where: { id },
+        include: { season: true },
+      });
 
       if (!episode) throw new BadRequestException("Episode not found");
 
@@ -155,6 +203,29 @@ export class VideoTranscoderService {
     return id;
   }
 
+  private async entityExists(id: string, type: VideoType): Promise<boolean> {
+    if (type === VideoType.EPISODE) {
+      const episode = await this.prisma.episode.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+
+      return !!episode;
+    }
+
+    const title = await this.prisma.title.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    return !!title;
+  }
+
+  private async ensureEntityExists(id: string, type: VideoType) {
+    if (!(await this.entityExists(id, type)))
+      throw new TranscodeAbortedError(`Entity ${id} was deleted during transcoding`);
+  }
+
   async updateStatus(id: string, type: VideoType, status: TranscodingStatus) {
     this.logger.log(`Updating ${type} ${id} status to ${status}`);
 
@@ -162,18 +233,20 @@ export class VideoTranscoderService {
 
     if (type === VideoType.EPISODE) {
       await Promise.all([
-        this.prisma.episode.update({ where: { id }, data }),
+        this.prisma.episode.updateMany({ where: { id }, data }),
         this.prisma.title.updateMany({
           where: { seasons: { some: { episodes: { some: { id } } } } },
           data,
         }),
       ]);
     } else if (type === VideoType.MOVIE) {
-      await this.prisma.title.update({ where: { id }, data });
+      await this.prisma.title.updateMany({ where: { id }, data });
     }
   }
 
   async updateProgress(id: string, type: VideoType, progress: number) {
+    if (!(await this.entityExists(id, type))) return;
+
     const where = type === VideoType.EPISODE ? { episodeId: id } : { titleId: id };
 
     await this.prisma.videoTranscodingProgress.upsert({

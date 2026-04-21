@@ -1,5 +1,5 @@
-import { VideoPlayerSkeleton } from "@/app/components/shared/CustomVideoPlayer";
-import { TitleInfoSkeleton } from "@/app/components/ui/TitleInfo";
+import { VideoPlayerSkeleton } from "@/features/player/components/CustomVideoPlayer";
+import { TitleInfoSkeleton } from "@/features/title/components/TitleInfo";
 import styles from "./page.module.scss";
 
 export default function Loading() {

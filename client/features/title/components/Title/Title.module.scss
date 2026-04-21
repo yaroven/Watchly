@@ -1,0 +1,126 @@
+.title {
+  all: unset;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid rgba(249, 115, 22, 0.7);
+    outline-offset: 6px;
+    border-radius: 28px;
+  }
+}
+
+.poster {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.posterConteiner {
+  position: relative;
+  aspect-ratio: 3 / 4.3;
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(15, 23, 42, 0.85);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(0);
+  transition:
+    transform 0.25s ease,
+    border-color 0.25s ease;
+
+  .title:hover & {
+    transform: translateY(-6px);
+    border-color: rgba(249, 115, 22, 0.3);
+  }
+
+  .title:hover &,
+  .title:focus-visible & {
+    .posterOverlay {
+      opacity: 1;
+    }
+    .posterBlackout {
+      opacity: 1;
+    }
+  }
+}
+
+.posterOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  color: #fff;
+  z-index: 10;
+  background: linear-gradient(180deg, rgba(7, 17, 31, 0.18), rgba(7, 17, 31, 0.72));
+
+  span {
+    font-size: 0.95rem;
+    font-weight: 700;
+  }
+}
+
+.posterBlackout {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(7, 17, 31, 0.1), transparent 32%, rgba(7, 17, 31, 0.84)),
+    linear-gradient(135deg, rgba(249, 115, 22, 0.12), transparent 60%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.posterMeta {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 11;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+
+  span {
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: rgba(7, 17, 31, 0.76);
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    color: #e2e8f0;
+    font-size: 0.75rem;
+    text-transform: capitalize;
+    backdrop-filter: blur(8px);
+  }
+}
+
+.copy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.name {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+  color: #f8fafc;
+}
+
+.caption {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted-foreground);
+  font-size: 0.88rem;
+}

@@ -5,12 +5,14 @@ export default function NotFound() {
   return (
     <div className={styles.container}>
       <div className={styles.content}>
+        <div className={styles.codeBadge}>404</div>
         <div className={styles.textGroup}>
-          <h1 className={styles.title}>404</h1>
-          <p className={styles.subtitle}>Lost in the Shadows?</p>
+          <p className={styles.eyebrow}>Admin Panel</p>
+          <h1 className={styles.title}>This admin page is missing</h1>
+          <p className={styles.subtitle}>The panel could not find the resource you requested.</p>
           <p className={styles.description}>
-            It seems the projector broke or the film was never loaded. The page you are looking for
-            doesn&apos;t exist in this theater.
+            The record may have been deleted, the route may be incorrect, or the page may not exist
+            in this admin section.
           </p>
         </div>
         <Link href="/admin/dashboard" className={styles.homeButton}>

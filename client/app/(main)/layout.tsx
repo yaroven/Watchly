@@ -1,7 +1,8 @@
+import Header from "@/shared/ui/Header";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { Metadata } from "next";
-import Header from "../components/ui/Header";
 import "../globals.scss";
+import styles from "./layout.module.scss";
 
 export const metadata: Metadata = {
   title: "Watchly",
@@ -14,9 +15,9 @@ export default function MainLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div>
+    <div className={styles.shell}>
       <Header />
-      {children}
+      <main className={styles.content}>{children}</main>
     </div>
   );
 }

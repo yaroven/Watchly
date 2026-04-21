@@ -1,0 +1,61 @@
+@use "@/shared/styles/admin-shell" as admin;
+
+.card {
+  @include admin.panel-card;
+  padding: 26px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  transition:
+    transform 0.2s,
+    border-color 0.2s;
+
+  &:hover {
+    transform: translateY(-4px);
+    border-color: #475569;
+  }
+}
+
+.icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &.titles {
+    background-color: #111f3e;
+    color: #3b82f6;
+  }
+
+  &.movies {
+    background-color: #1c1a3e;
+    color: #a855f7;
+  }
+
+  &.series {
+    background-color: #251e27;
+    color: #f97316;
+  }
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+
+  .label {
+    color: #94a3b8;
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .value {
+    font-size: 2rem;
+    font-weight: 700;
+    text-align: left;
+    color: white;
+  }
+}

@@ -1,9 +1,9 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { Prisma, Title, TitleType } from "@prisma/client";
-import { S3Service } from "src/S3/S3.service";
-import { PrismaService } from "src/prisma/prisma.service";
-import { VideoType } from "src/video-transcoder/enums/video-type.enum";
-import { VideoTranscoderService } from "src/video-transcoder/video-transcoder.service";
+import { S3Service } from "../S3/S3.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { VideoType } from "../video-transcoder/enums/video-type.enum";
+import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
 import { CreateTitleDto } from "./dto/request/create-title.dto";
 import { GetAllTitleDto } from "./dto/request/get-all-title.dto";
 import { UpdateTitleDto } from "./dto/request/update-title.dto";
@@ -105,6 +105,8 @@ export class TitleService {
     });
 
     if (!title) throw new BadRequestException(`Title with id ${id} not found`);
+
+    await this.videoTranscoderService.cancelScheduledTranscodes(id, VideoType.MOVIE);
 
     if (title.type === TitleType.MOVIE) {
       await this.s3Service.deleteRaw(id);

@@ -19,14 +19,18 @@ export default function Error({
   return (
     <div className={styles.errorContainer}>
       <div className={styles.content}>
+        <div className={styles.codeBadge}>Error</div>
         <div className={styles.iconWrapper}>
-          <AlertCircle size={64} />
+          <AlertCircle size={56} />
         </div>
-        <h1 className={styles.title}>Something went wrong</h1>
-        <p className={styles.description}>
-          We encountered an unexpected error while trying to play your content. The projection booth
-          is working on it, but meanwhile you can try to refresh or head back home.
-        </p>
+        <div className={styles.textGroup}>
+          <p className={styles.eyebrow}>Watchly</p>
+          <h1 className={styles.title}>Something went wrong</h1>
+          <p className={styles.description}>
+            We hit an unexpected problem while loading this screen. Try again, or head back to a
+            safe route while the system recovers.
+          </p>
+        </div>
         <div className={styles.actions}>
           <button onClick={() => reset()} className={styles.resetButton}>
             Try Again
