@@ -1,21 +1,35 @@
 services:
   frontend:
     build:
-      context: ./watchly-frontend
+      context: ./client
       dockerfile: Dockerfile
+      target: dev
+      args:
+        BACKEND_API_URL: "http://backend:3000"
+        NEXT_PUBLIC_BACKEND_API_URL: "http://localhost:3000"
+        NEXT_PUBLIC_APP_URL: "http://localhost:4000"
+        NEXT_PUBLIC_REMOTE_IMAGE_HOSTNAME: "m.media-amazon.com"
     ports:
       - "4000:4000"
     environment:
-      NEXT_PUBLIC_BACKEND_API_URL: "http://backend:3000"
+      BACKEND_API_URL: "http://backend:3000"
+      NEXT_PUBLIC_BACKEND_API_URL: "http://localhost:3000"
       NEXT_PUBLIC_APP_URL: "http://localhost:4000"
       NEXT_PUBLIC_REMOTE_IMAGE_HOSTNAME: "m.media-amazon.com"
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - ./client:/frontend
+      - frontend_node_modules:/frontend/node_modules
+      - frontend_next:/frontend/.next
     depends_on:
       - backend
 
   backend:
     build:
-      context: ./watchly-api
+      context: ./api
       dockerfile: Dockerfile
+      target: dev
     ports:
       - "3000:3000"
     environment:
@@ -30,6 +44,11 @@ services:
       S3_RAW_BUCKET_NAME: "raw"
       S3_PROCESSED_BUCKET_NAME: "content"
       S3_ENDPOINT: "http://localstack:4566"
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: 1000
+    volumes:
+      - ./api:/app
+      - backend_node_modules:/app/node_modules
     depends_on:
       - db
       - redis
@@ -72,6 +91,9 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock"
 
 volumes:
+  frontend_node_modules:
+  frontend_next:
+  backend_node_modules:
   postgres_data:
   redis_data:
   localstack_data:

@@ -1,14 +1,33 @@
-FROM node:alpine AS builder
+FROM node:alpine AS deps
 
 WORKDIR /app
 
 COPY package*.json ./
+COPY yarn.lock ./
 
 RUN yarn install --frozen-lockfile || yarn install
 
+FROM deps AS dev
+
+WORKDIR /app
+
+RUN apk add --no-cache ffmpeg
+
+COPY prisma ./prisma
+COPY prisma.config.ts ./
+
+ENV PATH="/app/node_modules/.bin:${PATH}"
+
+EXPOSE 3000
+
+CMD ["sh", "-c", "yarn wait-on tcp:db:5432 && yarn prisma generate && yarn prisma migrate deploy && yarn dev"]
+
+FROM deps AS builder
+
+WORKDIR /app
+
 COPY src ./src
 COPY prisma ./prisma
-COPY yarn.lock ./
 COPY eslint.config.mjs ./
 COPY tsconfig.json ./
 COPY prisma.config.ts ./

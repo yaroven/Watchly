@@ -1,7 +1,7 @@
-import { VideoPlayerSkeleton } from "@/app/components/shared/CustomVideoPlayer";
-import { EpisodeListSkeleton } from "@/app/components/ui/EpisodeList";
-import { SeasonTabsSkeleton } from "@/app/components/ui/SeasonTabs";
-import { TitleInfoSkeleton } from "@/app/components/ui/TitleInfo";
+import { EpisodeListSkeleton } from "@/features/episodes/components/EpisodeList";
+import { VideoPlayerSkeleton } from "@/features/player/components/CustomVideoPlayer";
+import { SeasonTabsSkeleton } from "@/features/season/components/SeasonTabs";
+import { TitleInfoSkeleton } from "@/features/title/components/TitleInfo";
 import styles from "./page.module.scss";
 
 export default function Loading() {

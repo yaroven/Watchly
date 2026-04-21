@@ -1,6 +1,6 @@
-import { TitleService } from "@/app/services/title.service";
-import { TitleType } from "@/app/types/title";
-import AdminTitlesClient from "./AdminTitlesClient";
+import TitleService from "@/features/title/api/title.service";
+import { TitleType } from "@/features/title/schemas/title";
+import TitlesLibrary from "./TitlesLibrary";
 
 interface PageProps {
   searchParams: Promise<{
@@ -26,7 +26,7 @@ export default async function Page({ searchParams }: PageProps) {
   });
 
   return (
-    <AdminTitlesClient
+    <TitlesLibrary
       initialData={initialData}
       initialFilters={{
         searchString,

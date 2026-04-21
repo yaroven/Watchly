@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { Season } from "@prisma/client";
-import { PrismaService } from "src/prisma/prisma.service";
-import { S3Service } from "src/S3/S3.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { S3Service } from "../S3/S3.service";
 import { CreateSeasonDto } from "./dto/request/create-season.dto";
 import { UpdateSeasonDto } from "./dto/request/update-season.dto";
 

@@ -1,5 +1,6 @@
-import Dashboard from "@/app/components/admin/Dashboard";
+import { ADMIN } from "@/shared/lib/routes";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <Dashboard />;
+  redirect(ADMIN.DASHBOARD);
 }

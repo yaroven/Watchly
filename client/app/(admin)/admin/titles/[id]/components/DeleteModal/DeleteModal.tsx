@@ -1,42 +1,44 @@
-import Modal from "@/app/components/shared/Modal";
+import Modal from "@/shared/ui/Modal";
 import { AlertTriangle } from "lucide-react";
 import styles from "./DeleteModal.module.scss";
 
 interface DeleteModalProps {
-  isDeleteModalOpen: boolean;
-  setIsDeleteModalOpen: (isOpen: boolean) => void;
-  title: { name: string };
+  isOpen: boolean;
+  onClose: () => void;
+  titleName: string;
   isDeleting: boolean;
-  handleDelete: () => Promise<void>;
+  onConfirm: () => Promise<void>;
 }
 
 export default function DeleteModal({
-  isDeleteModalOpen,
-  setIsDeleteModalOpen,
-  title,
+  isOpen,
+  onClose,
+  titleName,
   isDeleting,
-  handleDelete,
+  onConfirm,
 }: DeleteModalProps) {
   return (
-    <Modal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)}>
+    <Modal isOpen={isOpen} onClose={onClose}>
       <div className={styles.modalContent}>
         <AlertTriangle className={styles.warningIcon} size={48} />
         <h3>Delete Title</h3>
         <p>
-          Are you sure you want to delete <strong>{title.name}</strong>? This action cannot be
+          Are you sure you want to delete <strong>{titleName}</strong>? This action cannot be
           undone.
         </p>
         <div className={styles.modalActions}>
           <button
+            type="button"
             className={styles.modalCancelButton}
-            onClick={() => setIsDeleteModalOpen(false)}
+            onClick={onClose}
             disabled={isDeleting}
           >
             Cancel
           </button>
           <button
+            type="button"
             className={styles.modalConfirmButton}
-            onClick={handleDelete}
+            onClick={onConfirm}
             disabled={isDeleting}
           >
             {isDeleting ? "Deleting..." : "Confirm Delete"}
