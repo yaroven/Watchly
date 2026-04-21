@@ -1,4 +1,4 @@
-import Sidebar from "@/app/components/admin/Sidebar/Sidebar";
+import Sidebar from "@/features/admin/components/Sidebar";
 import type { Metadata } from "next";
 import "../globals.scss";
 import styles from "./layout.module.scss";
@@ -16,7 +16,9 @@ export default function AdminLayout({
   return (
     <div className={styles.adminLayout}>
       <Sidebar />
-      {children}
+      <div className={styles.adminContent}>
+        <main className={styles.adminMain}>{children}</main>
+      </div>
     </div>
   );
 }

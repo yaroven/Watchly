@@ -1,25 +1,41 @@
+@use "@/shared/styles/admin-shell" as admin;
+
 .container {
-  padding: 24px;
+  @include admin.page-shell;
+}
+
+.hero {
   display: flex;
-  flex-direction: column;
-  gap: 32px;
-  width: 100%;
-  color: #020617;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.pageTitle {
+  @include admin.section-title;
+}
+
+.pageSubtitle {
+  @include admin.section-subtitle;
 }
 
 .statsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 22px;
 }
 
 .dashboardGrid {
   display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 32px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
 }
 
 @media (max-width: 1024px) {
+  .container {
+    @include admin.mobile-page-shell;
+  }
+
   .dashboardGrid {
     grid-template-columns: 1fr;
   }

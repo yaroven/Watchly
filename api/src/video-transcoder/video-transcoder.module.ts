@@ -1,8 +1,7 @@
 import { BullModule } from "@nestjs/bullmq";
-import { forwardRef, Module } from "@nestjs/common";
-import { EpisodeModule } from "src/episode/episode.module";
-import { PrismaModule } from "src/prisma/prisma.module";
-import { S3Module } from "src/S3/S3.module";
+import { Module } from "@nestjs/common";
+import { PrismaModule } from "../prisma/prisma.module";
+import { S3Module } from "../S3/S3.module";
 import { VideoTranscoderProcessor } from "./video-transcoder-processor";
 import { VideoTranscoderController } from "./video-transcoder.controller";
 import { VideoTranscoderService } from "./video-transcoder.service";
@@ -21,7 +20,6 @@ import { VideoTranscoderService } from "./video-transcoder.service";
     }),
     S3Module,
     PrismaModule,
-    forwardRef(() => EpisodeModule),
   ],
   controllers: [VideoTranscoderController],
   providers: [VideoTranscoderService, VideoTranscoderProcessor],

@@ -1,8 +1,9 @@
-import JsonLd from "@/app/components/shared/JsonLd";
-import TitleInfo from "@/app/components/ui/TitleInfo";
-import { EpisodeService } from "@/app/services/episode.service";
-import { SeasonService } from "@/app/services/season.service";
-import { TitleService } from "@/app/services/title.service";
+import EpisodeService from "@/features/episodes/api/episode.service";
+import SeasonService from "@/features/season/api/season.service";
+import TitleService from "@/features/title/api/title.service";
+import TitleInfo from "@/features/title/components/TitleInfo";
+import { normalizeStreamUrl } from "@/shared/lib/normalize-stream-url";
+import JsonLd from "@/shared/ui/JsonLd";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import SeriesDetailsClient from "./SeriesDetailsClient";
@@ -41,23 +42,29 @@ export default async function Page({ params, searchParams }: PageProps) {
   try {
     title = await TitleService.getById(id);
     seasons = await SeasonService.getAll(id);
-    currentSeasonId = seasonId || seasons[0]?.id || "";
+    currentSeasonId =
+      seasonId && seasons.some((season) => season.id === seasonId)
+        ? seasonId
+        : (seasons[0]?.id ?? "");
 
     if (currentSeasonId) {
       episodes = await EpisodeService.getAll(currentSeasonId);
     }
 
     if (episodes.length > 0) {
-      currentEpisodeId = episodeId || episodes[0].id;
+      currentEpisodeId =
+        episodeId && episodes.some((episode) => episode.id === episodeId)
+          ? episodeId
+          : episodes[0].id;
       const rawUrl = await EpisodeService.getStreamUrl(currentEpisodeId);
-      episodeUrl = rawUrl.replace("localstack", "localhost");
+      episodeUrl = normalizeStreamUrl(rawUrl);
     }
   } catch (error) {
     console.error("Failed to fetch series details", error);
     return notFound();
   }
 
-  if (!seasons.length) {
+  if (!seasons?.length) {
     return (
       <div className={styles.container}>
         <TitleInfo id={id} initialData={title} />

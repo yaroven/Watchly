@@ -6,7 +6,7 @@ import * as fs from "fs-extra";
 import * as os from "os";
 import * as path from "path";
 import { TranscodeVideoDto } from "./dto/request/transcode-video.dto";
-import { VideoTranscoderService } from "./video-transcoder.service";
+import { TranscodeAbortedError, VideoTranscoderService } from "./video-transcoder.service";
 
 @Processor("video-transcode", { concurrency: 5 })
 @Injectable()
@@ -35,6 +35,11 @@ export class VideoTranscoderProcessor extends WorkerHost {
       this.logger.log(`Job ${jobId} finished successfully.`);
       return { result: "success" };
     } catch (error) {
+      if (error instanceof TranscodeAbortedError) {
+        this.logger.warn(`Job ${jobId} aborted: ${error.message}`);
+        return { result: "aborted" };
+      }
+
       await this.videoTranscodeService.updateStatus(id, type, TranscodingStatus.FAILED);
       this.logger.error(`Job ${jobId} failed:`, error);
       throw error;

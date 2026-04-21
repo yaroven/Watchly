@@ -1,16 +1,15 @@
+@use "@/shared/styles/admin-shell" as admin;
+
 .container {
-  display: flex;
-  flex-direction: column;
-  padding: 20px;
-  gap: 20px;
-  width: 100%;
+  @include admin.page-shell;
 }
 
-.header {
+.hero {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   width: 100%;
+  gap: 24px;
 }
 
 .headerTitleGroup {
@@ -19,36 +18,22 @@
 }
 
 .pageTitle {
-  margin: 0;
-  font-size: 1.8rem;
-  color: #fff;
+  @include admin.section-title;
+}
+
+.pageSubtitle {
+  @include admin.section-subtitle;
 }
 
 .headerActions {
   display: flex;
   align-items: center;
   gap: 16px;
-}
-
-.deleteButtonGroup {
-  display: flex;
-  align-items: center;
+  flex-wrap: wrap;
 }
 
 .deleteButton {
-  background-color: transparent;
-  color: #ca563f;
-  border: 1px solid #ca563f;
-  padding: 8px 16px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: all 0.3s ease-in-out;
-
-  &:hover {
-    background-color: #ca563f;
-    color: #fff;
-  }
+  @include admin.secondary-button;
 
   &:disabled {
     opacity: 0.5;
@@ -57,28 +42,23 @@
 }
 
 .previewButton {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background-color: #ca563f;
-  color: #fff;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: all 0.3s ease-in-out;
+  @include admin.primary-button;
+}
 
-  &:hover {
-    background-color: #b84430;
-    transform: translateY(-2px);
+.transcodeButton {
+  @include admin.secondary-button;
+  min-width: 220px;
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
   }
 }
 
 .grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 24px;
   align-items: start;
 }
 
@@ -91,32 +71,47 @@
 .contentColumn {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  max-height: calc(100vh - 100px);
-  overflow-y: hidden;
+  gap: 24px;
 }
 
 .card {
-  background-color: #1a1a1a;
-  border-radius: 8px;
-  padding: 20px;
-  border: 1px solid #333;
+  @include admin.panel-card;
+  padding: 28px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  overflow-y: auto;
+}
+
+.cardHeader {
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.5);
 
   h2 {
     margin: 0;
-    font-size: 1.4rem;
-    border-bottom: 1px solid #333;
-    padding-bottom: 10px;
-    margin-bottom: 10px;
+    font-size: 1.35rem;
+    color: #f8fafc;
+  }
+
+  p {
+    margin: 8px 0 0;
+    color: #8ea0bd;
   }
 }
 
 @media (max-width: 1024px) {
+  .container {
+    @include admin.mobile-page-shell;
+  }
+
+  .hero {
+    flex-direction: column;
+  }
+
   .grid {
     grid-template-columns: 1fr;
+  }
+
+  .card {
+    padding: 20px 18px;
   }
 }

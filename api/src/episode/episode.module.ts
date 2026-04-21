@@ -1,7 +1,7 @@
 import { forwardRef, Module } from "@nestjs/common";
-import { PrismaModule } from "src/prisma/prisma.module";
-import { S3Module } from "src/S3/S3.module";
-import { VideoTranscoderModule } from "src/video-transcoder/video-transcoder.module";
+import { PrismaModule } from "../prisma/prisma.module";
+import { S3Module } from "../S3/S3.module";
+import { VideoTranscoderModule } from "../video-transcoder/video-transcoder.module";
 import { EpisodeController } from "./episode.controller";
 import { EpisodeService } from "./episode.service";
 

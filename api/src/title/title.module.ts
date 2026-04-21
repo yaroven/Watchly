@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
-import { S3Module } from "src/S3/S3.module";
-import { PrismaModule } from "src/prisma/prisma.module";
-import { VideoTranscoderModule } from "src/video-transcoder/video-transcoder.module";
+import { S3Module } from "../S3/S3.module";
+import { PrismaModule } from "../prisma/prisma.module";
+import { VideoTranscoderModule } from "../video-transcoder/video-transcoder.module";
 import { TitleController } from "./title.controller";
 import { TitleService } from "./title.service";
 

@@ -1,10 +1,9 @@
+@use "@/shared/styles/admin-shell" as admin;
+
 .card {
-  background-color: #0f172a;
-  border: 1px solid #1e293b;
-  border-radius: 12px;
-  padding: 24px;
+  @include admin.panel-card;
+  padding: 26px;
   display: flex;
-  flex-direction: column;
   align-items: center;
   gap: 20px;
   transition:
@@ -20,7 +19,7 @@
 .icon {
   width: 56px;
   height: 56px;
-  border-radius: 12px;
+  border-radius: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -44,18 +43,19 @@
 .info {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
 
   .label {
-    color: #9f9f9f;
-    font-size: 2rem;
-    font-weight: 500;
+    color: #94a3b8;
+    font-size: 0.95rem;
+    font-weight: 700;
     margin-bottom: 4px;
   }
 
   .value {
-    font-size: 1.8rem;
+    font-size: 2rem;
     font-weight: 700;
-    text-align: center;
+    text-align: left;
     color: white;
   }
 }
