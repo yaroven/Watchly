@@ -49,7 +49,13 @@ export default function SeriesDetailsClient({
             <p>Switch episodes without leaving the page.</p>
           </div>
         </div>
-        <CustomVideoPlayer src={episodeUrl} />
+        {episodeUrl ? (
+          <CustomVideoPlayer src={episodeUrl} />
+        ) : (
+          <div className={styles.noContent}>
+            Video stream is not available for the selected episode yet.
+          </div>
+        )}
       </section>
 
       <section className={styles.section}>

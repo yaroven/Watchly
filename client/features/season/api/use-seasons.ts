@@ -1,15 +1,14 @@
 import { useQuery, UseQueryOptions } from "@tanstack/react-query";
 import { Season } from "../schemas/season";
+import seasonKeys from "./season.keys";
 import SeasonService from "./season.service";
-
-const prefix = "seasons";
 
 const useSeasons = (
   titleId: string,
-  options?: Omit<UseQueryOptions<Season[], Error, Season[], string[]>, "queryKey" | "queryFn">,
+  options?: Omit<UseQueryOptions<Season[], Error, Season[], readonly unknown[]>, "queryKey" | "queryFn">,
 ) => {
   return useQuery({
-    queryKey: [prefix, titleId],
+    queryKey: seasonKeys.list(titleId),
     queryFn: () => SeasonService.getAll(titleId),
     ...options,
   });

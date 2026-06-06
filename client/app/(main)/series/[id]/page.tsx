@@ -2,7 +2,6 @@ import EpisodeService from "@/features/episodes/api/episode.service";
 import SeasonService from "@/features/season/api/season.service";
 import TitleService from "@/features/title/api/title.service";
 import TitleInfo from "@/features/title/components/TitleInfo";
-import { normalizeStreamUrl } from "@/shared/lib/normalize-stream-url";
 import JsonLd from "@/shared/ui/JsonLd";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -56,8 +55,7 @@ export default async function Page({ params, searchParams }: PageProps) {
         episodeId && episodes.some((episode) => episode.id === episodeId)
           ? episodeId
           : episodes[0].id;
-      const rawUrl = await EpisodeService.getStreamUrl(currentEpisodeId);
-      episodeUrl = normalizeStreamUrl(rawUrl);
+      episodeUrl = await EpisodeService.getStreamUrl(currentEpisodeId);
     }
   } catch (error) {
     console.error("Failed to fetch series details", error);
@@ -67,7 +65,7 @@ export default async function Page({ params, searchParams }: PageProps) {
   if (!seasons?.length) {
     return (
       <div className={styles.container}>
-        <TitleInfo id={id} initialData={title} />
+        <TitleInfo title={title} />
         <div className={styles.noContent}>No seasons found for this series.</div>
       </div>
     );
@@ -76,7 +74,7 @@ export default async function Page({ params, searchParams }: PageProps) {
   return (
     <div className={styles.container}>
       <JsonLd data={title} />
-      <TitleInfo id={id} initialData={title} />
+      <TitleInfo title={title} />
       <SeriesDetailsClient
         seasons={seasons}
         episodes={episodes}

@@ -1,7 +1,6 @@
 import CustomVideoPlayer from "@/features/player/components/CustomVideoPlayer";
 import TitleService from "@/features/title/api/title.service";
 import TitleInfo from "@/features/title/components/TitleInfo";
-import { normalizeStreamUrl } from "@/shared/lib/normalize-stream-url";
 import JsonLd from "@/shared/ui/JsonLd";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -29,12 +28,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function Page({ params }: PageProps) {
   const { id } = await params;
   let title: Awaited<ReturnType<typeof TitleService.getById>>;
-  let fixedUrl = "";
+  let movieUrl = "";
 
   try {
     title = await TitleService.getById(id);
-    const movieUrl = await TitleService.getStreamUrl(id);
-    fixedUrl = normalizeStreamUrl(movieUrl);
+    movieUrl = await TitleService.getStreamUrl(id);
   } catch (error) {
     console.error("Failed to fetch movie details", error);
     return notFound();
@@ -43,9 +41,9 @@ export default async function Page({ params }: PageProps) {
   return (
     <div className={styles.container}>
       <JsonLd data={title} />
-      <TitleInfo id={id} initialData={title} />
+      <TitleInfo title={title} />
       <div className={styles.playerShell}>
-        <CustomVideoPlayer src={fixedUrl} />
+        <CustomVideoPlayer src={movieUrl} />
       </div>
     </div>
   );

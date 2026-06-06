@@ -43,6 +43,11 @@ export class SeasonController {
     return this.seasonService.update(id, updateSeasonDto);
   }
 
+  @Get(":id/poster-upload-url")
+  getPosterUploadUrl(@Param("id") id: string) {
+    return this.seasonService.createPosterUploadingUrl(id);
+  }
+
   @Delete(":id")
   remove(@Param("id") id: string) {
     return this.seasonService.remove(id);

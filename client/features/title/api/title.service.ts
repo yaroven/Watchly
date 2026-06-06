@@ -1,29 +1,46 @@
-import { normalizeStreamUrl } from "@/shared/lib/normalize-stream-url";
+import { parseApiDate } from "@/shared/lib/parse-api-date";
 import api from "@shared/api/axios";
 import axios from "axios";
 import { CreateTitleDto, GetAllTitlesDto, Title, UpdateTitleDto } from "../schemas/title";
 
 const prefix = "title";
 
+interface ApiTitle extends Omit<Title, "createdAt" | "updatedAt"> {
+  createdAt: string;
+  updatedAt: string;
+}
+
+const mapTitle = (title: ApiTitle): Title => ({
+  ...title,
+  createdAt: parseApiDate(title.createdAt),
+  updatedAt: parseApiDate(title.updatedAt),
+});
+
+type TitleCreatePayload = CreateTitleDto;
+type TitleUpdatePayload = UpdateTitleDto;
+
 const TitleService = {
-  createTitle: async (titleData: Omit<CreateTitleDto, "videoFile">): Promise<Title> => {
-    const { data } = await api.post<Title>(`/${prefix}`, titleData);
-    return data;
+  createTitle: async (titleData: TitleCreatePayload): Promise<Title> => {
+    const { data } = await api.post<ApiTitle>(`/${prefix}`, titleData);
+    return mapTitle(data);
   },
 
   getAll: async ({ searchString = "", page = 1, limit = 10, type }: GetAllTitlesDto = {}): Promise<{
     items: Title[];
     totalCount: number;
   }> => {
-    const { data } = await api.get<{ items: Title[]; totalCount: number }>(`/${prefix}`, {
+    const { data } = await api.get<{ items: ApiTitle[]; totalCount: number }>(`/${prefix}`, {
       params: { search: searchString, page, limit, type },
     });
-    return data;
+    return {
+      ...data,
+      items: data.items.map(mapTitle),
+    };
   },
 
   getById: async (id: string): Promise<Title> => {
-    const { data } = await api.get<Title>(`/${prefix}/${id}`);
-    return data;
+    const { data } = await api.get<ApiTitle>(`/${prefix}/${id}`);
+    return mapTitle(data);
   },
 
   getStreamUrl: async (id: string): Promise<string> => {
@@ -36,10 +53,15 @@ const TitleService = {
     return data.url;
   },
 
-  async uploadToS3(url: string, file: File, onProgress: (percent: number) => void): Promise<void> {
-    const uploadUrl = normalizeStreamUrl(url);
+  getPosterUploadUrl: async (id: string): Promise<{ uploadUrl: string; posterUrl: string }> => {
+    const { data } = await api.get<{ uploadUrl: string; posterUrl: string }>(
+      `/${prefix}/${id}/poster-upload-url`,
+    );
+    return data;
+  },
 
-    await axios.put(uploadUrl, file, {
+  async uploadToS3(url: string, file: File, onProgress: (percent: number) => void): Promise<void> {
+    await axios.put(url, file, {
       headers: {
         "Content-Type": file.type,
       },
@@ -51,9 +73,9 @@ const TitleService = {
     });
   },
 
-  update: async (id: string, titleData: UpdateTitleDto): Promise<Title> => {
-    const { data } = await api.patch<Title>(`/${prefix}/${id}`, titleData);
-    return data;
+  update: async (id: string, titleData: TitleUpdatePayload): Promise<Title> => {
+    const { data } = await api.patch<ApiTitle>(`/${prefix}/${id}`, titleData);
+    return mapTitle(data);
   },
 
   transcode: async (id: string): Promise<void> => {

@@ -12,6 +12,7 @@ interface CustomVideoPlayerContextType {
   isPlaying: boolean;
   areControlsVisible: boolean;
   isLoading: boolean;
+  errorMessage: string | null;
   timeline: number;
   buffered: number;
   duration: number;
@@ -26,6 +27,7 @@ interface CustomVideoPlayerContextType {
   quality: number;
   setQuality: (quality: number) => void;
   qualities: VideoQuality[];
+  currentLevelIndex: number;
 }
 
 const CustomVideoPlayerContext = createContext<CustomVideoPlayerContextType | null>(null);

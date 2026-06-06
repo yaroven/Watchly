@@ -26,12 +26,14 @@ export default function CustomVideoPlayerProvider({
     isLoading,
     timeline,
     buffered,
+    errorMessage,
     togglePlay,
     seek,
     duration,
     qualities,
     quality,
     setQuality,
+    currentLevelIndex,
   } = useVideoPlayer(videoRef, src);
 
   useEffect(() => {
@@ -178,6 +180,7 @@ export default function CustomVideoPlayerProvider({
         isPlaying,
         areControlsVisible,
         isLoading,
+        errorMessage,
         timeline,
         buffered,
         duration,
@@ -187,6 +190,7 @@ export default function CustomVideoPlayerProvider({
         quality,
         setQuality,
         qualities,
+        currentLevelIndex,
         onPlayToggle: togglePlay,
         onSeek: seek,
         onVolumeSeek,

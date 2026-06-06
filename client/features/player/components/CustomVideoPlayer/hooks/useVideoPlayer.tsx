@@ -17,10 +17,12 @@ export default function useVideoPlayer(videoRef: RefObject<HTMLVideoElement | nu
   const [timeline, setTimeline] = useState(0);
   const [buffered, setBuffered] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const hlsRef = useRef<Hls | null>(null);
   const [qualities, setQualities] = useState<VideoQuality[]>([]);
   const [quality, setQualityState] = useState(-1);
+  const [currentLevelIndex, setCurrentLevelIndex] = useState(-1);
   const pendingQualityChangeRef = useRef<{ shouldResume: boolean; time: number } | null>(null);
 
   const syncBuffered = useCallback(() => {
@@ -63,8 +65,13 @@ export default function useVideoPlayer(videoRef: RefObject<HTMLVideoElement | nu
     const handleLoadStart = () => setIsLoading(true);
     const handleCanPlay = async () => {
       setIsLoading(false);
+      setErrorMessage(null);
       syncDuration();
       await resumeAfterQualityChange();
+    };
+    const handleError = () => {
+      setIsLoading(false);
+      setErrorMessage("Video stream is unavailable");
     };
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
@@ -84,6 +91,7 @@ export default function useVideoPlayer(videoRef: RefObject<HTMLVideoElement | nu
     video.addEventListener("progress", handleProgress);
     video.addEventListener("loadedmetadata", handleDurationChange);
     video.addEventListener("durationchange", handleDurationChange);
+    video.addEventListener("error", handleError);
 
     frameId = window.requestAnimationFrame(() => {
       setTimeline(video.currentTime || 0);
@@ -107,6 +115,7 @@ export default function useVideoPlayer(videoRef: RefObject<HTMLVideoElement | nu
       video.removeEventListener("progress", handleProgress);
       video.removeEventListener("loadedmetadata", handleDurationChange);
       video.removeEventListener("durationchange", handleDurationChange);
+      video.removeEventListener("error", handleError);
     };
   }, [resumeAfterQualityChange, syncBuffered, syncDuration, videoRef]);
 
@@ -121,16 +130,73 @@ export default function useVideoPlayer(videoRef: RefObject<HTMLVideoElement | nu
       frameId = window.requestAnimationFrame(() => {
         setQualities([]);
         setQualityState(-1);
+        setCurrentLevelIndex(-1);
         setIsLoading(false);
+        setErrorMessage(null);
       });
       return;
     }
 
     frameId = window.requestAnimationFrame(() => {
       setIsLoading(true);
+      setErrorMessage(null);
       setQualities([]);
       setQualityState(-1);
+      setCurrentLevelIndex(-1);
     });
+
+    if (Hls.isSupported()) {
+      const hls = new Hls({
+        autoStartLoad: true,
+      });
+      const syncQualityOptions = () => {
+        setQualities(createQualityOptions(hls.levels));
+      };
+
+      hlsRef.current = hls;
+      hls.attachMedia(video);
+      hls.loadSource(src);
+
+      hls.on(Hls.Events.MANIFEST_LOADED, syncQualityOptions);
+      hls.on(Hls.Events.MANIFEST_PARSED, syncQualityOptions);
+      hls.on(Hls.Events.LEVELS_UPDATED, syncQualityOptions);
+
+      hls.on(Hls.Events.LEVEL_SWITCHING, () => {
+        setIsLoading(true);
+      });
+
+      hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
+        setCurrentLevelIndex(data.level);
+        setQualityState(hls.autoLevelEnabled ? -1 : data.level);
+      });
+
+      hls.on(Hls.Events.ERROR, (_, data) => {
+        if (!data.fatal) return;
+
+        switch (data.type) {
+          case Hls.ErrorTypes.NETWORK_ERROR:
+            setErrorMessage("Network error while loading video. Retrying...");
+            hls.startLoad();
+            break;
+          case Hls.ErrorTypes.MEDIA_ERROR:
+            setErrorMessage("Playback error. Recovering...");
+            hls.recoverMediaError();
+            break;
+          default:
+            setIsLoading(false);
+            setErrorMessage("Video stream is unavailable");
+            hls.destroy();
+            hlsRef.current = null;
+            break;
+        }
+      });
+
+      return () => {
+        window.cancelAnimationFrame(frameId);
+        hls.destroy();
+        hlsRef.current = null;
+      };
+    }
 
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = src;
@@ -141,63 +207,6 @@ export default function useVideoPlayer(videoRef: RefObject<HTMLVideoElement | nu
         video.load();
       };
     }
-
-    if (!Hls.isSupported()) {
-      video.src = src;
-
-      return () => {
-        window.cancelAnimationFrame(frameId);
-        video.removeAttribute("src");
-        video.load();
-      };
-    }
-
-    const hls = new Hls({
-      autoStartLoad: true,
-    });
-    const syncQualityOptions = () => {
-      setQualities(createQualityOptions(hls.levels));
-    };
-
-    hlsRef.current = hls;
-    hls.attachMedia(video);
-    hls.loadSource(src);
-
-    hls.on(Hls.Events.MANIFEST_LOADED, syncQualityOptions);
-    hls.on(Hls.Events.MANIFEST_PARSED, syncQualityOptions);
-    hls.on(Hls.Events.LEVELS_UPDATED, syncQualityOptions);
-
-    hls.on(Hls.Events.LEVEL_SWITCHING, () => {
-      setIsLoading(true);
-    });
-
-    hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
-      setQualityState(hls.autoLevelEnabled ? -1 : data.level);
-    });
-
-    hls.on(Hls.Events.ERROR, (_, data) => {
-      if (!data.fatal) return;
-
-      switch (data.type) {
-        case Hls.ErrorTypes.NETWORK_ERROR:
-          hls.startLoad();
-          break;
-        case Hls.ErrorTypes.MEDIA_ERROR:
-          hls.recoverMediaError();
-          break;
-        default:
-          setIsLoading(false);
-          hls.destroy();
-          hlsRef.current = null;
-          break;
-      }
-    });
-
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      hls.destroy();
-      hlsRef.current = null;
-    };
   }, [src, videoRef]);
 
   const setQuality = (level: number) => {
@@ -217,15 +226,7 @@ export default function useVideoPlayer(videoRef: RefObject<HTMLVideoElement | nu
     setIsLoading(true);
     setQualityState(level);
 
-    if (level === -1) {
-      hls.currentLevel = -1;
-      hls.nextLevel = -1;
-      hls.loadLevel = -1;
-      return;
-    }
-
-    hls.loadLevel = level;
-    hls.nextLevel = level;
+    hls.currentLevel = level;
   };
 
   const togglePlay = async () => {
@@ -258,10 +259,12 @@ export default function useVideoPlayer(videoRef: RefObject<HTMLVideoElement | nu
     timeline,
     buffered,
     duration,
+    errorMessage,
     togglePlay,
     seek,
     qualities,
     quality,
     setQuality,
+    currentLevelIndex,
   };
 }

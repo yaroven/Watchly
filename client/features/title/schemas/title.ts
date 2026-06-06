@@ -27,16 +27,33 @@ export interface GetAllTitlesDto {
   transcodingStatus?: TranscodingStatus;
 }
 
+const PosterFileSchema = z
+  .custom<FileList | undefined>((value) => value === undefined || value instanceof FileList)
+  .optional();
+
 export const BaseTitleSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().max(500),
-  posterUrl: z.url(),
   type: z.enum(TitleType),
 });
 
 export const CreateTitleSchema = BaseTitleSchema.extend({
   videoFile: z.custom<FileList>().optional(),
+  posterFile: PosterFileSchema,
 })
+  .refine(
+    (data) => {
+      if (!data.posterFile?.[0]) {
+        return true;
+      }
+
+      return data.posterFile[0].type.startsWith("image/");
+    },
+    {
+      message: "Only image files are supported for posters",
+      path: ["posterFile"],
+    },
+  )
   .refine(
     (data) => {
       if (data.type === TitleType.MOVIE) {
@@ -64,7 +81,21 @@ export const CreateTitleSchema = BaseTitleSchema.extend({
 
 export const UpdateTitleSchema = BaseTitleSchema.partial().extend({
   videoFile: z.custom<FileList>().optional(),
+  posterFile: PosterFileSchema,
 });
 
-export type CreateTitleDto = z.infer<typeof CreateTitleSchema>;
-export type UpdateTitleDto = z.infer<typeof UpdateTitleSchema>;
+export type TitleFormValues = z.infer<typeof CreateTitleSchema>;
+
+export interface CreateTitleDto {
+  name: string;
+  description: string;
+  type: TitleType;
+}
+
+export interface UpdateTitleDto {
+  name?: string;
+  description?: string;
+  type?: TitleType;
+  posterUrl?: string;
+  hlsUrl?: string;
+}

@@ -1,15 +1,11 @@
 import { useQuery, UseQueryOptions } from "@tanstack/react-query";
 import { Title } from "../schemas/title";
+import titleKeys from "./title.keys";
 import titleService from "./title.service";
 
-const prefix = "title";
-
-const useTitle = (
-  id: string,
-  options?: Omit<UseQueryOptions<Title, Error, Title, string[]>, "queryKey" | "queryFn">,
-) => {
+const useTitle = (id: string, options?: Omit<UseQueryOptions<Title, Error, Title, readonly unknown[]>, "queryKey" | "queryFn">) => {
   return useQuery({
-    queryKey: [prefix, id],
+    queryKey: titleKeys.detail(id),
     queryFn: () => titleService.getById(id),
     ...options,
   });
