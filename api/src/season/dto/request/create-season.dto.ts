@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsString, IsUUID } from "class-validator";
+import { IsInt, IsString, IsUUID } from "class-validator";
 
 export class CreateSeasonDto {
   @IsInt()
@@ -9,10 +9,6 @@ export class CreateSeasonDto {
 
   @IsString()
   description: string;
-
-  @IsString()
-  @IsOptional()
-  posterUrl?: string;
 
   @IsUUID()
   titleId: string;

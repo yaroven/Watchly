@@ -1,6 +1,7 @@
 "use client";
 
 import { TitleType } from "@/features/title/schemas/title";
+import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import { Clapperboard, Film } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -20,17 +21,17 @@ export default function TitleIdentity({
   type,
 }: TitleIdentityProps) {
   const typeLabel = type === TitleType.MOVIE ? "Movie" : "Series";
+  const posterSrc = getOptimizedImageSrc(posterUrl);
 
   return (
     <div className={styles.mainCell}>
       <Link href={to} className={styles.posterConteiner}>
         <Image
           className={styles.poster}
-          src={posterUrl}
+          src={posterSrc}
           alt={name}
           width={72}
           height={108}
-          unoptimized={!!posterUrl}
         />
       </Link>
 

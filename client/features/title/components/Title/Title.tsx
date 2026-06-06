@@ -1,6 +1,7 @@
 "use client";
 
 import { type Title } from "@/features/title/schemas/title";
+import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import { PlayCircle } from "lucide-react";
 import Image from "next/image";
 import styles from "./Title.module.scss";
@@ -16,16 +17,17 @@ export default function Title({
   transcodingStatus,
   onClick,
 }: TitleProps) {
+  const posterSrc = getOptimizedImageSrc(posterUrl);
+
   return (
     <button type="button" onClick={() => onClick()} className={styles.title}>
       <div className={styles.posterConteiner}>
         <Image
           className={styles.poster}
-          src={posterUrl || "/cat.webp"}
+          src={posterSrc}
           alt={name}
           width={150}
           height={225}
-          unoptimized={!!posterUrl}
         />
         <div className={styles.posterBlackout}></div>
         <div className={styles.posterOverlay}>

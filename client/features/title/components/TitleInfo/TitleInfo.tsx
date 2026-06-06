@@ -1,23 +1,18 @@
 "use client";
 
-import useTitle from "@/features/title/api/use-title";
 import { Title } from "@/features/title/schemas/title";
+import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import { Skeleton } from "@/shared/ui/Skeleton";
 import Image from "next/image";
-import { notFound } from "next/navigation";
 import styles from "./TitleInfo.module.scss";
 
 interface TitleInfoProps {
-  id: string;
-  initialData?: Title;
+  title: Title;
 }
 
-export default function TitleInfo({ id, initialData }: TitleInfoProps) {
-  const { data, error } = useTitle(id, { initialData });
-
-  if (error || !data) return notFound();
-
-  const { name, description, posterUrl, type, seasons, createdAt, transcodingStatus } = data;
+export default function TitleInfo({ title }: TitleInfoProps) {
+  const { name, description, posterUrl, type, seasons, createdAt, transcodingStatus } = title;
+  const posterSrc = getOptimizedImageSrc(posterUrl);
   const releaseYear =
     createdAt && !Number.isNaN(new Date(createdAt).getTime())
       ? new Date(createdAt).getFullYear()
@@ -35,7 +30,7 @@ export default function TitleInfo({ id, initialData }: TitleInfoProps) {
       <div className={styles.posterContainer}>
         <Image
           className={styles.poster}
-          src={posterUrl || "/cat.webp"}
+          src={posterSrc}
           alt={name}
           width={320}
           height={460}

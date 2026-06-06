@@ -26,7 +26,9 @@ export default function PlayerControls() {
   return (
     <div className={`${styles.controlBar} ${!areControlsVisible ? styles.hidden : ""}`}>
       <div className={styles.topPart}>
-        <div className={styles.timeline}>{formatPlayerTime(timeline)}</div>
+        <div className={styles.timeline}>
+          {formatPlayerTime(timeline)} / {formatPlayerTime(duration)}
+        </div>
         <ProgressBar
           max={duration}
           value={timeline}

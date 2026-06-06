@@ -4,7 +4,7 @@ import { useCustomVideoPlayer } from "../../CustomVideoPlayerContext";
 import styles from "./Settings.module.scss";
 
 export default function Settings() {
-  const { quality, setQuality, qualities } = useCustomVideoPlayer();
+  const { quality, setQuality, qualities, currentLevelIndex } = useCustomVideoPlayer();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -40,25 +40,34 @@ export default function Settings() {
         onClick={() => setIsOpen((value) => !value)}
         aria-expanded={isOpen}
         aria-label="Video quality settings"
+        title="Quality"
       >
         <SettingsIcon className={styles.settingsIcon} />
       </button>
       {isOpen && (
         <div className={styles.settingsPopup}>
           {qualities.length > 0 ? (
-            qualities.map((option) => (
-              <button
-                key={option.level}
-                type="button"
-                className={`${styles.qualityOption} ${quality === option.level ? styles.active : ""}`}
-                onClick={() => {
-                  setQuality(option.level);
-                  setIsOpen(false);
-                }}
-              >
-                {option.label}
-              </button>
-            ))
+            qualities.map((option) => {
+              const displayLabel =
+                option.level === -1 && currentLevelIndex !== -1
+                  ? `Auto (${qualities.find((q) => q.level === currentLevelIndex)?.label || ""})`
+                  : option.label;
+
+              return (
+                <button
+                  key={option.level}
+                  type="button"
+                  className={`${styles.qualityOption} ${quality === option.level ? styles.active : ""}`}
+                  onClick={() => {
+                    setQuality(option.level);
+                    setIsOpen(false);
+                  }}
+                  aria-pressed={quality === option.level}
+                >
+                  {displayLabel}
+                </button>
+              );
+            })
           ) : (
             <div className={styles.qualityOption}>Auto</div>
           )}

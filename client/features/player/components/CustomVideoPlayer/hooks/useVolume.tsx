@@ -7,15 +7,24 @@ export default function useVolume() {
   const [volumeValue, setVolumeValue] = useState(1);
   const previousVolumeRef = useRef(1);
 
+  const setVolume = (value: number | ((currentValue: number) => number)) => {
+    setVolumeValue((currentValue) => {
+      const nextVolume = typeof value === "function" ? value(currentValue) : value;
+      const clampedVolume = Math.min(Math.max(nextVolume, 0), 1);
+
+      setIsMuted(clampedVolume === 0);
+
+      if (clampedVolume > 0) {
+        previousVolumeRef.current = clampedVolume;
+      }
+
+      return clampedVolume;
+    });
+  };
+
   const onVolumeSeek = (e: ChangeEvent<HTMLInputElement>) => {
     const nextVolume = parseFloat(e.target.value);
-
-    setVolumeValue(nextVolume);
-    setIsMuted(nextVolume === 0);
-
-    if (nextVolume > 0) {
-      previousVolumeRef.current = nextVolume;
-    }
+    setVolume(nextVolume);
   };
 
   const onMuteToggle = () => {
@@ -35,6 +44,6 @@ export default function useVolume() {
     isMuted,
     volumeValue,
     onVolumeSeek,
-    setVolume: setVolumeValue,
+    setVolume,
   };
 }

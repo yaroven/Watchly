@@ -1,4 +1,5 @@
 import axios from "axios";
+import { toApiError } from "./api-error";
 
 const isServer = typeof window === "undefined";
 const baseURL = isServer
@@ -17,8 +18,9 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.error("[API Error]", error.response?.data || error.message);
-    return Promise.reject(error);
+    const apiError = toApiError(error);
+    console.error("[API Error]", apiError.details || apiError.message);
+    return Promise.reject(apiError);
   },
 );
 

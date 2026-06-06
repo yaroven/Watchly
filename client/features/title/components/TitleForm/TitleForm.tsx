@@ -1,11 +1,9 @@
 "use client";
 
-import TitleService from "@/features/title/api/title.service";
-import { useCreateTitle, useUpdateTitle } from "@/features/title/api/use-title-mutations";
 import {
-  CreateTitleDto,
   CreateTitleSchema,
   Title,
+  TitleFormValues,
   TitleType,
   UpdateTitleSchema,
 } from "@/features/title/schemas/title";
@@ -15,12 +13,12 @@ import FormField from "@/shared/ui/FormField";
 import FormFileInput from "@/shared/ui/FormFileInput";
 import Modal from "@/shared/ui/Modal";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Activity, useState } from "react";
-import { Resolver, useForm } from "react-hook-form";
+import { Activity, useEffect, useState } from "react";
+import { Resolver, useForm, useWatch } from "react-hook-form";
 import styles from "./TitleForm.module.scss";
+import { useTitleSubmissionWorkflow } from "./useTitleSubmissionWorkflow";
 
 interface TitleFormProps {
   initialData?: Title;
@@ -28,20 +26,12 @@ interface TitleFormProps {
 
 export default function TitleForm({ initialData }: TitleFormProps) {
   const router = useRouter();
-  const queryClient = useQueryClient();
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
-  const [actionError, setActionError] = useState<Error | null>(null);
-  const [createdTitleId, setCreatedTitleId] = useState<string | null>(null);
-
-  const { mutateAsync: createTitle, isPending: isCreating } = useCreateTitle();
-  const { mutateAsync: updateTitle, isPending: isUpdating } = useUpdateTitle();
 
   const defaultValues = initialData
     ? {
         name: initialData.name,
         description: initialData.description,
-        posterUrl: initialData.posterUrl,
         type: initialData.type,
       }
     : undefined;
@@ -52,75 +42,106 @@ export default function TitleForm({ initialData }: TitleFormProps) {
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors, isDirty },
-    watch,
     reset,
-  } = useForm<CreateTitleDto>({
-    resolver: zodResolver(schema) as Resolver<CreateTitleDto>,
+    setValue,
+  } = useForm<TitleFormValues>({
+    resolver: zodResolver(schema) as Resolver<TitleFormValues>,
     mode: "onBlur",
     defaultValues,
   });
 
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const selectedType = watch("type", TitleType.MOVIE);
-
-  const onSubmit = async (data: CreateTitleDto) => {
-    setActionError(null);
-    try {
-      if (isEditing && initialData) {
-        await updateTitle({ id: initialData.id, payload: data });
-        queryClient.invalidateQueries({ queryKey: ["title", initialData.id] });
-        setIsSuccessModalOpen(true);
-      } else {
-        const { videoFile, ...payload } = data;
-        const title = await createTitle(payload);
-
-        if (data.type === TitleType.MOVIE && videoFile?.[0]) {
-          const file = videoFile[0];
-          const uploadUrl = await TitleService.getUploadUrl(title.id);
-          await TitleService.uploadToS3(uploadUrl, file, (progress) => {
-            setUploadProgress(progress);
-          });
-        }
-
-        reset();
-        setCreatedTitleId(title.id);
-        setIsSuccessModalOpen(true);
-      }
-    } catch (err: unknown) {
-      setActionError(err instanceof Error ? err : new Error("Failed to save title"));
+  useEffect(() => {
+    if (initialData) {
+      reset({
+        name: initialData.name,
+        description: initialData.description,
+        type: initialData.type,
+        posterFile: undefined,
+        videoFile: undefined,
+      });
+      return;
     }
+
+    reset({
+      name: "",
+      description: "",
+      type: TitleType.MOVIE,
+      posterFile: undefined,
+      videoFile: undefined,
+    });
+  }, [initialData, reset]);
+
+  const selectedType = useWatch({
+    control,
+    name: "type",
+    defaultValue: TitleType.MOVIE,
+  });
+  const selectedVideoFile = useWatch({
+    control,
+    name: "videoFile",
+  });
+  const selectedPosterFile = useWatch({
+    control,
+    name: "posterFile",
+  });
+  const { submit, uploadProgress, isUploading, isPending, actionError, createdTitleId } =
+    useTitleSubmissionWorkflow({ initialData });
+
+  const onSubmit = async (data: TitleFormValues) => {
+    try {
+      await submit(data);
+      reset(
+        isEditing
+          ? {
+              name: data.name,
+              description: data.description,
+              type: data.type,
+              posterFile: undefined,
+            }
+          : {
+              name: "",
+              description: "",
+              type: TitleType.MOVIE,
+              posterFile: undefined,
+            },
+      );
+      setIsSuccessModalOpen(true);
+    } catch {}
   };
 
-  const isUploading = uploadProgress > 0 && uploadProgress < 100;
-  const isPending = isCreating || isUpdating;
   const closeSuccessModal = () => setIsSuccessModalOpen(false);
 
   return (
     <form className={styles.titleForm} onSubmit={handleSubmit(onSubmit)}>
       <FormField
-        type="input"
+        label="Name"
         placeholder="Name"
         name="name"
         register={register}
         error={errors.name}
       />
       <FormField
-        type="input"
+        label="Description"
         placeholder="Description"
         name="description"
         register={register}
         error={errors.description}
       />
-      <FormField
-        type="input"
-        placeholder="Poster URL"
-        name="posterUrl"
+      <FormFileInput
+        label="Banner"
         register={register}
-        error={errors.posterUrl}
+        setValue={setValue}
+        selectedFile={selectedPosterFile}
+        name="posterFile"
+        accept="image/*"
+        error={errors.posterFile}
+        id="title-poster-file"
       />
 
       <FormField
+        label="Type"
         name="type"
         register={register}
         error={errors.type}
@@ -134,7 +155,10 @@ export default function TitleForm({ initialData }: TitleFormProps) {
 
       <Activity mode={selectedType === TitleType.MOVIE && !isEditing ? "visible" : "hidden"}>
         <FormFileInput
+          label="Video File"
           register={register}
+          setValue={setValue}
+          selectedFile={selectedVideoFile}
           name="videoFile"
           accept="video/*"
           error={errors.videoFile}

@@ -17,8 +17,8 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { sdkStreamMixin } from "@aws-sdk/util-stream-node";
 import { Injectable, InternalServerErrorException, Logger, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { S3Config, S3ConfigName } from "../config/s3.config";
 import { Readable } from "stream";
+import { S3Config, S3ConfigName } from "../config/s3.config";
 
 @Injectable()
 export class S3Service implements OnModuleInit {
@@ -40,8 +40,19 @@ export class S3Service implements OnModuleInit {
         accessKeyId: this.s3Config.accessKeyId,
         secretAccessKey: this.s3Config.secretAccessKey,
       },
-      endpoint: this.s3Config.endpoint,
+      endpoint: this.s3Config.internalEndpoint,
     });
+  }
+
+  private mapSignedUrlToPublicEndpoint(url: string) {
+    const signedUrl = new URL(url);
+    const publicEndpoint = new URL(this.s3Config.publicEndpoint);
+
+    signedUrl.protocol = publicEndpoint.protocol;
+    signedUrl.hostname = publicEndpoint.hostname;
+    signedUrl.port = publicEndpoint.port;
+
+    return signedUrl.toString();
   }
 
   async onModuleInit() {
@@ -112,6 +123,14 @@ export class S3Service implements OnModuleInit {
     return this.getFileBuffer(key, this.processedBucketName);
   }
 
+  async getProcessedUploadUrl(key: string, expiresIn?: number) {
+    return this.getUploadPresignedUrl(key, this.processedBucketName, expiresIn);
+  }
+
+  getProcessedPublicUrl(key: string) {
+    return `${this.s3Config.publicEndpoint.replace(/\/$/, "")}/${this.processedBucketName}/${key}`;
+  }
+
   async uploadProcessedStream(key: string, stream: Readable, contentType: string) {
     return this.uploadStream(this.processedBucketName, key, stream, contentType);
   }
@@ -167,12 +186,14 @@ export class S3Service implements OnModuleInit {
 
   private async getUploadPresignedUrl(key: string, bucketName: string, expiresIn: number = 3600) {
     const command = new PutObjectCommand({ Bucket: bucketName, Key: key });
-    return getSignedUrl(this.s3Client, command, { expiresIn });
+    const signedUrl = await getSignedUrl(this.s3Client, command, { expiresIn });
+    return this.mapSignedUrlToPublicEndpoint(signedUrl);
   }
 
   private async getReadPresignedUrl(key: string, bucketName: string, expiresIn: number = 3600) {
     const command = new GetObjectCommand({ Bucket: bucketName, Key: key });
-    return getSignedUrl(this.s3Client, command, { expiresIn });
+    const signedUrl = await getSignedUrl(this.s3Client, command, { expiresIn });
+    return this.mapSignedUrlToPublicEndpoint(signedUrl);
   }
 
   private async deleteObject(bucketName: string, key: string) {

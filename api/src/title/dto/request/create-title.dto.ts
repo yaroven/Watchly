@@ -10,7 +10,4 @@ export class CreateTitleDto {
 
   @IsEnum(TitleType)
   type: TitleType;
-
-  @IsString()
-  posterUrl: string;
 }

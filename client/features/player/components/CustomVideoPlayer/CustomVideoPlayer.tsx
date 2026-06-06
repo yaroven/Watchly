@@ -15,7 +15,7 @@ function CustomVideoPlayerContent() {
     videoContainerRef,
     isPlaying,
     isLoading,
-    isFullscreen,
+    errorMessage,
     areControlsVisible,
     onPlayToggle,
     onSeek,
@@ -50,7 +50,7 @@ function CustomVideoPlayerContent() {
       ref={videoContainerRef}
     >
       <video
-        className={`${styles.videoPlayer} ${isFullscreen && styles.fullscreen}`}
+        className={styles.videoPlayer}
         ref={videoRef}
         playsInline
         preload="metadata"
@@ -72,10 +72,18 @@ function CustomVideoPlayerContent() {
           onDoubleClick={handleRightDoubleClick}
         />
       </div>
-      {!isPlaying && !isLoading && (
-        <PlayIcon onClick={onPlayToggle} className={styles.playIcon} size={64} />
+      {!isPlaying && !isLoading && !errorMessage && (
+        <button
+          type="button"
+          onClick={onPlayToggle}
+          className={styles.centerPlayButton}
+          aria-label="Play video"
+        >
+          <PlayIcon size={64} />
+        </button>
       )}
-      {isLoading && <LoaderCircle className={styles.loader} size={64} />}
+      {isLoading && !errorMessage && <LoaderCircle className={styles.loader} size={64} />}
+      {errorMessage && <div className={styles.errorMessage}>{errorMessage}</div>}
       <PlayerControls />
     </div>
   );

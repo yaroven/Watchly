@@ -43,7 +43,8 @@ services:
       S3_REGION: "us-east-1"
       S3_RAW_BUCKET_NAME: "raw"
       S3_PROCESSED_BUCKET_NAME: "content"
-      S3_ENDPOINT: "http://localstack:4566"
+      S3_ENDPOINT_INTERNAL: "http://localstack:4566"
+      S3_ENDPOINT_PUBLIC: "http://localhost:4566"
       CHOKIDAR_USEPOLLING: "true"
       CHOKIDAR_INTERVAL: 1000
     volumes:

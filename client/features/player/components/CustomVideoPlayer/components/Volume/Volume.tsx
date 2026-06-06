@@ -13,14 +13,23 @@ export default function Volume({ volume, onSeek, onToggle }: VolumeProps) {
   return (
     <div
       className={styles.volumeContainer}
-      onMouseOver={() => setIsOver(true)}
-      onMouseOut={() => setIsOver(false)}
+      onMouseEnter={() => setIsOver(true)}
+      onMouseLeave={() => setIsOver(false)}
+      onFocus={() => setIsOver(true)}
+      onBlur={() => setIsOver(false)}
     >
-      {getVolumeIcon(volume, {
-        onClick: onToggle,
-        size: 32,
-        className: styles.volumeIcon,
-      })}
+      <button
+        type="button"
+        className={styles.volumeButton}
+        onClick={onToggle}
+        aria-label={volume === 0 ? "Unmute video" : "Mute video"}
+        title={volume === 0 ? "Unmute" : "Mute"}
+      >
+        {getVolumeIcon(volume, {
+          size: 32,
+          className: styles.volumeIcon,
+        })}
+      </button>
       <input
         className={`${isOver ? "" : styles.hidden}`}
         value={volume}
@@ -29,6 +38,7 @@ export default function Volume({ volume, onSeek, onToggle }: VolumeProps) {
         max={1}
         onChange={onSeek}
         type="range"
+        aria-label="Volume"
       />
     </div>
   );

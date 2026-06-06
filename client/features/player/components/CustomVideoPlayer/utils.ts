@@ -25,7 +25,7 @@ export function createQualityOptions(levels: Level[]): VideoQuality[] {
   const manualLevels = levels
     .map((level, index) => {
       const parsedHeight = getLevelHeight(level);
-      const bitrate = level.bitrate || level.averageBitrate || 0;
+      const bitrate = level.bitrate || getAverageBitrate(level) || 0;
       const label = getQualityLabel(level, parsedHeight, bitrate, index);
 
       return {
@@ -43,6 +43,11 @@ export function createQualityOptions(levels: Level[]): VideoQuality[] {
     }));
 
   return [{ level: -1, height: 0, label: "Auto" }, ...manualLevels];
+}
+
+function getAverageBitrate(level: Level) {
+  const averageBitrate = (level as Level & { averageBitrate?: number }).averageBitrate;
+  return averageBitrate ?? 0;
 }
 
 function getLevelHeight(level: Level) {

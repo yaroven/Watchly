@@ -5,9 +5,14 @@ import {
   useDeleteSeason,
   useUpdateSeason,
 } from "@/features/season/api/use-season-mutations";
-import { CreateSeasonDto, Season } from "@/features/season/schemas/season";
+import {
+  Season,
+  SeasonFormSchema,
+  SeasonFormValues,
+} from "@/features/season/schemas/season";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Resolver, useForm } from "react-hook-form";
 
 interface UseSeasonManagerProps {
   seasons: Season[];
@@ -22,9 +27,14 @@ export const useSeasonManager = ({ seasons, titleId }: UseSeasonManagerProps) =>
   const {
     register,
     handleSubmit,
+    control,
     reset,
+    setValue,
     formState: { errors },
-  } = useForm<CreateSeasonDto>();
+  } = useForm<SeasonFormValues>({
+    resolver: zodResolver(SeasonFormSchema) as Resolver<SeasonFormValues>,
+    mode: "onBlur",
+  });
 
   const createMutation = useCreateSeason({
     onSuccess: () => {
@@ -51,7 +61,7 @@ export const useSeasonManager = ({ seasons, titleId }: UseSeasonManagerProps) =>
       name: "",
       description: "",
       number: seasons.length + 1,
-      posterUrl: "",
+      posterFile: undefined,
     });
   };
 
@@ -59,8 +69,11 @@ export const useSeasonManager = ({ seasons, titleId }: UseSeasonManagerProps) =>
     setSeasonToDelete(null);
   };
 
-  const onSubmit = (data: CreateSeasonDto) => {
-    const payload = { ...data, titleId };
+  const onSubmit = (data: SeasonFormValues) => {
+    const payload = {
+      ...data,
+      titleId,
+    };
 
     if (editingSeason) return updateMutation.mutate({ id: editingSeason.id, payload });
     return createMutation.mutate(payload);
@@ -72,7 +85,7 @@ export const useSeasonManager = ({ seasons, titleId }: UseSeasonManagerProps) =>
       name: season.name,
       description: season.description,
       number: season.number,
-      posterUrl: season.posterUrl,
+      posterFile: undefined,
     });
     setIsModalOpen(true);
   };
@@ -83,7 +96,7 @@ export const useSeasonManager = ({ seasons, titleId }: UseSeasonManagerProps) =>
       name: "",
       description: "",
       number: seasons.length + 1,
-      posterUrl: "",
+      posterFile: undefined,
     });
     setIsModalOpen(true);
   };
@@ -105,6 +118,8 @@ export const useSeasonManager = ({ seasons, titleId }: UseSeasonManagerProps) =>
     editingSeason,
     register,
     handleSubmit,
+    control,
+    setValue,
     errors,
     createMutation,
     updateMutation,

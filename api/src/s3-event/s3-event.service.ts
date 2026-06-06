@@ -44,7 +44,7 @@ export class S3EventService implements OnModuleInit {
 
     const clientConfig = {
       region: this.config.region,
-      endpoint: this.config.endpoint,
+      endpoint: this.config.internalEndpoint,
       credentials: {
         accessKeyId: this.config.accessKeyId,
         secretAccessKey: this.config.secretAccessKey,

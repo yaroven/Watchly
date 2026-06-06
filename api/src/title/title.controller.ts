@@ -52,6 +52,11 @@ export class TitleController {
     return this.titleService.createMovieUploadingUrl(id);
   }
 
+  @Get(":id/poster-upload-url")
+  getPosterUploadUrl(@Param("id") id: string) {
+    return this.titleService.createPosterUploadingUrl(id);
+  }
+
   @Post(":id/transcode")
   transcodeMovie(@Param("id") id: string) {
     return this.titleService.transcode(id);

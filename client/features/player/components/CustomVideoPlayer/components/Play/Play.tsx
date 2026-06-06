@@ -15,6 +15,8 @@ export default function Play({ isPlaying, size, onToggle }: PlayProps) {
       onClick={onToggle}
       className={styles.playButton}
       style={{ width: size, height: size }}
+      aria-label={isPlaying ? "Pause video" : "Play video"}
+      title={isPlaying ? "Pause" : "Play"}
     >
       {isPlaying ? <Pause size={size} /> : <PlayIcon size={size} />}
     </button>

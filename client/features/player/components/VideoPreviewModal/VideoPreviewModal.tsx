@@ -1,7 +1,6 @@
 "use client";
 
 import CustomVideoPlayer from "@/features/player/components/CustomVideoPlayer";
-import { normalizeStreamUrl } from "@/shared/lib/normalize-stream-url";
 import Modal from "@/shared/ui/Modal";
 import { LoaderCircle } from "lucide-react";
 import styles from "./VideoPreviewModal.module.scss";
@@ -21,7 +20,6 @@ export default function VideoPreviewModal({
   title,
   isLoading,
 }: VideoPreviewModalProps) {
-  const fixed = streamUrl ? normalizeStreamUrl(streamUrl) : undefined;
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="xl">
       <div className={styles.container}>
@@ -34,8 +32,8 @@ export default function VideoPreviewModal({
               <LoaderCircle className={styles.loader} size={48} />
               <p>Fetching stream URL...</p>
             </div>
-          ) : fixed ? (
-            <CustomVideoPlayer src={fixed} />
+          ) : streamUrl ? (
+            <CustomVideoPlayer src={streamUrl} />
           ) : (
             <div className={styles.error}>Could not load video stream</div>
           )}

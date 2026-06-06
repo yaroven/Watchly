@@ -8,7 +8,8 @@ export interface S3Config {
   region: string;
   processedBucketName: string;
   rawBucketName: string;
-  endpoint: string;
+  internalEndpoint: string;
+  publicEndpoint: string;
   queueName: string;
 }
 
@@ -18,6 +19,7 @@ export default registerAs(S3ConfigName, () => ({
   region: process.env.S3_REGION || "us-east-1",
   rawBucketName: process.env.S3_RAW_BUCKET_NAME || "raw",
   processedBucketName: process.env.S3_PROCESSED_BUCKET_NAME || "content",
-  endpoint: process.env.S3_ENDPOINT || "http://localhost:4566",
+  internalEndpoint: process.env.S3_ENDPOINT_INTERNAL || "http://localhost:4566",
+  publicEndpoint: process.env.S3_ENDPOINT_PUBLIC || "http://localhost:4566",
   queueName: process.env.SQS_QUEUE_NAME || "s3-event-queue",
 }));
