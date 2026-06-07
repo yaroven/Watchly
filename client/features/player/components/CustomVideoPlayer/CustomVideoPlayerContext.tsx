@@ -1,36 +1,71 @@
-import { createContext, RefObject, useContext } from "react";
+import { ChangeEvent, createContext, RefObject, useContext } from "react";
 
-export interface VideoQuality {
-  level: number; // -1 for auto
-  height: number;
-  label: string;
+import { VideoQuality } from "./types";
+
+export interface PlayerRefs {
+  video: RefObject<HTMLVideoElement | null>;
+  container: RefObject<HTMLDivElement | null>;
 }
 
-interface CustomVideoPlayerContextType {
-  videoRef: RefObject<HTMLVideoElement | null>;
-  videoContainerRef: RefObject<HTMLDivElement | null>;
+export interface PlayerPlayback {
   isPlaying: boolean;
-  areControlsVisible: boolean;
-  isLoading: boolean;
+  isInitialLoading: boolean;
+  isBuffering: boolean;
   errorMessage: string | null;
-  timeline: number;
-  buffered: number;
-  duration: number;
-  volumeValue: number;
-  isMuted: boolean;
-  isFullscreen: boolean;
-  onPlayToggle: () => void;
-  onSeek: (time: number) => void;
-  onVolumeSeek: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onMuteToggle: () => void;
-  onFullscreenToggle: () => void;
-  quality: number;
-  setQuality: (quality: number) => void;
-  qualities: VideoQuality[];
-  currentLevelIndex: number;
+  toggle: () => void | Promise<void>;
+  seek: (time: number) => void;
+  skip: (offset: number) => void;
 }
 
-const CustomVideoPlayerContext = createContext<CustomVideoPlayerContextType | null>(null);
+export interface PlayerTimeline {
+  current: number;
+  duration: number;
+  buffered: number;
+}
+
+export interface PlayerVolume {
+  value: number;
+  isMuted: boolean;
+  set: (value: number | ((current: number) => number)) => void;
+  seek: (e: ChangeEvent<HTMLInputElement>) => void;
+  toggleMute: () => void;
+}
+
+export interface PlayerFullscreen {
+  active: boolean;
+  toggle: () => void;
+}
+
+export interface PlayerQuality {
+  selected: number;
+  options: VideoQuality[];
+  currentLevel: number;
+  set: (level: number) => void;
+}
+
+export interface PlayerPlaybackRate {
+  value: number;
+  options: readonly number[];
+  set: (rate: number) => void;
+  step: (direction: 1 | -1) => void;
+}
+
+export interface PlayerUI {
+  controlsVisible: boolean;
+}
+
+export interface CustomVideoPlayerContextValue {
+  refs: PlayerRefs;
+  playback: PlayerPlayback;
+  timeline: PlayerTimeline;
+  volume: PlayerVolume;
+  fullscreen: PlayerFullscreen;
+  quality: PlayerQuality;
+  playbackRate: PlayerPlaybackRate;
+  ui: PlayerUI;
+}
+
+const CustomVideoPlayerContext = createContext<CustomVideoPlayerContextValue | null>(null);
 
 export const useCustomVideoPlayer = () => {
   const context = useContext(CustomVideoPlayerContext);
@@ -39,5 +74,14 @@ export const useCustomVideoPlayer = () => {
   }
   return context;
 };
+
+export const usePlayerRefs = () => useCustomVideoPlayer().refs;
+export const usePlayerPlayback = () => useCustomVideoPlayer().playback;
+export const usePlayerTimeline = () => useCustomVideoPlayer().timeline;
+export const usePlayerVolume = () => useCustomVideoPlayer().volume;
+export const usePlayerFullscreen = () => useCustomVideoPlayer().fullscreen;
+export const usePlayerQuality = () => useCustomVideoPlayer().quality;
+export const usePlayerPlaybackRate = () => useCustomVideoPlayer().playbackRate;
+export const usePlayerUI = () => useCustomVideoPlayer().ui;
 
 export default CustomVideoPlayerContext;

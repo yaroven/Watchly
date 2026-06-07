@@ -1,24 +1,23 @@
 import { Pause, Play as PlayIcon } from "lucide-react";
 
+import { usePlayerPlayback } from "../../CustomVideoPlayerContext";
 import styles from "./Play.module.scss";
 
-interface PlayProps {
-  isPlaying: boolean;
-  size: number;
-  onToggle: () => void | Promise<void>;
-}
+const ICON_SIZE = 32;
 
-export default function Play({ isPlaying, size, onToggle }: PlayProps) {
+export default function Play() {
+  const { isPlaying, toggle } = usePlayerPlayback();
+
   return (
     <button
       type="button"
-      onClick={onToggle}
+      onClick={toggle}
       className={styles.playButton}
-      style={{ width: size, height: size }}
+      style={{ width: ICON_SIZE, height: ICON_SIZE }}
       aria-label={isPlaying ? "Pause video" : "Play video"}
       title={isPlaying ? "Pause" : "Play"}
     >
-      {isPlaying ? <Pause size={size} /> : <PlayIcon size={size} />}
+      {isPlaying ? <Pause size={ICON_SIZE} /> : <PlayIcon size={ICON_SIZE} />}
     </button>
   );
 }

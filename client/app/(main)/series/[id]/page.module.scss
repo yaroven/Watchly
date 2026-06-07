@@ -42,6 +42,12 @@
   }
 }
 
+.nowPlayingMeta {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
 @media (max-width: 640px) {
   .section {
     padding: 18px;

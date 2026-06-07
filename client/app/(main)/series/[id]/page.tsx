@@ -78,9 +78,9 @@ export default async function Page({ params, searchParams }: PageProps) {
       <SeriesDetailsClient
         seasons={seasons}
         episodes={episodes}
-        episodeUrl={episodeUrl}
+        initialEpisodeUrl={episodeUrl}
+        initialEpisodeId={currentEpisodeId}
         currentSeasonId={currentSeasonId}
-        currentEpisodeId={currentEpisodeId}
       />
     </div>
   );

@@ -1,11 +1,15 @@
 import type { Level } from "hls.js";
 
-import { VideoQuality } from "./hooks/useVideoPlayer";
+import { VideoQuality } from "./types";
 
 export function clampTime(time: number, duration: number) {
   if (!Number.isFinite(time)) return 0;
   if (!Number.isFinite(duration) || duration <= 0) return Math.max(time, 0);
   return Math.min(Math.max(time, 0), duration);
+}
+
+export function formatPlaybackRate(rate: number) {
+  return `${Number(rate.toFixed(2)).toString()}x`;
 }
 
 export function formatPlayerTime(time: number) {
@@ -19,6 +23,17 @@ export function formatPlayerTime(time: number) {
   }
 
   return [minutes, seconds].map((value) => value.toString().padStart(2, "0")).join(":");
+}
+
+export function getQualityOptionLabel(
+  option: VideoQuality,
+  options: VideoQuality[],
+  currentLevel: number,
+) {
+  if (option.level !== -1 || currentLevel === -1) return option.label;
+
+  const activeOption = options.find((item) => item.level === currentLevel);
+  return activeOption ? `Auto (${activeOption.label})` : option.label;
 }
 
 export function createQualityOptions(levels: Level[]): VideoQuality[] {

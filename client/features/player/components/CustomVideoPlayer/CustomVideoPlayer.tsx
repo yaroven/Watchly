@@ -1,89 +1,43 @@
 "use client";
 
-import { LoaderCircle, PlayIcon } from "lucide-react";
 import { forwardRef, useImperativeHandle, useRef } from "react";
 
 import styles from "./CustomVideoPlayer.module.scss";
-import { useCustomVideoPlayer } from "./CustomVideoPlayerContext";
+import {
+  usePlayerFullscreen,
+  usePlayerPlayback,
+  usePlayerRefs,
+  usePlayerUI,
+} from "./CustomVideoPlayerContext";
 import CustomVideoPlayerProvider from "./CustomVideoPlayerProvider";
 import PlayerControls from "./components/PlayerControls";
-import { clampTime } from "./utils";
+import PlayerOverlay from "./components/PlayerOverlay";
+import VideoTapZones from "./components/VideoTapZones";
 
 function CustomVideoPlayerContent() {
-  const {
-    videoRef,
-    videoContainerRef,
-    isPlaying,
-    isLoading,
-    errorMessage,
-    areControlsVisible,
-    onPlayToggle,
-    onSeek,
-    onFullscreenToggle,
-  } = useCustomVideoPlayer();
+  const { video, container } = usePlayerRefs();
+  const { isPlaying, isInitialLoading, errorMessage, toggle, skip } = usePlayerPlayback();
+  const { toggle: toggleFullscreen } = usePlayerFullscreen();
+  const { controlsVisible } = usePlayerUI();
 
-  const skipBy = (offset: number) => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    onSeek(clampTime(video.currentTime + offset, video.duration || 0));
-  };
-
-  const handleLeftDoubleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    skipBy(-10);
-  };
-
-  const handleRightDoubleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    skipBy(10);
-  };
-
-  const handleCenterDoubleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onFullscreenToggle();
-  };
+  const containerClassName = [
+    styles.videoPlayerContainer,
+    isInitialLoading && styles.isLoading,
+    !controlsVisible && styles.hideCursor,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <div
-      className={`${styles.videoPlayerContainer} ${isLoading && styles.isLoading} ${!areControlsVisible && styles.hideCursor}`}
-      ref={videoContainerRef}
-    >
-      <video
-        className={styles.videoPlayer}
-        ref={videoRef}
-        playsInline
-        preload="metadata"
+    <div className={containerClassName} ref={container}>
+      <video className={styles.videoPlayer} ref={video} playsInline preload="metadata" />
+      <VideoTapZones onTap={toggle} onSkip={skip} onFullscreen={toggleFullscreen} />
+      <PlayerOverlay
+        isPlaying={isPlaying}
+        isInitialLoading={isInitialLoading}
+        errorMessage={errorMessage}
+        onPlay={toggle}
       />
-      <div className={styles.doubleClickLayer}>
-        <div
-          className={styles.dcLeft}
-          onClick={onPlayToggle}
-          onDoubleClick={handleLeftDoubleClick}
-        />
-        <div
-          className={styles.dcCenter}
-          onClick={onPlayToggle}
-          onDoubleClick={handleCenterDoubleClick}
-        />
-        <div
-          className={styles.dcRight}
-          onClick={onPlayToggle}
-          onDoubleClick={handleRightDoubleClick}
-        />
-      </div>
-      {!isPlaying && !isLoading && !errorMessage && (
-        <button
-          type="button"
-          onClick={onPlayToggle}
-          className={styles.centerPlayButton}
-          aria-label="Play video"
-        >
-          <PlayIcon size={64} />
-        </button>
-      )}
-      {isLoading && !errorMessage && <LoaderCircle className={styles.loader} size={64} />}
-      {errorMessage && <div className={styles.errorMessage}>{errorMessage}</div>}
       <PlayerControls />
     </div>
   );
@@ -91,15 +45,16 @@ function CustomVideoPlayerContent() {
 
 interface CustomVideoPlayerProps {
   src: string;
+  onEnded?: () => void;
 }
 
 const CustomVideoPlayer = forwardRef<HTMLVideoElement, CustomVideoPlayerProps>(
-  function CustomVideoPlayer({ src }, ref) {
+  function CustomVideoPlayer({ src, onEnded }, ref) {
     const videoRef = useRef<HTMLVideoElement>(null);
     useImperativeHandle(ref, () => videoRef.current as HTMLVideoElement, []);
 
     return (
-      <CustomVideoPlayerProvider videoRef={videoRef} src={src}>
+      <CustomVideoPlayerProvider videoRef={videoRef} src={src} onEnded={onEnded}>
         <CustomVideoPlayerContent />
       </CustomVideoPlayerProvider>
     );

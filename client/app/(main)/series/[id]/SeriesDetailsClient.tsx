@@ -1,44 +1,111 @@
 "use client";
 
+import EpisodeService from "@/features/episodes/api/episode.service";
 import EpisodeList from "@/features/episodes/components/EpisodeList";
 import { Episode } from "@/features/episodes/schemas/episode";
 import CustomVideoPlayer from "@/features/player/components/CustomVideoPlayer";
+import { VideoPlayerSkeleton } from "@/features/player/components/CustomVideoPlayer";
 import SeasonTabs from "@/features/season/components/SeasonTabs";
 import { Season } from "@/features/season/schemas/season";
+import TranscodingStatus from "@/types/transcoding-status";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./page.module.scss";
 
 interface SeriesDetailsClientProps {
   seasons: Season[];
   episodes: Episode[];
-  episodeUrl?: string;
+  initialEpisodeUrl?: string;
+  initialEpisodeId: string;
   currentSeasonId: string;
-  currentEpisodeId: string;
 }
 
 export default function SeriesDetailsClient({
   seasons,
   episodes,
-  episodeUrl,
+  initialEpisodeUrl,
+  initialEpisodeId,
   currentSeasonId,
-  currentEpisodeId,
 }: SeriesDetailsClientProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const handleEpisodeChange = (id: string) => {
-    const newParams = new URLSearchParams(searchParams.toString());
-    newParams.set("episode", id);
-    router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
-  };
+  const episodeIdFromUrl = searchParams.get("episode");
+  const fallbackEpisodeId = episodes.some((episode) => episode.id === initialEpisodeId)
+    ? initialEpisodeId
+    : (episodes[0]?.id ?? "");
+  const activeEpisodeId = episodeIdFromUrl ?? fallbackEpisodeId;
 
-  const handleSeasonChange = (id: string) => {
-    const newParams = new URLSearchParams(searchParams.toString());
-    newParams.set("season", id);
-    newParams.delete("episode");
-    router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
-  };
+  const activeEpisode = useMemo(
+    () => episodes.find((episode) => episode.id === activeEpisodeId) ?? episodes[0],
+    [activeEpisodeId, episodes],
+  );
+
+  const [streamUrl, setStreamUrl] = useState(initialEpisodeUrl ?? "");
+  const [isStreamLoading, setIsStreamLoading] = useState(false);
+
+  useEffect(() => {
+    if (!activeEpisodeId) {
+      setStreamUrl("");
+      return;
+    }
+
+    if (activeEpisodeId === initialEpisodeId && initialEpisodeUrl) {
+      setStreamUrl(initialEpisodeUrl);
+      return;
+    }
+
+    let cancelled = false;
+    setIsStreamLoading(true);
+
+    EpisodeService.getStreamUrl(activeEpisodeId)
+      .then((url) => {
+        if (!cancelled) setStreamUrl(url);
+      })
+      .catch(() => {
+        if (!cancelled) setStreamUrl("");
+      })
+      .finally(() => {
+        if (!cancelled) setIsStreamLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeEpisodeId, initialEpisodeId, initialEpisodeUrl]);
+
+  const handleEpisodeChange = useCallback(
+    (id: string) => {
+      const newParams = new URLSearchParams(searchParams.toString());
+      newParams.set("episode", id);
+      router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
+
+  const handleSeasonChange = useCallback(
+    (id: string) => {
+      const newParams = new URLSearchParams(searchParams.toString());
+      newParams.set("season", id);
+      newParams.delete("episode");
+      router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
+
+  const handleEpisodeEnded = useCallback(() => {
+    if (!activeEpisode) return;
+
+    const currentIndex = episodes.findIndex((episode) => episode.id === activeEpisode.id);
+    const nextEpisode = episodes[currentIndex + 1];
+
+    if (!nextEpisode || nextEpisode.transcodingStatus !== TranscodingStatus.COMPLETED) return;
+
+    handleEpisodeChange(nextEpisode.id);
+  }, [activeEpisode, episodes, handleEpisodeChange]);
+
+  const isEpisodeAvailable = activeEpisode?.transcodingStatus === TranscodingStatus.COMPLETED;
 
   return (
     <>
@@ -46,11 +113,24 @@ export default function SeriesDetailsClient({
         <div className={styles.sectionHeader}>
           <div>
             <h3>Now playing</h3>
-            <p>Switch episodes without leaving the page.</p>
+            {activeEpisode ? (
+              <p className={styles.nowPlayingMeta}>
+                E{activeEpisode.number} · {activeEpisode.name}
+              </p>
+            ) : (
+              <p>Switch episodes without leaving the page.</p>
+            )}
           </div>
         </div>
-        {episodeUrl ? (
-          <CustomVideoPlayer src={episodeUrl} />
+
+        {isStreamLoading ? (
+          <VideoPlayerSkeleton />
+        ) : streamUrl && isEpisodeAvailable ? (
+          <CustomVideoPlayer
+            key={activeEpisodeId}
+            src={streamUrl}
+            onEnded={handleEpisodeEnded}
+          />
         ) : (
           <div className={styles.noContent}>
             Video stream is not available for the selected episode yet.
@@ -58,22 +138,7 @@ export default function SeriesDetailsClient({
         )}
       </section>
 
-      <section className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <h3>Episodes</h3>
-        </div>
-        {episodes?.length ? (
-          <EpisodeList
-            episodes={episodes}
-            onClick={handleEpisodeChange}
-            currentEpisodeId={currentEpisodeId}
-          />
-        ) : (
-          <div className={styles.noContent}>Episodes for this season have not been added yet.</div>
-        )}
-      </section>
-
-      {seasons?.length > 0 && (
+      {seasons.length > 0 && (
         <section className={styles.section}>
           <div className={styles.sectionHeader}>
             <h3>Seasons</h3>
@@ -85,6 +150,21 @@ export default function SeriesDetailsClient({
           />
         </section>
       )}
+
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <h3>Episodes</h3>
+        </div>
+        {episodes.length ? (
+          <EpisodeList
+            episodes={episodes}
+            onClick={handleEpisodeChange}
+            currentEpisodeId={activeEpisode?.id ?? ""}
+          />
+        ) : (
+          <div className={styles.noContent}>Episodes for this season have not been added yet.</div>
+        )}
+      </section>
     </>
   );
 }

@@ -1,4 +1,6 @@
-import { useCustomVideoPlayer } from "../../CustomVideoPlayerContext";
+import { LoaderCircle } from "lucide-react";
+
+import { usePlayerPlayback, usePlayerTimeline, usePlayerUI } from "../../CustomVideoPlayerContext";
 import { formatPlayerTime } from "../../utils";
 import Fullscreen from "../Fullscreen";
 import Play from "../Play";
@@ -8,46 +10,29 @@ import Volume from "../Volume";
 import styles from "./PlayerControls.module.scss";
 
 export default function PlayerControls() {
-  const {
-    isPlaying,
-    timeline,
-    duration,
-    volumeValue,
-    isMuted,
-    isFullscreen,
-    onPlayToggle,
-    onSeek,
-    onVolumeSeek,
-    onMuteToggle,
-    onFullscreenToggle,
-    areControlsVisible,
-    buffered,
-  } = useCustomVideoPlayer();
+  const { current, duration } = usePlayerTimeline();
+  const { isBuffering } = usePlayerPlayback();
+  const { controlsVisible } = usePlayerUI();
+
   return (
-    <div className={`${styles.controlBar} ${!areControlsVisible ? styles.hidden : ""}`}>
+    <div className={`${styles.controlBar} ${!controlsVisible ? styles.hidden : ""}`}>
       <div className={styles.topPart}>
         <div className={styles.timeline}>
-          {formatPlayerTime(timeline)} / {formatPlayerTime(duration)}
+          {isBuffering && (
+            <LoaderCircle className={styles.bufferingIcon} size={14} aria-label="Buffering" />
+          )}
+          {formatPlayerTime(current)} / {formatPlayerTime(duration)}
         </div>
-        <ProgressBar
-          max={duration}
-          value={timeline}
-          buffered={buffered}
-          onChange={(e) => onSeek(parseFloat(e.target.value))}
-        />
+        <ProgressBar />
       </div>
       <div className={styles.bottomPart}>
         <div className={styles.playAndVolume}>
-          <Play isPlaying={isPlaying} onToggle={onPlayToggle} size={32} />
-          <Volume
-            onSeek={onVolumeSeek}
-            volume={isMuted ? 0 : volumeValue}
-            onToggle={onMuteToggle}
-          />
+          <Play />
+          <Volume />
         </div>
         <div className={styles.rightControls}>
           <Settings />
-          <Fullscreen isFullscreen={isFullscreen} onClick={onFullscreenToggle} />
+          <Fullscreen />
         </div>
       </div>
     </div>
