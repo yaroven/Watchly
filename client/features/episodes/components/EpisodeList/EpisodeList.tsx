@@ -1,4 +1,5 @@
 import { Episode } from "@/features/episodes/schemas/episode";
+
 import EpisodeItem from "../EpisodeItem";
 import styles from "./EpisodeList.module.scss";
 
@@ -11,12 +12,14 @@ interface EpisodeListProps {
 export default function EpisodeList({ episodes, currentEpisodeId, onClick }: EpisodeListProps) {
   return (
     <div className={styles.episodeList}>
-      {episodes.map(({ id, number }) => (
+      {episodes.map((episode) => (
         <EpisodeItem
-          key={id}
-          onClick={() => onClick(id)}
-          number={number}
-          isActive={id === currentEpisodeId}
+          key={episode.id}
+          onClick={() => onClick(episode.id)}
+          number={episode.number}
+          name={episode.name}
+          transcodingStatus={episode.transcodingStatus}
+          isActive={episode.id === currentEpisodeId}
         />
       ))}
     </div>

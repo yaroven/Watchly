@@ -32,7 +32,7 @@
 
 .settingsPopup {
   position: absolute;
-  bottom: 44px; /* Adjust based on your layout */
+  bottom: 44px;
   right: 0;
   background: rgba(15, 15, 15, 0.85);
   backdrop-filter: blur(16px);
@@ -41,13 +41,62 @@
   padding: 6px;
   display: flex;
   flex-direction: column;
-  min-width: 140px;
+  gap: 4px;
+  min-width: 160px;
   z-index: 20;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
   animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.qualityOption {
+.tabList {
+  display: flex;
+  gap: 4px;
+  padding: 2px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tab {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.65);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 10px;
+  border-radius: 6px;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+
+  &:hover {
+    color: #fff;
+  }
+
+  &:focus-visible {
+    outline: 2px solid #818cf8;
+    outline-offset: -2px;
+  }
+}
+
+.tabActive {
+  color: #fff;
+  background: rgba(99, 102, 241, 0.35);
+}
+
+.tabPanel {
+  display: flex;
+  flex-direction: column;
+  max-height: min(60vh, 320px);
+  overflow-y: auto;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.menuOption {
   border: 0;
   background: transparent;
   text-align: left;

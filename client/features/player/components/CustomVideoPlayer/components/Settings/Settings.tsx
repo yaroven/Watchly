@@ -1,76 +1,82 @@
 import { Settings as SettingsIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { useCustomVideoPlayer } from "../../CustomVideoPlayerContext";
+import { useState } from "react";
+
+import { usePlayerPlaybackRate, usePlayerQuality } from "../../CustomVideoPlayerContext";
+import useDismissiblePanel from "../../hooks/useDismissiblePanel";
+import { formatPlaybackRate } from "../../utils";
+import QualityMenu from "./QualityMenu";
+import SpeedMenu from "./SpeedMenu";
 import styles from "./Settings.module.scss";
 
+type SettingsTab = "quality" | "speed";
+
+const TABS: { id: SettingsTab; label: string }[] = [
+  { id: "quality", label: "Quality" },
+  { id: "speed", label: "Speed" },
+];
+
 export default function Settings() {
-  const { quality, setQuality, qualities, currentLevelIndex } = useCustomVideoPlayer();
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const panel = useDismissiblePanel();
+  const { set: setQuality } = usePlayerQuality();
+  const { value: playbackRate } = usePlayerPlaybackRate();
+  const [activeTab, setActiveTab] = useState<SettingsTab>("quality");
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleEscape);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [isOpen]);
+  const handleQualitySelect = (level: number) => {
+    setQuality(level);
+    panel.close();
+  };
 
   return (
-    <div ref={containerRef} className={styles.settingsContainer}>
+    <div ref={panel.ref} className={styles.settingsContainer}>
       <button
         type="button"
         className={styles.settingsButton}
-        onClick={() => setIsOpen((value) => !value)}
-        aria-expanded={isOpen}
-        aria-label="Video quality settings"
-        title="Quality"
+        onClick={panel.toggle}
+        aria-expanded={panel.isOpen}
+        aria-label="Video settings"
+        title={`Settings (${formatPlaybackRate(playbackRate)})`}
       >
         <SettingsIcon className={styles.settingsIcon} />
       </button>
-      {isOpen && (
-        <div className={styles.settingsPopup}>
-          {qualities.length > 0 ? (
-            qualities.map((option) => {
-              const displayLabel =
-                option.level === -1 && currentLevelIndex !== -1
-                  ? `Auto (${qualities.find((q) => q.level === currentLevelIndex)?.label || ""})`
-                  : option.label;
 
-              return (
-                <button
-                  key={option.level}
-                  type="button"
-                  className={`${styles.qualityOption} ${quality === option.level ? styles.active : ""}`}
-                  onClick={() => {
-                    setQuality(option.level);
-                    setIsOpen(false);
-                  }}
-                  aria-pressed={quality === option.level}
-                >
-                  {displayLabel}
-                </button>
-              );
-            })
-          ) : (
-            <div className={styles.qualityOption}>Auto</div>
-          )}
+      {panel.isOpen && (
+        <div className={styles.settingsPopup}>
+          <div className={styles.tabList} role="tablist" aria-label="Video settings">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                id={`settings-tab-${tab.id}`}
+                aria-selected={activeTab === tab.id}
+                aria-controls={`settings-panel-${tab.id}`}
+                className={`${styles.tab} ${activeTab === tab.id ? styles.tabActive : ""}`}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div
+            role="tabpanel"
+            id="settings-panel-quality"
+            aria-labelledby="settings-tab-quality"
+            hidden={activeTab !== "quality"}
+            className={styles.tabPanel}
+          >
+            <QualityMenu onSelect={handleQualitySelect} />
+          </div>
+
+          <div
+            role="tabpanel"
+            id="settings-panel-speed"
+            aria-labelledby="settings-tab-speed"
+            hidden={activeTab !== "speed"}
+            className={styles.tabPanel}
+          >
+            <SpeedMenu />
+          </div>
         </div>
       )}
     </div>

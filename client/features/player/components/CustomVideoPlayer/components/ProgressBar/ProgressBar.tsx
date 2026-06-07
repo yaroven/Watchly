@@ -1,17 +1,24 @@
-import { CSSProperties, ChangeEvent } from "react";
+import { CSSProperties, useState } from "react";
+
+import { usePlayerPlayback, usePlayerTimeline } from "../../CustomVideoPlayerContext";
 import styles from "./ProgressBar.module.scss";
 
-interface ProgressBarProps {
-  max: number;
-  value: number;
-  buffered: number;
-  onChange: (e: ChangeEvent<HTMLInputElement>) => void;
-}
+export default function ProgressBar() {
+  const { current, duration, buffered } = usePlayerTimeline();
+  const { seek } = usePlayerPlayback();
+  const [scrubTime, setScrubTime] = useState<number | null>(null);
 
-export default function ProgressBar({ max, value, buffered, onChange }: ProgressBarProps) {
-  const safeMax = max > 0 ? max : 0;
-  const playedPercentage = safeMax > 0 ? Math.min((value / safeMax) * 100, 100) : 0;
+  const safeMax = duration > 0 ? duration : 0;
+  const displayTime = scrubTime ?? current;
+  const playedPercentage = safeMax > 0 ? Math.min((displayTime / safeMax) * 100, 100) : 0;
   const bufferedPercentage = safeMax > 0 ? Math.min((buffered / safeMax) * 100, 100) : 0;
+
+  const handleInput = (value: number) => {
+    setScrubTime(value);
+    seek(value);
+  };
+
+  const endScrub = () => setScrubTime(null);
 
   return (
     <div
@@ -28,12 +35,17 @@ export default function ProgressBar({ max, value, buffered, onChange }: Progress
       <input
         type="range"
         min="0"
-        step={0.5}
+        step="any"
         max={safeMax}
-        value={Math.min(value, safeMax)}
-        onChange={onChange}
+        value={Math.min(displayTime, safeMax)}
+        onInput={(event) => handleInput(parseFloat(event.currentTarget.value))}
+        onPointerUp={endScrub}
+        onPointerCancel={endScrub}
         className={styles.rangeInput}
         aria-label="Seek video"
+        aria-valuemin={0}
+        aria-valuemax={safeMax}
+        aria-valuenow={displayTime}
       />
     </div>
   );

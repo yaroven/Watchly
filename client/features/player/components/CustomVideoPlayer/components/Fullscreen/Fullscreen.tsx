@@ -1,21 +1,20 @@
 import { Expand, Shrink } from "lucide-react";
+
+import { usePlayerFullscreen } from "../../CustomVideoPlayerContext";
 import styles from "./Fullscreen.module.scss";
 
-interface FullscreenProps {
-  isFullscreen: boolean;
-  onClick: () => void;
-}
+export default function Fullscreen() {
+  const { active, toggle } = usePlayerFullscreen();
 
-export default function Fullscreen({ isFullscreen, onClick }: FullscreenProps) {
   return (
     <button
       type="button"
       className={styles.screenButton}
-      onClick={onClick}
-      aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-      title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+      onClick={toggle}
+      aria-label={active ? "Exit fullscreen" : "Enter fullscreen"}
+      title={active ? "Exit fullscreen" : "Fullscreen"}
     >
-      {isFullscreen ? <Shrink /> : <Expand />}
+      {active ? <Shrink /> : <Expand />}
     </button>
   );
 }
