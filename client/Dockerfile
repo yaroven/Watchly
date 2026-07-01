@@ -1,62 +1,28 @@
-FROM node:alpine AS deps
+FROM node:22-alpine AS base
+WORKDIR /app
 
-WORKDIR /frontend
+COPY package.json yarn.lock ./
+COPY client/package.json ./client/package.json
 
-ARG NEXT_PUBLIC_BACKEND_API_URL
-ARG BACKEND_API_URL
-ARG NEXT_PUBLIC_APP_URL
-ARG NEXT_PUBLIC_REMOTE_IMAGE_HOSTNAME
+RUN yarn install --frozen-lockfile && yarn cache clean
 
-ENV HUSKY=0
-ENV BACKEND_API_URL=$BACKEND_API_URL
-ENV NEXT_PUBLIC_BACKEND_API_URL=$NEXT_PUBLIC_BACKEND_API_URL
-ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
-ENV NEXT_PUBLIC_REMOTE_IMAGE_HOSTNAME=$NEXT_PUBLIC_REMOTE_IMAGE_HOSTNAME
+FROM base AS builder
+WORKDIR /app
 
-COPY package*.json yarn.lock ./
+COPY . .
+RUN yarn workspace client build
 
-RUN yarn install --frozen-lockfile --ignore-scripts
+FROM node:22-alpine AS runner
+WORKDIR /app
 
-FROM deps AS dev
+ENV NODE_ENV=production
 
-EXPOSE 4000
-
-CMD ["yarn", "dev"]
-
-FROM deps AS builder
-
-WORKDIR /frontend
-
-COPY app ./app
-COPY public ./public
-COPY next.config.ts ./
-COPY tsconfig.json ./
-COPY eslint.config.mjs ./
-COPY next-env.d.ts ./
-
-RUN yarn build
-
-
-FROM node:alpine AS runner
-
-WORKDIR /frontend
-
-ARG NEXT_PUBLIC_BACKEND_API_URL
-ARG BACKEND_API_URL
-ARG NEXT_PUBLIC_APP_URL
-ARG NEXT_PUBLIC_REMOTE_IMAGE_HOSTNAME
-
-ENV HUSKY=0
-ENV BACKEND_API_URL=$BACKEND_API_URL
-ENV NEXT_PUBLIC_BACKEND_API_URL=$NEXT_PUBLIC_BACKEND_API_URL
-ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
-ENV NEXT_PUBLIC_REMOTE_IMAGE_HOSTNAME=$NEXT_PUBLIC_REMOTE_IMAGE_HOSTNAME
-
-COPY --from=builder /frontend/package.json ./package.json
-COPY --from=builder /frontend/node_modules ./node_modules
-COPY --from=builder /frontend/.next ./.next
-COPY --from=builder /frontend/public ./public
+COPY --from=builder /app/client/public ./client/public
+COPY --from=builder /app/client/.next/static ./client/.next/static
 
 EXPOSE 4000
 
-CMD ["yarn", "start"]
+ENV PORT=4000
+ENV HOSTNAME="0.0.0.0"
+
+CMD ["node", "client/server.js"]

@@ -1,34 +1,61 @@
 "use client";
 
 import Hls from "hls.js";
-import { RefObject, useCallback, useEffect, useRef, useState } from "react";
-
-import { VideoQuality } from "../types";
+import { RefObject, useCallback, useEffect, useRef } from "react";
+import { StoreApi } from "zustand";
+import { PlayerStoreState } from "../store/playerStore";
 import { createQualityOptions } from "../utils";
 
 interface UseHlsPlayerOptions {
   beginSourceLoad: () => void;
   clearSource: () => void;
-  setErrorMessage: (message: string | null) => void;
-  setIsInitialLoading: (value: boolean) => void;
-  setIsBuffering: (value: boolean) => void;
 }
 
 export default function useHlsPlayer(
   videoRef: RefObject<HTMLVideoElement | null>,
   src: string | undefined,
-  { beginSourceLoad, clearSource, setErrorMessage, setIsInitialLoading, setIsBuffering }: UseHlsPlayerOptions,
+  store: StoreApi<PlayerStoreState>,
+  { beginSourceLoad, clearSource }: UseHlsPlayerOptions,
 ) {
   const hlsRef = useRef<Hls | null>(null);
-  const [qualities, setQualities] = useState<VideoQuality[]>([]);
-  const [quality, setQualityState] = useState(-1);
-  const [currentLevelIndex, setCurrentLevelIndex] = useState(-1);
 
   const resetQualityState = useCallback(() => {
-    setQualities([]);
-    setQualityState(-1);
-    setCurrentLevelIndex(-1);
-  }, []);
+    store.setState({
+      qualities: [],
+      quality: -1,
+      currentLevelIndex: -1,
+    });
+  }, [store]);
+
+  const setQuality = useCallback(
+    (level: number) => {
+      const hls = hlsRef.current;
+
+      if (!hls) {
+        store.setState({ quality: level });
+        return;
+      }
+
+      const isAuto = level === -1;
+      const isAlreadySelected = isAuto
+        ? hls.autoLevelEnabled
+        : !hls.autoLevelEnabled && hls.loadLevel === level;
+
+      if (isAlreadySelected) return;
+
+      store.setState({ quality: level });
+      hls.nextLevel = level;
+      hls.loadLevel = level;
+    },
+    [store],
+  );
+
+  // Register setQuality action to the store
+  useEffect(() => {
+    store.setState({
+      setQuality,
+    } as Partial<PlayerStoreState>);
+  }, [setQuality, store]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -57,7 +84,7 @@ export default function useHlsPlayer(
       });
 
       const syncQualityOptions = () => {
-        setQualities(createQualityOptions(hls.levels));
+        store.setState({ qualities: createQualityOptions(hls.levels) });
       };
 
       hlsRef.current = hls;
@@ -69,8 +96,10 @@ export default function useHlsPlayer(
       hls.on(Hls.Events.LEVELS_UPDATED, syncQualityOptions);
 
       hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
-        setCurrentLevelIndex(data.level);
-        setQualityState(hls.autoLevelEnabled ? -1 : data.level);
+        store.setState({
+          currentLevelIndex: data.level,
+          quality: hls.autoLevelEnabled ? -1 : data.level,
+        });
       });
 
       hls.on(Hls.Events.ERROR, (_, data) => {
@@ -78,17 +107,19 @@ export default function useHlsPlayer(
 
         switch (data.type) {
           case Hls.ErrorTypes.NETWORK_ERROR:
-            setErrorMessage("Network error while loading video. Retrying...");
+            store.setState({ errorMessage: "Network error while loading video. Retrying..." });
             hls.startLoad();
             break;
           case Hls.ErrorTypes.MEDIA_ERROR:
-            setErrorMessage("Playback error. Recovering...");
+            store.setState({ errorMessage: "Playback error. Recovering..." });
             hls.recoverMediaError();
             break;
           default:
-            setIsInitialLoading(false);
-            setIsBuffering(false);
-            setErrorMessage("Video stream is unavailable");
+            store.setState({
+              isInitialLoading: false,
+              isBuffering: false,
+              errorMessage: "Video stream is unavailable",
+            });
             hls.destroy();
             hlsRef.current = null;
             break;
@@ -117,37 +148,8 @@ export default function useHlsPlayer(
     beginSourceLoad,
     clearSource,
     resetQualityState,
-    setErrorMessage,
-    setIsBuffering,
-    setIsInitialLoading,
     src,
     videoRef,
+    store,
   ]);
-
-  const setQuality = useCallback((level: number) => {
-    const hls = hlsRef.current;
-
-    if (!hls) {
-      setQualityState(level);
-      return;
-    }
-
-    const isAuto = level === -1;
-    const isAlreadySelected = isAuto
-      ? hls.autoLevelEnabled
-      : !hls.autoLevelEnabled && hls.loadLevel === level;
-
-    if (isAlreadySelected) return;
-
-    setQualityState(level);
-    hls.nextLevel = level;
-    hls.loadLevel = level;
-  }, []);
-
-  return {
-    qualities,
-    quality,
-    setQuality,
-    currentLevelIndex,
-  };
 }

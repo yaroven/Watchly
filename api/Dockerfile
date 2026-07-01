@@ -1,56 +1,35 @@
-FROM node:alpine AS deps
-
+FROM node:22-alpine AS base
 WORKDIR /app
+RUN apk add --no-cache libc6-compat ffmpeg
 
-COPY package*.json ./
-COPY yarn.lock ./
+COPY package.json yarn.lock ./
+COPY api/package.json ./api/
 
-RUN yarn install --frozen-lockfile || yarn install
+RUN yarn install --frozen-lockfile && yarn cache clean
 
-FROM deps AS dev
-
+FROM base AS builder
 WORKDIR /app
+COPY . .
 
-RUN apk add --no-cache ffmpeg
+RUN yarn workspace api build
 
-COPY prisma ./prisma
-COPY prisma.config.ts ./
+FROM node:22-alpine AS runner
+WORKDIR /app
+RUN apk add --no-cache libc6-compat ffmpeg
 
-ENV PATH="/app/node_modules/.bin:${PATH}"
+ENV NODE_ENV=production
+
+COPY package.json yarn.lock ./
+COPY api/package.json ./api/
+
+RUN yarn install --frozen-lockfile --production && yarn cache clean
+
+COPY --from=builder /app/api/dist ./api/dist
+COPY --from=builder /app/api/prisma ./api/prisma
+COPY --from=builder /app/api/prisma.config.ts ./api/prisma.config.ts
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "yarn wait-on tcp:db:5432 && yarn prisma generate && yarn prisma migrate deploy && yarn dev"]
-
-FROM deps AS builder
-
-WORKDIR /app
-
-COPY src ./src
-COPY prisma ./prisma
-COPY eslint.config.mjs ./
-COPY tsconfig.json ./
-COPY prisma.config.ts ./
-
-ENV PATH="/app/node_modules/.bin:${PATH}"
-
-RUN yarn prisma generate && yarn build
-
-
-
-
-FROM node:alpine AS runner
-
-WORKDIR /app
-
-RUN apk add --no-cache ffmpeg
-
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
-
-EXPOSE 3000
-
-CMD ["sh", "-c", "yarn wait-on tcp:db:5432 && yarn prisma generate && yarn prisma migrate deploy && yarn prod"]
+CMD ["yarn", "workspace", "api", "prod"]

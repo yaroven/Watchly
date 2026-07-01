@@ -32,9 +32,7 @@ export class EpisodeController {
   async findOne(@Param("id") id: string): Promise<Episode> {
     const episode = await this.episodeService.findOne(id);
 
-    if (!episode) {
-      throw new NotFoundException(`Episode with id ${id} not found`);
-    }
+    if (!episode) throw new NotFoundException(`Episode with id ${id} not found`);
 
     return episode;
   }
@@ -45,8 +43,8 @@ export class EpisodeController {
   }
 
   @Delete(":id")
-  remove(@Param("id") id: string) {
-    return this.episodeService.remove(id);
+  delete(@Param("id") id: string) {
+    return this.episodeService.delete(id);
   }
 
   @Post(":id/transcode")

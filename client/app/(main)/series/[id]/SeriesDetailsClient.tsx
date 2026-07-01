@@ -8,7 +8,7 @@ import { VideoPlayerSkeleton } from "@/features/player/components/CustomVideoPla
 import SeasonTabs from "@/features/season/components/SeasonTabs";
 import { Season } from "@/features/season/schemas/season";
 import TranscodingStatus from "@/types/transcoding-status";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useQueryState } from "nuqs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./page.module.scss";
 
@@ -27,15 +27,20 @@ export default function SeriesDetailsClient({
   initialEpisodeId,
   currentSeasonId,
 }: SeriesDetailsClientProps) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const [episodeId, setEpisodeId] = useQueryState("episode", {
+    history: "replace",
+    shallow: true,
+  });
+  const [seasonId, setSeasonId] = useQueryState("season", {
+    history: "replace",
+    shallow: true,
+  });
+  const [, setT] = useQueryState("t");
 
-  const episodeIdFromUrl = searchParams.get("episode");
   const fallbackEpisodeId = episodes.some((episode) => episode.id === initialEpisodeId)
     ? initialEpisodeId
     : (episodes[0]?.id ?? "");
-  const activeEpisodeId = episodeIdFromUrl ?? fallbackEpisodeId;
+  const activeEpisodeId = episodeId ?? fallbackEpisodeId;
 
   const activeEpisode = useMemo(
     () => episodes.find((episode) => episode.id === activeEpisodeId) ?? episodes[0],
@@ -77,21 +82,19 @@ export default function SeriesDetailsClient({
 
   const handleEpisodeChange = useCallback(
     (id: string) => {
-      const newParams = new URLSearchParams(searchParams.toString());
-      newParams.set("episode", id);
-      router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
+      void setEpisodeId(id, { scroll: false });
+      void setT(null, { scroll: false });
     },
-    [pathname, router, searchParams],
+    [setEpisodeId, setT],
   );
 
   const handleSeasonChange = useCallback(
     (id: string) => {
-      const newParams = new URLSearchParams(searchParams.toString());
-      newParams.set("season", id);
-      newParams.delete("episode");
-      router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
+      void setSeasonId(id, { scroll: false });
+      void setEpisodeId(null, { scroll: false });
+      void setT(null, { scroll: false });
     },
-    [pathname, router, searchParams],
+    [setSeasonId, setEpisodeId, setT],
   );
 
   const handleEpisodeEnded = useCallback(() => {

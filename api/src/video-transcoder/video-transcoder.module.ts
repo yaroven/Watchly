@@ -1,7 +1,7 @@
 import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { PrismaModule } from "../prisma/prisma.module";
-import { S3Module } from "../S3/S3.module";
+import { S3Module } from "../s3/s3.module";
 import { VideoTranscoderProcessor } from "./video-transcoder-processor";
 import { VideoTranscoderController } from "./video-transcoder.controller";
 import { VideoTranscoderService } from "./video-transcoder.service";

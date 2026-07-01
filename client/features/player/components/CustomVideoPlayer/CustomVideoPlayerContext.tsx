@@ -1,87 +1,109 @@
-import { ChangeEvent, createContext, RefObject, useContext } from "react";
+"use client";
 
-import { VideoQuality } from "./types";
+import { ChangeEvent, createContext, useContext } from "react";
+import { StoreApi, useStore } from "zustand";
+import { PLAYBACK_RATES } from "./constants";
+import { usePlayerSettingsStore } from "./store/playerSettingsStore";
+import { PlayerStoreState } from "./store/playerStore";
 
-export interface PlayerRefs {
-  video: RefObject<HTMLVideoElement | null>;
-  container: RefObject<HTMLDivElement | null>;
-}
+export const PlayerStoreContext = createContext<StoreApi<PlayerStoreState> | null>(null);
 
-export interface PlayerPlayback {
-  isPlaying: boolean;
-  isInitialLoading: boolean;
-  isBuffering: boolean;
-  errorMessage: string | null;
-  toggle: () => void | Promise<void>;
-  seek: (time: number) => void;
-  skip: (offset: number) => void;
-}
-
-export interface PlayerTimeline {
-  current: number;
-  duration: number;
-  buffered: number;
-}
-
-export interface PlayerVolume {
-  value: number;
-  isMuted: boolean;
-  set: (value: number | ((current: number) => number)) => void;
-  seek: (e: ChangeEvent<HTMLInputElement>) => void;
-  toggleMute: () => void;
-}
-
-export interface PlayerFullscreen {
-  active: boolean;
-  toggle: () => void;
-}
-
-export interface PlayerQuality {
-  selected: number;
-  options: VideoQuality[];
-  currentLevel: number;
-  set: (level: number) => void;
-}
-
-export interface PlayerPlaybackRate {
-  value: number;
-  options: readonly number[];
-  set: (rate: number) => void;
-  step: (direction: 1 | -1) => void;
-}
-
-export interface PlayerUI {
-  controlsVisible: boolean;
-}
-
-export interface CustomVideoPlayerContextValue {
-  refs: PlayerRefs;
-  playback: PlayerPlayback;
-  timeline: PlayerTimeline;
-  volume: PlayerVolume;
-  fullscreen: PlayerFullscreen;
-  quality: PlayerQuality;
-  playbackRate: PlayerPlaybackRate;
-  ui: PlayerUI;
-}
-
-const CustomVideoPlayerContext = createContext<CustomVideoPlayerContextValue | null>(null);
-
-export const useCustomVideoPlayer = () => {
-  const context = useContext(CustomVideoPlayerContext);
-  if (!context) {
-    throw new Error("useCustomVideoPlayer must be used within a CustomVideoPlayerProvider");
+export const usePlayerStore = () => {
+  const store = useContext(PlayerStoreContext);
+  if (!store) {
+    throw new Error("usePlayerStore must be used within a CustomVideoPlayerProvider");
   }
-  return context;
+  return store;
 };
 
-export const usePlayerRefs = () => useCustomVideoPlayer().refs;
-export const usePlayerPlayback = () => useCustomVideoPlayer().playback;
-export const usePlayerTimeline = () => useCustomVideoPlayer().timeline;
-export const usePlayerVolume = () => useCustomVideoPlayer().volume;
-export const usePlayerFullscreen = () => useCustomVideoPlayer().fullscreen;
-export const usePlayerQuality = () => useCustomVideoPlayer().quality;
-export const usePlayerPlaybackRate = () => useCustomVideoPlayer().playbackRate;
-export const usePlayerUI = () => useCustomVideoPlayer().ui;
+export const usePlayerRefs = () => {
+  const store = usePlayerStore();
+  const video = useStore(store, (s) => s.videoRef);
+  const container = useStore(store, (s) => s.containerRef);
+  return { video, container };
+};
 
-export default CustomVideoPlayerContext;
+export const usePlayerPlayback = () => {
+  const store = usePlayerStore();
+  const isPlaying = useStore(store, (s) => s.isPlaying);
+  const isInitialLoading = useStore(store, (s) => s.isInitialLoading);
+  const isBuffering = useStore(store, (s) => s.isBuffering);
+  const errorMessage = useStore(store, (s) => s.errorMessage);
+  const toggle = useStore(store, (s) => s.togglePlay);
+  const seek = useStore(store, (s) => s.seek);
+  const skip = useStore(store, (s) => s.skip);
+
+  return {
+    isPlaying,
+    isInitialLoading,
+    isBuffering,
+    errorMessage,
+    toggle,
+    seek,
+    skip,
+  };
+};
+
+export const usePlayerTimeline = () => {
+  const store = usePlayerStore();
+  const current = useStore(store, (s) => s.timeline);
+  const duration = useStore(store, (s) => s.duration);
+  const buffered = useStore(store, (s) => s.buffered);
+
+  return { current, duration, buffered };
+};
+
+export const usePlayerVolume = () => {
+  const volume = usePlayerSettingsStore((s) => s.volume);
+  const isMuted = usePlayerSettingsStore((s) => s.isMuted);
+  const set = usePlayerSettingsStore((s) => s.setVolume);
+  const toggleMute = usePlayerSettingsStore((s) => s.toggleMute);
+
+  return {
+    value: volume,
+    isMuted,
+    set,
+    seek: (e: ChangeEvent<HTMLInputElement>) => {
+      set(parseFloat(e.target.value));
+    },
+    toggleMute,
+  };
+};
+
+export const usePlayerFullscreen = () => {
+  const store = usePlayerStore();
+  const active = useStore(store, (s) => s.isFullscreen);
+  const toggle = useStore(store, (s) => s.toggleFullscreen);
+
+  return { active, toggle };
+};
+
+export const usePlayerQuality = () => {
+  const store = usePlayerStore();
+  const selected = useStore(store, (s) => s.quality);
+  const options = useStore(store, (s) => s.qualities);
+  const currentLevel = useStore(store, (s) => s.currentLevelIndex);
+  const set = useStore(store, (s) => s.setQuality);
+
+  return { selected, options, currentLevel, set };
+};
+
+export const usePlayerPlaybackRate = () => {
+  const value = usePlayerSettingsStore((s) => s.playbackRate);
+  const set = usePlayerSettingsStore((s) => s.setPlaybackRate);
+  const step = usePlayerSettingsStore((s) => s.stepPlaybackRate);
+
+  return {
+    value,
+    options: PLAYBACK_RATES,
+    set,
+    step,
+  };
+};
+
+export const usePlayerUI = () => {
+  const store = usePlayerStore();
+  const controlsVisible = useStore(store, (s) => s.controlsVisible);
+
+  return { controlsVisible };
+};

@@ -1,35 +1,28 @@
 "use client";
 
-import { RefObject, useEffect, useRef, useState } from "react";
+import { RefObject, useEffect, useRef } from "react";
+import { StoreApi } from "zustand";
+import { PlayerStoreState } from "../store/playerStore";
 
-export default function useFullscreenMode(containerRef: RefObject<HTMLDivElement | null>) {
-  const [isFullscreen, setFullscreen] = useState(false);
+export default function useFullscreenMode(
+  containerRef: RefObject<HTMLDivElement | null>,
+  store: StoreApi<PlayerStoreState>,
+) {
   const wasFullscreenRef = useRef(false);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
       const active = !!document.fullscreenElement;
 
-      if (!active && wasFullscreenRef.current) containerRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+      if (!active && wasFullscreenRef.current) {
+        containerRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+      }
 
       wasFullscreenRef.current = active;
-      setFullscreen(active);
+      store.setState({ isFullscreen: active });
     };
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
-  }, [containerRef]);
-
-  useEffect(() => {
-    if (isFullscreen) {
-      if (!document.fullscreenElement) void containerRef.current?.requestFullscreen();
-      return;
-    }
-
-    if (document.fullscreenElement) void document.exitFullscreen();
-  }, [containerRef, isFullscreen]);
-
-  const toggle = () => setFullscreen((value) => !value);
-
-  return { isFullscreen, toggle };
+  }, [containerRef, store]);
 }

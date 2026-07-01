@@ -1,7 +1,8 @@
 import { BadRequestException, forwardRef, Inject, Injectable } from "@nestjs/common";
 import { Episode } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
-import { S3Service } from "../S3/S3.service";
+import BucketType from "../s3/enums/BucketType";
+import { S3Service } from "../s3/s3.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
 import { CreateEpisodeDto } from "./dto/request/create-episode.dto";
@@ -24,11 +25,10 @@ export class EpisodeService {
       },
     });
 
-    if (existingEpisode) {
+    if (existingEpisode)
       throw new BadRequestException(
         `Episode with number ${data.number} already exists in this season`,
       );
-    }
 
     return this.prisma.episode.create({ data });
   }
@@ -49,15 +49,13 @@ export class EpisodeService {
   }
 
   async findOne(id: string): Promise<Episode | null> {
-    return await this.prisma.episode.findUnique({ where: { id } });
+    return this.prisma.episode.findUnique({ where: { id } });
   }
 
   async update(id: string, data: UpdateEpisodeDto): Promise<Episode> {
     if (data.number) {
       const episode = await this.findOne(id);
-      if (!episode) {
-        throw new BadRequestException(`Episode with id ${id} not found`);
-      }
+      if (!episode) throw new BadRequestException(`Episode with id ${id} not found`);
 
       const existingEpisode = await this.prisma.episode.findFirst({
         where: {
@@ -67,17 +65,16 @@ export class EpisodeService {
         },
       });
 
-      if (existingEpisode) {
+      if (existingEpisode)
         throw new BadRequestException(
           `Episode with number ${data.number} already exists in this season`,
         );
-      }
     }
 
     return this.prisma.episode.update({ where: { id }, data });
   }
 
-  async remove(id: string): Promise<Episode> {
+  async delete(id: string): Promise<Episode> {
     const episode = await this.findOneDetailed(id);
     if (!episode) throw new BadRequestException(`Episode with id ${id} not found`);
 
@@ -86,9 +83,8 @@ export class EpisodeService {
 
     await this.videoTranscoderService.cancelScheduledTranscodes(id, VideoType.EPISODE);
 
-    await this.s3Service.deleteRaw(id);
-
-    await this.s3Service.deleteProcessedFolder(`videos/${titleId}/${seasonId}/${id}/`);
+    await this.s3Service.deleteObject(id, BucketType.RAW);
+    await this.s3Service.deleteFolder(`videos/${titleId}/${seasonId}/${id}/`, BucketType.PROCESSED);
 
     return this.prisma.episode.delete({ where: { id } });
   }
@@ -109,7 +105,7 @@ export class EpisodeService {
 
     if (!episode) throw new BadRequestException(`Episode with id ${id} not found`);
 
-    const url = await this.s3Service.getRawUploadUrl(id);
+    const url = await this.s3Service.getUploadPresignedUrl(id, BucketType.RAW);
     return { url };
   }
 
@@ -121,8 +117,9 @@ export class EpisodeService {
     const seasonId = episode.seasonId;
     const titleId = episode.season.titleId;
 
-    const url = await this.s3Service.getProcessedReadUrl(
+    const url = await this.s3Service.getReadPresignedUrl(
       `videos/${titleId}/${seasonId}/${episode.id}/master.m3u8`,
+      BucketType.PROCESSED,
     );
 
     return { url };

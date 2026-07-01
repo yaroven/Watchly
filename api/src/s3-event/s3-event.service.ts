@@ -1,4 +1,4 @@
-import { Event, PutBucketNotificationConfigurationCommand, S3Client } from "@aws-sdk/client-s3";
+import { PutBucketNotificationConfigurationCommand, S3Client } from "@aws-sdk/client-s3";
 import {
   CreateQueueCommand,
   DeleteMessageCommand,
@@ -6,6 +6,7 @@ import {
   Message,
   ReceiveMessageCommand,
   SQSClient,
+  SetQueueAttributesCommand,
 } from "@aws-sdk/client-sqs";
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -14,26 +15,13 @@ import { PrismaService } from "../prisma/prisma.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
 
-interface S3EventRecord {
-  eventName: string;
-  s3: {
-    object: {
-      key: string;
-    };
-  };
-}
-
-interface S3Event {
-  Records?: S3EventRecord[];
-}
-
 @Injectable()
 export class S3EventService implements OnModuleInit {
   private readonly logger = new Logger(S3EventService.name);
   private sqsClient: SQSClient;
   private s3Client: S3Client;
   private config: S3Config;
-  private queueUrl?: string;
+  private queueUrl: string;
 
   constructor(
     private readonly configService: ConfigService,
@@ -41,7 +29,6 @@ export class S3EventService implements OnModuleInit {
     private readonly videoTranscoderService: VideoTranscoderService,
   ) {
     this.config = this.configService.getOrThrow<S3Config>(S3ConfigName);
-
     const clientConfig = {
       region: this.config.region,
       endpoint: this.config.internalEndpoint,
@@ -50,124 +37,104 @@ export class S3EventService implements OnModuleInit {
         secretAccessKey: this.config.secretAccessKey,
       },
     };
-
     this.sqsClient = new SQSClient(clientConfig);
     this.s3Client = new S3Client({ ...clientConfig, forcePathStyle: true });
   }
 
   async onModuleInit() {
     await this.setupInfrastructure();
-    this.startPolling();
+    // Запускаємо цикл в фоні
+    this.pollLoop().catch((err) => this.logger.error("Critical polling error", err));
   }
 
   private async setupInfrastructure() {
-    try {
-      const createQueueCmd = new CreateQueueCommand({ QueueName: this.config.queueName });
-      const { QueueUrl } = await this.sqsClient.send(createQueueCmd);
+    // 1. Створюємо чергу
+    const { QueueUrl } = await this.sqsClient.send(
+      new CreateQueueCommand({ QueueName: this.config.queueName }),
+    );
+    this.queueUrl = QueueUrl!;
 
-      this.queueUrl = QueueUrl!;
-
-      this.logger.log(`SQS Queue created/verified: ${this.queueUrl}`);
-
-      const getAttrsCmd = new GetQueueAttributesCommand({
+    // 2. Отримуємо ARN для політики та нотифікацій
+    const { Attributes } = await this.sqsClient.send(
+      new GetQueueAttributesCommand({
         QueueUrl: this.queueUrl,
         AttributeNames: ["QueueArn"],
-      });
+      }),
+    );
+    const queueArn = Attributes?.QueueArn;
 
-      const { Attributes } = await this.sqsClient.send(getAttrsCmd);
-      const queueArn = Attributes?.QueueArn;
+    // 3. Даємо дозвіл S3 писати в SQS
+    await this.sqsClient.send(
+      new SetQueueAttributesCommand({
+        QueueUrl: this.queueUrl,
+        Attributes: {
+          Policy: JSON.stringify({
+            Version: "2012-10-17",
+            Statement: [
+              {
+                Effect: "Allow",
+                Principal: { Service: "s3.amazonaws.com" },
+                Action: "sqs:SendMessage",
+                Resource: queueArn,
+              },
+            ],
+          }),
+        },
+      }),
+    );
 
-      if (!queueArn) throw new Error("Could not retrieve QueueArn");
-
-      const bucketNotificationConfig = {
+    // 4. Підписуємо бакет на події
+    await this.s3Client.send(
+      new PutBucketNotificationConfigurationCommand({
         Bucket: this.config.rawBucketName,
         NotificationConfiguration: {
-          QueueConfigurations: [
-            {
-              QueueArn: queueArn,
-              Events: ["s3:ObjectCreated:*" as Event],
-            },
-          ],
+          QueueConfigurations: [{ QueueArn: queueArn!, Events: ["s3:ObjectCreated:*"] }],
         },
-      };
-
-      await this.s3Client.send(
-        new PutBucketNotificationConfigurationCommand(bucketNotificationConfig),
-      );
-      this.logger.log(
-        `S3 Notifications configured for bucket "${this.config.rawBucketName}" -> Queue "${this.config.queueName}"`,
-      );
-    } catch (error) {
-      this.logger.error("Failed to setup S3-SQS infrastructure", error);
-    }
-  }
-
-  private startPolling() {
-    setTimeout(() => {
-      void this.pollLoop();
-    }, 1000);
+      }),
+    );
   }
 
   private async pollLoop() {
+    this.logger.log("S3 Polling started...");
     while (true) {
       try {
-        const receiveCmd = new ReceiveMessageCommand({
-          QueueUrl: this.queueUrl,
-          MaxNumberOfMessages: 10,
-          WaitTimeSeconds: 20,
-        });
+        const { Messages } = await this.sqsClient.send(
+          new ReceiveMessageCommand({
+            QueueUrl: this.queueUrl,
+            MaxNumberOfMessages: 5,
+            WaitTimeSeconds: 20, // Long polling
+          }),
+        );
 
-        const { Messages } = await this.sqsClient.send(receiveCmd);
-
-        if (Messages && Messages.length > 0)
-          await Promise.all(Messages.map((msg) => this.processMessage(msg)));
+        if (Messages) {
+          for (const msg of Messages) {
+            await this.processMessage(msg);
+          }
+        }
       } catch (error) {
-        this.logger.error("Error polling SQS", error);
-        await new Promise((resolve) => setTimeout(resolve, 5000));
+        this.logger.error("Polling error", error);
+        await new Promise((res) => setTimeout(res, 5000));
       }
     }
   }
 
   private async processMessage(message: Message) {
     try {
-      if (!message.Body) return;
+      const body = JSON.parse(message.Body!);
+      if (!body.Records) return;
 
-      const body = JSON.parse(message.Body) as S3Event;
-      if (body.Records) {
-        for (const record of body.Records) {
-          const eventName = record.eventName;
-          const key = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
+      for (const record of body.Records) {
+        const key = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
 
-          if (eventName.startsWith("s3:TestEvent")) continue;
-
-          this.logger.log(`Received S3 Event: ${eventName} for ${key}`);
-
-          const id = key;
-
-          const episode = await this.prisma.episode.findUnique({ where: { id } });
-          if (episode) {
-            this.logger.log(`Detected upload for Episode ${id}. Starting transcoding...`);
-            await this.videoTranscoderService.scheduleTranscodeVideo({
-              id,
-              type: VideoType.EPISODE,
-            });
-            continue;
-          }
-
-          const title = await this.prisma.title.findUnique({ where: { id } });
-          if (title) {
-            this.logger.log(`Detected upload for Movie ${id}. Starting transcoding...`);
-            await this.videoTranscoderService.scheduleTranscodeVideo({
-              id,
-              type: VideoType.MOVIE,
-            });
-            continue;
-          }
-
-          this.logger.warn(`Uploaded file ${id} does not match any known Episode or Movie.`);
+        // Ідемпотентність: перевіряємо статус в БД
+        const task = await this.resolveTask(key);
+        if (task) {
+          // Якщо завдання вже в процесі, сервіс має ігнорувати повторні запити
+          await this.videoTranscoderService.scheduleTranscodeVideo(task);
         }
       }
 
+      // ВИДАЛЯЄМО лише після успішної обробки
       await this.sqsClient.send(
         new DeleteMessageCommand({
           QueueUrl: this.queueUrl,
@@ -175,7 +142,19 @@ export class S3EventService implements OnModuleInit {
         }),
       );
     } catch (error) {
-      this.logger.error(`Error processing message ${message.MessageId ?? "unknown"}`, error);
+      this.logger.error("Failed to process message", error);
+      // Якщо тут помилка, ми НЕ видаляємо повідомлення,
+      // воно повернеться в чергу через visibilityTimeout
     }
+  }
+
+  private async resolveTask(id: string) {
+    const episode = await this.prisma.episode.findUnique({ where: { id } });
+    if (episode) return { id, type: VideoType.EPISODE };
+
+    const title = await this.prisma.title.findUnique({ where: { id } });
+    if (title) return { id, type: VideoType.MOVIE };
+
+    return null;
   }
 }
