@@ -1,9 +1,12 @@
 "use client";
 
-import { RefObject, useEffect, useEffectEvent } from "react";
+import { RefObject, useEffect } from "react";
+import { TimelineShortcutSeek, VolumeShortcutSeek } from "../constants";
+import useShortcuts from "./useShortcuts";
 
 interface UsePlayerKeyboardOptions {
   videoRef: RefObject<HTMLVideoElement | null>;
+  containerRef: RefObject<HTMLDivElement | null>;
   togglePlay: () => void | Promise<void>;
   seek: (time: number) => void;
   toggleMute: () => void;
@@ -21,71 +24,34 @@ export default function usePlayerKeyboard({
   stepPlaybackRate,
   toggleFullscreen,
 }: UsePlayerKeyboardOptions) {
-  const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
-    const activeTag = document.activeElement?.tagName.toLowerCase();
-    if (activeTag === "input" || activeTag === "textarea") return;
-
-    const video = videoRef.current;
-
-    if (e.code === "Space" || e.key === "k" || e.key === "K") {
-      e.preventDefault();
-      void togglePlay();
-      return;
-    }
-
-    if (e.key === "m" || e.key === "M") {
-      if (e.repeat) return;
-      e.preventDefault();
-      toggleMute();
-      return;
-    }
-
-    if (e.key === "f" || e.key === "F") {
-      e.preventDefault();
-      toggleFullscreen();
-      return;
-    }
-
-    if (e.key === "<" || (e.shiftKey && e.key === ",")) {
-      e.preventDefault();
-      stepPlaybackRate(-1);
-      return;
-    }
-
-    if (e.key === ">" || (e.shiftKey && e.key === ".")) {
-      e.preventDefault();
-      stepPlaybackRate(1);
-      return;
-    }
-
-    if (!video) return;
-
-    if (e.code === "ArrowLeft") {
-      e.preventDefault();
-      seek(video.currentTime - 5);
-      return;
-    }
-
-    if (e.code === "ArrowRight") {
-      e.preventDefault();
-      seek(video.currentTime + 5);
-      return;
-    }
-
-    if (e.code === "ArrowUp") {
-      e.preventDefault();
-      setVolume((value) => Math.min(value + 0.1, 1));
-      return;
-    }
-
-    if (e.code === "ArrowDown") {
-      e.preventDefault();
-      setVolume((value) => Math.max(value - 0.1, 0));
-    }
-  });
-
+  const { register, unregister } = useShortcuts();
   useEffect(() => {
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
+    register({ key: "Space" }, () => togglePlay());
+    register({ key: "m" }, (event) => {
+      if (!event.repeat) toggleMute();
+    });
+    register({ key: "f" }, () => toggleFullscreen());
+    register({ key: "ArrowLeft", modifiers: ["Shift"] }, () => stepPlaybackRate(-1));
+    register({ key: "ArrowRight", modifiers: ["Shift"] }, () => stepPlaybackRate(1));
+    register({ key: "ArrowLeft" }, () => {
+      if (videoRef.current) seek(videoRef.current.currentTime - TimelineShortcutSeek);
+    });
+    register({ key: "ArrowRight" }, () => {
+      if (videoRef.current) seek(videoRef.current.currentTime + TimelineShortcutSeek);
+    });
+    register({ key: "ArrowUp" }, () => setVolume((value) => value + VolumeShortcutSeek));
+    register({ key: "ArrowDown" }, () => setVolume((value) => value - VolumeShortcutSeek));
+
+    return () => {
+      unregister({ key: "Space" });
+      unregister({ key: "m" });
+      unregister({ key: "f" });
+      unregister({ key: "ArrowLeft", modifiers: ["Shift"] });
+      unregister({ key: "ArrowRight", modifiers: ["Shift"] });
+      unregister({ key: "ArrowLeft" });
+      unregister({ key: "ArrowRight" });
+      unregister({ key: "ArrowUp" });
+      unregister({ key: "ArrowDown" });
+    };
+  }, [register, seek, setVolume, stepPlaybackRate, toggleFullscreen, toggleMute, togglePlay, unregister]);
 }

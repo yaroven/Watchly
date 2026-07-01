@@ -1,6 +1,6 @@
 import { forwardRef, Module } from "@nestjs/common";
 import { PrismaModule } from "../prisma/prisma.module";
-import { S3Module } from "../S3/S3.module";
+import { S3Module } from "../s3/s3.module";
 import { VideoTranscoderModule } from "../video-transcoder/video-transcoder.module";
 import { EpisodeController } from "./episode.controller";
 import { EpisodeService } from "./episode.service";

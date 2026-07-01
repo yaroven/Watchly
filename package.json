@@ -9,9 +9,9 @@
   ],
   "scripts": {
     "commitlint": "commitlint",
-    "docker:build": "docker compose build",
-    "dev:up": "docker compose up -d",
-    "dev:down": "docker compose down",
+    "docker:dev": "docker compose --project-name watchly -f ./config/dev/docker-compose.yml",
+    "dev:up": "yarn docker:dev up -d",
+    "dev:down": "yarn docker:dev down",
     "lint:api": "yarn workspace api precommit",
     "lint:client": "yarn workspace client precommit",
     "lint": "yarn lint:api && yarn lint:client",

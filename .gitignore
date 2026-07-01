@@ -13,3 +13,11 @@ client/.git-backup/
 dist
 *.code-workspace
 tsconfig.build.tsbuildinfo
+tsconfig.tsbuildinfo
+
+config/dev/volumes/api/*
+config/dev/volumes/client/*
+config/dev/data/*
+
+!config/dev/volumes/api/.gitkeep
+!config/dev/volumes/client/.gitkeep

@@ -63,7 +63,7 @@ export class TitleController {
   }
 
   @Delete(":id")
-  remove(@Param("id") id: string) {
-    return this.titleService.remove(id);
+  delete(@Param("id") id: string) {
+    return this.titleService.delete(id);
   }
 }

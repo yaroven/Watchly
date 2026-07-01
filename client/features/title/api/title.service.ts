@@ -25,12 +25,12 @@ const TitleService = {
     return mapTitle(data);
   },
 
-  getAll: async ({ searchString = "", page = 1, limit = 10, type }: GetAllTitlesDto = {}): Promise<{
+  getAll: async ({ searchString = "", page = 1, limit = 10, type, transcodingStatus }: GetAllTitlesDto = {}): Promise<{
     items: Title[];
     totalCount: number;
   }> => {
     const { data } = await api.get<{ items: ApiTitle[]; totalCount: number }>(`/${prefix}`, {
-      params: { search: searchString, page, limit, type },
+      params: { search: searchString, page, limit, type, transcodingStatus },
     });
     return {
       ...data,

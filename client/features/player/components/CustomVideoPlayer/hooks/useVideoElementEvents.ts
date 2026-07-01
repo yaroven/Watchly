@@ -1,57 +1,72 @@
 "use client";
 
-import { RefObject, useCallback, useEffect, useRef, useState } from "react";
-
+import { parseAsInteger, useQueryState } from "nuqs";
+import { RefObject, useCallback, useEffect, useRef } from "react";
+import { StoreApi } from "zustand";
+import { PlayerStoreState } from "../store/playerStore";
 import { clampTime, getBufferedTime } from "../utils";
 
 export default function useVideoElementEvents(
   videoRef: RefObject<HTMLVideoElement | null>,
+  store: StoreApi<PlayerStoreState>,
   onEnded?: () => void,
 ) {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
-  const [isBuffering, setIsBuffering] = useState(false);
-  const [timeline, setTimeline] = useState(0);
-  const [buffered, setBuffered] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [urlTime, setUrlTime] = useQueryState(
+    "t",
+    parseAsInteger.withDefault(0).withOptions({
+      shallow: true,
+      history: "replace",
+      throttleMs: 1000,
+      scroll: false,
+    }),
+  );
 
   const seekTargetRef = useRef<number | null>(null);
   const hasPlayedRef = useRef(false);
+  const hasSeekedInitialTimeRef = useRef(false);
   const onEndedRef = useRef(onEnded);
 
   onEndedRef.current = onEnded;
 
   const syncBuffered = useCallback(() => {
-    if (!videoRef.current) return;
-    setBuffered(getBufferedTime(videoRef.current));
-  }, [videoRef]);
+    const video = videoRef.current;
+    if (!video) return;
+    store.setState({ buffered: getBufferedTime(video) });
+  }, [videoRef, store]);
 
   const syncDuration = useCallback(() => {
-    if (!videoRef.current) return;
-    setDuration(Number.isFinite(videoRef.current.duration) ? videoRef.current.duration : 0);
-  }, [videoRef]);
+    const video = videoRef.current;
+    if (!video) return;
+    store.setState({
+      duration: Number.isFinite(video.duration) ? video.duration : 0,
+    });
+  }, [videoRef, store]);
 
   const resetSession = useCallback(() => {
     hasPlayedRef.current = false;
     seekTargetRef.current = null;
+    hasSeekedInitialTimeRef.current = false;
   }, []);
 
   const beginSourceLoad = useCallback(() => {
     resetSession();
-    setIsInitialLoading(true);
-    setIsBuffering(false);
-    setErrorMessage(null);
-    setTimeline(0);
-  }, [resetSession]);
+    store.setState({
+      isInitialLoading: true,
+      isBuffering: false,
+      errorMessage: null,
+      timeline: 0,
+    });
+  }, [resetSession, store]);
 
   const clearSource = useCallback(() => {
     resetSession();
-    setIsInitialLoading(false);
-    setIsBuffering(false);
-    setErrorMessage(null);
-    setTimeline(0);
-  }, [resetSession]);
+    store.setState({
+      isInitialLoading: false,
+      isBuffering: false,
+      errorMessage: null,
+      timeline: 0,
+    });
+  }, [resetSession, store]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -60,46 +75,93 @@ export default function useVideoElementEvents(
     if (!video) return;
 
     const handleLoadStart = () => {
-      if (!hasPlayedRef.current) setIsInitialLoading(true);
+      if (!hasPlayedRef.current) {
+        store.setState({ isInitialLoading: true });
+      }
     };
+
     const handleCanPlay = () => {
-      setIsInitialLoading(false);
-      setIsBuffering(false);
-      setErrorMessage(null);
+      store.setState({
+        isInitialLoading: false,
+        isBuffering: false,
+        errorMessage: null,
+      });
       syncDuration();
+
+      // Seek to initial time from URL query if it's the first time loading this video source
+      if (!hasSeekedInitialTimeRef.current) {
+        hasSeekedInitialTimeRef.current = true;
+        const initialTime = urlTime;
+        if (initialTime > 0) {
+          const target = clampTime(initialTime, video.duration || 0);
+          video.currentTime = target;
+          store.setState({ timeline: target });
+        }
+      }
     };
+
     const handleError = () => {
-      setIsInitialLoading(false);
-      setIsBuffering(false);
-      setErrorMessage("Video stream is unavailable");
+      store.setState({
+        isInitialLoading: false,
+        isBuffering: false,
+        errorMessage: "Video stream is unavailable",
+      });
     };
+
     const handlePlay = () => {
       hasPlayedRef.current = true;
-      setIsPlaying(true);
+      store.setState({ isPlaying: true });
     };
-    const handlePause = () => setIsPlaying(false);
-    const handleEnded = () => onEndedRef.current?.();
+
+    const handlePause = () => {
+      store.setState({ isPlaying: false });
+    };
+
+    const handleEnded = () => {
+      onEndedRef.current?.();
+    };
+
     const handleWaiting = () => {
-      if (hasPlayedRef.current) setIsBuffering(true);
+      if (hasPlayedRef.current) {
+        store.setState({ isBuffering: true });
+      }
     };
+
     const handlePlaying = () => {
-      setIsInitialLoading(false);
-      setIsBuffering(false);
+      store.setState({
+        isInitialLoading: false,
+        isBuffering: false,
+      });
       syncDuration();
     };
+
     const handleTimeUpdate = () => {
       if (seekTargetRef.current !== null) return;
-      setTimeline(video.currentTime);
+      const currentTime = video.currentTime;
+      store.setState({ timeline: currentTime });
+
+      // Update URL query parameter 't' with the current playback time during playback
+      if (!video.paused) {
+        void setUrlTime(Math.floor(currentTime));
+      }
     };
+
     const handleSeeked = () => {
       const target = seekTargetRef.current;
 
       if (target !== null && Math.abs(video.currentTime - target) > 0.3) return;
 
       seekTargetRef.current = null;
-      setTimeline(video.currentTime);
-      setIsBuffering(false);
+      const currentTime = video.currentTime;
+      store.setState({
+        timeline: currentTime,
+        isBuffering: false,
+      });
+
+      // Instantly sync URL parameter upon manual seek
+      void setUrlTime(Math.floor(currentTime));
     };
+
     const handleProgress = () => syncBuffered();
     const handleDurationChange = () => syncDuration();
 
@@ -119,12 +181,17 @@ export default function useVideoElementEvents(
     video.addEventListener("error", handleError);
 
     frameId = window.requestAnimationFrame(() => {
-      setTimeline(video.currentTime || 0);
+      const currentTime = video.currentTime || 0;
+      store.setState({
+        timeline: currentTime,
+        isPlaying: !video.paused,
+      });
       syncBuffered();
       syncDuration();
-      setIsPlaying(!video.paused);
       if (!hasPlayedRef.current) {
-        setIsInitialLoading(video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA);
+        store.setState({
+          isInitialLoading: video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA,
+        });
       }
     });
 
@@ -145,51 +212,9 @@ export default function useVideoElementEvents(
       video.removeEventListener("durationchange", handleDurationChange);
       video.removeEventListener("error", handleError);
     };
-  }, [syncBuffered, syncDuration, videoRef]);
-
-  const togglePlay = useCallback(async () => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    if (video.paused) {
-      try {
-        await video.play();
-      } catch {
-        setIsPlaying(false);
-      }
-      return;
-    }
-
-    video.pause();
-  }, [videoRef]);
-
-  const seek = useCallback(
-    (time: number) => {
-      const video = videoRef.current;
-      if (!video) return;
-
-      const nextTime = clampTime(time, video.duration);
-      seekTargetRef.current = nextTime;
-      setTimeline(nextTime);
-      if (hasPlayedRef.current) setIsBuffering(true);
-      video.currentTime = nextTime;
-    },
-    [videoRef],
-  );
+  }, [syncBuffered, syncDuration, videoRef, store, urlTime, setUrlTime]);
 
   return {
-    isPlaying,
-    isInitialLoading,
-    isBuffering,
-    timeline,
-    buffered,
-    duration,
-    errorMessage,
-    setErrorMessage,
-    setIsInitialLoading,
-    setIsBuffering,
-    togglePlay,
-    seek,
     beginSourceLoad,
     clearSource,
   };

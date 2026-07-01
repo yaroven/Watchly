@@ -8,7 +8,8 @@ import * as path from "path";
 import { Readable } from "stream";
 
 import { PrismaService } from "../prisma/prisma.service";
-import { S3Service } from "../S3/S3.service";
+import BucketType from "../s3/enums/BucketType";
+import { S3Service } from "../s3/s3.service";
 import { TranscodeVideoDto } from "./dto/request/transcode-video.dto";
 import { VideoType } from "./enums/video-type.enum";
 
@@ -145,7 +146,7 @@ export class VideoTranscoderService {
     this.logger.log(`Downloading ${key} to ${writePath}`);
     let downloadStream: Readable;
     try {
-      downloadStream = await this.s3Service.getRaw(key);
+      downloadStream = await this.s3Service.get(key, BucketType.RAW);
     } catch (error) {
       if (
         !(await this.entityExists(key, VideoType.MOVIE)) &&
@@ -178,7 +179,8 @@ export class VideoTranscoderService {
       const s3Key = `videos/${key}/${file}`;
       const contentType = file.endsWith(".m3u8") ? "application/x-mpegURL" : "video/MP2T";
 
-      await this.s3Service.uploadProcessedStream(
+      await this.s3Service.uploadStream(
+        BucketType.PROCESSED,
         s3Key,
         fs.createReadStream(localFilePath),
         contentType,

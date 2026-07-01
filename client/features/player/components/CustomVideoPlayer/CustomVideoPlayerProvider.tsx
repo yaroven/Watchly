@@ -1,15 +1,14 @@
 "use client";
 
-import { ReactNode, RefObject, useCallback, useEffect, useRef } from "react";
-
+import { ReactNode, RefObject, useEffect, useRef } from "react";
+import { useStore } from "zustand";
 import useControlsVisibility from "./hooks/useControlsVisibility";
 import useFullscreenMode from "./hooks/useFullscreenMode";
-import usePlaybackRate from "./hooks/usePlaybackRate";
 import usePlayerKeyboard from "./hooks/usePlayerKeyboard";
 import useVideoPlayer from "./hooks/useVideoPlayer";
-import useVolume from "./hooks/useVolume";
-import CustomVideoPlayerContext from "./CustomVideoPlayerContext";
-import { clampTime } from "./utils";
+import { PlayerStoreContext } from "./CustomVideoPlayerContext";
+import { usePlayerSettingsStore } from "./store/playerSettingsStore";
+import { createPlayerStore } from "./store/playerStore";
 
 interface CustomVideoPlayerProviderProps {
   children: ReactNode;
@@ -25,91 +24,57 @@ export default function CustomVideoPlayerProvider({
   onEnded,
 }: CustomVideoPlayerProviderProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const volume = useVolume();
-  const playbackRate = usePlaybackRate();
-  const player = useVideoPlayer(videoRef, src, onEnded);
-  const { isFullscreen, toggle: toggleFullscreen } = useFullscreenMode(containerRef);
-  const controlsVisible = useControlsVisibility(containerRef, player.isPlaying);
 
-  const seek = useCallback(
-    (time: number) => {
-      const video = videoRef.current;
-      if (!video) return;
-      player.seek(clampTime(time, video.duration || 0));
-    },
-    [player, videoRef],
-  );
+  // Initialize per-instance store once
+  const storeRef = useRef<ReturnType<typeof createPlayerStore> | null>(null);
+  if (!storeRef.current) {
+    storeRef.current = createPlayerStore(videoRef, containerRef);
+  }
+  const store = storeRef.current;
 
-  const skip = useCallback(
-    (offset: number) => {
-      const video = videoRef.current;
-      if (!video) return;
-      seek(video.currentTime + offset);
-    },
-    [seek, videoRef],
-  );
+  // Retrieve global persistent player settings
+  const volume = usePlayerSettingsStore((s) => s.volume);
+  const isMuted = usePlayerSettingsStore((s) => s.isMuted);
+  const playbackRate = usePlayerSettingsStore((s) => s.playbackRate);
+  const volumeStore = usePlayerSettingsStore();
 
+  // Setup video events, HLS, fullscreen, and visibility
+  useVideoPlayer(videoRef, src, store, onEnded);
+  useFullscreenMode(containerRef, store);
+
+  const isPlaying = useStore(store, (s) => s.isPlaying);
+  const controlsVisible = useControlsVisibility(containerRef, isPlaying);
+
+  // Synchronize controls visibility to store
+  useEffect(() => {
+    store.setState({ controlsVisible });
+  }, [controlsVisible, store]);
+
+  // Synchronize global settings from store to HTMLVideoElement
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
-    video.volume = volume.volumeValue;
-    video.muted = volume.isMuted;
-    video.playbackRate = playbackRate.rate;
-  }, [playbackRate.rate, volume.isMuted, volume.volumeValue, videoRef]);
+    video.volume = volume;
+    video.muted = isMuted;
+    video.playbackRate = playbackRate;
+  }, [volume, isMuted, playbackRate, videoRef]);
 
+  // Setup keyboard controls
   usePlayerKeyboard({
     videoRef,
-    togglePlay: player.togglePlay,
-    seek,
-    toggleMute: volume.onMuteToggle,
-    setVolume: volume.setVolume,
-    stepPlaybackRate: playbackRate.step,
-    toggleFullscreen,
+    containerRef,
+    togglePlay: () => store.getState().togglePlay(),
+    seek: (time) => store.getState().seek(time),
+    toggleMute: volumeStore.toggleMute,
+    setVolume: volumeStore.setVolume,
+    stepPlaybackRate: volumeStore.stepPlaybackRate,
+    toggleFullscreen: () => store.getState().toggleFullscreen(),
   });
 
   return (
-    <CustomVideoPlayerContext.Provider
-      value={{
-        refs: { video: videoRef, container: containerRef },
-        playback: {
-          isPlaying: player.isPlaying,
-          isInitialLoading: player.isInitialLoading,
-          isBuffering: player.isBuffering,
-          errorMessage: player.errorMessage,
-          toggle: player.togglePlay,
-          seek,
-          skip,
-        },
-        timeline: {
-          current: player.timeline,
-          duration: player.duration,
-          buffered: player.buffered,
-        },
-        volume: {
-          value: volume.volumeValue,
-          isMuted: volume.isMuted,
-          set: volume.setVolume,
-          seek: volume.onVolumeSeek,
-          toggleMute: volume.onMuteToggle,
-        },
-        fullscreen: { active: isFullscreen, toggle: toggleFullscreen },
-        quality: {
-          selected: player.quality,
-          options: player.qualities,
-          currentLevel: player.currentLevelIndex,
-          set: player.setQuality,
-        },
-        playbackRate: {
-          value: playbackRate.rate,
-          options: playbackRate.options,
-          set: playbackRate.set,
-          step: playbackRate.step,
-        },
-        ui: { controlsVisible },
-      }}
-    >
+    <PlayerStoreContext.Provider value={store}>
       {children}
-    </CustomVideoPlayerContext.Provider>
+    </PlayerStoreContext.Provider>
   );
 }

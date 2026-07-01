@@ -1,4 +1,4 @@
-import { TitleType } from "@prisma/client";
+import { TitleType, TranscodingStatus } from "@prisma/client";
 import { Transform } from "class-transformer";
 import { IsEnum, IsNumber, IsOptional, IsString } from "class-validator";
 
@@ -10,6 +10,10 @@ export class GetAllTitleDto {
   @IsOptional()
   @IsEnum(TitleType)
   type?: TitleType;
+
+  @IsOptional()
+  @IsEnum(TranscodingStatus)
+  transcodingStatus?: TranscodingStatus;
 
   @IsOptional()
   @Transform(({ value }) => parseInt(value as string))

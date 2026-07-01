@@ -49,7 +49,7 @@ export class SeasonController {
   }
 
   @Delete(":id")
-  remove(@Param("id") id: string) {
-    return this.seasonService.remove(id);
+  delete(@Param("id") id: string) {
+    return this.seasonService.delete(id);
   }
 }

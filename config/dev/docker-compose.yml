@@ -1,35 +1,49 @@
 services:
-  frontend:
+  client:
+    container_name: "client"
     build:
-      context: ./client
-      dockerfile: Dockerfile
-      target: dev
+      context: ../../
+      dockerfile: client/Dockerfile
+      target: runner
       args:
-        BACKEND_API_URL: "http://backend:3000"
+        BACKEND_API_URL: "http://api:3000"
         NEXT_PUBLIC_BACKEND_API_URL: "http://localhost:3000"
         NEXT_PUBLIC_APP_URL: "http://localhost:4000"
         NEXT_PUBLIC_REMOTE_IMAGE_HOSTNAME: "m.media-amazon.com"
-    ports:
-      - "4000:4000"
+    command: sh -c "yarn workspace client dev"
     environment:
-      BACKEND_API_URL: "http://backend:3000"
+      NODE_ENV: "development"
+      BACKEND_API_URL: "http://api:3000"
       NEXT_PUBLIC_BACKEND_API_URL: "http://localhost:3000"
       NEXT_PUBLIC_APP_URL: "http://localhost:4000"
       NEXT_PUBLIC_REMOTE_IMAGE_HOSTNAME: "m.media-amazon.com"
+      NEXT_PUBLIC_S3_IMAGE_PORT: "4000"
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
     volumes:
-      - ./client:/frontend
-      - frontend_node_modules:/frontend/node_modules
-      - frontend_next:/frontend/.next
+      - ../../client:/app/client
+      - ../../package.json:/app/package.json
+      - ../../yarn.lock:/app/yarn.lock
+      - ./volumes/client/node_modules:/app/node_modules
+      - ./volumes/client/package_node_modules:/app/client/node_modules
+      - ./volumes/client/.next:/app/client/.next
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://client:4000/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     depends_on:
-      - backend
+      api:
+        condition: service_healthy
 
-  backend:
+  api:
+    container_name: "api"
     build:
-      context: ./api
-      dockerfile: Dockerfile
-      target: dev
+      context: ../../
+      dockerfile: api/Dockerfile
+      target: runner
+    command: sh -c "yarn workspace api db:prepare && yarn workspace api dev"
     ports:
       - "3000:3000"
     environment:
@@ -44,12 +58,20 @@ services:
       S3_RAW_BUCKET_NAME: "raw"
       S3_PROCESSED_BUCKET_NAME: "content"
       S3_ENDPOINT_INTERNAL: "http://localstack:4566"
-      S3_ENDPOINT_PUBLIC: "http://localhost:4566"
-      CHOKIDAR_USEPOLLING: "true"
-      CHOKIDAR_INTERVAL: 1000
+      S3_ENDPOINT_PUBLIC: "http://localhost:4000"
     volumes:
-      - ./api:/app
-      - backend_node_modules:/app/node_modules
+      - ../../api:/app/api
+      - ../../package.json:/app/package.json
+      - ../../yarn.lock:/app/yarn.lock
+      - ./volumes/api/node_modules:/app/node_modules
+      - ./volumes/api/package_node_modules:/app/api/node_modules
+    healthcheck:
+      test:
+        ["CMD-SHELL", "wget -q -O /dev/null http://api:3000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     depends_on:
       - db
       - redis
@@ -57,6 +79,7 @@ services:
 
   db:
     image: "postgres:16"
+    container_name: "postgres"
     environment:
       POSTGRES_USER: "root"
       POSTGRES_PASSWORD: "root"
@@ -68,6 +91,7 @@ services:
 
   redis:
     image: "redis:8.4.0"
+    container_name: "redis"
     ports:
       - "6379:6379"
     volumes:
@@ -75,6 +99,7 @@ services:
 
   localstack:
     image: "gresau/localstack-persist:4"
+    container_name: "localstack"
     ports:
       - "4510-4559:4510-4559"
       - "4566:4566"
@@ -91,10 +116,27 @@ services:
       - "localstack_data:/persisted-data"
       - "/var/run/docker.sock:/var/run/docker.sock"
 
+  nginx:
+    image: "nginx:latest"
+    container_name: "nginx"
+    # network_mode: "host"
+    volumes:
+      # config files
+      - ./volumes/nginx/config/default.conf:/etc/nginx/conf.d/default.conf
+      - ./volumes/nginx/config/proxy.conf:/etc/nginx/proxy.conf
+    ports:
+      - "4000:4000"
+    depends_on:
+      client:
+        condition: service_healthy
+
 volumes:
   frontend_node_modules:
+    driver: local
   frontend_next:
+    driver: local
   backend_node_modules:
+    driver: local
   postgres_data:
   redis_data:
   localstack_data:

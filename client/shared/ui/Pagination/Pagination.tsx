@@ -4,7 +4,7 @@ import styles from "./Pagination.module.scss";
 interface PaginationProps {
   currentPage: number;
   totalPages: number;
-  onPageChange: (page: number) => void;
+  onPageChange: (page: string) => void;
 }
 
 export default function Pagination({ currentPage, totalPages, onPageChange }: PaginationProps) {
@@ -16,7 +16,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pa
     <div className={styles.pagination}>
       <button
         className={styles.arrowButton}
-        onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+        onClick={() => onPageChange(Math.max(1, currentPage - 1).toString())}
         disabled={currentPage === 1}
       >
         <ChevronLeft size={20} />
@@ -27,7 +27,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pa
           <button
             key={num}
             className={currentPage === num ? styles.activePage : styles.pageButton}
-            onClick={() => onPageChange(num)}
+            onClick={() => onPageChange(num.toString())}
           >
             {num}
           </button>
@@ -36,7 +36,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pa
 
       <button
         className={styles.arrowButton}
-        onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+        onClick={() => onPageChange(Math.min(totalPages, currentPage + 1).toString())}
         disabled={currentPage === totalPages}
       >
         <ChevronRight size={20} />

@@ -10,7 +10,6 @@ import {
   NotFound,
   PutObjectCommand,
   S3Client,
-  S3ServiceException,
 } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -19,6 +18,7 @@ import { Injectable, InternalServerErrorException, Logger, OnModuleInit } from "
 import { ConfigService } from "@nestjs/config";
 import { Readable } from "stream";
 import { S3Config, S3ConfigName } from "../config/s3.config";
+import BucketType from "./enums/BucketType";
 
 @Injectable()
 export class S3Service implements OnModuleInit {
@@ -56,10 +56,21 @@ export class S3Service implements OnModuleInit {
   }
 
   async onModuleInit() {
-    await Promise.all([
-      this.initializeBucket(this.rawBucketName),
-      this.initializeBucket(this.processedBucketName),
-    ]);
+    await this.initializeBucketWithRetry(this.rawBucketName);
+    await this.initializeBucketWithRetry(this.processedBucketName);
+  }
+
+  private async initializeBucketWithRetry(bucketName: string, retries = 3) {
+    for (let i = 0; i < retries; i++) {
+      try {
+        await this.initializeBucket(bucketName);
+        return;
+      } catch (error) {
+        if (i === retries - 1) throw error;
+        this.logger.warn(`Failed to initialize bucket "${bucketName}". Retrying in 2 seconds...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
   }
 
   private async initializeBucket(bucketName: string) {
@@ -69,113 +80,61 @@ export class S3Service implements OnModuleInit {
     } catch (error: any) {
       if (error instanceof NotFound) {
         this.logger.log(`Bucket "${bucketName}" not found. Creating it now...`);
-        try {
-          await this.s3Client.send(new CreateBucketCommand({ Bucket: bucketName }));
-          this.logger.log(`Bucket "${bucketName}" created successfully.`);
-        } catch (createError) {
-          if (
-            createError instanceof BucketAlreadyOwnedByYou ||
-            createError instanceof BucketAlreadyExists
-          ) {
-            this.logger.log(`Bucket "${bucketName}" was created by another process.`);
-            return;
-          }
-
-          this.logger.error(
-            `Failed to create bucket: ${createError instanceof Error ? createError.message : createError}`,
-          );
-          throw new InternalServerErrorException(`Failed to create bucket: ${bucketName}`);
-        }
-      } else if (error instanceof S3ServiceException) {
-        this.logger.error(`S3 Service Error [${error.name}]: ${error.message}`);
-        throw new InternalServerErrorException(`S3 Connection Error: ${error.name}`);
-      } else {
-        this.logger.error(`Unexpected Error: ${error}`);
-        throw new InternalServerErrorException(
-          "An unexpected error occurred during S3 initialization",
-        );
+        return this.createBucket(bucketName);
       }
+
+      this.logger.error(`Unexpected Error: ${error}`);
+      throw new InternalServerErrorException(
+        "An unexpected error occurred during S3 initialization",
+      );
     }
   }
-  async getRaw(key: string) {
-    return this.get(key, this.rawBucketName);
+  private async createBucket(bucketName: string) {
+    try {
+      await this.s3Client.send(new CreateBucketCommand({ Bucket: bucketName }));
+      this.logger.log(`Bucket "${bucketName}" created successfully.`);
+    } catch (createError) {
+      if (
+        createError instanceof BucketAlreadyOwnedByYou ||
+        createError instanceof BucketAlreadyExists
+      ) {
+        this.logger.log(`Bucket "${bucketName}" was created by another process.`);
+        return;
+      }
+
+      this.logger.error(
+        `Failed to create bucket: ${createError instanceof Error ? createError.message : createError}`,
+      );
+      throw new InternalServerErrorException(`Failed to create bucket: ${bucketName}`);
+    }
   }
 
-  async getRawBuffer(key: string) {
-    return this.getFileBuffer(key, this.rawBucketName);
+  private getBucketName(type: BucketType): string {
+    const cfg = this.configService.getOrThrow<S3Config>(S3ConfigName);
+    return type === BucketType.RAW ? cfg.rawBucketName : cfg.processedBucketName;
   }
 
-  async uploadRawStream(key: string, stream: Readable, contentType: string) {
-    return this.uploadStream(this.rawBucketName, key, stream, contentType);
-  }
-
-  async getRawUploadUrl(key: string, expiresIn?: number) {
-    return this.getUploadPresignedUrl(key, this.rawBucketName, expiresIn);
-  }
-
-  // --- PROCESSED BUCKET METHODS ---
-
-  async getProcessed(key: string) {
-    return this.get(key, this.processedBucketName);
-  }
-
-  async getProcessedBuffer(key: string) {
-    return this.getFileBuffer(key, this.processedBucketName);
-  }
-
-  async getProcessedUploadUrl(key: string, expiresIn?: number) {
-    return this.getUploadPresignedUrl(key, this.processedBucketName, expiresIn);
-  }
-
-  getProcessedPublicUrl(key: string) {
-    return `${this.s3Config.publicEndpoint.replace(/\/$/, "")}/${this.processedBucketName}/${key}`;
-  }
-
-  async uploadProcessedStream(key: string, stream: Readable, contentType: string) {
-    return this.uploadStream(this.processedBucketName, key, stream, contentType);
-  }
-
-  async getProcessedReadUrl(key: string, expiresIn?: number) {
-    return this.getReadPresignedUrl(key, this.processedBucketName, expiresIn);
-  }
-
-  async deleteRaw(key: string) {
-    return this.deleteObject(this.rawBucketName, key);
-  }
-
-  async deleteProcessed(key: string) {
-    return this.deleteObject(this.processedBucketName, key);
-  }
-
-  async deleteProcessedFolder(prefix: string) {
-    return this.deleteFolder(this.processedBucketName, prefix);
-  }
-
-  // --- GENERIC INTERNAL HELPERS ---
-  // These can stay public if you need them, but making them private
-  // ensures everyone follows the Raw/Processed convention.
-
-  private async get(key: string, bucketName: string): Promise<Readable> {
+  async get(key: string, type: BucketType): Promise<Readable> {
     const response = await this.s3Client.send(
-      new GetObjectCommand({ Bucket: bucketName, Key: key }),
+      new GetObjectCommand({ Bucket: this.getBucketName(type), Key: key }),
     );
     return response.Body as Readable;
   }
 
-  private async getFileBuffer(key: string, bucketName: string) {
+  async getFileBuffer(key: string, type: BucketType) {
     const response = await this.s3Client.send(
-      new GetObjectCommand({ Bucket: bucketName, Key: key }),
+      new GetObjectCommand({ Bucket: this.getBucketName(type), Key: key }),
     );
     const mixed = sdkStreamMixin(response.Body as any);
     const uint8 = await mixed.transformToByteArray();
     return Buffer.from(uint8);
   }
 
-  private async uploadStream(bucket: string, key: string, stream: Readable, contentType: string) {
+  async uploadStream(type: BucketType, key: string, stream: Readable, contentType: string) {
     const parallelUploads3 = new Upload({
       client: this.s3Client,
       params: {
-        Bucket: bucket,
+        Bucket: this.getBucketName(type),
         Key: key,
         Body: stream,
         ContentType: contentType,
@@ -184,19 +143,20 @@ export class S3Service implements OnModuleInit {
     return parallelUploads3.done();
   }
 
-  private async getUploadPresignedUrl(key: string, bucketName: string, expiresIn: number = 3600) {
-    const command = new PutObjectCommand({ Bucket: bucketName, Key: key });
+  async getUploadPresignedUrl(key: string, type: BucketType, expiresIn: number = 3600) {
+    const command = new PutObjectCommand({ Bucket: this.getBucketName(type), Key: key });
     const signedUrl = await getSignedUrl(this.s3Client, command, { expiresIn });
     return this.mapSignedUrlToPublicEndpoint(signedUrl);
   }
 
-  private async getReadPresignedUrl(key: string, bucketName: string, expiresIn: number = 3600) {
-    const command = new GetObjectCommand({ Bucket: bucketName, Key: key });
+  async getReadPresignedUrl(key: string, type: BucketType, expiresIn: number = 3600) {
+    const command = new GetObjectCommand({ Bucket: this.getBucketName(type), Key: key });
     const signedUrl = await getSignedUrl(this.s3Client, command, { expiresIn });
     return this.mapSignedUrlToPublicEndpoint(signedUrl);
   }
 
-  private async deleteObject(bucketName: string, key: string) {
+  async deleteObject(key: string, type: BucketType) {
+    const bucketName = this.getBucketName(type);
     try {
       await this.s3Client.send(new DeleteObjectCommand({ Bucket: bucketName, Key: key }));
       this.logger.log(`Deleted object "${key}" from bucket "${bucketName}".`);
@@ -205,9 +165,9 @@ export class S3Service implements OnModuleInit {
     }
   }
 
-  private async deleteFolder(bucketName: string, prefix: string) {
-    let internalPrefix = prefix;
-    if (!internalPrefix.endsWith("/")) internalPrefix += "/";
+  async deleteFolder(prefix: string, type: BucketType) {
+    const bucketName = this.getBucketName(type);
+    let internalPrefix = prefix.endsWith("/") ? prefix : prefix + "/";
     try {
       let continuationToken: string | undefined;
       do {
