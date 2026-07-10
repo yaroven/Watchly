@@ -2,6 +2,7 @@ import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { ThrottlerModule } from "@nestjs/throttler";
+import { LoggerModule } from "nestjs-pino";
 import { AppController } from "./app.controller";
 import redisConfig, { RedisConfig, RedisConfigName } from "./config/redis.config";
 import s3Config from "./config/s3.config";
@@ -33,6 +34,15 @@ import { VideoTranscoderModule } from "./video-transcoder/video-transcoder.modul
             port: redis.port,
           },
         };
+      },
+    }),
+    LoggerModule.forRoot({
+      pinoHttp: {
+        transport:
+          process.env.NODE_ENV !== "production"
+            ? { target: "pino-pretty", options: { colorize: true } }
+            : undefined,
+        level: "info",
       },
     }),
     S3Module,
