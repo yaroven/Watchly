@@ -1,20 +1,18 @@
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
+import { Logger } from "nestjs-pino";
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
-  const nodeEnv = process.env.NODE_ENV;
-  const app = await NestFactory.create(AppModule, {
-    logger:
-      nodeEnv === "development"
-        ? ["log", "error", "warn", "debug", "verbose"]
-        : ["log", "error", "warn"],
-  });
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
     }),
   );
+
+  app.useLogger(app.get(Logger));
+
   app.enableCors("*");
   await app.listen(process.env.PORT ?? 3000, "0.0.0.0");
 }
