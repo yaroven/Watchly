@@ -23,5 +23,5 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         # У блоці with залишаємо тільки ті параметри, які цей екшен реально підтримує
         with:
-          model: "gemini-2.5-flash"
+          model: "gemini-3.5-flash"
           language: "uk" # Вказуємо мову рев'ю прямо в його налаштуваннях

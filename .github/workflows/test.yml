@@ -1,0 +1,41 @@
+name: Test API
+
+on:
+  pull_request:
+    paths:
+      - 'api/**'
+      - 'package.json'
+      - 'yarn.lock'
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'api/**'
+      - 'package.json'
+      - 'yarn.lock'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+
+      - name: Install Dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: yarn workspace api prisma generate
+
+      - name: Run Unit Tests
+        run: yarn workspace api test:unit
+        env:
+          NODE_ENV: test
