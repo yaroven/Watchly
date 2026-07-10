@@ -1,0 +1,27 @@
+name: Gemini AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Gemini AI Review
+        uses: petarzarkov/gemini-code-review-action@v1.1.3
+        # Передаємо токени як змінні оточення (env), бо цей екшен шукає їх саме там
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        # У блоці with залишаємо тільки ті параметри, які цей екшен реально підтримує
+        with:
+          model: "gemini-2.5-flash"
+          language: "uk" # Вказуємо мову рев'ю прямо в його налаштуваннях
