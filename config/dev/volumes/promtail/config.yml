@@ -1,0 +1,57 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: docker-containers
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: container-logs
+          __path__: /var/lib/docker/containers/*/*.log
+
+    pipeline_stages:
+      # Extract container ID from filename
+      - regex:
+          expression: '^/var/lib/docker/containers/(?P<container_id>[a-f0-9]+)/(?P<log_file>[a-f0-9\-]+)\.log$'
+          source: filename
+
+      # Parse Docker JSON log format (log, stream, time)
+      - json:
+          expressions:
+            log: log
+            stream: stream
+            time: time
+
+      # Extract stream as label
+      - labels:
+          stream:
+
+      # Use the actual log content from Docker's "log" field
+      - json:
+          expressions:
+            level: level
+            msg: message
+            context: context
+            time: time
+          source: log
+
+      # Extract log level as label if present
+      - labels:
+          level:
+
+      # Format timestamp from application log if present, otherwise use Docker timestamp
+      - timestamp:
+          format: RFC3339
+          source: time
+          fallback: time
+
+      # Replace the output with the actual log content
+      - output:
+          source: log
