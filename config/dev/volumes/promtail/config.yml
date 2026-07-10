@@ -33,12 +33,11 @@ scrape_configs:
       - labels:
           stream:
 
-      # Use the actual log content from Docker's "log" field
+      # Parse Pino JSON logs from the actual log content
       - json:
           expressions:
             level: level
-            msg: message
-            context: context
+            msg: msg
             time: time
           source: log
 
@@ -46,9 +45,9 @@ scrape_configs:
       - labels:
           level:
 
-      # Format timestamp from application log if present, otherwise use Docker timestamp
+      # Parse Pino timestamp (epoch milliseconds)
       - timestamp:
-          format: RFC3339
+          format: UnixMs
           source: time
           fallback: time
 

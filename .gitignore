@@ -23,4 +23,5 @@ config/dev/data/*
 !config/dev/volumes/api/.gitkeep
 !config/dev/volumes/client/.gitkeep
 !config/dev/volumes/grafana/.gitkeep
+!config/dev/volumes/grafana/provisioning/
 !config/dev/volumes/grafana/provisioning/**
