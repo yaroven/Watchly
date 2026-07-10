@@ -4,13 +4,13 @@ services:
     build:
       context: ../../
       dockerfile: client/Dockerfile
-      target: runner
+      target: base
       args:
         BACKEND_API_URL: "http://api:3000"
         NEXT_PUBLIC_BACKEND_API_URL: "http://localhost:3000"
         NEXT_PUBLIC_APP_URL: "http://localhost:4000"
         NEXT_PUBLIC_REMOTE_IMAGE_HOSTNAME: "m.media-amazon.com"
-    command: sh -c "yarn workspace client dev"
+    command: sh -c "yarn install --frozen-lockfile && yarn workspace client dev"
     environment:
       NODE_ENV: "development"
       BACKEND_API_URL: "http://api:3000"
@@ -29,10 +29,10 @@ services:
       - ./volumes/client/.next:/app/client/.next
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://client:4000/ || exit 1"]
-      interval: 10s
-      timeout: 5s
+      interval: 30s
+      timeout: 10s
       retries: 5
-      start_period: 10s
+      start_period: 60s
     depends_on:
       api:
         condition: service_healthy
@@ -42,8 +42,8 @@ services:
     build:
       context: ../../
       dockerfile: api/Dockerfile
-      target: runner
-    command: sh -c "yarn workspace api db:prepare && yarn workspace api dev"
+      target: base
+    command: sh -c "yarn install --frozen-lockfile && yarn workspace api db:prepare && yarn workspace api dev"
     ports:
       - "3000:3000"
     environment:
@@ -68,10 +68,10 @@ services:
     healthcheck:
       test:
         ["CMD-SHELL", "wget -q -O /dev/null http://api:3000/health || exit 1"]
-      interval: 10s
-      timeout: 5s
+      interval: 30s
+      timeout: 10s
       retries: 5
-      start_period: 10s
+      start_period: 60s
     depends_on:
       - db
       - redis
@@ -116,6 +116,39 @@ services:
       - "localstack_data:/persisted-data"
       - "/var/run/docker.sock:/var/run/docker.sock"
 
+  grafana:
+    image: "grafana/grafana-enterprise"
+    container_name: "grafana"
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./volumes/grafana:/var/lib/grafana
+      - ./volumes/grafana/provisioning:/etc/grafana/provisioning
+
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: "loki"
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./volumes/loki/local-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+
+  promtail:
+    image: grafana/promtail:3.0.0
+    container_name: "promtail"
+    volumes:
+      # config files
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./volumes/promtail/config.yml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+
   nginx:
     image: "nginx:latest"
     container_name: "nginx"
@@ -140,3 +173,4 @@ volumes:
   postgres_data:
   redis_data:
   localstack_data:
+  loki_data:
