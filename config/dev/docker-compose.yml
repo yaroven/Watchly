@@ -10,7 +10,7 @@ services:
         NEXT_PUBLIC_BACKEND_API_URL: "http://localhost:3000"
         NEXT_PUBLIC_APP_URL: "http://localhost:4000"
         NEXT_PUBLIC_REMOTE_IMAGE_HOSTNAME: "m.media-amazon.com"
-    command: sh -c "yarn install --frozen-lockfile && yarn workspace client dev"
+    command: sh -c "pnpm install --frozen-lockfile && pnpm --filter client dev"
     environment:
       NODE_ENV: "development"
       BACKEND_API_URL: "http://api:3000"
@@ -23,7 +23,8 @@ services:
     volumes:
       - ../../client:/app/client
       - ../../package.json:/app/package.json
-      - ../../yarn.lock:/app/yarn.lock
+      - ../../pnpm-lock.yaml:/app/pnpm-lock.yaml
+      - ../../pnpm-workspace.yaml:/app/pnpm-workspace.yaml
       - ./volumes/client/node_modules:/app/node_modules
       - ./volumes/client/package_node_modules:/app/client/node_modules
       - ./volumes/client/.next:/app/client/.next
@@ -43,7 +44,7 @@ services:
       context: ../../
       dockerfile: api/Dockerfile
       target: base
-    command: sh -c "yarn install --frozen-lockfile && yarn workspace api db:prepare && yarn workspace api dev"
+    command: sh -c "pnpm install --frozen-lockfile && pnpm --filter api db:prepare && pnpm --filter api dev"
     ports:
       - "3000:3000"
     environment:
@@ -62,7 +63,8 @@ services:
     volumes:
       - ../../api:/app/api
       - ../../package.json:/app/package.json
-      - ../../yarn.lock:/app/yarn.lock
+      - ../../pnpm-lock.yaml:/app/pnpm-lock.yaml
+      - ../../pnpm-workspace.yaml:/app/pnpm-workspace.yaml
       - ./volumes/api/node_modules:/app/node_modules
       - ./volumes/api/package_node_modules:/app/api/node_modules
     healthcheck:
