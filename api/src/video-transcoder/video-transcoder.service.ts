@@ -8,7 +8,7 @@ import * as path from "path";
 import { Readable } from "stream";
 
 import { PrismaService } from "../prisma/prisma.service";
-import BucketType from "../s3/enums/BucketType";
+import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
 import { TranscodeVideoDto } from "./dto/request/transcode-video.dto";
 import { VideoType } from "./enums/video-type.enum";

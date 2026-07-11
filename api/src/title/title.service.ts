@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { Prisma, Title, TitleType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
-import BucketType from "../s3/enums/BucketType";
+import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
 import { SeasonService } from "../season/season.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
@@ -102,7 +102,7 @@ export class TitleService {
       throw new BadRequestException(`Title with id ${id} not found`);
     }
     if (data.posterUrl !== undefined) {
-      this.assertManagedPosterUrl(id, data.posterUrl);
+      await this.assertManagedPosterUrl(id, data.posterUrl);
     }
 
     return this.prisma.title.update({ where: { id }, data });
@@ -167,7 +167,7 @@ export class TitleService {
 
     if (title.type === TitleType.SERIES) {
       for (const season of title.seasons) {
-        this.seasonService.delete(season.id);
+        await this.seasonService.delete(season.id);
       }
     }
 
