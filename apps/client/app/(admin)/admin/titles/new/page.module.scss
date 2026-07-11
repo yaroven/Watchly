@@ -1,0 +1,52 @@
+@use "@/shared/styles/admin-shell" as admin;
+
+.container {
+  @include admin.page-shell;
+}
+
+.hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.pageTitle {
+  @include admin.section-title;
+}
+
+.pageSubtitle {
+  @include admin.section-subtitle;
+}
+
+.card {
+  @include admin.panel-card;
+  padding: 28px;
+}
+
+.cardHeader {
+  margin-bottom: 22px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+
+  h2 {
+    margin: 0;
+    font-size: 1.35rem;
+    color: #f8fafc;
+  }
+
+  p {
+    margin: 8px 0 0;
+    color: #8ea0bd;
+  }
+}
+
+@media (max-width: 820px) {
+  .container {
+    @include admin.mobile-page-shell;
+  }
+
+  .card {
+    padding: 20px 18px;
+  }
+}

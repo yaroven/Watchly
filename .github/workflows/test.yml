@@ -3,17 +3,21 @@ name: Test API
 on:
   pull_request:
     paths:
-      - 'api/**'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
+      - "apps/api/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
   push:
     branches:
       - main
       - develop
     paths:
-      - 'api/**'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
+      - "apps/api/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -31,8 +35,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'pnpm'
+          node-version: "22"
+          cache: "pnpm"
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile

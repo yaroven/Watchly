@@ -1,0 +1,15 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 24px;
+}
+
+.playerShell {
+  width: 100%;
+  padding: 18px;
+  border-radius: 28px;
+  border: 1px solid var(--border);
+  background: var(--background-panel);
+  box-shadow: var(--shadow-lg);
+}

@@ -1,0 +1,84 @@
+@mixin page-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 100vh;
+  padding: 40px 36px 56px;
+  gap: 28px;
+  color: #f8fafc;
+  background: linear-gradient(180deg, #050b1d 0%, #020617 100%);
+}
+
+@mixin panel-card {
+  width: 100%;
+  border-radius: 32px;
+  background: rgba(17, 24, 39, 0.92);
+  border: 1px solid rgba(71, 85, 105, 0.28);
+}
+
+@mixin section-title {
+  margin: 0;
+  font-size: clamp(2.2rem, 4vw, 4rem);
+  line-height: 0.98;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+}
+
+@mixin section-subtitle {
+  margin: 14px 0 0;
+  max-width: 680px;
+  color: #90a0bc;
+  font-size: 1rem;
+}
+
+@mixin primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 0 24px;
+  border: none;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #ef2d2d 0%, #dc2626 100%);
+  color: #fff;
+  font-size: 0.98rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+  }
+}
+
+@mixin secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 20px;
+  border-radius: 18px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  background: transparent;
+  color: #fca5a5;
+  font-size: 0.95rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+
+  &:hover {
+    color: #fff;
+    background: rgba(239, 68, 68, 0.14);
+    border-color: rgba(248, 113, 113, 0.75);
+  }
+}
+
+@mixin mobile-page-shell {
+  padding: 24px 16px 40px;
+  gap: 20px;
+}
