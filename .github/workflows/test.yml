@@ -3,7 +3,7 @@ name: Test API
 on:
   pull_request:
     paths:
-      - 'api/**'
+      - 'apps/api/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
   push:
@@ -11,7 +11,7 @@ on:
       - main
       - develop
     paths:
-      - 'api/**'
+      - 'apps/api/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
 

@@ -1,6 +1,5 @@
 packages:
-  - 'api'
-  - 'client'
+  - 'apps/*'
 
 allowBuilds:
   "@parcel/watcher": true

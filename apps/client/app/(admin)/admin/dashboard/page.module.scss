@@ -1,0 +1,42 @@
+@use "@/shared/styles/admin-shell" as admin;
+
+.container {
+  @include admin.page-shell;
+}
+
+.hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.pageTitle {
+  @include admin.section-title;
+}
+
+.pageSubtitle {
+  @include admin.section-subtitle;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 22px;
+}
+
+.dashboardGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+}
+
+@media (max-width: 1024px) {
+  .container {
+    @include admin.mobile-page-shell;
+  }
+
+  .dashboardGrid {
+    grid-template-columns: 1fr;
+  }
+}
