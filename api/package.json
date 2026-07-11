@@ -17,7 +17,7 @@
     "docker:build": "docker compose build",
     "debug": "nest start --debug --watch",
     "prod": "node dist/main",
-    "db:prepare": "yarn workspace api prisma generate && yarn workspace api prisma migrate deploy",
+    "db:prepare": "prisma generate && prisma migrate deploy",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "test": "jest",
@@ -31,10 +31,10 @@
   },
   "lint-staged": {
     "*": [
-      "yarn prettier:write"
+      "prettier --write --ignore-unknown"
     ],
     "*.{js,ts}": [
-      "yarn lint:fix"
+      "eslint --fix"
     ]
   },
   "dependencies": {

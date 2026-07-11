@@ -1,0 +1,13 @@
+packages:
+  - 'api'
+  - 'client'
+
+allowBuilds:
+  "@parcel/watcher": true
+  "@prisma/engines": true
+  "@swc/core": true
+  "aws-sdk": true
+  "msgpackr-extract": true
+  "prisma": true
+  "sharp": true
+  "unrs-resolver": true

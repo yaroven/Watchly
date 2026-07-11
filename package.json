@@ -3,18 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "license": "MIT",
-  "workspaces": [
-    "api",
-    "client"
-  ],
   "scripts": {
     "commitlint": "commitlint",
     "docker:dev": "docker compose --project-name watchly -f ./config/dev/docker-compose.yml",
-    "dev:up": "yarn docker:dev up -d",
-    "dev:down": "yarn docker:dev down",
-    "lint:api": "yarn workspace api precommit",
-    "lint:client": "yarn workspace client precommit",
-    "lint": "yarn lint:api && yarn lint:client",
+    "dev:up": "pnpm docker:dev up -d",
+    "dev:down": "pnpm docker:dev down",
+    "lint:api": "pnpm --filter api precommit",
+    "lint:client": "pnpm --filter client precommit",
+    "lint": "pnpm lint:api && pnpm lint:client",
     "prepare": "husky"
   },
   "devDependencies": {
