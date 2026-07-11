@@ -1,12 +1,12 @@
 import { BadRequestException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
-import { EpisodeService } from "./episode.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { S3Service } from "../s3/s3.service";
-import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
+import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
 import { CreateEpisodeDto } from "./dto/request/create-episode.dto";
 import { UpdateEpisodeDto } from "./dto/request/update-episode.dto";
+import { EpisodeService } from "./episode.service";
 
 describe("EpisodeService", () => {
   let service: EpisodeService;
@@ -110,9 +110,7 @@ describe("EpisodeService", () => {
         number: 1,
       });
 
-      await expect(service.create(createEpisodeDto)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.create(createEpisodeDto)).rejects.toThrow(BadRequestException);
       await expect(service.create(createEpisodeDto)).rejects.toThrow(
         "Episode with number 1 already exists in this season",
       );
@@ -139,9 +137,7 @@ describe("EpisodeService", () => {
 
     it("should return episodes for specific season when seasonId is provided", async () => {
       const seasonId = "season-1";
-      const mockEpisodes = [
-        { id: "episode-1", number: 1, seasonId },
-      ];
+      const mockEpisodes = [{ id: "episode-1", number: 1, seasonId }];
 
       mockPrismaService.episode.findMany.mockResolvedValue(mockEpisodes);
 
@@ -236,7 +232,7 @@ describe("EpisodeService", () => {
     it("should throw BadRequestException if episode not found", async () => {
       mockPrismaService.episode.findUnique.mockResolvedValue(null);
 
-      await expect(service.update("non-existent", { name: "Test" })).rejects.toThrow(
+      await expect(service.update("non-existent", { name: "Test", number: 2 })).rejects.toThrow(
         BadRequestException,
       );
     });
@@ -286,10 +282,7 @@ describe("EpisodeService", () => {
         "episode-1",
         VideoType.EPISODE,
       );
-      expect(mockS3Service.deleteObject).toHaveBeenCalledWith(
-        "episode-1",
-        expect.any(String),
-      );
+      expect(mockS3Service.deleteObject).toHaveBeenCalledWith("episode-1", expect.any(String));
       expect(mockS3Service.deleteFolder).toHaveBeenCalled();
       expect(mockPrismaService.episode.delete).toHaveBeenCalledWith({
         where: { id: "episode-1" },
@@ -299,9 +292,7 @@ describe("EpisodeService", () => {
     it("should throw BadRequestException if episode not found", async () => {
       mockPrismaService.episode.findUnique.mockResolvedValue(null);
 
-      await expect(service.delete("non-existent")).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.delete("non-existent")).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -321,9 +312,7 @@ describe("EpisodeService", () => {
     it("should throw BadRequestException if episode not found", async () => {
       mockPrismaService.episode.findUnique.mockResolvedValue(null);
 
-      await expect(service.transcode("non-existent")).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.transcode("non-existent")).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -347,9 +336,7 @@ describe("EpisodeService", () => {
     it("should throw BadRequestException if episode not found", async () => {
       mockPrismaService.episode.findUnique.mockResolvedValue(null);
 
-      await expect(service.getUploadUrl("non-existent")).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.getUploadUrl("non-existent")).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -380,9 +367,7 @@ describe("EpisodeService", () => {
     it("should throw BadRequestException if episode not found", async () => {
       mockPrismaService.episode.findUnique.mockResolvedValue(null);
 
-      await expect(service.getStreamUrl("non-existent")).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.getStreamUrl("non-existent")).rejects.toThrow(BadRequestException);
     });
   });
 });

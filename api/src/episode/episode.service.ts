@@ -1,7 +1,7 @@
 import { BadRequestException, forwardRef, Inject, Injectable } from "@nestjs/common";
 import { Episode } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
-import BucketType from "../s3/enums/BucketType";
+import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
