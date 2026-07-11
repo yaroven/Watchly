@@ -16,10 +16,10 @@
   },
   "lint-staged": {
     "*": [
-      "yarn prettier:write"
+      "pnpm prettier:write"
     ],
     "*.{js,jsx,ts,tsx}": [
-      "yarn lint:fix"
+      "pnpm lint:fix"
     ]
   },
   "dependencies": {

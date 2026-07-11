@@ -25,13 +25,18 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:unit": "jest --testPathPattern=src --testPathIgnorePatterns=e2e",
+    "test:integration": "jest --testPathPattern=test --testNamePattern='integration'",
     "precommit": "lint-staged"
   },
   "lint-staged": {
     "*": [
       "prettier --write --ignore-unknown"
     ],
-    "*.{js,ts}": [
+    "src/**/*.{js,ts}": [
+      "eslint --fix"
+    ],
+    "!src/**/*.spec.ts": [
       "eslint --fix"
     ]
   },
@@ -96,20 +101,27 @@
     "wait-on": "^9.0.3"
   },
   "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "roots": [
+      "<rootDir>/src"
     ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
+    "testMatch": [
+      "**/*.spec.ts"
+    ],
     "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
+      "^.+\\.ts$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "src/**/*.ts",
+      "!src/**/*.spec.ts",
+      "!src/**/*.dto.ts"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "moduleFileExtensions": [
+      "ts",
+      "js",
+      "json"
+    ]
   }
 }
