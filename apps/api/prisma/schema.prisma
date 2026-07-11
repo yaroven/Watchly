@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum TitleType {
+  MOVIE
+  SERIES
+}
+
+enum TranscodingStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+}
+
+model Title {
+  id                String            @id @default(uuid())
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  name              String
+  description       String
+  type              TitleType
+  posterUrl         String
+  hlsUrl            String?
+  transcodingStatus TranscodingStatus @default(PENDING)
+
+  videoTranscodingProgress VideoTranscodingProgress?
+
+  seasons Season[]
+
+  @@index([name, description, type])
+}
+
+model VideoTranscodingProgress {
+  id                 String   @id @default(uuid())
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  progressPercentage Int      @default(0)
+
+  titleId String? @unique
+  title   Title?  @relation(fields: [titleId], references: [id], onDelete: Cascade)
+
+  episodeId String?  @unique
+  episode   Episode? @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  @@index([titleId])
+  @@index([episodeId])
+}
+
+model Season {
+  id          String    @id @default(uuid())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  number      Int
+  name        String
+  description String
+  posterUrl   String?
+  titleId     String
+  title       Title     @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  episodes    Episode[]
+
+  @@unique([titleId, number])
+}
+
+model Episode {
+  id                String            @id @default(uuid())
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  number            Int
+  name              String
+  description       String
+  seasonId          String
+  season            Season            @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  transcodingStatus TranscodingStatus @default(PENDING)
+
+  videoTranscodingProgress VideoTranscodingProgress?
+
+  @@unique([seasonId, number])
+}

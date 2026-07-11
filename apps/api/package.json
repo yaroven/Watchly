@@ -33,10 +33,7 @@
     "*": [
       "prettier --write --ignore-unknown"
     ],
-    "src/**/*.{js,ts}": [
-      "eslint --fix"
-    ],
-    "!src/**/*.spec.ts": [
+    "*.{js,ts}": [
       "eslint --fix"
     ]
   },
@@ -86,6 +83,7 @@
     "globals": "^16.0.0",
     "husky": "^9.1.7",
     "jest": "^29.7.0",
+    "jest-mock-extended": "^4.0.1",
     "pino-pretty": "^11.0.0",
     "prettier": "^3.4.2",
     "prettier-plugin-organize-imports": "^4.3.0",
@@ -101,27 +99,20 @@
     "wait-on": "^9.0.3"
   },
   "jest": {
-    "preset": "ts-jest",
-    "testEnvironment": "node",
-    "roots": [
-      "<rootDir>/src"
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
     ],
-    "testMatch": [
-      "**/*.spec.ts"
-    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
     "transform": {
-      "^.+\\.ts$": "ts-jest"
+      "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "src/**/*.ts",
-      "!src/**/*.spec.ts",
-      "!src/**/*.dto.ts"
+      "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "moduleFileExtensions": [
-      "ts",
-      "js",
-      "json"
-    ]
+    "testEnvironment": "node"
   }
 }

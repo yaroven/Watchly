@@ -1,0 +1,68 @@
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pageNumbers {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.pageButton,
+.activePage,
+.arrowButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  padding: 0 10px;
+}
+
+.pageButton {
+  background: rgba(15, 23, 42, 0.8);
+  color: #cbd5e1;
+
+  &:hover {
+    background: rgba(30, 41, 59, 0.96);
+    color: white;
+    border-color: rgba(249, 115, 22, 0.26);
+  }
+}
+
+.activePage {
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  color: white;
+  border-color: rgba(249, 115, 22, 0.35);
+
+  &:hover {
+    background: linear-gradient(135deg, #fb923c, #f97316);
+  }
+}
+
+.arrowButton {
+  background: rgba(15, 23, 42, 0.8);
+  color: #fff;
+
+  &:hover:not(:disabled) {
+    background: rgba(30, 41, 59, 0.96);
+    border-color: rgba(249, 115, 22, 0.3);
+    color: #fb923c;
+  }
+
+  &:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    border-color: transparent;
+  }
+}

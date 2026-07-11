@@ -1,0 +1,15 @@
+.pageLoader {
+  background: transparent;
+  width: 100%;
+  height: 100%;
+}
+
+.loader {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  color: white;
+  pointer-events: auto;
+}

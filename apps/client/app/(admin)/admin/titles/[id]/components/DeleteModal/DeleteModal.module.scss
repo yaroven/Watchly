@@ -1,0 +1,89 @@
+.modalContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 18px;
+  padding: 8px 4px;
+  color: #fff;
+
+  h3 {
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+  }
+
+  p {
+    color: #94a3b8;
+    margin: 0;
+    line-height: 1.5;
+
+    strong {
+      color: #fff;
+    }
+  }
+}
+
+.warningIcon {
+  color: #f87171;
+  width: 58px;
+  height: 58px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(127, 29, 29, 0.25);
+}
+
+.modalActions {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  justify-content: center;
+
+  button {
+    min-height: 52px;
+    padding: 0 24px;
+    border-radius: 18px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 120px;
+  }
+}
+
+.modalConfirmButton {
+  background: linear-gradient(135deg, #ef2d2d 0%, #dc2626 100%);
+  color: white;
+  border: none;
+
+  &:hover {
+    transform: translateY(-2px);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.modalCancelButton {
+  background: rgba(30, 41, 59, 0.86);
+  color: #cbd5e1;
+  border: 1px solid rgba(71, 85, 105, 0.36);
+
+  &:hover {
+    background: rgba(41, 52, 74, 0.95);
+    color: white;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+@media (max-width: 640px) {
+  .modalActions {
+    flex-direction: column;
+  }
+}

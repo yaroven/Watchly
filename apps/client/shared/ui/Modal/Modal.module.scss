@@ -1,0 +1,100 @@
+.overlay {
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  position: fixed;
+  z-index: 1000;
+  background: radial-gradient(circle at top, rgba(239, 68, 68, 0.12), transparent 28%), rgba(2, 6, 23, 0.78);
+  backdrop-filter: blur(14px);
+  animation: fadeIn 0.3s ease-out;
+}
+
+.dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.modal {
+  position: relative;
+  padding: 32px 32px 28px;
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.98) 0%, rgba(10, 16, 30, 0.98) 100%);
+  color: #efefef;
+  border-radius: 28px;
+  width: 95%;
+  border: 1px solid rgba(71, 85, 105, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 32px 80px rgba(2, 6, 23, 0.54);
+  animation: slideUp 0.24s ease-out;
+  max-height: min(90vh, 960px);
+  overflow: auto;
+
+  &.sm {
+    max-width: 400px;
+  }
+  &.md {
+    max-width: 600px;
+  }
+  &.lg {
+    max-width: 800px;
+  }
+  &.xl {
+    max-width: 1100px;
+  }
+}
+
+.closeButton {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(71, 85, 105, 0.38);
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 10px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  appearance: none;
+
+  &:hover {
+    background: rgba(41, 52, 74, 0.95);
+    color: #fff;
+    transform: translateY(-1px);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 768px) {
+  .modal {
+    padding: 26px 18px 22px;
+    border-radius: 24px;
+  }
+}

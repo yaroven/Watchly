@@ -1,0 +1,163 @@
+.siteShell {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #020617 0%, #081225 100%);
+}
+
+.siteHeader {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 50px;
+  padding: 0 24px;
+  background: rgba(2, 6, 23, 0.86);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.siteHeaderNav {
+  display: flex;
+  gap: 24px;
+  width: min(520px, 100%);
+}
+
+.siteContent {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding: 48px 24px 64px;
+}
+
+.siteHero {
+  display: grid;
+  gap: 16px;
+}
+
+.siteMetaRow {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.siteGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 20px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.adminShell {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  gap: 28px;
+  padding: 36px 32px 48px;
+  background: linear-gradient(180deg, #050b1d 0%, #020617 100%);
+}
+
+.adminHero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.adminHeroText {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+}
+
+.adminPanels {
+  display: grid;
+  gap: 24px;
+}
+
+.adminPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px;
+  border: 1px solid rgba(51, 65, 85, 0.7);
+  border-radius: 28px;
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.adminFilterRow {
+  display: grid;
+  grid-template-columns: 1.5fr repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.adminTableHeader,
+.adminTableRow {
+  display: grid;
+  grid-template-columns: minmax(260px, 2fr) repeat(4, minmax(110px, 1fr));
+  gap: 16px;
+  align-items: center;
+}
+
+.adminTableHeader {
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.56);
+}
+
+.adminTableRow {
+  padding: 16px 0;
+}
+
+.titleCell {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.authShell {
+  display: flex;
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  background: linear-gradient(180deg, #020617 0%, #081225 100%);
+}
+
+.authCard {
+  display: flex;
+  width: min(460px, 100%);
+  flex-direction: column;
+  gap: 18px;
+  padding: 32px;
+  border: 1px solid rgba(51, 65, 85, 0.72);
+  border-radius: 28px;
+  background: rgba(15, 23, 42, 0.94);
+  box-shadow: 0 30px 80px rgba(2, 6, 23, 0.45);
+}
+
+.formField {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (max-width: 960px) {
+  .adminShell {
+    padding: 24px 20px 36px;
+  }
+
+  .adminHero {
+    flex-direction: column;
+  }
+
+  .adminFilterRow,
+  .adminTableHeader,
+  .adminTableRow {
+    grid-template-columns: 1fr;
+  }
+}
