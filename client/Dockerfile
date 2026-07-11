@@ -1,16 +1,17 @@
 FROM node:22-alpine AS base
+RUN npm install -g pnpm
 WORKDIR /app
 
-COPY package.json yarn.lock ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY client/package.json ./client/package.json
 
-RUN yarn install --frozen-lockfile && yarn cache clean
+RUN pnpm install --frozen-lockfile
 
 FROM base AS builder
 WORKDIR /app
 
 COPY . .
-RUN yarn workspace client build
+RUN pnpm --filter client build
 
 FROM node:22-alpine AS runner
 WORKDIR /app
