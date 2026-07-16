@@ -1,4 +1,4 @@
-import { BadRequestException, forwardRef, Inject, Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import { Episode } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
@@ -7,12 +7,12 @@ import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
 import { CreateEpisodeDto } from "./dto/request/create-episode.dto";
 import { UpdateEpisodeDto } from "./dto/request/update-episode.dto";
+import { getEpisodeTitleAndSeasonId } from "./episode-path.util";
 
 @Injectable()
 export class EpisodeService {
   constructor(
     private readonly prisma: PrismaService,
-    @Inject(forwardRef(() => VideoTranscoderService))
     private readonly videoTranscoderService: VideoTranscoderService,
     private readonly s3Service: S3Service,
   ) {}
@@ -78,8 +78,7 @@ export class EpisodeService {
     const episode = await this.findOneDetailed(id);
     if (!episode) throw new BadRequestException(`Episode with id ${id} not found`);
 
-    const seasonId = episode.seasonId;
-    const titleId = episode.season.titleId;
+    const { seasonId, titleId } = getEpisodeTitleAndSeasonId(episode);
 
     await this.videoTranscoderService.cancelScheduledTranscodes(id, VideoType.EPISODE);
 
@@ -114,8 +113,7 @@ export class EpisodeService {
 
     if (!episode) throw new BadRequestException(`Episode with id ${id} not found`);
 
-    const seasonId = episode.seasonId;
-    const titleId = episode.season.titleId;
+    const { seasonId, titleId } = getEpisodeTitleAndSeasonId(episode);
 
     const url = await this.s3Service.getReadPresignedUrl(
       `videos/${titleId}/${seasonId}/${episode.id}/master.m3u8`,
