@@ -3,12 +3,15 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
+import { VideoType } from "../video-transcoder/enums/video-type.enum";
+import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
 import { SeasonService } from "./season.service";
 
 describe("SeasonService", () => {
   let service: SeasonService;
   let prismaMock: jest.Mocked<PrismaService>;
   let s3ServiceMock: jest.Mocked<S3Service>;
+  let videoTranscoderServiceMock: jest.Mocked<VideoTranscoderService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -35,12 +38,21 @@ describe("SeasonService", () => {
             deleteFolder: jest.fn(),
           },
         },
+        {
+          provide: VideoTranscoderService,
+          useValue: {
+            cancelScheduledTranscodes: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
     service = module.get<SeasonService>(SeasonService);
     prismaMock = module.get(PrismaService) as jest.Mocked<PrismaService>;
     s3ServiceMock = module.get(S3Service) as jest.Mocked<S3Service>;
+    videoTranscoderServiceMock = module.get(
+      VideoTranscoderService,
+    ) as jest.Mocked<VideoTranscoderService>;
   });
 
   afterEach(() => {
@@ -275,6 +287,7 @@ describe("SeasonService", () => {
         (prismaMock.season.findUnique as jest.Mock).mockResolvedValue(season);
         s3ServiceMock.deleteObject.mockResolvedValue(undefined as any);
         s3ServiceMock.deleteFolder.mockResolvedValue(undefined as any);
+        videoTranscoderServiceMock.cancelScheduledTranscodes.mockResolvedValue(undefined as any);
         (prismaMock.season.delete as jest.Mock).mockResolvedValue(season);
       });
 
@@ -285,6 +298,15 @@ describe("SeasonService", () => {
           where: { id: "season-1" },
           include: { episodes: true },
         });
+
+        expect(videoTranscoderServiceMock.cancelScheduledTranscodes).toHaveBeenCalledWith(
+          "episode-1",
+          VideoType.EPISODE,
+        );
+        expect(videoTranscoderServiceMock.cancelScheduledTranscodes).toHaveBeenCalledWith(
+          "episode-2",
+          VideoType.EPISODE,
+        );
 
         expect(s3ServiceMock.deleteObject).toHaveBeenCalledWith("episode-1", BucketType.RAW);
         expect(s3ServiceMock.deleteObject).toHaveBeenCalledWith("episode-2", BucketType.RAW);

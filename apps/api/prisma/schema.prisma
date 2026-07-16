@@ -47,6 +47,7 @@ model Title {
   seasons Season[]
 
   @@index([name, description, type])
+  @@index([name])
 }
 
 model VideoTranscodingProgress {
