@@ -1,7 +1,8 @@
 import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
-import { ThrottlerModule } from "@nestjs/throttler";
+import { APP_GUARD } from "@nestjs/core";
+import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { LoggerModule } from "nestjs-pino";
 import { AppController } from "./app.controller";
 import redisConfig, { RedisConfig, RedisConfigName } from "./config/redis.config";
@@ -58,6 +59,6 @@ import { VideoTranscoderModule } from "./video-transcoder/video-transcoder.modul
     S3EventModule,
   ],
   controllers: [AppController],
-  providers: [],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}
