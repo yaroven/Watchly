@@ -201,10 +201,10 @@ describe("S3Service", () => {
       expect(mockSend).toHaveBeenCalledWith(expect.any(DeleteObjectCommand));
     });
 
-    test("should not throw on delete error", async () => {
+    test("should rethrow on delete error", async () => {
       mockSend.mockRejectedValueOnce(new Error("delete failed"));
 
-      await expect(service.deleteObject("my-key", BucketType.RAW)).resolves.not.toThrow();
+      await expect(service.deleteObject("my-key", BucketType.RAW)).rejects.toThrow("delete failed");
     });
   });
 
@@ -214,7 +214,9 @@ describe("S3Service", () => {
       const batch2 = [{ Key: "key3" }];
       mockSend
         .mockResolvedValueOnce({ Contents: batch1, NextContinuationToken: "token-abc" })
-        .mockResolvedValueOnce({ Contents: batch2 });
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({ Contents: batch2 })
+        .mockResolvedValueOnce({});
 
       await service.deleteFolder("videos/title-1/", BucketType.PROCESSED);
 
@@ -230,10 +232,10 @@ describe("S3Service", () => {
       expect(mockSend).toHaveBeenCalledTimes(1);
     });
 
-    test("should not throw on list error", async () => {
+    test("should rethrow on list error", async () => {
       mockSend.mockRejectedValueOnce(new Error("list failed"));
 
-      await expect(service.deleteFolder("folder", BucketType.RAW)).resolves.not.toThrow();
+      await expect(service.deleteFolder("folder", BucketType.RAW)).rejects.toThrow("list failed");
     });
 
     test("should append trailing slash if missing", async () => {
