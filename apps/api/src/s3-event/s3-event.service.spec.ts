@@ -224,7 +224,7 @@ describe("S3EventService", () => {
       });
     });
 
-    test("should skip processing when no Records in body", async () => {
+    test("should delete message with no Records instead of leaving it in the queue", async () => {
       const message = {
         MessageId: "msg-1",
         ReceiptHandle: "receipt-789",
@@ -235,8 +235,7 @@ describe("S3EventService", () => {
       await (service as any).processMessage(message);
 
       expect(videoTranscoderServiceMock.scheduleTranscodeVideo).not.toHaveBeenCalled();
-      // No Records means the function returns early, before the delete call
-      expect(mockSend).not.toHaveBeenCalled();
+      expect(mockSend.mock.calls[0][0]).toBeInstanceOf(DeleteMessageCommand);
     });
 
     test("should skip scheduling when task resolution returns null", async () => {
@@ -280,12 +279,29 @@ describe("S3EventService", () => {
       expect(deleteCall).toBeDefined();
     });
 
-    test("should not delete message on processing error", async () => {
+    test("should delete unparseable (poison-pill) messages instead of retrying forever", async () => {
       const message = {
         MessageId: "msg-1",
         ReceiptHandle: "receipt-error",
         Body: "invalid json",
       };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (service as any).processMessage(message);
+
+      expect(mockSend.mock.calls[0][0]).toBeInstanceOf(DeleteMessageCommand);
+    });
+
+    test("should not delete message when processing a valid message throws", async () => {
+      const message = {
+        MessageId: "msg-1",
+        ReceiptHandle: "receipt-retry",
+        Body: JSON.stringify({
+          Records: [{ s3: { object: { key: "11111111-1111-4111-8111-111111111111" } } }],
+        }),
+      };
+
+      (prismaMock.episode.findUnique as jest.Mock).mockRejectedValue(new Error("db down"));
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (service as any).processMessage(message);
