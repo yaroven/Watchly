@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
-import { Episode } from "@prisma/client";
+import { Episode, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
@@ -30,7 +30,20 @@ export class EpisodeService {
         `Episode with number ${data.number} already exists in this season`,
       );
 
-    return this.prisma.episode.create({ data });
+    return this.createOrThrowConflict(data);
+  }
+
+  private async createOrThrowConflict(data: CreateEpisodeDto): Promise<Episode> {
+    try {
+      return await this.prisma.episode.create({ data });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        throw new BadRequestException(
+          `Episode with number ${data.number} already exists in this season`,
+        );
+      }
+      throw error;
+    }
   }
 
   async findAll(seasonId?: string): Promise<Episode[]> {
@@ -71,7 +84,16 @@ export class EpisodeService {
         );
     }
 
-    return this.prisma.episode.update({ where: { id }, data });
+    try {
+      return await this.prisma.episode.update({ where: { id }, data });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        throw new BadRequestException(
+          `Episode with number ${data.number} already exists in this season`,
+        );
+      }
+      throw error;
+    }
   }
 
   async delete(id: string): Promise<Episode> {
