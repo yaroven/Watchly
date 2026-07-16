@@ -12,7 +12,6 @@ import {
 } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { sdkStreamMixin } from "@aws-sdk/util-stream-node";
 import { InternalServerErrorException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Test } from "@nestjs/testing";
@@ -23,7 +22,6 @@ import { S3Service } from "./s3.service";
 
 jest.mock("@aws-sdk/lib-storage");
 jest.mock("@aws-sdk/s3-request-presigner");
-jest.mock("@aws-sdk/util-stream-node");
 
 const mockSend = jest.fn();
 
@@ -99,25 +97,6 @@ describe("S3Service", () => {
 
       expect(mockSend).toHaveBeenCalledWith(expect.any(GetObjectCommand));
       expect(result).toBe(mockBody);
-    });
-  });
-
-  describe("getFileBuffer", () => {
-    test("should return buffer from S3 object", async () => {
-      const mockBody = new Readable({ read() {} });
-      mockSend.mockResolvedValueOnce({ Body: mockBody });
-
-      const uint8 = new Uint8Array(Buffer.from("test data"));
-      const mixedStream = new Readable({ read() {} });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (sdkStreamMixin as jest.Mock).mockReturnValueOnce({
-        transformToByteArray: jest.fn().mockResolvedValue(uint8),
-      });
-
-      const result = await service.getFileBuffer("my-key", BucketType.RAW);
-
-      expect(sdkStreamMixin).toHaveBeenCalledWith(mockBody);
-      expect(result).toBeInstanceOf(Buffer);
     });
   });
 
