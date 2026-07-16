@@ -110,8 +110,7 @@ export class S3Service implements OnModuleInit {
   }
 
   private getBucketName(type: BucketType): string {
-    const cfg = this.configService.getOrThrow<S3Config>(S3ConfigName);
-    return type === BucketType.RAW ? cfg.rawBucketName : cfg.processedBucketName;
+    return type === BucketType.RAW ? this.rawBucketName : this.processedBucketName;
   }
 
   async get(key: string, type: BucketType): Promise<Readable> {
@@ -162,6 +161,7 @@ export class S3Service implements OnModuleInit {
       this.logger.log(`Deleted object "${key}" from bucket "${bucketName}".`);
     } catch (error) {
       this.logger.error(`Failed to delete object "${key}" from bucket "${bucketName}":`, error);
+      throw error;
     }
   }
 
@@ -201,6 +201,7 @@ export class S3Service implements OnModuleInit {
         `Failed to delete folder "${internalPrefix}" from bucket "${bucketName}":`,
         error,
       );
+      throw error;
     }
   }
 }

@@ -46,7 +46,6 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     await this.setupInfrastructure();
-    // Запускаємо цикл в фоні
     this.pollLoopFinished = this.pollLoop().catch((err) =>
       this.logger.error("Critical polling error", err),
     );
@@ -60,13 +59,11 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async setupInfrastructure() {
-    // 1. Створюємо чергу
     const { QueueUrl } = await this.sqsClient.send(
       new CreateQueueCommand({ QueueName: this.config.queueName }),
     );
     this.queueUrl = QueueUrl!;
 
-    // 2. Отримуємо ARN для політики та нотифікацій
     const { Attributes } = await this.sqsClient.send(
       new GetQueueAttributesCommand({
         QueueUrl: this.queueUrl,
@@ -75,7 +72,6 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
     );
     const queueArn = Attributes?.QueueArn;
 
-    // 3. Даємо дозвіл S3 писати в SQS
     await this.sqsClient.send(
       new SetQueueAttributesCommand({
         QueueUrl: this.queueUrl,
@@ -95,7 +91,6 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
       }),
     );
 
-    // 4. Підписуємо бакет на події
     await this.s3Client.send(
       new PutBucketNotificationConfigurationCommand({
         Bucket: this.config.rawBucketName,
@@ -142,15 +137,12 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
       for (const record of body.Records) {
         const key = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
 
-        // Ідемпотентність: перевіряємо статус в БД
         const task = await this.resolveTask(key);
         if (task) {
-          // Якщо завдання вже в процесі, сервіс має ігнорувати повторні запити
           await this.videoTranscoderService.scheduleTranscodeVideo(task);
         }
       }
 
-      // ВИДАЛЯЄМО лише після успішної обробки
       await this.sqsClient.send(
         new DeleteMessageCommand({
           QueueUrl: this.queueUrl,
@@ -159,8 +151,6 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
       );
     } catch (error) {
       this.logger.error("Failed to process message", error);
-      // Якщо тут помилка, ми НЕ видаляємо повідомлення,
-      // воно повернеться в чергу через visibilityTimeout
     }
   }
 

@@ -5,6 +5,7 @@ import {
   Get,
   NotFoundException,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -29,7 +30,7 @@ export class EpisodeController {
   }
 
   @Get(":id")
-  async findOne(@Param("id") id: string): Promise<Episode> {
+  async findOne(@Param("id", ParseUUIDPipe) id: string): Promise<Episode> {
     const episode = await this.episodeService.findOne(id);
 
     if (!episode) throw new NotFoundException(`Episode with id ${id} not found`);
@@ -38,27 +39,27 @@ export class EpisodeController {
   }
 
   @Patch(":id")
-  update(@Param("id") id: string, @Body() updateEpisodeDto: UpdateEpisodeDto) {
+  update(@Param("id", ParseUUIDPipe) id: string, @Body() updateEpisodeDto: UpdateEpisodeDto) {
     return this.episodeService.update(id, updateEpisodeDto);
   }
 
   @Delete(":id")
-  delete(@Param("id") id: string) {
+  delete(@Param("id", ParseUUIDPipe) id: string) {
     return this.episodeService.delete(id);
   }
 
   @Post(":id/transcode")
-  transcode(@Param("id") id: string) {
+  transcode(@Param("id", ParseUUIDPipe) id: string) {
     return this.episodeService.transcode(id);
   }
 
   @Get(":id/upload-url")
-  getUploadUrl(@Param("id") id: string) {
+  getUploadUrl(@Param("id", ParseUUIDPipe) id: string) {
     return this.episodeService.getUploadUrl(id);
   }
 
   @Get(":id/video")
-  getStreamUrl(@Param("id") id: string) {
+  getStreamUrl(@Param("id", ParseUUIDPipe) id: string) {
     return this.episodeService.getStreamUrl(id);
   }
 }
