@@ -168,26 +168,27 @@ export class VideoTranscoderService {
   private async uploadFilesToDb(id: string, type: VideoType, key: string, outputDir: string) {
     await this.ensureEntityExists(id, type);
     this.logger.log(`Uploading processed files to Object DB...`);
-    const files = await fs.readdir(outputDir, { recursive: true });
-    for (const file of files as string[]) {
-      if (!(await this.entityExists(id, type)))
-        throw new TranscodeAbortedError(
-          `Entity ${id} was deleted before processed upload finished`,
+    const files = (await fs.readdir(outputDir, { recursive: true })) as string[];
+
+    await Promise.all(
+      files.map(async (file) => {
+        const localFilePath = path.join(outputDir, file);
+        if ((await fs.stat(localFilePath)).isDirectory()) return;
+
+        const s3Key = `videos/${key}/${file}`;
+        const contentType = file.endsWith(".m3u8") ? "application/x-mpegURL" : "video/MP2T";
+
+        await this.s3Service.uploadStream(
+          BucketType.PROCESSED,
+          s3Key,
+          fs.createReadStream(localFilePath),
+          contentType,
         );
+      }),
+    );
 
-      const localFilePath = path.join(outputDir, file);
-      if ((await fs.stat(localFilePath)).isDirectory()) continue;
-
-      const s3Key = `videos/${key}/${file}`;
-      const contentType = file.endsWith(".m3u8") ? "application/x-mpegURL" : "video/MP2T";
-
-      await this.s3Service.uploadStream(
-        BucketType.PROCESSED,
-        s3Key,
-        fs.createReadStream(localFilePath),
-        contentType,
-      );
-    }
+    if (!(await this.entityExists(id, type)))
+      throw new TranscodeAbortedError(`Entity ${id} was deleted before processed upload finished`);
   }
 
   private async uploadPath(id: string, type: VideoType): Promise<string> {
