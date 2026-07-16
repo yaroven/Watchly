@@ -110,8 +110,7 @@ export class S3Service implements OnModuleInit {
   }
 
   private getBucketName(type: BucketType): string {
-    const cfg = this.configService.getOrThrow<S3Config>(S3ConfigName);
-    return type === BucketType.RAW ? cfg.rawBucketName : cfg.processedBucketName;
+    return type === BucketType.RAW ? this.rawBucketName : this.processedBucketName;
   }
 
   async get(key: string, type: BucketType): Promise<Readable> {
