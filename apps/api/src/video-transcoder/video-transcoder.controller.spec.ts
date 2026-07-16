@@ -41,7 +41,7 @@ describe("VideoTranscoderController", () => {
         });
 
         test("should return progress for episode", async () => {
-          const result = await controller.getProgress("vid-1", "episode");
+          const result = await controller.getProgress("vid-1", VideoType.EPISODE);
           expect(videoTranscoderServiceMock.getProgress).toHaveBeenCalledWith(
             "vid-1",
             VideoType.EPISODE,
@@ -56,7 +56,7 @@ describe("VideoTranscoderController", () => {
         });
 
         test("should throw NotFoundException", async () => {
-          const action = controller.getProgress("vid-1", "episode");
+          const action = controller.getProgress("vid-1", VideoType.EPISODE);
           await expect(action).rejects.toThrow(NotFoundException);
         });
       });
@@ -70,16 +70,7 @@ describe("VideoTranscoderController", () => {
       });
 
       test("should return progress for movie", async () => {
-        const result = await controller.getProgress("vid-1", "movie");
-        expect(videoTranscoderServiceMock.getProgress).toHaveBeenCalledWith(
-          "vid-1",
-          VideoType.MOVIE,
-        );
-        expect(result).toEqual(progressData);
-      });
-
-      test("should default to movie if type is undefined", async () => {
-        const result = await controller.getProgress("vid-1", undefined as any);
+        const result = await controller.getProgress("vid-1", VideoType.MOVIE);
         expect(videoTranscoderServiceMock.getProgress).toHaveBeenCalledWith(
           "vid-1",
           VideoType.MOVIE,
