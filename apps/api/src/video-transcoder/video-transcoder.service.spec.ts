@@ -40,6 +40,7 @@ jest.mock("fluent-ffmpeg", () => {
       return this;
     }),
     run: jest.fn(),
+    kill: jest.fn(),
   };
   const mockFfmpeg: any = jest.fn(() => m);
   mockFfmpeg.ffprobe = jest.fn((file: string, cb: any) => {
