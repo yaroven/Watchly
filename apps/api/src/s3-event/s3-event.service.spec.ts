@@ -133,23 +133,30 @@ describe("S3EventService", () => {
 
   describe("resolveTask", () => {
     test("should return EPISODE task when episode exists", async () => {
-      (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue({ id: "ep-1" });
+      (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue({
+        id: "11111111-1111-4111-8111-111111111111",
+      });
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = await (service as any).resolveTask("ep-1");
+      const result = await (service as any).resolveTask("11111111-1111-4111-8111-111111111111");
 
-      expect(result).toEqual({ id: "ep-1", type: VideoType.EPISODE });
+      expect(result).toEqual({
+        id: "11111111-1111-4111-8111-111111111111",
+        type: VideoType.EPISODE,
+      });
       expect(prismaMock.title.findUnique).not.toHaveBeenCalled();
     });
 
     test("should return MOVIE task when episode not found but title exists", async () => {
       (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
-      (prismaMock.title.findUnique as jest.Mock).mockResolvedValue({ id: "title-1" });
+      (prismaMock.title.findUnique as jest.Mock).mockResolvedValue({
+        id: "22222222-2222-4222-8222-222222222222",
+      });
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = await (service as any).resolveTask("title-1");
+      const result = await (service as any).resolveTask("22222222-2222-4222-8222-222222222222");
 
-      expect(result).toEqual({ id: "title-1", type: VideoType.MOVIE });
+      expect(result).toEqual({ id: "22222222-2222-4222-8222-222222222222", type: VideoType.MOVIE });
     });
 
     test("should return null when neither episode nor title exists", async () => {
@@ -157,7 +164,7 @@ describe("S3EventService", () => {
       (prismaMock.title.findUnique as jest.Mock).mockResolvedValue(null);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = await (service as any).resolveTask("unknown-id");
+      const result = await (service as any).resolveTask("33333333-3333-4333-8333-333333333333");
 
       expect(result).toBeNull();
     });
@@ -169,18 +176,20 @@ describe("S3EventService", () => {
         MessageId: "msg-1",
         ReceiptHandle: "receipt-123",
         Body: JSON.stringify({
-          Records: [{ s3: { object: { key: "ep-1" } } }],
+          Records: [{ s3: { object: { key: "11111111-1111-4111-8111-111111111111" } } }],
         }),
       };
 
-      (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue({ id: "ep-1" });
+      (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue({
+        id: "11111111-1111-4111-8111-111111111111",
+      });
       videoTranscoderServiceMock.scheduleTranscodeVideo.mockResolvedValue(undefined);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (service as any).processMessage(message);
 
       expect(videoTranscoderServiceMock.scheduleTranscodeVideo).toHaveBeenCalledWith({
-        id: "ep-1",
+        id: "11111111-1111-4111-8111-111111111111",
         type: VideoType.EPISODE,
       });
       expect(mockSend).toHaveBeenCalledWith(
@@ -196,19 +205,21 @@ describe("S3EventService", () => {
         MessageId: "msg-1",
         ReceiptHandle: "receipt-456",
         Body: JSON.stringify({
-          Records: [{ s3: { object: { key: "title-1" } } }],
+          Records: [{ s3: { object: { key: "22222222-2222-4222-8222-222222222222" } } }],
         }),
       };
 
       (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
-      (prismaMock.title.findUnique as jest.Mock).mockResolvedValue({ id: "title-1" });
+      (prismaMock.title.findUnique as jest.Mock).mockResolvedValue({
+        id: "22222222-2222-4222-8222-222222222222",
+      });
       videoTranscoderServiceMock.scheduleTranscodeVideo.mockResolvedValue(undefined);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (service as any).processMessage(message);
 
       expect(videoTranscoderServiceMock.scheduleTranscodeVideo).toHaveBeenCalledWith({
-        id: "title-1",
+        id: "22222222-2222-4222-8222-222222222222",
         type: VideoType.MOVIE,
       });
     });
@@ -233,7 +244,7 @@ describe("S3EventService", () => {
         MessageId: "msg-1",
         ReceiptHandle: "receipt-abc",
         Body: JSON.stringify({
-          Records: [{ s3: { object: { key: "unknown" } } }],
+          Records: [{ s3: { object: { key: "33333333-3333-4333-8333-333333333333" } } }],
         }),
       };
 
@@ -251,11 +262,13 @@ describe("S3EventService", () => {
         MessageId: "msg-1",
         ReceiptHandle: "receipt-xyz",
         Body: JSON.stringify({
-          Records: [{ s3: { object: { key: "ep-1" } } }],
+          Records: [{ s3: { object: { key: "11111111-1111-4111-8111-111111111111" } } }],
         }),
       };
 
-      (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue({ id: "ep-1" });
+      (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue({
+        id: "11111111-1111-4111-8111-111111111111",
+      });
       videoTranscoderServiceMock.scheduleTranscodeVideo.mockResolvedValue(undefined);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -280,25 +293,44 @@ describe("S3EventService", () => {
       expect(mockSend).not.toHaveBeenCalled();
     });
 
-    test("should decode URL-encoded S3 key and replace plus signs with spaces", async () => {
+    test("should decode percent-encoded characters in S3 key before matching", async () => {
       const message = {
         MessageId: "msg-1",
         ReceiptHandle: "receipt-b",
         Body: JSON.stringify({
-          Records: [{ s3: { object: { key: "video+with+spaces.mp4" } } }],
+          Records: [{ s3: { object: { key: "%32%32222222-2222-4222-8222-222222222222" } } }],
         }),
       };
 
       (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
-      (prismaMock.title.findUnique as jest.Mock).mockResolvedValue({ id: "title-1" });
+      (prismaMock.title.findUnique as jest.Mock).mockResolvedValue({
+        id: "22222222-2222-4222-8222-222222222222",
+      });
       videoTranscoderServiceMock.scheduleTranscodeVideo.mockResolvedValue(undefined);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (service as any).processMessage(message);
 
       expect(prismaMock.episode.findUnique).toHaveBeenCalledWith({
-        where: { id: "video with spaces.mp4" },
+        where: { id: "22222222-2222-4222-8222-222222222222" },
       });
+    });
+
+    test("should skip non-UUID S3 keys without querying the database", async () => {
+      const message = {
+        MessageId: "msg-1",
+        ReceiptHandle: "receipt-c",
+        Body: JSON.stringify({
+          Records: [{ s3: { object: { key: "not-a-uuid.mp4" } } }],
+        }),
+      };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (service as any).processMessage(message);
+
+      expect(prismaMock.episode.findUnique).not.toHaveBeenCalled();
+      expect(prismaMock.title.findUnique).not.toHaveBeenCalled();
+      expect(videoTranscoderServiceMock.scheduleTranscodeVideo).not.toHaveBeenCalled();
     });
   });
 });
