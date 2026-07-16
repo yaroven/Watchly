@@ -5,6 +5,7 @@ import {
   Get,
   NotFoundException,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -28,7 +29,7 @@ export class SeasonController {
   }
 
   @Get(":id")
-  async findOne(@Param("id") id: string) {
+  async findOne(@Param("id", ParseUUIDPipe) id: string) {
     const season = await this.seasonService.findOne(id);
 
     if (!season) {
@@ -39,17 +40,17 @@ export class SeasonController {
   }
 
   @Patch(":id")
-  update(@Param("id") id: string, @Body() updateSeasonDto: UpdateSeasonDto) {
+  update(@Param("id", ParseUUIDPipe) id: string, @Body() updateSeasonDto: UpdateSeasonDto) {
     return this.seasonService.update(id, updateSeasonDto);
   }
 
   @Get(":id/poster-upload-url")
-  getPosterUploadUrl(@Param("id") id: string) {
+  getPosterUploadUrl(@Param("id", ParseUUIDPipe) id: string) {
     return this.seasonService.createPosterUploadingUrl(id);
   }
 
   @Delete(":id")
-  delete(@Param("id") id: string) {
+  delete(@Param("id", ParseUUIDPipe) id: string) {
     return this.seasonService.delete(id);
   }
 }
