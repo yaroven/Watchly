@@ -5,6 +5,7 @@ import {
   Get,
   NotFoundException,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -24,7 +25,7 @@ export class TitleController {
   }
 
   @Get(":id/video")
-  getMovie(@Param("id") id: string) {
+  getMovie(@Param("id", ParseUUIDPipe) id: string) {
     return this.titleService.getMovieUrl(id);
   }
 
@@ -34,7 +35,7 @@ export class TitleController {
   }
 
   @Get(":id")
-  async findOne(@Param("id") id: string) {
+  async findOne(@Param("id", ParseUUIDPipe) id: string) {
     const title = await this.titleService.findOne(id);
 
     if (!title) throw new NotFoundException(`Title with id ${id} not found`);
@@ -43,27 +44,27 @@ export class TitleController {
   }
 
   @Patch(":id")
-  update(@Param("id") id: string, @Body() data: UpdateTitleDto) {
+  update(@Param("id", ParseUUIDPipe) id: string, @Body() data: UpdateTitleDto) {
     return this.titleService.update(id, data);
   }
 
   @Get(":id/upload-url")
-  getUploadUrl(@Param("id") id: string) {
+  getUploadUrl(@Param("id", ParseUUIDPipe) id: string) {
     return this.titleService.createMovieUploadingUrl(id);
   }
 
   @Get(":id/poster-upload-url")
-  getPosterUploadUrl(@Param("id") id: string) {
+  getPosterUploadUrl(@Param("id", ParseUUIDPipe) id: string) {
     return this.titleService.createPosterUploadingUrl(id);
   }
 
   @Post(":id/transcode")
-  transcodeMovie(@Param("id") id: string) {
+  transcodeMovie(@Param("id", ParseUUIDPipe) id: string) {
     return this.titleService.transcode(id);
   }
 
   @Delete(":id")
-  delete(@Param("id") id: string) {
+  delete(@Param("id", ParseUUIDPipe) id: string) {
     return this.titleService.delete(id);
   }
 }
