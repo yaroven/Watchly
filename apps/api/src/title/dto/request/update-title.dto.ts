@@ -17,8 +17,4 @@ export class UpdateTitleDto {
   @IsString()
   @IsOptional()
   posterUrl: string;
-
-  @IsOptional()
-  @IsString()
-  hlsUrl?: string;
 }
