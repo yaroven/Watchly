@@ -130,10 +130,24 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async processMessage(message: Message) {
+    let body: { Records?: { s3: { object: { key: string } } }[] };
     try {
-      const body = JSON.parse(message.Body!) as { Records?: { s3: { object: { key: string } } }[] };
-      if (!body.Records) return;
+      body = JSON.parse(message.Body!) as { Records?: { s3: { object: { key: string } } }[] };
+    } catch (error) {
+      this.logger.error(
+        `Discarding unparseable SQS message ${message.MessageId}: ${message.Body}`,
+        error,
+      );
+      await this.deleteMessage(message);
+      return;
+    }
 
+    if (!body.Records) {
+      await this.deleteMessage(message);
+      return;
+    }
+
+    try {
       for (const record of body.Records) {
         const key = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
 
@@ -150,15 +164,19 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
         }
       }
 
-      await this.sqsClient.send(
-        new DeleteMessageCommand({
-          QueueUrl: this.queueUrl,
-          ReceiptHandle: message.ReceiptHandle,
-        }),
-      );
+      await this.deleteMessage(message);
     } catch (error) {
       this.logger.error("Failed to process message", error);
     }
+  }
+
+  private async deleteMessage(message: Message) {
+    await this.sqsClient.send(
+      new DeleteMessageCommand({
+        QueueUrl: this.queueUrl,
+        ReceiptHandle: message.ReceiptHandle,
+      }),
+    );
   }
 
   private isUuid(value: string): boolean {
