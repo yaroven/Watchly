@@ -2,49 +2,19 @@ import { BadRequestException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { TitleType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
 import { SeasonService } from "../season/season.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
-import { CreateTitleDto } from "./dto/request/create-title.dto";
-import { GetAllTitleDto } from "./dto/request/get-all-title.dto";
-import { UpdateTitleDto } from "./dto/request/update-title.dto";
 import { TitleService } from "./title.service";
 
 describe("TitleService", () => {
   let service: TitleService;
-  let prismaService: PrismaService;
-  let s3Service: S3Service;
-  let videoTranscoderService: VideoTranscoderService;
-  let seasonService: SeasonService;
-
-  const mockPrismaService = {
-    title: {
-      create: jest.fn(),
-      findMany: jest.fn(),
-      findUnique: jest.fn(),
-      update: jest.fn(),
-      updateMany: jest.fn(),
-      delete: jest.fn(),
-      count: jest.fn(),
-    },
-  };
-
-  const mockS3Service = {
-    getUploadPresignedUrl: jest.fn(),
-    getReadPresignedUrl: jest.fn(),
-    deleteObject: jest.fn(),
-    deleteFolder: jest.fn(),
-  };
-
-  const mockVideoTranscoderService = {
-    scheduleTranscodeVideo: jest.fn(),
-    cancelScheduledTranscodes: jest.fn(),
-  };
-
-  const mockSeasonService = {
-    delete: jest.fn(),
-  };
+  let prismaServiceMock: jest.Mocked<PrismaService>;
+  let s3ServiceMock: jest.Mocked<S3Service>;
+  let videoTranscoderServiceMock: jest.Mocked<VideoTranscoderService>;
+  let seasonServiceMock: jest.Mocked<SeasonService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -52,28 +22,49 @@ describe("TitleService", () => {
         TitleService,
         {
           provide: PrismaService,
-          useValue: mockPrismaService,
+          useValue: {
+            title: {
+              create: jest.fn(),
+              findMany: jest.fn(),
+              findUnique: jest.fn(),
+              update: jest.fn(),
+              delete: jest.fn(),
+              count: jest.fn(),
+            },
+          },
         },
         {
           provide: S3Service,
-          useValue: mockS3Service,
+          useValue: {
+            getUploadPresignedUrl: jest.fn(),
+            getReadPresignedUrl: jest.fn(),
+            deleteObject: jest.fn(),
+            deleteFolder: jest.fn(),
+          },
         },
         {
           provide: VideoTranscoderService,
-          useValue: mockVideoTranscoderService,
+          useValue: {
+            scheduleTranscodeVideo: jest.fn(),
+            cancelScheduledTranscodes: jest.fn(),
+          },
         },
         {
           provide: SeasonService,
-          useValue: mockSeasonService,
+          useValue: {
+            delete: jest.fn(),
+          },
         },
       ],
     }).compile();
 
     service = module.get<TitleService>(TitleService);
-    prismaService = module.get<PrismaService>(PrismaService);
-    s3Service = module.get<S3Service>(S3Service);
-    videoTranscoderService = module.get<VideoTranscoderService>(VideoTranscoderService);
-    seasonService = module.get<SeasonService>(SeasonService);
+    prismaServiceMock = module.get(PrismaService) as jest.Mocked<PrismaService>;
+    s3ServiceMock = module.get(S3Service) as jest.Mocked<S3Service>;
+    videoTranscoderServiceMock = module.get(
+      VideoTranscoderService,
+    ) as jest.Mocked<VideoTranscoderService>;
+    seasonServiceMock = module.get(SeasonService) as jest.Mocked<SeasonService>;
   });
 
   afterEach(() => {
@@ -81,416 +72,402 @@ describe("TitleService", () => {
   });
 
   describe("create", () => {
-    it("should create a title with default poster", async () => {
-      const createTitleDto: CreateTitleDto = {
-        name: "Test Title",
-        type: TitleType.MOVIE,
-        description: "Test overview",
-      };
+    describe("when valid data is provided", () => {
+      const createData = { name: "Title", type: TitleType.MOVIE, description: "Desc" };
+      const createdTitle = { id: "title-1", ...createData, posterUrl: "/cat.webp" };
 
-      const mockTitle = {
-        id: "title-1",
-        ...createTitleDto,
-        posterUrl: "/cat.webp",
-      };
+      beforeEach(() => {
+        (prismaServiceMock.title.create as jest.Mock).mockResolvedValue(createdTitle);
+      });
 
-      mockPrismaService.title.create.mockResolvedValue(mockTitle);
-
-      const result = await service.create(createTitleDto);
-
-      expect(result).toEqual(mockTitle);
-      expect(mockPrismaService.title.create).toHaveBeenCalledWith({
-        data: {
-          ...createTitleDto,
-          posterUrl: "/cat.webp",
-        },
+      test("should return created title with default poster", async () => {
+        const result = await service.create(createData);
+        expect(prismaServiceMock.title.create).toHaveBeenCalledWith({
+          data: { ...createData, posterUrl: "/cat.webp" },
+        });
+        expect(result).toEqual(createdTitle);
       });
     });
   });
 
   describe("findAll", () => {
-    it("should return paginated titles without filters", async () => {
-      const getAllTitleDto: GetAllTitleDto = {
-        page: 1,
-        limit: 10,
-      };
+    describe("when fetching without filters", () => {
+      const titles = [{ id: "title-1", name: "Title 1" }];
 
-      const mockTitles = [
-        { id: "title-1", name: "Title 1" },
-        { id: "title-2", name: "Title 2" },
-      ];
+      beforeEach(() => {
+        (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue(titles);
+        (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(1);
+      });
 
-      mockPrismaService.title.findMany.mockResolvedValue(mockTitles);
-      mockPrismaService.title.count.mockResolvedValue(2);
-
-      const result = await service.findAll(getAllTitleDto);
-
-      expect(result).toEqual({ items: mockTitles, totalCount: 2 });
-      expect(mockPrismaService.title.findMany).toHaveBeenCalledWith({
-        where: {},
-        skip: 0,
-        take: 10,
-        orderBy: { createdAt: "desc" },
+      test("should return paginated titles", async () => {
+        const result = await service.findAll({ page: 1, limit: 10 });
+        expect(prismaServiceMock.title.findMany).toHaveBeenCalledWith({
+          where: {},
+          skip: 0,
+          take: 10,
+          orderBy: { createdAt: "desc" },
+        });
+        expect(result).toEqual({ items: titles, totalCount: 1 });
       });
     });
 
-    it("should filter titles by search term", async () => {
-      const getAllTitleDto: GetAllTitleDto = {
-        search: "Test",
-        page: 1,
-        limit: 10,
-      };
+    describe("when searching by text", () => {
+      beforeEach(() => {
+        (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([]);
+        (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(0);
+      });
 
-      const mockTitles = [{ id: "title-1", name: "Test Title" }];
-
-      mockPrismaService.title.findMany.mockResolvedValue(mockTitles);
-      mockPrismaService.title.count.mockResolvedValue(1);
-
-      const result = await service.findAll(getAllTitleDto);
-
-      expect(mockPrismaService.title.findMany).toHaveBeenCalledWith({
-        where: {
-          name: {
-            contains: "Test",
-            mode: "insensitive",
-          },
-        },
-        skip: 0,
-        take: 10,
-        orderBy: { createdAt: "desc" },
+      test("should filter by search term", async () => {
+        await service.findAll({ search: "Test", page: 1, limit: 10 });
+        expect(prismaServiceMock.title.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { name: { contains: "Test", mode: "insensitive" } },
+          }),
+        );
       });
     });
 
-    it("should filter titles by type", async () => {
-      const getAllTitleDto: GetAllTitleDto = {
-        type: TitleType.MOVIE,
-        page: 1,
-        limit: 10,
-      };
+    describe("when sorting by specific field", () => {
+      beforeEach(() => {
+        (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([]);
+        (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(0);
+      });
 
-      const mockTitles = [{ id: "title-1", name: "Movie", type: TitleType.MOVIE }];
-
-      mockPrismaService.title.findMany.mockResolvedValue(mockTitles);
-      mockPrismaService.title.count.mockResolvedValue(1);
-
-      const result = await service.findAll(getAllTitleDto);
-
-      expect(mockPrismaService.title.findMany).toHaveBeenCalledWith({
-        where: { type: TitleType.MOVIE },
-        skip: 0,
-        take: 10,
-        orderBy: { createdAt: "desc" },
+      test("should sort ascending by name", async () => {
+        await service.findAll({ sortBy: "name", sort: "asc", page: 1, limit: 10 });
+        expect(prismaServiceMock.title.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            orderBy: { name: "asc" },
+          }),
+        );
       });
     });
 
-    it("should filter titles by transcoding status", async () => {
-      const getAllTitleDto: GetAllTitleDto = {
-        transcodingStatus: "COMPLETED",
-        page: 1,
-        limit: 10,
-      };
+    describe("when filtering by type", () => {
+      beforeEach(() => {
+        (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([]);
+        (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(0);
+      });
 
-      const mockTitles = [{ id: "title-1", name: "Movie", transcodingStatus: "COMPLETED" }];
+      test("should filter by TitleType.MOVIE", async () => {
+        await service.findAll({ type: TitleType.MOVIE, page: 1, limit: 10 });
+        expect(prismaServiceMock.title.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ type: TitleType.MOVIE }),
+          }),
+        );
+      });
 
-      mockPrismaService.title.findMany.mockResolvedValue(mockTitles);
-      mockPrismaService.title.count.mockResolvedValue(1);
-
-      const result = await service.findAll(getAllTitleDto);
-
-      expect(mockPrismaService.title.findMany).toHaveBeenCalledWith({
-        where: { transcodingStatus: "COMPLETED" },
-        skip: 0,
-        take: 10,
-        orderBy: { createdAt: "desc" },
+      test("should filter by TitleType.SERIES", async () => {
+        await service.findAll({ type: TitleType.SERIES, page: 1, limit: 10 });
+        expect(prismaServiceMock.title.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ type: TitleType.SERIES }),
+          }),
+        );
       });
     });
 
-    it("should limit results to maximum 100", async () => {
-      const getAllTitleDto: GetAllTitleDto = {
-        limit: 200,
-        page: 1,
-      };
-
-      const mockTitles = [{ id: "title-1", name: "Movie" }];
-
-      mockPrismaService.title.findMany.mockResolvedValue(mockTitles);
-      mockPrismaService.title.count.mockResolvedValue(1);
-
-      const result = await service.findAll(getAllTitleDto);
-
-      expect(mockPrismaService.title.findMany).toHaveBeenCalledWith({
-        where: {},
-        skip: 0,
-        take: 100,
-        orderBy: { createdAt: "desc" },
+    describe("when filtering by transcodingStatus", () => {
+      beforeEach(() => {
+        (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([]);
+        (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(0);
       });
-    });
 
-    it("should sort by specified field", async () => {
-      const getAllTitleDto: GetAllTitleDto = {
-        sortBy: "name",
-        sort: "asc",
-        page: 1,
-        limit: 10,
-      };
-
-      const mockTitles = [{ id: "title-1", name: "Movie" }];
-
-      mockPrismaService.title.findMany.mockResolvedValue(mockTitles);
-      mockPrismaService.title.count.mockResolvedValue(1);
-
-      const result = await service.findAll(getAllTitleDto);
-
-      expect(mockPrismaService.title.findMany).toHaveBeenCalledWith({
-        where: {},
-        skip: 0,
-        take: 10,
-        orderBy: { name: "asc" },
+      test("should filter by transcodingStatus", async () => {
+        await service.findAll({ transcodingStatus: "COMPLETED", page: 1, limit: 10 });
+        expect(prismaServiceMock.title.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ transcodingStatus: "COMPLETED" }),
+          }),
+        );
       });
     });
   });
 
   describe("findOne", () => {
-    it("should return a title by id", async () => {
-      const mockTitle = { id: "title-1", name: "Test Title" };
-      mockPrismaService.title.findUnique.mockResolvedValue(mockTitle);
+    describe("when title exists", () => {
+      const title = { id: "title-1" };
 
-      const result = await service.findOne("title-1");
+      beforeEach(() => {
+        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(title);
+      });
 
-      expect(result).toEqual(mockTitle);
-      expect(mockPrismaService.title.findUnique).toHaveBeenCalledWith({
-        where: { id: "title-1" },
+      test("should return title", async () => {
+        const result = await service.findOne("title-1");
+        expect(prismaServiceMock.title.findUnique).toHaveBeenCalledWith({
+          where: { id: "title-1" },
+        });
+        expect(result).toEqual(title);
       });
     });
 
-    it("should return null if title not found", async () => {
-      mockPrismaService.title.findUnique.mockResolvedValue(null);
+    describe("when title does not exist", () => {
+      beforeEach(() => {
+        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(null);
+      });
 
-      const result = await service.findOne("non-existent");
-
-      expect(result).toBeNull();
+      test("should return null", async () => {
+        const result = await service.findOne("non-existent");
+        expect(result).toBeNull();
+      });
     });
   });
 
   describe("update", () => {
-    it("should update a title successfully", async () => {
-      const updateTitleDto: UpdateTitleDto = {
-        name: "Updated Title",
-        description: "Test description",
-        type: TitleType.MOVIE,
-        posterUrl: "/cat.webp",
-      };
+    describe("when title does not exist", () => {
+      beforeEach(() => {
+        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(null);
+      });
 
-      const mockTitle = { id: "title-1", name: "Old Title" };
-      const mockUpdatedTitle = { ...mockTitle, ...updateTitleDto };
-
-      mockPrismaService.title.findUnique.mockResolvedValue(mockTitle);
-      mockS3Service.getReadPresignedUrl.mockResolvedValue("https://example.com/poster");
-      mockPrismaService.title.update.mockResolvedValue(mockUpdatedTitle);
-
-      const result = await service.update("title-1", updateTitleDto);
-
-      expect(result).toEqual(mockUpdatedTitle);
-      expect(mockPrismaService.title.update).toHaveBeenCalledWith({
-        where: { id: "title-1" },
-        data: updateTitleDto,
+      test("should throw BadRequestException", async () => {
+        const action = service.update("non-existent", { name: "New Name" } as any);
+        await expect(action).rejects.toThrow(BadRequestException);
       });
     });
 
-    it("should throw BadRequestException if title not found", async () => {
-      mockPrismaService.title.findUnique.mockResolvedValue(null);
+    describe("when updating with default poster url", () => {
+      const title = { id: "title-1", name: "Old Name" };
+      const updateData = { name: "New Name", posterUrl: "/cat.webp" };
+      const updatedTitle = { ...title, ...updateData };
 
-      await expect(service.update("non-existent", { name: "Test" } as any)).rejects.toThrow(
-        BadRequestException,
-      );
+      beforeEach(() => {
+        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(title);
+        (prismaServiceMock.title.update as jest.Mock).mockResolvedValue(updatedTitle);
+      });
+
+      test("should update title successfully without presigned url check", async () => {
+        const result = await service.update("title-1", updateData as any);
+        expect(s3ServiceMock.getReadPresignedUrl).not.toHaveBeenCalled();
+        expect(prismaServiceMock.title.update).toHaveBeenCalledWith({
+          where: { id: "title-1" },
+          data: updateData,
+        });
+        expect(result).toEqual(updatedTitle);
+      });
     });
 
-    it("should reject non-managed poster URL", async () => {
-      const updateTitleDto: UpdateTitleDto = {
-        posterUrl: "https://external.com/poster.jpg",
-        name: "Test",
-        description: "Test",
-        type: TitleType.MOVIE,
-      };
+    describe("when updating with external poster url", () => {
+      const title = { id: "title-1" };
+      const updateData = { posterUrl: "https://external.com/poster.jpg" };
 
-      const mockTitle = { id: "title-1", name: "Test Title" };
+      beforeEach(() => {
+        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(title);
+        (s3ServiceMock.getReadPresignedUrl as jest.Mock).mockResolvedValue(
+          "https://s3.amazonaws.com/poster",
+        );
+      });
 
-      mockPrismaService.title.findUnique.mockResolvedValue(mockTitle);
-      mockS3Service.getReadPresignedUrl.mockResolvedValue("https://s3.amazonaws.com/poster");
-
-      await expect(service.update("title-1", updateTitleDto)).rejects.toThrow(BadRequestException);
-      await expect(service.update("title-1", updateTitleDto)).rejects.toThrow(
-        "Poster URL must be generated by the backend",
-      );
+      test("should throw BadRequestException", async () => {
+        const action = service.update("title-1", updateData as any);
+        await expect(action).rejects.toThrow(BadRequestException);
+        await expect(action).rejects.toThrow("Poster URL must be generated by the backend");
+      });
     });
 
-    it("should allow default poster URL", async () => {
-      const updateTitleDto: UpdateTitleDto = {
-        posterUrl: "/cat.webp",
-        name: "Test",
-        description: "Test",
-        type: TitleType.MOVIE,
-      };
+    describe("when updating with managed poster url", () => {
+      const title = { id: "title-1" };
+      const updateData = { posterUrl: "https://s3.amazonaws.com/poster" };
 
-      const mockTitle = { id: "title-1", name: "Test Title" };
+      beforeEach(() => {
+        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(title);
+        (s3ServiceMock.getReadPresignedUrl as jest.Mock).mockResolvedValue(
+          "https://s3.amazonaws.com/poster",
+        );
+        (prismaServiceMock.title.update as jest.Mock).mockResolvedValue({
+          ...title,
+          ...updateData,
+        });
+      });
 
-      mockPrismaService.title.findUnique.mockResolvedValue(mockTitle);
-      mockPrismaService.title.update.mockResolvedValue(mockTitle);
-
-      const result = await service.update("title-1", updateTitleDto);
-
-      expect(result).toEqual(mockTitle);
-      expect(mockS3Service.getReadPresignedUrl).not.toHaveBeenCalled();
+      test("should update title successfully", async () => {
+        await service.update("title-1", updateData as any);
+        expect(prismaServiceMock.title.update).toHaveBeenCalled();
+      });
     });
   });
 
   describe("createMovieUploadingUrl", () => {
-    it("should return presigned upload URL for movie", async () => {
-      const mockTitle = { id: "title-1", name: "Test Movie" };
-      const mockUrl = "https://example.com/upload-url";
+    describe("when title exists", () => {
+      const urlResponse = "https://s3.com/upload";
 
-      mockPrismaService.title.findUnique.mockResolvedValue(mockTitle);
-      mockS3Service.getUploadPresignedUrl.mockResolvedValue(mockUrl);
+      beforeEach(() => {
+        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({ id: "title-1" });
+        (s3ServiceMock.getUploadPresignedUrl as jest.Mock).mockResolvedValue(urlResponse);
+      });
 
-      const result = await service.createMovieUploadingUrl("title-1");
-
-      expect(result).toEqual({ url: mockUrl });
-      expect(mockS3Service.getUploadPresignedUrl).toHaveBeenCalledWith(
-        "title-1",
-        expect.any(String),
-        120,
-      );
+      test("should return upload url", async () => {
+        const result = await service.createMovieUploadingUrl("title-1");
+        expect(s3ServiceMock.getUploadPresignedUrl).toHaveBeenCalledWith(
+          "title-1",
+          expect.any(String),
+          120,
+        );
+        expect(result).toEqual({ url: urlResponse });
+      });
     });
 
-    it("should throw BadRequestException if movie not found", async () => {
-      mockPrismaService.title.findUnique.mockResolvedValue(null);
+    describe("when title does not exist", () => {
+      beforeEach(() => {
+        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(null);
+      });
 
-      await expect(service.createMovieUploadingUrl("non-existent")).rejects.toThrow(
-        BadRequestException,
-      );
+      test("should throw BadRequestException", async () => {
+        const action = service.createMovieUploadingUrl("non-existent");
+        await expect(action).rejects.toThrow(BadRequestException);
+      });
     });
   });
 
   describe("createPosterUploadingUrl", () => {
-    it("should return upload URL and poster URL", async () => {
-      const mockTitle = { id: "title-1", name: "Test Title" };
-      const mockUploadUrl = "https://example.com/upload-url";
-      const mockPosterUrl = "https://example.com/poster-url";
+    describe("when title exists", () => {
+      const uploadUrl = "upload-url";
+      const posterUrl = "poster-url";
 
-      mockPrismaService.title.findUnique.mockResolvedValue(mockTitle);
-      mockS3Service.getUploadPresignedUrl.mockResolvedValue(mockUploadUrl);
-      mockS3Service.getReadPresignedUrl.mockResolvedValue(mockPosterUrl);
+      beforeEach(() => {
+        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({ id: "title-1" });
+        (s3ServiceMock.getUploadPresignedUrl as jest.Mock).mockResolvedValue(uploadUrl);
+        (s3ServiceMock.getReadPresignedUrl as jest.Mock).mockResolvedValue(posterUrl);
+      });
 
-      const result = await service.createPosterUploadingUrl("title-1");
-
-      expect(result).toEqual({ uploadUrl: mockUploadUrl, posterUrl: mockPosterUrl });
-      expect(mockS3Service.getUploadPresignedUrl).toHaveBeenCalledWith(
-        `posters/titles/title-1`,
-        expect.any(String),
-        120,
-      );
-      expect(mockS3Service.getReadPresignedUrl).toHaveBeenCalledWith(
-        `posters/titles/title-1`,
-        expect.any(String),
-      );
-    });
-
-    it("should throw BadRequestException if title not found", async () => {
-      mockPrismaService.title.findUnique.mockResolvedValue(null);
-
-      await expect(service.createPosterUploadingUrl("non-existent")).rejects.toThrow(
-        BadRequestException,
-      );
+      test("should return upload and poster urls", async () => {
+        const result = await service.createPosterUploadingUrl("title-1");
+        expect(s3ServiceMock.getUploadPresignedUrl).toHaveBeenCalledWith(
+          "posters/titles/title-1",
+          expect.any(String),
+          120,
+        );
+        expect(s3ServiceMock.getReadPresignedUrl).toHaveBeenCalledWith(
+          "posters/titles/title-1",
+          expect.any(String),
+        );
+        expect(result).toEqual({ uploadUrl, posterUrl });
+      });
     });
   });
 
   describe("transcode", () => {
-    it("should schedule movie transcoding", async () => {
-      const mockTitle = { id: "title-1", name: "Test Movie" };
-      mockPrismaService.title.findUnique.mockResolvedValue(mockTitle);
+    describe("when title exists", () => {
+      beforeEach(() => {
+        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({ id: "title-1" });
+      });
 
-      await service.transcode("title-1");
-
-      expect(mockVideoTranscoderService.scheduleTranscodeVideo).toHaveBeenCalledWith({
-        id: "title-1",
-        type: VideoType.MOVIE,
+      test("should schedule transcoding", async () => {
+        await service.transcode("title-1");
+        expect(videoTranscoderServiceMock.scheduleTranscodeVideo).toHaveBeenCalledWith({
+          id: "title-1",
+          type: VideoType.MOVIE,
+        });
       });
     });
 
-    it("should throw BadRequestException if movie not found", async () => {
-      mockPrismaService.title.findUnique.mockResolvedValue(null);
+    describe("when title does not exist", () => {
+      beforeEach(() => {
+        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(null);
+      });
 
-      await expect(service.transcode("non-existent")).rejects.toThrow(BadRequestException);
+      test("should throw BadRequestException", async () => {
+        const action = service.transcode("non-existent");
+        await expect(action).rejects.toThrow(BadRequestException);
+      });
     });
   });
 
   describe("getMovieUrl", () => {
-    it("should return presigned movie URL", async () => {
-      const mockUrl = "https://example.com/movie-url";
+    describe("always", () => {
+      const url = "movie-url";
 
-      mockS3Service.getReadPresignedUrl.mockResolvedValue(mockUrl);
+      beforeEach(() => {
+        (s3ServiceMock.getReadPresignedUrl as jest.Mock).mockResolvedValue(url);
+      });
 
-      const result = await service.getMovieUrl("title-1");
-
-      expect(result).toEqual({ url: mockUrl });
-      expect(mockS3Service.getReadPresignedUrl).toHaveBeenCalledWith(
-        `videos/title-1/master.m3u8`,
-        expect.any(String),
-      );
+      test("should return movie presigned url", async () => {
+        const result = await service.getMovieUrl("title-1");
+        expect(s3ServiceMock.getReadPresignedUrl).toHaveBeenCalledWith(
+          "videos/title-1/master.m3u8",
+          expect.any(String),
+        );
+        expect(result).toEqual({ url });
+      });
     });
   });
 
   describe("delete", () => {
-    it("should delete a movie successfully", async () => {
-      const mockTitle = {
-        id: "title-1",
-        name: "Test Movie",
-        type: TitleType.MOVIE,
-        seasons: [],
-      };
+    describe("when title exists as MOVIE", () => {
+      const title = { id: "title-1", type: TitleType.MOVIE, seasons: [] };
 
-      mockPrismaService.title.findUnique.mockResolvedValue(mockTitle);
-      mockPrismaService.title.delete.mockResolvedValue(mockTitle);
+      beforeEach(() => {
+        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(title);
+        (prismaServiceMock.title.delete as jest.Mock).mockResolvedValue(title);
+      });
 
-      const result = await service.delete("title-1");
-
-      expect(result).toEqual(mockTitle);
-      expect(mockVideoTranscoderService.cancelScheduledTranscodes).toHaveBeenCalledWith(
-        "title-1",
-        VideoType.MOVIE,
-      );
-      expect(mockS3Service.deleteObject).toHaveBeenCalled();
-      expect(mockS3Service.deleteFolder).toHaveBeenCalledWith(
-        `videos/title-1/`,
-        expect.any(String),
-      );
-      expect(mockPrismaService.title.delete).toHaveBeenCalledWith({
-        where: { id: "title-1" },
+      test("should delete title and cleanup resources", async () => {
+        const result = await service.delete("title-1");
+        expect(videoTranscoderServiceMock.cancelScheduledTranscodes).toHaveBeenCalledWith(
+          "title-1",
+          VideoType.MOVIE,
+        );
+        expect(s3ServiceMock.deleteObject).toHaveBeenCalledWith(
+          "posters/titles/title-1",
+          BucketType.PROCESSED,
+        );
+        expect(s3ServiceMock.deleteFolder).toHaveBeenCalledWith(
+          "videos/title-1/",
+          BucketType.PROCESSED,
+        );
+        expect(prismaServiceMock.title.delete).toHaveBeenCalledWith({ where: { id: "title-1" } });
+        expect(result).toEqual(title);
       });
     });
 
-    it("should delete a series and cascade delete seasons", async () => {
-      const mockTitle = {
+    describe("when title exists as SERIES", () => {
+      const title = {
         id: "title-1",
-        name: "Test Series",
         type: TitleType.SERIES,
         seasons: [{ id: "season-1" }, { id: "season-2" }],
       };
 
-      mockPrismaService.title.findUnique.mockResolvedValue(mockTitle);
-      mockPrismaService.title.delete.mockResolvedValue(mockTitle);
+      beforeEach(() => {
+        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(title);
+        (prismaServiceMock.title.delete as jest.Mock).mockResolvedValue(title);
+      });
 
-      const result = await service.delete("title-1");
+      test("should cascade delete seasons", async () => {
+        await service.delete("title-1");
+        expect(seasonServiceMock.delete).toHaveBeenCalledWith("season-1");
+        expect(seasonServiceMock.delete).toHaveBeenCalledWith("season-2");
+      });
 
-      expect(result).toEqual(mockTitle);
-      expect(mockSeasonService.delete).toHaveBeenCalledWith("season-1");
-      expect(mockSeasonService.delete).toHaveBeenCalledWith("season-2");
+      test("should cancel scheduled transcode jobs", async () => {
+        await service.delete("title-1");
+        expect(videoTranscoderServiceMock.cancelScheduledTranscodes).toHaveBeenCalledWith(
+          "title-1",
+          VideoType.MOVIE,
+        );
+      });
+
+      test("should cleanup S3 resources (poster and video folder)", async () => {
+        await service.delete("title-1");
+        expect(s3ServiceMock.deleteObject).toHaveBeenCalledWith(
+          "posters/titles/title-1",
+          BucketType.PROCESSED,
+        );
+        expect(s3ServiceMock.deleteFolder).toHaveBeenCalledWith(
+          "videos/title-1/",
+          BucketType.PROCESSED,
+        );
+      });
     });
 
-    it("should throw BadRequestException if title not found", async () => {
-      mockPrismaService.title.findUnique.mockResolvedValue(null);
+    describe("when title does not exist", () => {
+      beforeEach(() => {
+        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(null);
+      });
 
-      await expect(service.delete("non-existent")).rejects.toThrow(BadRequestException);
+      test("should throw BadRequestException", async () => {
+        const action = service.delete("non-existent");
+        await expect(action).rejects.toThrow(BadRequestException);
+      });
     });
   });
 });

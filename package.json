@@ -11,7 +11,7 @@
     "lint:api": "pnpm --filter api precommit",
     "lint:client": "pnpm --filter client precommit",
     "lint": "pnpm lint:api && pnpm lint:client",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.3.0",

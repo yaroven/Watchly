@@ -4,7 +4,7 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat ffmpeg
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY api/package.json ./api/
+COPY apps/api/package.json ./apps/api/
 
 RUN pnpm install --frozen-lockfile
 
@@ -21,17 +21,12 @@ RUN apk add --no-cache libc6-compat ffmpeg
 
 ENV NODE_ENV=production
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY api/package.json ./api/
-
-RUN pnpm install --frozen-lockfile --prod
-
-COPY --from=builder /app/api/dist ./api/dist
-COPY --from=builder /app/api/prisma ./api/prisma
-COPY --from=builder /app/api/prisma.config.ts ./api/prisma.config.ts
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
+COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
+COPY --from=builder /app/apps/api/prisma.config.ts ./apps/api/prisma.config.ts
 
 EXPOSE 3000
 
-CMD ["pnpm", "--filter", "api", "prod"]
+CMD ["node", "apps/api/dist/src/main"]
