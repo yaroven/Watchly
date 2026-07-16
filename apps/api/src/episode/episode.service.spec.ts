@@ -1,5 +1,6 @@
 import { BadRequestException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
@@ -90,6 +91,23 @@ describe("EpisodeService", () => {
         });
         expect(prismaMock.episode.create).toHaveBeenCalledWith({ data: createData });
         expect(result).toEqual(createdEpisode);
+      });
+    });
+
+    describe("when a concurrent request wins the race after the pre-check", () => {
+      beforeEach(() => {
+        (prismaMock.episode.findFirst as jest.Mock).mockResolvedValue(null);
+        (prismaMock.episode.create as jest.Mock).mockRejectedValue(
+          new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+            code: "P2002",
+            clientVersion: "test",
+          }),
+        );
+      });
+
+      test("should throw BadRequestException instead of the raw Prisma error", async () => {
+        const action = service.create(createData as any);
+        await expect(action).rejects.toThrow(BadRequestException);
       });
     });
   });
@@ -224,6 +242,25 @@ describe("EpisodeService", () => {
             data: { number: 2 },
           });
           expect(result).toEqual(updatedEpisode);
+        });
+      });
+
+      describe("when a concurrent request wins the race after the pre-check", () => {
+        const episode = { id: "episode-1", seasonId: "season-1" };
+        beforeEach(() => {
+          (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(episode);
+          (prismaMock.episode.findFirst as jest.Mock).mockResolvedValue(null);
+          (prismaMock.episode.update as jest.Mock).mockRejectedValue(
+            new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+              code: "P2002",
+              clientVersion: "test",
+            }),
+          );
+        });
+
+        test("should throw BadRequestException instead of the raw Prisma error", async () => {
+          const action = service.update("episode-1", { number: 2 });
+          await expect(action).rejects.toThrow(BadRequestException);
         });
       });
     });
