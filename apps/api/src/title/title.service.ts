@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable, InternalServerErrorException } from "@nestjs/common";
 import { Prisma, Title, TitleType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
@@ -165,7 +165,15 @@ export class TitleService {
     await this.videoTranscoderService.cancelScheduledTranscodes(id, VideoType.MOVIE);
 
     if (title.type === TitleType.SERIES) {
-      await Promise.all(title.seasons.map((season) => this.seasonService.delete(season.id)));
+      const results = await Promise.allSettled(
+        title.seasons.map((season) => this.seasonService.delete(season.id)),
+      );
+      const failedCount = results.filter((r) => r.status === "rejected").length;
+      if (failedCount > 0) {
+        throw new InternalServerErrorException(
+          `Failed to clean up ${failedCount} of ${title.seasons.length} seasons for title ${id}`,
+        );
+      }
     }
 
     await this.s3Service.deleteObject(this.getPosterKey(id), BucketType.PROCESSED);
