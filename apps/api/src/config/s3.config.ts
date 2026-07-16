@@ -13,9 +13,25 @@ export interface S3Config {
   queueName: string;
 }
 
+function requireInProduction(
+  value: string | undefined,
+  envVar: string,
+  devDefault: string,
+): string {
+  if (value) return value;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(`Missing required environment variable: ${envVar}`);
+  }
+  return devDefault;
+}
+
 export default registerAs(S3ConfigName, () => ({
-  accessKeyId: process.env.S3_ACCESS_KEY_ID || "localstack",
-  secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || "localstack",
+  accessKeyId: requireInProduction(process.env.S3_ACCESS_KEY_ID, "S3_ACCESS_KEY_ID", "localstack"),
+  secretAccessKey: requireInProduction(
+    process.env.S3_SECRET_ACCESS_KEY,
+    "S3_SECRET_ACCESS_KEY",
+    "localstack",
+  ),
   region: process.env.S3_REGION || "us-east-1",
   rawBucketName: process.env.S3_RAW_BUCKET_NAME || "raw",
   processedBucketName: process.env.S3_PROCESSED_BUCKET_NAME || "content",
