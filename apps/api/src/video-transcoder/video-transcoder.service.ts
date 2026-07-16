@@ -76,7 +76,6 @@ export class VideoTranscoderService {
     const width: number = videoStream?.width || 0;
     this.logger.log(`Starting HLS Transcoding for ${id}`);
     await this.runHlsTranscode(id, type, inputPath, outputDir, width);
-    await this.ensureEntityExists(id, type);
     await this.uploadFilesToDb(id, type, uploadTo, outputDir);
   }
 
