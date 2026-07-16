@@ -162,6 +162,7 @@ export class S3Service implements OnModuleInit {
       this.logger.log(`Deleted object "${key}" from bucket "${bucketName}".`);
     } catch (error) {
       this.logger.error(`Failed to delete object "${key}" from bucket "${bucketName}":`, error);
+      throw error;
     }
   }
 
@@ -201,6 +202,7 @@ export class S3Service implements OnModuleInit {
         `Failed to delete folder "${internalPrefix}" from bucket "${bucketName}":`,
         error,
       );
+      throw error;
     }
   }
 }

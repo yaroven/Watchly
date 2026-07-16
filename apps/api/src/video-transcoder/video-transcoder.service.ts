@@ -71,7 +71,8 @@ export class VideoTranscoderService {
     await this.downloadRawVideo(id, inputPath);
     await this.ensureEntityExists(id, type);
     const metadata: ffmpeg.FfprobeData = await this.getMetadata(inputPath);
-    const width: number = metadata.streams[0].width || 0;
+    const videoStream = metadata.streams.find((stream) => stream.codec_type === "video");
+    const width: number = videoStream?.width || 0;
     this.logger.log(`Starting HLS Transcoding for ${id}`);
     await this.runHlsTranscode(id, type, inputPath, outputDir, width);
     await this.ensureEntityExists(id, type);
