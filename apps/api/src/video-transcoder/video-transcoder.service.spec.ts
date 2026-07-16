@@ -86,6 +86,7 @@ describe("VideoTranscoderService", () => {
               upsert: jest.fn(),
               findUnique: jest.fn(),
             },
+            $transaction: jest.fn().mockImplementation((ops) => Promise.all(ops)),
           },
         },
         {
