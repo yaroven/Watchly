@@ -126,11 +126,18 @@ export class S3EventService implements OnModuleInit {
       for (const record of body.Records) {
         const key = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
 
+        if (!this.isUuid(key)) {
+          this.logger.warn(`Skipping S3 event for non-UUID object key "${key}"`);
+          continue;
+        }
+
         // Ідемпотентність: перевіряємо статус в БД
         const task = await this.resolveTask(key);
         if (task) {
           // Якщо завдання вже в процесі, сервіс має ігнорувати повторні запити
           await this.videoTranscoderService.scheduleTranscodeVideo(task);
+        } else {
+          this.logger.warn(`No title or episode found for uploaded object "${key}"`);
         }
       }
 
@@ -146,6 +153,10 @@ export class S3EventService implements OnModuleInit {
       // Якщо тут помилка, ми НЕ видаляємо повідомлення,
       // воно повернеться в чергу через visibilityTimeout
     }
+  }
+
+  private isUuid(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
   }
 
   private async resolveTask(id: string) {
