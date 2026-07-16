@@ -165,9 +165,7 @@ export class TitleService {
     await this.videoTranscoderService.cancelScheduledTranscodes(id, VideoType.MOVIE);
 
     if (title.type === TitleType.SERIES) {
-      for (const season of title.seasons) {
-        await this.seasonService.delete(season.id);
-      }
+      await Promise.all(title.seasons.map((season) => this.seasonService.delete(season.id)));
     }
 
     await this.s3Service.deleteObject(this.getPosterKey(id), BucketType.PROCESSED);

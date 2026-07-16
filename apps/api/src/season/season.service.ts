@@ -3,6 +3,8 @@ import { Season } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
+import { VideoType } from "../video-transcoder/enums/video-type.enum";
+import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
 import { CreateSeasonDto } from "./dto/request/create-season.dto";
 import { UpdateSeasonDto } from "./dto/request/update-season.dto";
 
@@ -26,6 +28,7 @@ export class SeasonService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly s3Service: S3Service,
+    private readonly videoTranscoderService: VideoTranscoderService,
   ) {}
 
   async create(data: CreateSeasonDto): Promise<Season> {
@@ -80,9 +83,12 @@ export class SeasonService {
       throw new BadRequestException(`Season with id ${id} not found`);
     }
 
-    for (const episode of season.episodes) {
-      await this.s3Service.deleteObject(episode.id, BucketType.RAW);
-    }
+    await Promise.all(
+      season.episodes.map(async (episode) => {
+        await this.videoTranscoderService.cancelScheduledTranscodes(episode.id, VideoType.EPISODE);
+        await this.s3Service.deleteObject(episode.id, BucketType.RAW);
+      }),
+    );
 
     await this.s3Service.deleteObject(this.getPosterKey(id), BucketType.PROCESSED);
     await this.s3Service.deleteFolder(`videos/${season.titleId}/${id}/`, BucketType.PROCESSED);
