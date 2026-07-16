@@ -8,7 +8,9 @@ import * as path from "path";
 import { TranscodeVideoDto } from "./dto/request/transcode-video.dto";
 import { TranscodeAbortedError, VideoTranscoderService } from "./video-transcoder.service";
 
-@Processor("video-transcode", { concurrency: 5 })
+@Processor("video-transcode", {
+  concurrency: Number(process.env.VIDEO_TRANSCODE_CONCURRENCY) || 2,
+})
 @Injectable()
 export class VideoTranscoderProcessor extends WorkerHost {
   private readonly logger = new Logger(VideoTranscoderProcessor.name);
