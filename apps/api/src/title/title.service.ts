@@ -168,8 +168,10 @@ export class TitleService {
       await Promise.all(title.seasons.map((season) => this.seasonService.delete(season.id)));
     }
 
-    await this.s3Service.deleteObject(this.getPosterKey(id), BucketType.PROCESSED);
-    await this.s3Service.deleteFolder(`videos/${id}/`, BucketType.PROCESSED);
+    await Promise.all([
+      this.s3Service.deleteObject(this.getPosterKey(id), BucketType.PROCESSED),
+      this.s3Service.deleteFolder(`videos/${id}/`, BucketType.PROCESSED),
+    ]);
 
     return this.prisma.title.delete({ where: { id } });
   }
