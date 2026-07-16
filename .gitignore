@@ -1,5 +1,7 @@
 node_modules/
 .pnp.*
+.agents/
+skills-lock.json
 
 api/.git-backup/
 client/.git-backup/
