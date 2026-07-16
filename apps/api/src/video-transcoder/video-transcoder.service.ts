@@ -7,6 +7,7 @@ import * as fs from "fs-extra";
 import * as path from "path";
 import { Readable } from "stream";
 
+import { getEpisodeTitleAndSeasonId } from "../episode/episode-path.util";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
@@ -71,7 +72,8 @@ export class VideoTranscoderService {
     await this.downloadRawVideo(id, inputPath);
     await this.ensureEntityExists(id, type);
     const metadata: ffmpeg.FfprobeData = await this.getMetadata(inputPath);
-    const width: number = metadata.streams[0].width || 0;
+    const videoStream = metadata.streams.find((stream) => stream.codec_type === "video");
+    const width: number = videoStream?.width || 0;
     this.logger.log(`Starting HLS Transcoding for ${id}`);
     await this.runHlsTranscode(id, type, inputPath, outputDir, width);
     await this.ensureEntityExists(id, type);
@@ -197,8 +199,7 @@ export class VideoTranscoderService {
 
       if (!episode) throw new BadRequestException("Episode not found");
 
-      const seasonId = episode.seasonId;
-      const titleId = episode.season.titleId;
+      const { seasonId, titleId } = getEpisodeTitleAndSeasonId(episode);
       return `${titleId}/${seasonId}/${episode.id}`;
     }
 

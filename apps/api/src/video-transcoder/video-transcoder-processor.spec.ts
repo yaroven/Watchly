@@ -21,7 +21,6 @@ describe("VideoTranscoderProcessor", () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    jest.restoreAllMocks();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
