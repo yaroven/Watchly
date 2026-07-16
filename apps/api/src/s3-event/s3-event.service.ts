@@ -8,7 +8,7 @@ import {
   SQSClient,
   SetQueueAttributesCommand,
 } from "@aws-sdk/client-sqs";
-import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { S3Config, S3ConfigName } from "../config/s3.config";
 import { PrismaService } from "../prisma/prisma.service";
@@ -16,12 +16,15 @@ import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
 
 @Injectable()
-export class S3EventService implements OnModuleInit {
+export class S3EventService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(S3EventService.name);
   private sqsClient: SQSClient;
   private s3Client: S3Client;
   private config: S3Config;
   private queueUrl: string;
+  private isShuttingDown = false;
+  private readonly shutdownController = new AbortController();
+  private pollLoopFinished: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly configService: ConfigService,
@@ -43,18 +46,24 @@ export class S3EventService implements OnModuleInit {
 
   async onModuleInit() {
     await this.setupInfrastructure();
-    // Запускаємо цикл в фоні
-    this.pollLoop().catch((err) => this.logger.error("Critical polling error", err));
+    this.pollLoopFinished = this.pollLoop().catch((err) =>
+      this.logger.error("Critical polling error", err),
+    );
+  }
+
+  async onModuleDestroy() {
+    this.logger.log("Stopping S3 polling...");
+    this.isShuttingDown = true;
+    this.shutdownController.abort();
+    await this.pollLoopFinished;
   }
 
   private async setupInfrastructure() {
-    // 1. Створюємо чергу
     const { QueueUrl } = await this.sqsClient.send(
       new CreateQueueCommand({ QueueName: this.config.queueName }),
     );
     this.queueUrl = QueueUrl!;
 
-    // 2. Отримуємо ARN для політики та нотифікацій
     const { Attributes } = await this.sqsClient.send(
       new GetQueueAttributesCommand({
         QueueUrl: this.queueUrl,
@@ -63,7 +72,6 @@ export class S3EventService implements OnModuleInit {
     );
     const queueArn = Attributes?.QueueArn;
 
-    // 3. Даємо дозвіл S3 писати в SQS
     await this.sqsClient.send(
       new SetQueueAttributesCommand({
         QueueUrl: this.queueUrl,
@@ -83,7 +91,6 @@ export class S3EventService implements OnModuleInit {
       }),
     );
 
-    // 4. Підписуємо бакет на події
     await this.s3Client.send(
       new PutBucketNotificationConfigurationCommand({
         Bucket: this.config.rawBucketName,
@@ -96,7 +103,7 @@ export class S3EventService implements OnModuleInit {
 
   private async pollLoop() {
     this.logger.log("S3 Polling started...");
-    while (true) {
+    while (!this.isShuttingDown) {
       try {
         const { Messages } = await this.sqsClient.send(
           new ReceiveMessageCommand({
@@ -104,18 +111,22 @@ export class S3EventService implements OnModuleInit {
             MaxNumberOfMessages: 5,
             WaitTimeSeconds: 20, // Long polling
           }),
+          { abortSignal: this.shutdownController.signal },
         );
 
         if (Messages) {
           for (const msg of Messages) {
+            if (this.isShuttingDown) break;
             await this.processMessage(msg);
           }
         }
       } catch (error) {
+        if (this.isShuttingDown) break;
         this.logger.error("Polling error", error);
         await new Promise((res) => setTimeout(res, 5000));
       }
     }
+    this.logger.log("S3 polling stopped.");
   }
 
   private async processMessage(message: Message) {
@@ -131,17 +142,14 @@ export class S3EventService implements OnModuleInit {
           continue;
         }
 
-        // Ідемпотентність: перевіряємо статус в БД
         const task = await this.resolveTask(key);
         if (task) {
-          // Якщо завдання вже в процесі, сервіс має ігнорувати повторні запити
           await this.videoTranscoderService.scheduleTranscodeVideo(task);
         } else {
           this.logger.warn(`No title or episode found for uploaded object "${key}"`);
         }
       }
 
-      // ВИДАЛЯЄМО лише після успішної обробки
       await this.sqsClient.send(
         new DeleteMessageCommand({
           QueueUrl: this.queueUrl,
@@ -150,8 +158,6 @@ export class S3EventService implements OnModuleInit {
       );
     } catch (error) {
       this.logger.error("Failed to process message", error);
-      // Якщо тут помилка, ми НЕ видаляємо повідомлення,
-      // воно повернеться в чергу через visibilityTimeout
     }
   }
 
