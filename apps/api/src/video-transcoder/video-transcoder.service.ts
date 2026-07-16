@@ -111,6 +111,8 @@ export class VideoTranscoderService {
         streamMap.push(`v:${index},a:${index}`);
       });
 
+      let killedForAbort = false;
+
       command
         .addOption("-var_stream_map", streamMap.join(" "))
         .output(path.join(outputDir, "%v/index.m3u8"))
@@ -122,11 +124,25 @@ export class VideoTranscoderService {
             this.updateProgress(id, type, percentage).catch((err: { message: string }) =>
               this.logger.error(`Failed to update progress: ${err.message}`),
             );
+            this.entityExists(id, type)
+              .then((exists) => {
+                if (!exists) {
+                  killedForAbort = true;
+                  command.kill("SIGKILL");
+                }
+              })
+              .catch(() => undefined);
             lastProgressUpdate = now;
           }
         })
         .on("end", () => resolve())
-        .on("error", (err) => reject(err))
+        .on("error", (err) => {
+          if (killedForAbort) {
+            reject(new TranscodeAbortedError(`Entity ${id} was deleted during transcoding`));
+          } else {
+            reject(err);
+          }
+        })
         .run();
     });
   }
