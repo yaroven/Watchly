@@ -234,7 +234,7 @@ export class VideoTranscoderService {
     const data = { transcodingStatus: status };
 
     if (type === VideoType.EPISODE) {
-      await Promise.all([
+      await this.prisma.$transaction([
         this.prisma.episode.updateMany({ where: { id }, data }),
         this.prisma.title.updateMany({
           where: { seasons: { some: { episodes: { some: { id } } } } },
