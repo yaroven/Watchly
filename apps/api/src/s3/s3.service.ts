@@ -13,7 +13,6 @@ import {
 } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { sdkStreamMixin } from "@aws-sdk/util-stream-node";
 import { Injectable, InternalServerErrorException, Logger, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Readable } from "stream";
@@ -118,15 +117,6 @@ export class S3Service implements OnModuleInit {
       new GetObjectCommand({ Bucket: this.getBucketName(type), Key: key }),
     );
     return response.Body as Readable;
-  }
-
-  async getFileBuffer(key: string, type: BucketType) {
-    const response = await this.s3Client.send(
-      new GetObjectCommand({ Bucket: this.getBucketName(type), Key: key }),
-    );
-    const mixed = sdkStreamMixin(response.Body as any);
-    const uint8 = await mixed.transformToByteArray();
-    return Buffer.from(uint8);
   }
 
   async uploadStream(type: BucketType, key: string, stream: Readable, contentType: string) {

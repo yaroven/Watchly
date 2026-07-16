@@ -76,7 +76,6 @@ export class VideoTranscoderService {
     const width: number = videoStream?.width || 0;
     this.logger.log(`Starting HLS Transcoding for ${id}`);
     await this.runHlsTranscode(id, type, inputPath, outputDir, width);
-    await this.ensureEntityExists(id, type);
     await this.uploadFilesToDb(id, type, uploadTo, outputDir);
   }
 
@@ -235,7 +234,7 @@ export class VideoTranscoderService {
     const data = { transcodingStatus: status };
 
     if (type === VideoType.EPISODE) {
-      await Promise.all([
+      await this.prisma.$transaction([
         this.prisma.episode.updateMany({ where: { id }, data }),
         this.prisma.title.updateMany({
           where: { seasons: { some: { episodes: { some: { id } } } } },
