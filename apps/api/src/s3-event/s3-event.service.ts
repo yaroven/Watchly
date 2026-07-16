@@ -137,9 +137,16 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
       for (const record of body.Records) {
         const key = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
 
+        if (!this.isUuid(key)) {
+          this.logger.warn(`Skipping S3 event for non-UUID object key "${key}"`);
+          continue;
+        }
+
         const task = await this.resolveTask(key);
         if (task) {
           await this.videoTranscoderService.scheduleTranscodeVideo(task);
+        } else {
+          this.logger.warn(`No title or episode found for uploaded object "${key}"`);
         }
       }
 
@@ -152,6 +159,10 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.logger.error("Failed to process message", error);
     }
+  }
+
+  private isUuid(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
   }
 
   private async resolveTask(id: string) {
