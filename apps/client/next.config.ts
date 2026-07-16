@@ -6,6 +6,7 @@ const s3ImageBucket = process.env.NEXT_PUBLIC_S3_IMAGE_BUCKET || "content";
 const s3ImageHostname = process.env.NEXT_PUBLIC_S3_IMAGE_HOSTNAME || "localhost";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   sassOptions: {
     implementation: "sass-embedded",
   },

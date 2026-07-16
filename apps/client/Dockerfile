@@ -3,7 +3,7 @@ RUN npm install -g pnpm
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY client/package.json ./client/package.json
+COPY apps/client/package.json ./apps/client/package.json
 
 RUN pnpm install --frozen-lockfile
 
@@ -18,12 +18,13 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-COPY --from=builder /app/client/public ./client/public
-COPY --from=builder /app/client/.next/static ./client/.next/static
+COPY --from=builder /app/apps/client/public ./apps/client/public
+COPY --from=builder /app/apps/client/.next/standalone ./
+COPY --from=builder /app/apps/client/.next/static ./apps/client/.next/static
 
 EXPOSE 4000
 
 ENV PORT=4000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "client/server.js"]
+CMD ["node", "apps/client/server.js"]

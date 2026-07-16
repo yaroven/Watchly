@@ -1,41 +1,17 @@
 import { BadRequestException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { PrismaService } from "../prisma/prisma.service";
+import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
-import { CreateEpisodeDto } from "./dto/request/create-episode.dto";
-import { UpdateEpisodeDto } from "./dto/request/update-episode.dto";
 import { EpisodeService } from "./episode.service";
 
 describe("EpisodeService", () => {
   let service: EpisodeService;
-  let prismaService: PrismaService;
-  let s3Service: S3Service;
-  let videoTranscoderService: VideoTranscoderService;
-
-  const mockPrismaService = {
-    episode: {
-      create: jest.fn(),
-      findFirst: jest.fn(),
-      findMany: jest.fn(),
-      findUnique: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-    },
-  };
-
-  const mockS3Service = {
-    deleteObject: jest.fn(),
-    deleteFolder: jest.fn(),
-    getUploadPresignedUrl: jest.fn(),
-    getReadPresignedUrl: jest.fn(),
-  };
-
-  const mockVideoTranscoderService = {
-    cancelScheduledTranscodes: jest.fn(),
-    scheduleTranscodeVideo: jest.fn(),
-  };
+  let prismaMock: jest.Mocked<PrismaService>;
+  let s3ServiceMock: jest.Mocked<S3Service>;
+  let videoTranscoderServiceMock: jest.Mocked<VideoTranscoderService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -43,23 +19,42 @@ describe("EpisodeService", () => {
         EpisodeService,
         {
           provide: PrismaService,
-          useValue: mockPrismaService,
+          useValue: {
+            episode: {
+              create: jest.fn(),
+              findMany: jest.fn(),
+              findUnique: jest.fn(),
+              findFirst: jest.fn(),
+              update: jest.fn(),
+              delete: jest.fn(),
+            },
+          },
         },
         {
           provide: S3Service,
-          useValue: mockS3Service,
+          useValue: {
+            getReadPresignedUrl: jest.fn(),
+            getUploadPresignedUrl: jest.fn(),
+            deleteObject: jest.fn(),
+            deleteFolder: jest.fn(),
+          },
         },
         {
           provide: VideoTranscoderService,
-          useValue: mockVideoTranscoderService,
+          useValue: {
+            scheduleTranscodeVideo: jest.fn(),
+            cancelScheduledTranscodes: jest.fn(),
+          },
         },
       ],
     }).compile();
 
     service = module.get<EpisodeService>(EpisodeService);
-    prismaService = module.get<PrismaService>(PrismaService);
-    s3Service = module.get<S3Service>(S3Service);
-    videoTranscoderService = module.get<VideoTranscoderService>(VideoTranscoderService);
+    prismaMock = module.get(PrismaService) as jest.Mocked<PrismaService>;
+    s3ServiceMock = module.get(S3Service) as jest.Mocked<S3Service>;
+    videoTranscoderServiceMock = module.get(
+      VideoTranscoderService,
+    ) as jest.Mocked<VideoTranscoderService>;
   });
 
   afterEach(() => {
@@ -67,307 +62,329 @@ describe("EpisodeService", () => {
   });
 
   describe("create", () => {
-    it("should create an episode successfully", async () => {
-      const createEpisodeDto: CreateEpisodeDto = {
-        seasonId: "season-1",
-        number: 1,
-        name: "Test Episode",
-        description: "Test overview",
-      };
+    const createData = { seasonId: "season-1", number: 1, name: "Episode 1", description: "Desc" };
 
-      const mockEpisode = {
-        id: "episode-1",
-        ...createEpisodeDto,
-      };
-
-      mockPrismaService.episode.findFirst.mockResolvedValue(null);
-      mockPrismaService.episode.create.mockResolvedValue(mockEpisode);
-
-      const result = await service.create(createEpisodeDto);
-
-      expect(result).toEqual(mockEpisode);
-      expect(mockPrismaService.episode.findFirst).toHaveBeenCalledWith({
-        where: {
-          seasonId: createEpisodeDto.seasonId,
-          number: createEpisodeDto.number,
-        },
+    describe("when episode with same number exists in season", () => {
+      beforeEach(() => {
+        (prismaMock.episode.findFirst as jest.Mock).mockResolvedValue({ id: "existing-id" });
       });
-      expect(mockPrismaService.episode.create).toHaveBeenCalledWith({
-        data: createEpisodeDto,
+
+      test("should throw BadRequestException", async () => {
+        const action = service.create(createData as any);
+        await expect(action).rejects.toThrow(BadRequestException);
       });
     });
 
-    it("should throw BadRequestException if episode number already exists in season", async () => {
-      const createEpisodeDto: CreateEpisodeDto = {
-        seasonId: "season-1",
-        number: 1,
-        name: "Test Episode",
-        description: "Test overview",
-      };
+    describe("when episode does not exist", () => {
+      const createdEpisode = { id: "episode-1", ...createData };
 
-      mockPrismaService.episode.findFirst.mockResolvedValue({
-        id: "existing-episode",
-        number: 1,
+      beforeEach(() => {
+        (prismaMock.episode.findFirst as jest.Mock).mockResolvedValue(null);
+        (prismaMock.episode.create as jest.Mock).mockResolvedValue(createdEpisode);
       });
 
-      await expect(service.create(createEpisodeDto)).rejects.toThrow(BadRequestException);
-      await expect(service.create(createEpisodeDto)).rejects.toThrow(
-        "Episode with number 1 already exists in this season",
-      );
+      test("should create and return the episode", async () => {
+        const result = await service.create(createData as any);
+        expect(prismaMock.episode.findFirst).toHaveBeenCalledWith({
+          where: { seasonId: "season-1", number: 1 },
+        });
+        expect(prismaMock.episode.create).toHaveBeenCalledWith({ data: createData });
+        expect(result).toEqual(createdEpisode);
+      });
     });
   });
 
   describe("findAll", () => {
-    it("should return all episodes when no seasonId is provided", async () => {
-      const mockEpisodes = [
-        { id: "episode-1", number: 1 },
-        { id: "episode-2", number: 2 },
-      ];
+    const episodes = [{ id: "episode-1" }, { id: "episode-2" }];
 
-      mockPrismaService.episode.findMany.mockResolvedValue(mockEpisodes);
+    describe("when seasonId is provided", () => {
+      beforeEach(() => {
+        (prismaMock.episode.findMany as jest.Mock).mockResolvedValue(episodes);
+      });
 
-      const result = await service.findAll();
-
-      expect(result).toEqual(mockEpisodes);
-      expect(mockPrismaService.episode.findMany).toHaveBeenCalledWith({
-        where: {},
-        orderBy: { number: "asc" },
+      test("should return episodes for the season", async () => {
+        const result = await service.findAll("season-1");
+        expect(prismaMock.episode.findMany).toHaveBeenCalledWith({
+          where: { seasonId: "season-1" },
+          orderBy: { number: "asc" },
+        });
+        expect(result).toEqual(episodes);
       });
     });
 
-    it("should return episodes for specific season when seasonId is provided", async () => {
-      const seasonId = "season-1";
-      const mockEpisodes = [{ id: "episode-1", number: 1, seasonId }];
+    describe("when seasonId is not provided", () => {
+      beforeEach(() => {
+        (prismaMock.episode.findMany as jest.Mock).mockResolvedValue(episodes);
+      });
 
-      mockPrismaService.episode.findMany.mockResolvedValue(mockEpisodes);
+      test("should return all episodes", async () => {
+        const result = await service.findAll();
+        expect(prismaMock.episode.findMany).toHaveBeenCalledWith({
+          where: {},
+          orderBy: { number: "asc" },
+        });
+        expect(result).toEqual(episodes);
+      });
+    });
+  });
 
-      const result = await service.findAll(seasonId);
+  describe("findOneDetailed", () => {
+    describe("when episode is found", () => {
+      const episode = { id: "episode-1" };
+      beforeEach(() => {
+        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(episode);
+      });
 
-      expect(result).toEqual(mockEpisodes);
-      expect(mockPrismaService.episode.findMany).toHaveBeenCalledWith({
-        where: { seasonId },
-        orderBy: { number: "asc" },
+      test("should return detailed episode", async () => {
+        const result = await service.findOneDetailed("episode-1");
+        expect(prismaMock.episode.findUnique).toHaveBeenCalledWith({
+          where: { id: "episode-1" },
+          include: { season: { include: { title: true } } },
+        });
+        expect(result).toEqual(episode);
       });
     });
   });
 
   describe("findOne", () => {
-    it("should return an episode by id", async () => {
-      const mockEpisode = { id: "episode-1", number: 1 };
-      mockPrismaService.episode.findUnique.mockResolvedValue(mockEpisode);
+    describe("when episode exists", () => {
+      const episode = { id: "episode-1" };
+      beforeEach(() => {
+        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(episode);
+      });
 
-      const result = await service.findOne("episode-1");
-
-      expect(result).toEqual(mockEpisode);
-      expect(mockPrismaService.episode.findUnique).toHaveBeenCalledWith({
-        where: { id: "episode-1" },
+      test("should return the episode", async () => {
+        const result = await service.findOne("episode-1");
+        expect(prismaMock.episode.findUnique).toHaveBeenCalledWith({ where: { id: "episode-1" } });
+        expect(result).toEqual(episode);
       });
     });
 
-    it("should return null if episode not found", async () => {
-      mockPrismaService.episode.findUnique.mockResolvedValue(null);
+    describe("when episode does not exist", () => {
+      beforeEach(() => {
+        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
+      });
 
-      const result = await service.findOne("non-existent");
-
-      expect(result).toBeNull();
-    });
-  });
-
-  describe("findOneDetailed", () => {
-    it("should return episode with relations", async () => {
-      const mockEpisode = {
-        id: "episode-1",
-        number: 1,
-        season: {
-          id: "season-1",
-          title: {
-            id: "title-1",
-            name: "Test Title",
-          },
-        },
-      };
-
-      mockPrismaService.episode.findUnique.mockResolvedValue(mockEpisode);
-
-      const result = await service.findOneDetailed("episode-1");
-
-      expect(result).toEqual(mockEpisode);
-      expect(mockPrismaService.episode.findUnique).toHaveBeenCalledWith({
-        where: { id: "episode-1" },
-        include: { season: { include: { title: true } } },
+      test("should return null", async () => {
+        const result = await service.findOne("non-existent");
+        expect(prismaMock.episode.findUnique).toHaveBeenCalledWith({
+          where: { id: "non-existent" },
+        });
+        expect(result).toBeNull();
       });
     });
   });
 
   describe("update", () => {
-    it("should update an episode successfully", async () => {
-      const updateEpisodeDto: UpdateEpisodeDto = {
-        name: "Updated Episode",
-      };
+    describe("when number is provided", () => {
+      describe("when episode not found", () => {
+        beforeEach(() => {
+          (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
+        });
 
-      const mockEpisode = {
-        id: "episode-1",
-        number: 1,
-        seasonId: "season-1",
-      };
+        test("should throw BadRequestException", async () => {
+          const action = service.update("non-existent", { number: 2 });
+          await expect(action).rejects.toThrow(BadRequestException);
+        });
+      });
 
-      const mockUpdatedEpisode = {
-        ...mockEpisode,
-        ...updateEpisodeDto,
-      };
+      describe("when episode found but number already taken", () => {
+        const episode = { id: "episode-1", seasonId: "season-1" };
+        beforeEach(() => {
+          (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(episode);
+          (prismaMock.episode.findFirst as jest.Mock).mockResolvedValue({ id: "existing-id" });
+        });
 
-      mockPrismaService.episode.findUnique.mockResolvedValue(mockEpisode);
-      mockPrismaService.episode.findFirst.mockResolvedValue(null);
-      mockPrismaService.episode.update.mockResolvedValue(mockUpdatedEpisode);
+        test("should throw BadRequestException", async () => {
+          const action = service.update("episode-1", { number: 2 });
+          await expect(action).rejects.toThrow(BadRequestException);
+        });
+      });
 
-      const result = await service.update("episode-1", updateEpisodeDto);
+      describe("when episode found and number is available", () => {
+        const episode = { id: "episode-1", seasonId: "season-1" };
+        const updatedEpisode = { ...episode, number: 2 };
+        beforeEach(() => {
+          (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(episode);
+          (prismaMock.episode.findFirst as jest.Mock).mockResolvedValue(null);
+          (prismaMock.episode.update as jest.Mock).mockResolvedValue(updatedEpisode);
+        });
 
-      expect(result).toEqual(mockUpdatedEpisode);
-      expect(mockPrismaService.episode.update).toHaveBeenCalledWith({
-        where: { id: "episode-1" },
-        data: updateEpisodeDto,
+        test("should update and return the episode", async () => {
+          const result = await service.update("episode-1", { number: 2 });
+          expect(prismaMock.episode.findFirst).toHaveBeenCalledWith({
+            where: {
+              seasonId: "season-1",
+              number: 2,
+              id: { not: "episode-1" },
+            },
+          });
+          expect(prismaMock.episode.update).toHaveBeenCalledWith({
+            where: { id: "episode-1" },
+            data: { number: 2 },
+          });
+          expect(result).toEqual(updatedEpisode);
+        });
       });
     });
 
-    it("should throw BadRequestException if episode not found", async () => {
-      mockPrismaService.episode.findUnique.mockResolvedValue(null);
-
-      await expect(service.update("non-existent", { name: "Test", number: 2 })).rejects.toThrow(
-        BadRequestException,
-      );
-    });
-
-    it("should throw BadRequestException if number conflicts with existing episode", async () => {
-      const updateEpisodeDto: UpdateEpisodeDto = {
-        number: 2,
-      };
-
-      const mockEpisode = {
-        id: "episode-1",
-        number: 1,
-        seasonId: "season-1",
-      };
-
-      mockPrismaService.episode.findUnique.mockResolvedValue(mockEpisode);
-      mockPrismaService.episode.findFirst.mockResolvedValue({
-        id: "episode-2",
-        number: 2,
-        seasonId: "season-1",
+    describe("when number is not provided", () => {
+      const updatedEpisode = { id: "episode-1", name: "New Name" };
+      beforeEach(() => {
+        (prismaMock.episode.update as jest.Mock).mockResolvedValue(updatedEpisode);
       });
 
-      await expect(service.update("episode-1", updateEpisodeDto)).rejects.toThrow(
-        BadRequestException,
-      );
+      test("should update and return without checking number availability", async () => {
+        const result = await service.update("episode-1", { name: "New Name" });
+        expect(prismaMock.episode.findUnique).not.toHaveBeenCalled();
+        expect(prismaMock.episode.findFirst).not.toHaveBeenCalled();
+        expect(prismaMock.episode.update).toHaveBeenCalledWith({
+          where: { id: "episode-1" },
+          data: { name: "New Name" },
+        });
+        expect(result).toEqual(updatedEpisode);
+      });
     });
   });
 
   describe("delete", () => {
-    it("should delete an episode successfully", async () => {
-      const mockEpisode = {
-        id: "episode-1",
-        seasonId: "season-1",
-        season: {
-          id: "season-1",
-          titleId: "title-1",
-        },
-      };
+    describe("when episode does not exist", () => {
+      beforeEach(() => {
+        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
+      });
 
-      mockPrismaService.episode.findUnique.mockResolvedValue(mockEpisode);
-      mockPrismaService.episode.delete.mockResolvedValue(mockEpisode);
-
-      const result = await service.delete("episode-1");
-
-      expect(result).toEqual(mockEpisode);
-      expect(mockVideoTranscoderService.cancelScheduledTranscodes).toHaveBeenCalledWith(
-        "episode-1",
-        VideoType.EPISODE,
-      );
-      expect(mockS3Service.deleteObject).toHaveBeenCalledWith("episode-1", expect.any(String));
-      expect(mockS3Service.deleteFolder).toHaveBeenCalled();
-      expect(mockPrismaService.episode.delete).toHaveBeenCalledWith({
-        where: { id: "episode-1" },
+      test("should throw BadRequestException", async () => {
+        const action = service.delete("non-existent");
+        await expect(action).rejects.toThrow(BadRequestException);
       });
     });
 
-    it("should throw BadRequestException if episode not found", async () => {
-      mockPrismaService.episode.findUnique.mockResolvedValue(null);
+    describe("when episode exists", () => {
+      const episode = {
+        id: "episode-1",
+        seasonId: "season-1",
+        season: { titleId: "title-1" },
+      };
 
-      await expect(service.delete("non-existent")).rejects.toThrow(BadRequestException);
+      beforeEach(() => {
+        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(episode);
+        videoTranscoderServiceMock.cancelScheduledTranscodes.mockResolvedValue(undefined as any);
+        s3ServiceMock.deleteObject.mockResolvedValue(undefined as any);
+        s3ServiceMock.deleteFolder.mockResolvedValue(undefined as any);
+        (prismaMock.episode.delete as jest.Mock).mockResolvedValue(episode);
+      });
+
+      test("should delete episode and related media", async () => {
+        const result = await service.delete("episode-1");
+
+        expect(videoTranscoderServiceMock.cancelScheduledTranscodes).toHaveBeenCalledWith(
+          "episode-1",
+          VideoType.EPISODE,
+        );
+        expect(s3ServiceMock.deleteObject).toHaveBeenCalledWith("episode-1", BucketType.RAW);
+        expect(s3ServiceMock.deleteFolder).toHaveBeenCalledWith(
+          "videos/title-1/season-1/episode-1/",
+          BucketType.PROCESSED,
+        );
+        expect(prismaMock.episode.delete).toHaveBeenCalledWith({ where: { id: "episode-1" } });
+
+        expect(result).toEqual(episode);
+      });
     });
   });
 
   describe("transcode", () => {
-    it("should schedule video transcoding", async () => {
-      const mockEpisode = { id: "episode-1", number: 1 };
-      mockPrismaService.episode.findUnique.mockResolvedValue(mockEpisode);
+    describe("when episode does not exist", () => {
+      beforeEach(() => {
+        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
+      });
 
-      await service.transcode("episode-1");
-
-      expect(mockVideoTranscoderService.scheduleTranscodeVideo).toHaveBeenCalledWith({
-        id: "episode-1",
-        type: VideoType.EPISODE,
+      test("should throw BadRequestException", async () => {
+        const action = service.transcode("non-existent");
+        await expect(action).rejects.toThrow(BadRequestException);
       });
     });
 
-    it("should throw BadRequestException if episode not found", async () => {
-      mockPrismaService.episode.findUnique.mockResolvedValue(null);
+    describe("when episode exists", () => {
+      const episode = { id: "episode-1" };
+      beforeEach(() => {
+        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(episode);
+        videoTranscoderServiceMock.scheduleTranscodeVideo.mockResolvedValue(undefined as any);
+      });
 
-      await expect(service.transcode("non-existent")).rejects.toThrow(BadRequestException);
+      test("should schedule transcode", async () => {
+        await service.transcode("episode-1");
+        expect(videoTranscoderServiceMock.scheduleTranscodeVideo).toHaveBeenCalledWith({
+          id: "episode-1",
+          type: VideoType.EPISODE,
+        });
+      });
     });
   });
 
   describe("getUploadUrl", () => {
-    it("should return presigned upload URL", async () => {
-      const mockEpisode = { id: "episode-1", number: 1 };
-      const mockUrl = "https://example.com/upload-url";
+    describe("when episode does not exist", () => {
+      beforeEach(() => {
+        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
+      });
 
-      mockPrismaService.episode.findUnique.mockResolvedValue(mockEpisode);
-      mockS3Service.getUploadPresignedUrl.mockResolvedValue(mockUrl);
-
-      const result = await service.getUploadUrl("episode-1");
-
-      expect(result).toEqual({ url: mockUrl });
-      expect(mockS3Service.getUploadPresignedUrl).toHaveBeenCalledWith(
-        "episode-1",
-        expect.any(String),
-      );
+      test("should throw BadRequestException", async () => {
+        const action = service.getUploadUrl("non-existent");
+        await expect(action).rejects.toThrow(BadRequestException);
+      });
     });
 
-    it("should throw BadRequestException if episode not found", async () => {
-      mockPrismaService.episode.findUnique.mockResolvedValue(null);
+    describe("when episode exists", () => {
+      const episode = { id: "episode-1" };
+      const url = "upload-url";
+      beforeEach(() => {
+        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(episode);
+        s3ServiceMock.getUploadPresignedUrl.mockResolvedValue(url);
+      });
 
-      await expect(service.getUploadUrl("non-existent")).rejects.toThrow(BadRequestException);
+      test("should return upload url", async () => {
+        const result = await service.getUploadUrl("episode-1");
+        expect(s3ServiceMock.getUploadPresignedUrl).toHaveBeenCalledWith(
+          "episode-1",
+          BucketType.RAW,
+        );
+        expect(result).toEqual({ url });
+      });
     });
   });
 
   describe("getStreamUrl", () => {
-    it("should return presigned stream URL", async () => {
-      const mockEpisode = {
-        id: "episode-1",
-        seasonId: "season-1",
-        season: {
-          id: "season-1",
-          titleId: "title-1",
-        },
-      };
-      const mockUrl = "https://example.com/stream-url";
+    describe("when episode does not exist", () => {
+      beforeEach(() => {
+        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
+      });
 
-      mockPrismaService.episode.findUnique.mockResolvedValue(mockEpisode);
-      mockS3Service.getReadPresignedUrl.mockResolvedValue(mockUrl);
-
-      const result = await service.getStreamUrl("episode-1");
-
-      expect(result).toEqual({ url: mockUrl });
-      expect(mockS3Service.getReadPresignedUrl).toHaveBeenCalledWith(
-        `videos/title-1/season-1/episode-1/master.m3u8`,
-        expect.any(String),
-      );
+      test("should throw BadRequestException", async () => {
+        const action = service.getStreamUrl("non-existent");
+        await expect(action).rejects.toThrow(BadRequestException);
+      });
     });
 
-    it("should throw BadRequestException if episode not found", async () => {
-      mockPrismaService.episode.findUnique.mockResolvedValue(null);
+    describe("when episode exists", () => {
+      const episode = {
+        id: "episode-1",
+        seasonId: "season-1",
+        season: { titleId: "title-1" },
+      };
+      const url = "stream-url";
+      beforeEach(() => {
+        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(episode);
+        s3ServiceMock.getReadPresignedUrl.mockResolvedValue(url);
+      });
 
-      await expect(service.getStreamUrl("non-existent")).rejects.toThrow(BadRequestException);
+      test("should return stream url", async () => {
+        const result = await service.getStreamUrl("episode-1");
+        expect(s3ServiceMock.getReadPresignedUrl).toHaveBeenCalledWith(
+          "videos/title-1/season-1/episode-1/master.m3u8",
+          BucketType.PROCESSED,
+        );
+        expect(result).toEqual({ url });
+      });
     });
   });
 });
