@@ -7,12 +7,14 @@ import * as fs from "fs-extra";
 import * as path from "path";
 import { Readable } from "stream";
 
+import { mapWithConcurrencyLimit } from "../common/concurrency.util";
 import { getEpisodeTitleAndSeasonId } from "../episode/episode-path.util";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
 import { TranscodeVideoDto } from "./dto/request/transcode-video.dto";
 import { VideoType } from "./enums/video-type.enum";
+import { VIDEO_TRANSCODE_QUEUE_NAME } from "./video-transcode-queue.options";
 
 export class TranscodeAbortedError extends Error {
   constructor(message: string) {
@@ -23,7 +25,7 @@ export class TranscodeAbortedError extends Error {
 
 @Injectable()
 export class VideoTranscoderService {
-  private readonly logger = new Logger();
+  private readonly logger = new Logger(VideoTranscoderService.name);
   private readonly resolutionVariants = [
     { width: 2560, height: 1440, bitrate: "8000k", name: "1440p" },
     { width: 1920, height: 1080, bitrate: "5000k", name: "1080p" },
@@ -32,38 +34,31 @@ export class VideoTranscoderService {
   ];
 
   constructor(
-    @InjectQueue("video-transcode") private readonly queue: Queue,
+    @InjectQueue(VIDEO_TRANSCODE_QUEUE_NAME) private readonly queue: Queue,
     private readonly s3Service: S3Service,
     private readonly prisma: PrismaService,
   ) {}
 
+  private jobId(payload: TranscodeVideoDto): string {
+    return `transcode-${payload.type}-${payload.id}`;
+  }
+
   async scheduleTranscodeVideo(payload: TranscodeVideoDto) {
     this.logger.log("Processing: ", payload);
     await this.queue.add("transcode-video", payload, {
-      priority: 1,
-      delay: 0,
-      attempts: 3,
-      backoff: { type: "exponential", delay: 2000 },
-      removeOnComplete: true,
+      jobId: this.jobId(payload),
     });
   }
 
   async cancelScheduledTranscodes(id: string, type: VideoType) {
-    const jobs = await this.queue.getJobs([
-      "waiting",
-      "delayed",
-      "prioritized",
-      "waiting-children",
-    ]);
+    const cancellableStates = ["waiting", "delayed", "prioritized", "waiting-children"];
+    const job = await this.queue.getJob(this.jobId({ id, type }));
+    if (!job) return;
 
-    await Promise.all(
-      jobs
-        .filter((job) => {
-          const data = job.data as TranscodeVideoDto;
-          return data.id === id && data.type === type;
-        })
-        .map((job) => job.remove()),
-    );
+    const state = await job.getState();
+    if (cancellableStates.includes(state)) {
+      await job.remove();
+    }
   }
 
   async transcodeVideo(id: string, inputPath: string, outputDir: string, type: VideoType) {
@@ -120,8 +115,10 @@ export class VideoTranscoderService {
           const now = Date.now();
           if (now - lastProgressUpdate > UPDATE_INTERVAL) {
             const percentage = Math.round(progress.percent || 0);
-            this.updateProgress(id, type, percentage).catch((err: { message: string }) =>
-              this.logger.error(`Failed to update progress: ${err.message}`),
+            this.updateProgress(id, type, percentage).catch((err: unknown) =>
+              this.logger.error(
+                `Failed to update progress: ${err instanceof Error ? err.message : String(err)}`,
+              ),
             );
             this.entityExists(id, type)
               .then((exists) => {
@@ -130,7 +127,11 @@ export class VideoTranscoderService {
                   command.kill("SIGKILL");
                 }
               })
-              .catch(() => undefined);
+              .catch((err: unknown) =>
+                this.logger.error(
+                  `Failed to check entity existence during transcoding: ${err instanceof Error ? err.message : String(err)}`,
+                ),
+              );
             lastProgressUpdate = now;
           }
         })
@@ -176,7 +177,10 @@ export class VideoTranscoderService {
 
     const writeStream = fs.createWriteStream(writePath);
     return new Promise<void>((res, rej) => {
-      downloadStream.pipe(writeStream).on("finish", res).on("error", rej);
+      downloadStream.on("error", rej);
+      writeStream.on("error", rej);
+      writeStream.on("finish", res);
+      downloadStream.pipe(writeStream);
     });
   }
 
@@ -185,22 +189,20 @@ export class VideoTranscoderService {
     this.logger.log(`Uploading processed files to Object DB...`);
     const files = (await fs.readdir(outputDir, { recursive: true })) as string[];
 
-    await Promise.all(
-      files.map(async (file) => {
-        const localFilePath = path.join(outputDir, file);
-        if ((await fs.stat(localFilePath)).isDirectory()) return;
+    await mapWithConcurrencyLimit(files, 8, async (file) => {
+      const localFilePath = path.join(outputDir, file);
+      if ((await fs.stat(localFilePath)).isDirectory()) return;
 
-        const s3Key = `videos/${key}/${file}`;
-        const contentType = file.endsWith(".m3u8") ? "application/x-mpegURL" : "video/MP2T";
+      const s3Key = `videos/${key}/${file}`;
+      const contentType = file.endsWith(".m3u8") ? "application/x-mpegURL" : "video/MP2T";
 
-        await this.s3Service.uploadStream(
-          BucketType.PROCESSED,
-          s3Key,
-          fs.createReadStream(localFilePath),
-          contentType,
-        );
-      }),
-    );
+      await this.s3Service.uploadStream(
+        BucketType.PROCESSED,
+        s3Key,
+        fs.createReadStream(localFilePath),
+        contentType,
+      );
+    });
 
     if (!(await this.entityExists(id, type)))
       throw new TranscodeAbortedError(`Entity ${id} was deleted before processed upload finished`);
@@ -222,22 +224,15 @@ export class VideoTranscoderService {
     return id;
   }
 
+  private readonly entityExistsCheckers: Record<VideoType, (id: string) => Promise<boolean>> = {
+    [VideoType.EPISODE]: async (id) =>
+      !!(await this.prisma.episode.findUnique({ where: { id }, select: { id: true } })),
+    [VideoType.MOVIE]: async (id) =>
+      !!(await this.prisma.title.findUnique({ where: { id }, select: { id: true } })),
+  };
+
   private async entityExists(id: string, type: VideoType): Promise<boolean> {
-    if (type === VideoType.EPISODE) {
-      const episode = await this.prisma.episode.findUnique({
-        where: { id },
-        select: { id: true },
-      });
-
-      return !!episode;
-    }
-
-    const title = await this.prisma.title.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-
-    return !!title;
+    return this.entityExistsCheckers[type](id);
   }
 
   private async ensureEntityExists(id: string, type: VideoType) {
@@ -251,12 +246,16 @@ export class VideoTranscoderService {
     const data = { transcodingStatus: status };
 
     if (type === VideoType.EPISODE) {
+      const episode = await this.prisma.episode.findUnique({
+        where: { id },
+        select: { season: { select: { titleId: true } } },
+      });
+
+      if (!episode) return;
+
       await this.prisma.$transaction([
         this.prisma.episode.updateMany({ where: { id }, data }),
-        this.prisma.title.updateMany({
-          where: { seasons: { some: { episodes: { some: { id } } } } },
-          data,
-        }),
+        this.prisma.title.updateMany({ where: { id: episode.season.titleId }, data }),
       ]);
     } else if (type === VideoType.MOVIE) {
       await this.prisma.title.updateMany({ where: { id }, data });

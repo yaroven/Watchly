@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable, InternalServerErrorException } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { Prisma, Title, TitleType } from "@prisma/client";
+import { settleAllOrLog } from "../common/settle-all-or-throw.util";
+import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
-import { assertManagedPosterUrl } from "../s3/poster-assertion.util";
 import { S3Service } from "../s3/s3.service";
 import { SeasonService } from "../season/season.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
@@ -14,13 +15,12 @@ import { DEFAULT_TITLE_POSTER_URL } from "./title.constants";
 
 @Injectable()
 export class TitleService {
-  private getPosterKey(id: string) {
-    return `posters/titles/${id}`;
-  }
+  private readonly logger = new Logger(TitleService.name);
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly s3Service: S3Service,
+    private readonly posterService: PosterService,
     private readonly videoTranscoderService: VideoTranscoderService,
     private readonly seasonService: SeasonService,
   ) {}
@@ -43,7 +43,6 @@ export class TitleService {
     sort,
     sortBy,
   }: GetAllTitleDto): Promise<{ items: Title[]; totalCount: number }> {
-    const safeLimit = Math.min(limit, 100);
     const where: Prisma.TitleWhereInput = {};
     const orderBy: Prisma.TitleOrderByWithRelationInput = {};
 
@@ -70,8 +69,8 @@ export class TitleService {
     const [items, totalCount] = await Promise.all([
       this.prisma.title.findMany({
         where,
-        skip: (page - 1) * safeLimit,
-        take: safeLimit,
+        skip: (page - 1) * limit,
+        take: limit,
         orderBy,
       }),
       this.prisma.title.count({ where }),
@@ -90,9 +89,9 @@ export class TitleService {
       throw new BadRequestException(`Title with id ${id} not found`);
     }
     if (data.posterUrl !== undefined) {
-      await assertManagedPosterUrl(
-        this.s3Service,
-        this.getPosterKey(id),
+      await this.posterService.assertManagedPosterUrl(
+        "titles",
+        id,
         data.posterUrl,
         DEFAULT_TITLE_POSTER_URL,
       );
@@ -116,11 +115,7 @@ export class TitleService {
       throw new BadRequestException(`Title with id ${id} not found`);
     }
 
-    const key = this.getPosterKey(id);
-    const uploadUrl = await this.s3Service.getUploadPresignedUrl(key, BucketType.PROCESSED, 120);
-    const posterUrl = await this.s3Service.getReadPresignedUrl(key, BucketType.PROCESSED);
-
-    return { uploadUrl, posterUrl };
+    return this.posterService.createUploadUrl("titles", id);
   }
 
   async transcode(id: string): Promise<void> {
@@ -148,7 +143,7 @@ export class TitleService {
     const title = await this.prisma.title.findUnique({
       where: { id },
       include: {
-        seasons: true,
+        seasons: { include: { episodes: true } },
       },
     });
 
@@ -156,25 +151,37 @@ export class TitleService {
       throw new BadRequestException(`Title with id ${id} not found`);
     }
 
-    await this.videoTranscoderService.cancelScheduledTranscodes(id, VideoType.MOVIE);
-
-    if (title.type === TitleType.SERIES) {
-      const results = await Promise.allSettled(
-        title.seasons.map((season) => this.seasonService.delete(season.id)),
-      );
-      const failedCount = results.filter((r) => r.status === "rejected").length;
-      if (failedCount > 0) {
-        throw new InternalServerErrorException(
-          `Failed to clean up ${failedCount} of ${title.seasons.length} seasons for title ${id}`,
-        );
-      }
-    }
+    const deleted = await this.prisma.title.delete({ where: { id } });
 
     await Promise.all([
-      this.s3Service.deleteObject(this.getPosterKey(id), BucketType.PROCESSED),
-      this.s3Service.deleteFolder(`videos/${id}/`, BucketType.PROCESSED),
+      settleAllOrLog(
+        [
+          { id: "poster", run: () => this.posterService.deletePoster("titles", id) },
+          {
+            id: "processed-folder",
+            run: () => this.s3Service.deleteFolder(`videos/${id}/`, BucketType.PROCESSED),
+          },
+          {
+            id: "scheduled-transcodes",
+            run: () => this.videoTranscoderService.cancelScheduledTranscodes(id, VideoType.MOVIE),
+          },
+        ],
+        (task) => task.run(),
+        (task) => task.id,
+        this.logger,
+        { itemLabel: "asset", parentLabel: "title", parentId: id },
+      ),
+      title.type === TitleType.SERIES
+        ? settleAllOrLog(
+            title.seasons,
+            (season) => this.seasonService.cleanupAssets(season),
+            (season) => season.id,
+            this.logger,
+            { itemLabel: "season", parentLabel: "title", parentId: id },
+          )
+        : Promise.resolve(),
     ]);
 
-    return this.prisma.title.delete({ where: { id } });
+    return deleted;
   }
 }

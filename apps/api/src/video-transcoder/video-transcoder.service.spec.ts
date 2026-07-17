@@ -61,7 +61,7 @@ describe("VideoTranscoderService", () => {
   beforeEach(async () => {
     queueMock = {
       add: jest.fn(),
-      getJobs: jest.fn(),
+      getJob: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -117,33 +117,63 @@ describe("VideoTranscoderService", () => {
   });
 
   describe("cancelScheduledTranscodes", () => {
-    test("should remove matched jobs", async () => {
-      const job1 = {
-        data: { id: "vid-1", type: VideoType.MOVIE },
+    test("should remove job when it is in a cancellable state", async () => {
+      const job = {
+        getState: jest.fn().mockResolvedValue("waiting"),
         remove: jest.fn().mockResolvedValue(true),
       };
-      const job2 = {
-        data: { id: "vid-2", type: VideoType.MOVIE },
-        remove: jest.fn().mockResolvedValue(true),
-      };
-      queueMock.getJobs.mockResolvedValue([job1, job2]);
+      queueMock.getJob.mockResolvedValue(job);
 
       await service.cancelScheduledTranscodes("vid-1", VideoType.MOVIE);
 
-      expect(queueMock.getJobs).toHaveBeenCalled();
-      expect(job1.remove).toHaveBeenCalled();
-      expect(job2.remove).not.toHaveBeenCalled();
+      expect(queueMock.getJob).toHaveBeenCalledWith(`transcode-${VideoType.MOVIE}-vid-1`);
+      expect(job.remove).toHaveBeenCalled();
+    });
+
+    test("should not remove job when it is already active", async () => {
+      const job = {
+        getState: jest.fn().mockResolvedValue("active"),
+        remove: jest.fn().mockResolvedValue(true),
+      };
+      queueMock.getJob.mockResolvedValue(job);
+
+      await service.cancelScheduledTranscodes("vid-1", VideoType.MOVIE);
+
+      expect(job.remove).not.toHaveBeenCalled();
+    });
+
+    test("should do nothing when no job is scheduled", async () => {
+      queueMock.getJob.mockResolvedValue(undefined);
+
+      await service.cancelScheduledTranscodes("vid-1", VideoType.MOVIE);
+
+      expect(queueMock.getJob).toHaveBeenCalledWith(`transcode-${VideoType.MOVIE}-vid-1`);
     });
   });
 
   describe("updateStatus", () => {
     test("should update status for EPISODE", async () => {
+      (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue({
+        season: { titleId: "title-1" },
+      });
+
       await service.updateStatus("ep-1", VideoType.EPISODE, "COMPLETED");
       expect(prismaMock.episode.updateMany).toHaveBeenCalledWith({
         where: { id: "ep-1" },
         data: { transcodingStatus: "COMPLETED" },
       });
-      expect(prismaMock.title.updateMany).toHaveBeenCalled();
+      expect(prismaMock.title.updateMany).toHaveBeenCalledWith({
+        where: { id: "title-1" },
+        data: { transcodingStatus: "COMPLETED" },
+      });
+    });
+
+    test("should do nothing for EPISODE when episode no longer exists", async () => {
+      (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
+
+      await service.updateStatus("ep-1", VideoType.EPISODE, "COMPLETED");
+      expect(prismaMock.episode.updateMany).not.toHaveBeenCalled();
+      expect(prismaMock.title.updateMany).not.toHaveBeenCalled();
     });
 
     test("should update status for MOVIE", async () => {

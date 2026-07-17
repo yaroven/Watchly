@@ -1,6 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { TitleType } from "@prisma/client";
+import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
@@ -42,6 +43,7 @@ describe("TitleService", () => {
             deleteFolder: jest.fn(),
           },
         },
+        PosterService,
         {
           provide: VideoTranscoderService,
           useValue: {
@@ -53,6 +55,7 @@ describe("TitleService", () => {
           provide: SeasonService,
           useValue: {
             delete: jest.fn(),
+            cleanupAssets: jest.fn(),
           },
         },
       ],
@@ -432,10 +435,11 @@ describe("TitleService", () => {
         (prismaServiceMock.title.delete as jest.Mock).mockResolvedValue(title);
       });
 
-      test("should cascade delete seasons", async () => {
+      test("should clean up assets for each season after the title row is deleted", async () => {
         await service.delete("title-1");
-        expect(seasonServiceMock.delete).toHaveBeenCalledWith("season-1");
-        expect(seasonServiceMock.delete).toHaveBeenCalledWith("season-2");
+        expect(prismaServiceMock.title.delete).toHaveBeenCalledWith({ where: { id: "title-1" } });
+        expect(seasonServiceMock.cleanupAssets).toHaveBeenCalledWith(title.seasons[0]);
+        expect(seasonServiceMock.cleanupAssets).toHaveBeenCalledWith(title.seasons[1]);
       });
 
       test("should cancel scheduled transcode jobs", async () => {

@@ -1,5 +1,6 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { Episode, Prisma } from "@prisma/client";
+import { settleAllOrLog } from "../common/settle-all-or-throw.util";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
@@ -11,6 +12,8 @@ import { getEpisodeTitleAndSeasonId } from "./episode-path.util";
 
 @Injectable()
 export class EpisodeService {
+  private readonly logger = new Logger(EpisodeService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly videoTranscoderService: VideoTranscoderService,
@@ -18,28 +21,17 @@ export class EpisodeService {
   ) {}
 
   async create(data: CreateEpisodeDto): Promise<Episode> {
-    const existingEpisode = await this.prisma.episode.findFirst({
-      where: {
-        seasonId: data.seasonId,
-        number: data.number,
-      },
-    });
-
-    if (existingEpisode)
-      throw new BadRequestException(
-        `Episode with number ${data.number} already exists in this season`,
-      );
-
-    return this.createOrThrowConflict(data);
-  }
-
-  private async createOrThrowConflict(data: CreateEpisodeDto): Promise<Episode> {
     try {
       return await this.prisma.episode.create({ data });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        (error.code === "P2002" || error.code === "P2003")
+      ) {
         throw new BadRequestException(
-          `Episode with number ${data.number} already exists in this season`,
+          error.code === "P2002"
+            ? `Episode with number ${data.number} already exists in this season`
+            : `Season with id ${data.seasonId} not found`,
         );
       }
       throw error;
@@ -102,12 +94,31 @@ export class EpisodeService {
 
     const { seasonId, titleId } = getEpisodeTitleAndSeasonId(episode);
 
-    await this.videoTranscoderService.cancelScheduledTranscodes(id, VideoType.EPISODE);
+    const deleted = await this.prisma.episode.delete({ where: { id } });
 
-    await this.s3Service.deleteObject(id, BucketType.RAW);
-    await this.s3Service.deleteFolder(`videos/${titleId}/${seasonId}/${id}/`, BucketType.PROCESSED);
+    await settleAllOrLog(
+      [
+        {
+          id: "scheduled-transcodes",
+          run: () => this.videoTranscoderService.cancelScheduledTranscodes(id, VideoType.EPISODE),
+        },
+        { id: "raw-video", run: () => this.s3Service.deleteObject(id, BucketType.RAW) },
+        {
+          id: "processed-folder",
+          run: () =>
+            this.s3Service.deleteFolder(
+              `videos/${titleId}/${seasonId}/${id}/`,
+              BucketType.PROCESSED,
+            ),
+        },
+      ],
+      (task) => task.run(),
+      (task) => task.id,
+      this.logger,
+      { itemLabel: "asset", parentLabel: "episode", parentId: id },
+    );
 
-    return this.prisma.episode.delete({ where: { id } });
+    return deleted;
   }
 
   async transcode(id: string): Promise<void> {

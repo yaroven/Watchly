@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { PosterModule } from "../poster/poster.module";
 import { PrismaModule } from "../prisma/prisma.module";
 import { S3Module } from "../s3/s3.module";
 import { VideoTranscoderModule } from "../video-transcoder/video-transcoder.module";
@@ -6,7 +7,7 @@ import { SeasonController } from "./season.controller";
 import { SeasonService } from "./season.service";
 
 @Module({
-  imports: [PrismaModule, S3Module, VideoTranscoderModule],
+  imports: [PrismaModule, S3Module, PosterModule, VideoTranscoderModule],
   controllers: [SeasonController],
   providers: [SeasonService],
   exports: [SeasonService],
