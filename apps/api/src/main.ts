@@ -1,5 +1,6 @@
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import helmet from "helmet";
 import { Logger } from "nestjs-pino";
 import { AppModule } from "./app.module";
@@ -28,6 +29,14 @@ async function bootstrap() {
   );
   const allowedOrigins = corsAllowedOrigins.split(",").map((origin) => origin.trim());
   app.enableCors({ origin: allowedOrigins });
+
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle("Watchly API")
+    .setDescription("Titles, seasons, episodes, and video transcoding pipeline")
+    .setVersion("1.0")
+    .build();
+  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup("docs", app, swaggerDocument);
 
   await app.listen(process.env.PORT ?? 3000, "0.0.0.0");
 }
