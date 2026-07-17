@@ -1,4 +1,6 @@
 import { registerAs } from "@nestjs/config";
+import { DEV_DEFAULTS } from "../common/dev-defaults.const";
+import { requireInProduction } from "../common/env.util";
 
 export const S3ConfigName = "s3";
 
@@ -13,29 +15,39 @@ export interface S3Config {
   queueName: string;
 }
 
-function requireInProduction(
-  value: string | undefined,
-  envVar: string,
-  devDefault: string,
-): string {
-  if (value) return value;
-  if (process.env.NODE_ENV === "production") {
-    throw new Error(`Missing required environment variable: ${envVar}`);
-  }
-  return devDefault;
-}
-
+/**
+ * Policy: every value here goes through requireInProduction — hard-fail if
+ * unset in production, fall back to a LocalStack-friendly default otherwise.
+ * Nothing is silently defaulted in prod, and nothing needs a `.env` just to
+ * run `docker compose up` locally.
+ */
 export default registerAs(S3ConfigName, () => ({
-  accessKeyId: requireInProduction(process.env.S3_ACCESS_KEY_ID, "S3_ACCESS_KEY_ID", "localstack"),
+  accessKeyId: requireInProduction(
+    process.env.S3_ACCESS_KEY_ID,
+    "S3_ACCESS_KEY_ID",
+    DEV_DEFAULTS.S3_ACCESS_KEY_ID,
+  ),
   secretAccessKey: requireInProduction(
     process.env.S3_SECRET_ACCESS_KEY,
     "S3_SECRET_ACCESS_KEY",
-    "localstack",
+    DEV_DEFAULTS.S3_SECRET_ACCESS_KEY,
   ),
-  region: process.env.S3_REGION || "us-east-1",
-  rawBucketName: process.env.S3_RAW_BUCKET_NAME || "raw",
-  processedBucketName: process.env.S3_PROCESSED_BUCKET_NAME || "content",
-  internalEndpoint: process.env.S3_ENDPOINT_INTERNAL || "http://localhost:4566",
-  publicEndpoint: process.env.S3_ENDPOINT_PUBLIC || "http://localhost:4566",
-  queueName: process.env.SQS_QUEUE_NAME || "s3-event-queue",
+  region: requireInProduction(process.env.S3_REGION, "S3_REGION", "us-east-1"),
+  rawBucketName: requireInProduction(process.env.S3_RAW_BUCKET_NAME, "S3_RAW_BUCKET_NAME", "raw"),
+  processedBucketName: requireInProduction(
+    process.env.S3_PROCESSED_BUCKET_NAME,
+    "S3_PROCESSED_BUCKET_NAME",
+    "content",
+  ),
+  internalEndpoint: requireInProduction(
+    process.env.S3_ENDPOINT_INTERNAL,
+    "S3_ENDPOINT_INTERNAL",
+    "http://localhost:4566",
+  ),
+  publicEndpoint: requireInProduction(
+    process.env.S3_ENDPOINT_PUBLIC,
+    "S3_ENDPOINT_PUBLIC",
+    "http://localhost:4566",
+  ),
+  queueName: requireInProduction(process.env.SQS_QUEUE_NAME, "SQS_QUEUE_NAME", "s3-event-queue"),
 }));

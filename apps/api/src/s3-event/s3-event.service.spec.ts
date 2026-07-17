@@ -3,6 +3,8 @@ import {
   CreateQueueCommand,
   DeleteMessageCommand,
   GetQueueAttributesCommand,
+  GetQueueUrlCommand,
+  QueueNameExists,
   SetQueueAttributesCommand,
 } from "@aws-sdk/client-sqs";
 import { ConfigService } from "@nestjs/config";
@@ -25,6 +27,8 @@ const mockConfig = {
 
 const mockQueueUrl = "https://sqs.us-east-1.amazonaws.com/123/watchly-s3-events";
 const mockQueueArn = "arn:aws:sqs:us-east-1:123:watchly-s3-events";
+const mockDlqUrl = "https://sqs.us-east-1.amazonaws.com/123/watchly-s3-events-dlq";
+const mockDlqArn = "arn:aws:sqs:us-east-1:123:watchly-s3-events-dlq";
 
 describe("S3EventService", () => {
   let service: S3EventService;
@@ -82,6 +86,8 @@ describe("S3EventService", () => {
   describe("setupInfrastructure", () => {
     beforeEach(() => {
       mockSend
+        .mockResolvedValueOnce({ QueueUrl: mockDlqUrl })
+        .mockResolvedValueOnce({ Attributes: { QueueArn: mockDlqArn } })
         .mockResolvedValueOnce({ QueueUrl: mockQueueUrl })
         .mockResolvedValueOnce({ Attributes: { QueueArn: mockQueueArn } })
         .mockResolvedValueOnce({})
@@ -128,6 +134,26 @@ describe("S3EventService", () => {
       expect(notifCall[0].input.NotificationConfiguration.QueueConfigurations[0].QueueArn).toBe(
         mockQueueArn,
       );
+    });
+
+    test("should reuse the existing queue and reconcile its attributes when CreateQueue reports it already exists", async () => {
+      mockSend.mockReset();
+      mockSend
+        .mockResolvedValueOnce({ QueueUrl: mockDlqUrl }) // create dlq
+        .mockResolvedValueOnce({ Attributes: { QueueArn: mockDlqArn } }) // dlq arn
+        .mockRejectedValueOnce(new QueueNameExists({ message: "already exists", $metadata: {} })) // create main queue fails
+        .mockResolvedValueOnce({ QueueUrl: mockQueueUrl }) // GetQueueUrl fallback
+        .mockResolvedValueOnce({}) // SetQueueAttributes (RedrivePolicy)
+        .mockResolvedValueOnce({ Attributes: { QueueArn: mockQueueArn } }) // main queue arn
+        .mockResolvedValueOnce({}) // SetQueueAttributes (Policy)
+        .mockResolvedValueOnce({}); // PutBucketNotificationConfiguration
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (service as any).setupInfrastructure();
+
+      expect(mockSend).toHaveBeenCalledWith(expect.any(GetQueueUrlCommand));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((service as any).queueUrl).toBe(mockQueueUrl);
     });
   });
 
