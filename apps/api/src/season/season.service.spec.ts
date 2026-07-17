@@ -1,5 +1,6 @@
 import { BadRequestException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
+import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
@@ -44,6 +45,7 @@ describe("SeasonService", () => {
             cancelScheduledTranscodes: jest.fn(),
           },
         },
+        PosterService,
       ],
     }).compile();
 
@@ -158,9 +160,13 @@ describe("SeasonService", () => {
 
     describe("when season exists and posterUrl is provided", () => {
       const season = { id: "season-1" };
-      const backendPoster = "backend-url";
+      const backendPoster =
+        "https://s3.example.com/posters/seasons/season-1?X-Amz-Date=1&X-Amz-Signature=aaa";
 
-      describe("when posterUrl matches the backend url", () => {
+      describe("when posterUrl matches the backend url's path", () => {
+        const submittedPoster =
+          "https://s3.example.com/posters/seasons/season-1?X-Amz-Date=2&X-Amz-Signature=bbb";
+
         beforeEach(() => {
           (prismaMock.season.findUnique as jest.Mock).mockResolvedValue(season);
           s3ServiceMock.getReadPresignedUrl.mockResolvedValue(backendPoster);
@@ -173,7 +179,7 @@ describe("SeasonService", () => {
         test("should assert poster URL and update the season", async () => {
           const result = await service.update("season-1", {
             name: "New Title",
-            posterUrl: backendPoster,
+            posterUrl: submittedPoster,
           });
           expect(s3ServiceMock.getReadPresignedUrl).toHaveBeenCalledWith(
             "posters/seasons/season-1",
@@ -181,13 +187,13 @@ describe("SeasonService", () => {
           );
           expect(prismaMock.season.update).toHaveBeenCalledWith({
             where: { id: "season-1" },
-            data: { name: "New Title", posterUrl: backendPoster },
+            data: { name: "New Title", posterUrl: submittedPoster },
           });
           expect(result).toEqual({ ...season, name: "New Title" });
         });
       });
 
-      describe("when posterUrl does not match the backend url", () => {
+      describe("when posterUrl does not match the backend url's path", () => {
         beforeEach(() => {
           (prismaMock.season.findUnique as jest.Mock).mockResolvedValue(season);
           s3ServiceMock.getReadPresignedUrl.mockResolvedValue(backendPoster);
@@ -196,7 +202,7 @@ describe("SeasonService", () => {
         test("should throw BadRequestException", async () => {
           const action = service.update("season-1", {
             name: "New Title",
-            posterUrl: "invalid-url",
+            posterUrl: "https://s3.example.com/some/other/path",
           });
           await expect(action).rejects.toThrow(BadRequestException);
           expect(prismaMock.season.update).not.toHaveBeenCalled();
