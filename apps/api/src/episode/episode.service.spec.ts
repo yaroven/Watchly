@@ -65,38 +65,22 @@ describe("EpisodeService", () => {
   describe("create", () => {
     const createData = { seasonId: "season-1", number: 1, name: "Episode 1", description: "Desc" };
 
-    describe("when episode with same number exists in season", () => {
-      beforeEach(() => {
-        (prismaMock.episode.findFirst as jest.Mock).mockResolvedValue({ id: "existing-id" });
-      });
-
-      test("should throw BadRequestException", async () => {
-        const action = service.create(createData as any);
-        await expect(action).rejects.toThrow(BadRequestException);
-      });
-    });
-
     describe("when episode does not exist", () => {
       const createdEpisode = { id: "episode-1", ...createData };
 
       beforeEach(() => {
-        (prismaMock.episode.findFirst as jest.Mock).mockResolvedValue(null);
         (prismaMock.episode.create as jest.Mock).mockResolvedValue(createdEpisode);
       });
 
       test("should create and return the episode", async () => {
         const result = await service.create(createData as any);
-        expect(prismaMock.episode.findFirst).toHaveBeenCalledWith({
-          where: { seasonId: "season-1", number: 1 },
-        });
         expect(prismaMock.episode.create).toHaveBeenCalledWith({ data: createData });
         expect(result).toEqual(createdEpisode);
       });
     });
 
-    describe("when a concurrent request wins the race after the pre-check", () => {
+    describe("when episode with same number already exists in season", () => {
       beforeEach(() => {
-        (prismaMock.episode.findFirst as jest.Mock).mockResolvedValue(null);
         (prismaMock.episode.create as jest.Mock).mockRejectedValue(
           new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
             code: "P2002",

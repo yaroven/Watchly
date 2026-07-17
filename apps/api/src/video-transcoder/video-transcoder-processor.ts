@@ -6,9 +6,10 @@ import * as fs from "fs-extra";
 import * as os from "os";
 import * as path from "path";
 import { TranscodeVideoDto } from "./dto/request/transcode-video.dto";
+import { VIDEO_TRANSCODE_QUEUE_NAME } from "./video-transcode-queue.options";
 import { TranscodeAbortedError, VideoTranscoderService } from "./video-transcoder.service";
 
-@Processor("video-transcode", {
+@Processor(VIDEO_TRANSCODE_QUEUE_NAME, {
   concurrency: Number(process.env.VIDEO_TRANSCODE_CONCURRENCY) || 2,
 })
 @Injectable()

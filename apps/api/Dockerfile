@@ -30,3 +30,7 @@ COPY --from=builder /app/apps/api/prisma.config.ts ./apps/api/prisma.config.ts
 EXPOSE 3000
 
 CMD ["node", "apps/api/dist/src/main"]
+
+FROM runner AS worker-runner
+
+CMD ["node", "apps/api/dist/src/worker-main"]
