@@ -46,8 +46,12 @@ model Title {
 
   seasons Season[]
 
-  @@index([name, description, type])
-  @@index([name])
+  @@index([type, transcodingStatus])
+  // Also see migration 20260717000000_title_search_indexes: it creates the
+  // pg_trgm extension and a GIN trigram index on `name` for ILIKE search.
+  // Neither is representable here (no postgresqlExtensions preview feature
+  // enabled) — `prisma db push` / introspection against a fresh DB will not
+  // recreate them. Run that migration explicitly on any new environment.
 }
 
 model VideoTranscodingProgress {
