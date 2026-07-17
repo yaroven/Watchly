@@ -3,7 +3,9 @@ import {
   CreateQueueCommand,
   DeleteMessageCommand,
   GetQueueAttributesCommand,
+  GetQueueUrlCommand,
   Message,
+  QueueNameExists,
   ReceiveMessageCommand,
   SQSClient,
   SetQueueAttributesCommand,
@@ -58,11 +60,52 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
     await this.pollLoopFinished;
   }
 
+  /**
+   * SQS CreateQueue is only idempotent when the requested attributes match an
+   * existing queue's exactly (e.g. the DLQ's ARN can change across restarts
+   * of a persisted LocalStack volume) — a mismatch throws QueueNameExists
+   * instead of returning the existing queue. Fall back to looking the queue
+   * up by name and reconciling its attributes so setup is idempotent across
+   * restarts.
+   */
+  private async getOrCreateQueue(
+    name: string,
+    attributes?: Record<string, string>,
+  ): Promise<string> {
+    try {
+      const { QueueUrl } = await this.sqsClient.send(
+        new CreateQueueCommand({ QueueName: name, Attributes: attributes }),
+      );
+      return QueueUrl!;
+    } catch (error) {
+      if (!(error instanceof QueueNameExists)) throw error;
+
+      const { QueueUrl } = await this.sqsClient.send(new GetQueueUrlCommand({ QueueName: name }));
+      if (attributes) {
+        await this.sqsClient.send(
+          new SetQueueAttributesCommand({ QueueUrl: QueueUrl!, Attributes: attributes }),
+        );
+      }
+      return QueueUrl!;
+    }
+  }
+
   private async setupInfrastructure() {
-    const { QueueUrl } = await this.sqsClient.send(
-      new CreateQueueCommand({ QueueName: this.config.queueName }),
+    const dlqUrl = await this.getOrCreateQueue(`${this.config.queueName}-dlq`);
+    const { Attributes: dlqAttributes } = await this.sqsClient.send(
+      new GetQueueAttributesCommand({
+        QueueUrl: dlqUrl,
+        AttributeNames: ["QueueArn"],
+      }),
     );
-    this.queueUrl = QueueUrl!;
+    const dlqArn = dlqAttributes?.QueueArn;
+
+    this.queueUrl = await this.getOrCreateQueue(this.config.queueName, {
+      RedrivePolicy: JSON.stringify({
+        deadLetterTargetArn: dlqArn,
+        maxReceiveCount: 5,
+      }),
+    });
 
     const { Attributes } = await this.sqsClient.send(
       new GetQueueAttributesCommand({
@@ -147,26 +190,37 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    try {
-      for (const record of body.Records) {
-        const key = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
+    const results = await Promise.allSettled(
+      body.Records.map((record) => this.processRecord(record)),
+    );
 
-        if (!this.isUuid(key)) {
-          this.logger.warn(`Skipping S3 event for non-UUID object key "${key}"`);
-          continue;
-        }
+    const failed = results.filter(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    );
 
-        const task = await this.resolveTask(key);
-        if (task) {
-          await this.videoTranscoderService.scheduleTranscodeVideo(task);
-        } else {
-          this.logger.warn(`No title or episode found for uploaded object "${key}"`);
-        }
+    if (failed.length > 0) {
+      for (const { reason } of failed) {
+        this.logger.error(`Failed to process record in message ${message.MessageId}`, reason);
       }
+      return;
+    }
 
-      await this.deleteMessage(message);
-    } catch (error) {
-      this.logger.error("Failed to process message", error);
+    await this.deleteMessage(message);
+  }
+
+  private async processRecord(record: { s3: { object: { key: string } } }) {
+    const key = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
+
+    if (!this.isUuid(key)) {
+      this.logger.warn(`Skipping S3 event for non-UUID object key "${key}"`);
+      return;
+    }
+
+    const task = await this.resolveTask(key);
+    if (task) {
+      await this.videoTranscoderService.scheduleTranscodeVideo(task);
+    } else {
+      this.logger.warn(`No title or episode found for uploaded object "${key}"`);
     }
   }
 
