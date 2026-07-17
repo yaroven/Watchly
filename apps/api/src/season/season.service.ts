@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable, InternalServerErrorException } from "@nestjs/common";
-import { Season } from "@prisma/client";
+import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import { Episode, Prisma, Season } from "@prisma/client";
+import { settleAllOrLog } from "../common/settle-all-or-throw.util";
+import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
-import { assertManagedPosterUrl } from "../s3/poster-assertion.util";
 import { S3Service } from "../s3/s3.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
@@ -11,18 +12,24 @@ import { UpdateSeasonDto } from "./dto/request/update-season.dto";
 
 @Injectable()
 export class SeasonService {
-  private getPosterKey(id: string) {
-    return `posters/seasons/${id}`;
-  }
+  private readonly logger = new Logger(SeasonService.name);
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly s3Service: S3Service,
+    private readonly posterService: PosterService,
     private readonly videoTranscoderService: VideoTranscoderService,
   ) {}
 
   async create(data: CreateSeasonDto): Promise<Season> {
-    return this.prisma.season.create({ data });
+    try {
+      return await this.prisma.season.create({ data });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+        throw new BadRequestException(`Title with id ${data.titleId} not found`);
+      }
+      throw error;
+    }
   }
 
   async findAll(titleId?: string): Promise<Season[]> {
@@ -44,7 +51,7 @@ export class SeasonService {
     }
 
     if (data.posterUrl !== undefined) {
-      await assertManagedPosterUrl(this.s3Service, this.getPosterKey(id), data.posterUrl);
+      await this.posterService.assertManagedPosterUrl("seasons", id, data.posterUrl);
     }
 
     return this.prisma.season.update({ where: { id }, data });
@@ -56,11 +63,7 @@ export class SeasonService {
       throw new BadRequestException(`Season with id ${id} not found`);
     }
 
-    const key = this.getPosterKey(id);
-    const uploadUrl = await this.s3Service.getUploadPresignedUrl(key, BucketType.PROCESSED, 120);
-    const posterUrl = await this.s3Service.getReadPresignedUrl(key, BucketType.PROCESSED);
-
-    return { uploadUrl, posterUrl };
+    return this.posterService.createUploadUrl("seasons", id);
   }
 
   async delete(id: string): Promise<Season> {
@@ -73,22 +76,45 @@ export class SeasonService {
       throw new BadRequestException(`Season with id ${id} not found`);
     }
 
-    const results = await Promise.allSettled(
-      season.episodes.map(async (episode) => {
+    const deleted = await this.prisma.season.delete({ where: { id } });
+    await this.cleanupAssets(season);
+
+    return deleted;
+  }
+
+  /**
+   * Best-effort storage/queue cleanup for a season whose DB row (and cascaded
+   * episodes) is already deleted. Called both from `delete` and from
+   * TitleService when a whole series is removed.
+   */
+  async cleanupAssets(season: Season & { episodes: Episode[] }): Promise<void> {
+    await settleAllOrLog(
+      season.episodes,
+      async (episode) => {
         await this.videoTranscoderService.cancelScheduledTranscodes(episode.id, VideoType.EPISODE);
         await this.s3Service.deleteObject(episode.id, BucketType.RAW);
-      }),
+      },
+      (episode) => episode.id,
+      this.logger,
+      { itemLabel: "episode", parentLabel: "season", parentId: season.id },
     );
-    const failedCount = results.filter((r) => r.status === "rejected").length;
-    if (failedCount > 0) {
-      throw new InternalServerErrorException(
-        `Failed to clean up ${failedCount} of ${season.episodes.length} episodes for season ${id}`,
-      );
-    }
 
-    await this.s3Service.deleteObject(this.getPosterKey(id), BucketType.PROCESSED);
-    await this.s3Service.deleteFolder(`videos/${season.titleId}/${id}/`, BucketType.PROCESSED);
-
-    return this.prisma.season.delete({ where: { id } });
+    await settleAllOrLog(
+      [
+        { id: "poster", run: () => this.posterService.deletePoster("seasons", season.id) },
+        {
+          id: "processed-folder",
+          run: () =>
+            this.s3Service.deleteFolder(
+              `videos/${season.titleId}/${season.id}/`,
+              BucketType.PROCESSED,
+            ),
+        },
+      ],
+      (task) => task.run(),
+      (task) => task.id,
+      this.logger,
+      { itemLabel: "asset", parentLabel: "season", parentId: season.id },
+    );
   }
 }
