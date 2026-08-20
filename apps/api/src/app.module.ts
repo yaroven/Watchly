@@ -5,6 +5,11 @@ import { APP_GUARD } from "@nestjs/core";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { LoggerModule } from "nestjs-pino";
 import { AppController } from "./app.controller";
+import loggerConfig, {
+  buildLoggerParams,
+  LoggerConfig,
+  LoggerConfigName,
+} from "./config/logger.config";
 import redisConfig, { RedisConfig, RedisConfigName } from "./config/redis.config";
 import s3Config from "./config/s3.config";
 import { EpisodeModule } from "./episode/episode.module";
@@ -37,18 +42,14 @@ import { VideoTranscoderModule } from "./video-transcoder/video-transcoder.modul
         };
       },
     }),
-    LoggerModule.forRoot({
-      pinoHttp: {
-        transport:
-          process.env.NODE_ENV !== "production"
-            ? { target: "pino-pretty", options: { colorize: true } }
-            : undefined,
-        level: "info",
-      },
+    LoggerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) =>
+        buildLoggerParams(configService.get<LoggerConfig>(LoggerConfigName)!, "api"),
     }),
     S3Module,
     ConfigModule.forRoot({
-      load: [s3Config, redisConfig],
+      load: [s3Config, redisConfig, loggerConfig],
       isGlobal: true,
     }),
     VideoTranscoderModule,

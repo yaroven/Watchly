@@ -2,6 +2,11 @@ import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { LoggerModule } from "nestjs-pino";
+import loggerConfig, {
+  buildLoggerParams,
+  LoggerConfig,
+  LoggerConfigName,
+} from "../config/logger.config";
 import redisConfig, { RedisConfig, RedisConfigName } from "../config/redis.config";
 import s3Config from "../config/s3.config";
 import { PrismaModule } from "../prisma/prisma.module";
@@ -17,15 +22,11 @@ import { VideoTranscoderService } from "./video-transcoder.service";
  */
 @Module({
   imports: [
-    ConfigModule.forRoot({ load: [s3Config, redisConfig], isGlobal: true }),
-    LoggerModule.forRoot({
-      pinoHttp: {
-        transport:
-          process.env.NODE_ENV !== "production"
-            ? { target: "pino-pretty", options: { colorize: true } }
-            : undefined,
-        level: "info",
-      },
+    ConfigModule.forRoot({ load: [s3Config, redisConfig, loggerConfig], isGlobal: true }),
+    LoggerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) =>
+        buildLoggerParams(configService.get<LoggerConfig>(LoggerConfigName)!, "transcoder-worker"),
     }),
     BullModule.forRootAsync({
       inject: [ConfigService],
