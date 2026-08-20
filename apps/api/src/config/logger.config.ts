@@ -13,11 +13,17 @@ export interface LoggerConfig {
 export default registerAs(LoggerConfigName, (): LoggerConfig => ({
   level: process.env.LOG_LEVEL ?? "info",
   lokiUrl: process.env.LOKI_URL,
-  // Pretty-printing follows the terminal, not NODE_ENV: inside a container
-  // stdout is not a TTY, so logs stay newline-delimited JSON — the format
-  // both Loki and `docker compose logs` want — while a local `pnpm dev` run
-  // in a terminal still gets colourised output.
-  pretty: Boolean(process.stdout.isTTY),
+  // Pretty-printing is driven by the terminal rather than NODE_ENV: inside a
+  // container stdout is not a TTY, so logs stay newline-delimited JSON — the
+  // format both Loki and `docker compose logs` want — while a local `pnpm dev`
+  // run in a terminal still gets colourised output.
+  //
+  // NODE_ENV only vetoes it, so that pino never tries to load pino-pretty in
+  // production. It is a devDependency: it happens to reach the runtime image
+  // today (the Dockerfile copies node_modules wholesale, without pruning), but
+  // a `pnpm prune --prod` there would otherwise crash any prod process started
+  // with a TTY — `docker run -it`, or an orchestrator with tty: true.
+  pretty: process.env.NODE_ENV !== "production" && Boolean(process.stdout.isTTY),
 }));
 
 /**

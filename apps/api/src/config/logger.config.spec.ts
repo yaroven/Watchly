@@ -1,4 +1,4 @@
-import { buildLoggerParams, LoggerConfig } from "./logger.config";
+import loggerConfig, { buildLoggerParams, LoggerConfig } from "./logger.config";
 
 type Target = { target: string; level: string; options: Record<string, unknown> };
 
@@ -7,6 +7,27 @@ function targetsOf(config: Partial<LoggerConfig> = {}, service = "api"): Target[
     .pinoHttp as { transport: { targets: Target[] } };
   return transport.targets;
 }
+
+describe("loggerConfig", () => {
+  const originalEnv = { ...process.env };
+  const originalIsTTY = process.stdout.isTTY;
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    process.stdout.isTTY = originalIsTTY;
+  });
+
+  // pino-pretty is a devDependency, so production must never reach for it —
+  // a pruned runtime image would crash on startup under `docker run -it`.
+  test("should never pretty-print in production, even on a TTY", () => {
+    process.stdout.isTTY = true;
+    process.env.NODE_ENV = "production";
+    expect(loggerConfig().pretty).toBe(false);
+
+    process.env.NODE_ENV = "development";
+    expect(loggerConfig().pretty).toBe(true);
+  });
+});
 
 /**
  * These cases guard couplings that live outside this file — the Loki server
