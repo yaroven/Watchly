@@ -30,7 +30,7 @@
       "options": {
         "dedupStrategy": "none",
         "enableLogDetails": true,
-        "prettifyLogMessage": false,
+        "prettifyLogMessage": true,
         "showCommonContext": true,
         "showContext": true,
         "showLabels": true,
@@ -40,7 +40,7 @@
       },
       "targets": [
         {
-          "expr": "{job=\"container-logs\", container_name=~\"$container\", level=~\"$level\"}",
+          "expr": "{app=\"watchly\", service=~\"$service\", level=~\"$level\"}",
           "refId": "A",
           "editorMode": "builder"
         }
@@ -63,7 +63,7 @@
           "value": "$__all"
         },
         "datasource": "Loki",
-        "definition": "label_values({job=\"container-logs\"}, level)",
+        "definition": "label_values({app=\"watchly\"}, level)",
         "hide": 0,
         "includeAll": true,
         "label": "Log Level",
@@ -72,7 +72,7 @@
         "options": [],
         "query": {
           "label": "level",
-          "query": "label_values({job=\"container-logs\"}, level)",
+          "query": "label_values({app=\"watchly\"}, level)",
           "refId": "LokiLevelVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -89,17 +89,17 @@
           "value": "$__all"
         },
         "datasource": "Loki",
-        "definition": "label_values({job=\"container-logs\"}, container_name)",
+        "definition": "label_values({app=\"watchly\"}, service)",
         "hide": 0,
         "includeAll": true,
-        "label": "Container",
+        "label": "Service",
         "multi": true,
-        "name": "container",
+        "name": "service",
         "options": [],
         "query": {
-          "label": "container_name",
-          "query": "label_values({job=\"container-logs\"}, container_name)",
-          "refId": "LokiContainerVariableQueryEditor-VariableQuery"
+          "label": "service",
+          "query": "label_values({app=\"watchly\"}, service)",
+          "refId": "LokiServiceVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
         "regex": "",

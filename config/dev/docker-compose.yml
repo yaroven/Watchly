@@ -61,6 +61,7 @@ services:
       S3_PROCESSED_BUCKET_NAME: "content"
       S3_ENDPOINT_INTERNAL: "http://localstack:4566"
       S3_ENDPOINT_PUBLIC: "http://localhost:4000"
+      LOKI_URL: "http://loki:3100"
     volumes:
       - ../../apps/api:/app/apps/api
       - ../../package.json:/app/package.json
@@ -79,6 +80,7 @@ services:
       - db
       - redis
       - localstack
+      - loki
 
   transcoder-worker:
     container_name: "transcoder-worker"
@@ -102,6 +104,7 @@ services:
       S3_ENDPOINT_INTERNAL: "http://localstack:4566"
       S3_ENDPOINT_PUBLIC: "http://localhost:4000"
       VIDEO_TRANSCODE_CONCURRENCY: 2
+      LOKI_URL: "http://loki:3100"
     volumes:
       - ../../apps/api:/app/apps/api
       - ../../package.json:/app/package.json
@@ -113,6 +116,7 @@ services:
       - db
       - redis
       - localstack
+      - loki
 
   db:
     image: "postgres:16"
@@ -176,15 +180,6 @@ services:
       - ./volumes/loki/local-config.yaml:/etc/loki/local-config.yaml:ro
       - loki_data:/loki
     command: -config.file=/etc/loki/local-config.yaml
-
-  promtail:
-    image: grafana/promtail:3.0.0
-    container_name: "promtail"
-    volumes:
-      # config files
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - ./volumes/promtail/config.yml:/etc/promtail/config.yml
-    command: -config.file=/etc/promtail/config.yml
 
   nginx:
     image: "nginx:latest"
