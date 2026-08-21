@@ -2,11 +2,12 @@
 
 import { CreateTitleSchema, Title, TitleFormValues, TitleType, UpdateTitleSchema } from "@/features/title/schemas/title";
 import ProgressBar from "@/features/transcoding/components/ProgressBar";
-import FormButton from "@/shared/ui/FormButton";
 import FormField from "@/shared/ui/FormField";
 import FormFileInput from "@/shared/ui/FormFileInput";
 import Modal from "@/shared/ui/Modal";
+import Select from "@/shared/ui/Select";
 import { zodResolver } from "@hookform/resolvers/zod";
+import Button from "@shared/ui/Button";
 import { CheckCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Activity, useEffect, useState } from "react";
@@ -117,15 +118,24 @@ export default function TitleForm({ initialData }: TitleFormProps) {
         selectedFile={selectedPosterFile}
         name="posterFile"
         accept="image/*"
+        hint="Any image format"
+        disabled={isPending}
         error={errors.posterFile}
         id="title-poster-file"
       />
 
-      <FormField label="Type" name="type" register={register} error={errors.type} as="select" disabled={isEditing}>
-        <option value="">Select type</option>
-        <option value={TitleType.MOVIE}>Movie</option>
-        <option value={TitleType.SERIES}>Series</option>
-      </FormField>
+      <Select
+        label="Type"
+        name="type"
+        control={control}
+        error={errors.type}
+        disabled={isEditing}
+        placeholder="Select type"
+        options={[
+          { value: TitleType.MOVIE, label: "Movie" },
+          { value: TitleType.SERIES, label: "Series" },
+        ]}
+      />
 
       <Activity mode={selectedType === TitleType.MOVIE && !isEditing ? "visible" : "hidden"}>
         <FormFileInput
@@ -135,6 +145,8 @@ export default function TitleForm({ initialData }: TitleFormProps) {
           selectedFile={selectedVideoFile}
           name="videoFile"
           accept="video/*"
+          hint="Any video format"
+          disabled={isPending}
           error={errors.videoFile}
           id="title-video-file"
         />
@@ -143,9 +155,9 @@ export default function TitleForm({ initialData }: TitleFormProps) {
       {isUploading && <ProgressBar progress={uploadProgress} />}
 
       {actionError && <div className={styles.errorAlert}>Error: {actionError.message}</div>}
-      <FormButton disabled={isPending || (!isDirty && !isEditing)} type="submit">
-        {isPending ? (isUploading ? "Uploading Video..." : "Saving Title...") : isEditing ? "Update Title" : "Create Title"}
-      </FormButton>
+      <Button disabled={isPending || (!isDirty && !isEditing)} type="submit">
+        {isPending ? (isUploading ? "Uploading Video..." : "Saving TitleCard...") : isEditing ? "Update TitleCard" : "Create TitleCard"}
+      </Button>
 
       <Modal isOpen={isSuccessModalOpen} onClose={closeSuccessModal}>
         <div className={styles.modalContent}>

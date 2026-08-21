@@ -1,9 +1,9 @@
 "use client";
 
-import FormButton from "@/shared/ui/FormButton";
 import FormField from "@/shared/ui/FormField";
 import FormFileInput from "@/shared/ui/FormFileInput";
 import Modal from "@/shared/ui/Modal/Modal";
+import Button from "@shared/ui/Button";
 import { useWatch } from "react-hook-form";
 import styles from "../../SeasonManager.module.scss";
 import { useSeasonManagerContext } from "../../context/SeasonManagerContext";
@@ -52,9 +52,9 @@ export default function SeasonModal() {
           error={errors.posterFile}
           id="season-poster-file"
         />
-        <FormButton type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+        <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
           {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingSeason ? "Update" : "Create"}
-        </FormButton>
+        </Button>
       </form>
     </Modal>
   );

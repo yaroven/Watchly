@@ -1,10 +1,10 @@
 "use client";
 
 import ProgressBar from "@/features/transcoding/components/ProgressBar/ProgressBar";
-import FormButton from "@/shared/ui/FormButton";
 import FormField from "@/shared/ui/FormField";
 import FormFileInput from "@/shared/ui/FormFileInput";
 import Modal from "@/shared/ui/Modal/Modal";
+import Button from "@shared/ui/Button";
 import { useWatch } from "react-hook-form";
 import { useEpisodeManagerContext } from "../../context/EpisodeManagerContext";
 import styles from "./EpisodeModal.module.scss";
@@ -61,9 +61,9 @@ export default function EpisodeModal() {
 
         {isUploading && <ProgressBar progress={uploadProgress} />}
 
-        <FormButton type="submit" disabled={isUploading || createMutation.isPending || updateMutation.isPending}>
+        <Button type="submit" disabled={isUploading || createMutation.isPending || updateMutation.isPending}>
           {createMutation.isPending || updateMutation.isPending || isUploading ? "Uploading..." : editingEpisode ? "Update" : "Create"}
-        </FormButton>
+        </Button>
       </form>
     </Modal>
   );
