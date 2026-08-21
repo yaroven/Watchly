@@ -1,1 +1,1 @@
-export { TitleInfoSkeleton, default } from "./TitleInfo";
+export { default } from "./TitleInfo";
