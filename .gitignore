@@ -29,3 +29,8 @@ config/dev/data/*
 !config/dev/volumes/grafana/provisioning/
 !config/dev/volumes/grafana/provisioning/**
 !config/dev/volumes/transcoder-worker/.gitkeep
+# macOS
+.DS_Store
+
+# JetBrains IDE
+.idea/
