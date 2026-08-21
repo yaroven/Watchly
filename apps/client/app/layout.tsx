@@ -34,7 +34,6 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geistSans.variable} ${ptSans.className} ${geistMono.variable}`}>
         <Providers>{children}</Providers>
-        <div id="modal-portal" />
       </body>
     </html>
   );

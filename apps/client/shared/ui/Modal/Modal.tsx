@@ -1,10 +1,9 @@
 "use client";
 
-import { X } from "lucide-react";
+import Close from "@mui/icons-material/Close";
+import Box from "@mui/material/Box";
+import Dialog from "@mui/material/Dialog";
 import type { ReactNode } from "react";
-import { useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
-import styles from "./Modal.module.scss";
 
 interface ModalProps {
   children: ReactNode;
@@ -13,85 +12,63 @@ interface ModalProps {
   size?: "sm" | "md" | "lg" | "xl";
 }
 
+/**
+ * Dialog owns the focus trap, Escape handling, scroll lock and the portal,
+ * so this only supplies the framing and the close button.
+ */
 export default function Modal({ children, isOpen, onClose, size = "md" }: ModalProps) {
-  const dialogRef = useRef<HTMLDivElement | null>(null);
-  const previousActiveElementRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const previousOverflow = document.body.style.overflow;
-    previousActiveElementRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    document.body.style.overflow = "hidden";
-
-    const focusableSelector =
-      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-        return;
-      }
-
-      if (event.key !== "Tab" || !dialogRef.current) {
-        return;
-      }
-
-      const focusableElements = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(focusableSelector));
-
-      if (!focusableElements.length) {
-        event.preventDefault();
-        dialogRef.current.focus();
-        return;
-      }
-
-      const firstElement = focusableElements[0];
-      const lastElement = focusableElements[focusableElements.length - 1];
-      const activeElement = document.activeElement;
-
-      if (event.shiftKey && activeElement === firstElement) {
-        event.preventDefault();
-        lastElement.focus();
-      } else if (!event.shiftKey && activeElement === lastElement) {
-        event.preventDefault();
-        firstElement.focus();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    requestAnimationFrame(() => {
-      const dialog = dialogRef.current;
-      if (!dialog) return;
-
-      const focusableElements = dialog.querySelectorAll<HTMLElement>(focusableSelector);
-      const initialFocusTarget = focusableElements[0] ?? dialog;
-      initialFocusTarget.focus();
-    });
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", handleKeyDown);
-      previousActiveElementRef.current?.focus();
-    };
-  }, [isOpen, onClose]);
-
-  if (!isOpen || typeof document === "undefined") return null;
-
-  const portalRoot = document.getElementById("modal-portal");
-  if (!portalRoot) return null;
-
-  return createPortal(
-    <>
-      <div className={styles.overlay} onClick={onClose} />
-      <div className={styles.dialog} role="dialog" aria-modal="true" onClick={onClose}>
-        <div ref={dialogRef} className={`${styles.modal} ${styles[size]}`} tabIndex={-1} onClick={(event) => event.stopPropagation()}>
-          <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Close modal">
-            <X />
-          </button>
-          {children}
-        </div>
-      </div>
-    </>,
-    portalRoot,
+  return (
+    <Dialog
+      open={isOpen}
+      // Dialog calls onClose with (event, reason); the callers take no args.
+      onClose={() => onClose()}
+      // The widths below are the app's own, not MUI's breakpoint scale.
+      maxWidth={false}
+      slotProps={{
+        paper: {
+          sx: {
+            position: "relative",
+            width: "95%",
+            maxWidth: MAX_WIDTHS[size],
+            backgroundColor: "#000000",
+            backgroundImage: "none",
+            borderRadius: "20px",
+            border: "1px solid #333333",
+            p: { xs: "26px 18px 22px", sm: "32px 32px 28px" },
+          },
+        },
+        backdrop: { sx: { backgroundColor: "rgba(0,0,0,.7)" } },
+      }}
+    >
+      <Box
+        component="button"
+        type="button"
+        onClick={onClose}
+        aria-label="Close modal"
+        sx={{
+          position: "absolute",
+          top: "16px",
+          right: "16px",
+          width: 36,
+          height: 36,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: "8px",
+          border: "none",
+          background: "#333333",
+          color: "#e5e5e5",
+          cursor: "pointer",
+          opacity: 0.75,
+          transition: "opacity .1s ease-in-out",
+          ":hover": { opacity: 1 },
+        }}
+      >
+        <Close sx={{ fontSize: "20px" }} />
+      </Box>
+      {children}
+    </Dialog>
   );
 }
+
+const MAX_WIDTHS = { sm: 400, md: 600, lg: 800, xl: 1100 } as const;
