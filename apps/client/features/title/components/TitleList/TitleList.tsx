@@ -1,5 +1,5 @@
 import { Title as TitleI, TitleType } from "@/features/title/schemas/title";
-import Title from "../Title";
+import TitleCard from "../TitleCard";
 import styles from "./TitleList.module.scss";
 
 interface TitleListProps {
@@ -11,7 +11,7 @@ export default function TitleList({ titles, onClick }: TitleListProps) {
   return (
     <div className={styles.titleContainer}>
       {titles.map((data) => (
-        <Title onClick={() => onClick && onClick(data.id, data.type)} key={data.id} {...data} />
+        <TitleCard onClick={() => onClick && onClick(data.id, data.type)} key={data.id} {...data} />
       ))}
     </div>
   );
