@@ -1,8 +1,10 @@
 "use client";
-import { Edit, FileText, Trash, UploadCloud } from "lucide-react";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
 import { ChangeEvent, useEffect, useMemo, useRef } from "react";
 import { FieldError, FieldValues, Path, PathValue, UseFormRegister, UseFormSetValue } from "react-hook-form";
-import styles from "./FormFileInput.module.scss";
+import FilePreviewCard from "./components/FilePreviewCard";
+import UploadDropzone from "./components/UploadDropzone";
 
 interface FormFileInputProps<T extends FieldValues> {
   name: Path<T>;
@@ -15,7 +17,10 @@ interface FormFileInputProps<T extends FieldValues> {
   accept?: string;
   onFileSelect?: (file: File | null) => void;
   id?: string;
+  hint?: string;
+  disabled?: boolean;
 }
+
 export default function FormFileInput<T extends FieldValues>({
   accept = "*",
   onFileSelect,
@@ -27,6 +32,8 @@ export default function FormFileInput<T extends FieldValues>({
   name,
   error,
   valueAsNumber,
+  hint,
+  disabled = false,
 }: FormFileInputProps<T>) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const file = selectedFile?.[0] ?? null;
@@ -79,69 +86,50 @@ export default function FormFileInput<T extends FieldValues>({
   };
 
   return (
-    <div className={styles.uploadContainer}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: "6px" }}>
       {label && (
-        <label htmlFor={id} className={styles.label}>
+        <Typography component="label" htmlFor={id} sx={{ fontSize: "14px", fontWeight: 400, color: "#999999" }}>
           {label}
-        </label>
+        </Typography>
       )}
-      <div className={`${styles.uploadWrapper} ${error ? styles.errorState : ""}`}>
-        <input
-          {...rest}
-          type="file"
-          id={id}
-          accept={accept}
-          onChange={handleFileChange}
-          className={styles.hiddenInput}
-          aria-invalid={error ? "true" : "false"}
-          aria-describedby={errorId}
-          ref={(e) => {
-            ref(e);
-            fileInputRef.current = e;
-          }}
+
+      <Box
+        component="input"
+        {...rest}
+        type="file"
+        id={id}
+        accept={accept}
+        onChange={handleFileChange}
+        disabled={disabled}
+        aria-invalid={error ? "true" : "false"}
+        aria-describedby={errorId}
+        sx={{ display: "none" }}
+        ref={(e: HTMLInputElement) => {
+          ref(e);
+          fileInputRef.current = e;
+        }}
+      />
+
+      {!fileUrl ? (
+        <UploadDropzone inputId={id} hint={hint} hasError={Boolean(error)} disabled={disabled} />
+      ) : (
+        <FilePreviewCard
+          inputId={id}
+          fileUrl={fileUrl}
+          fileName={fileName}
+          isVideo={isVideo}
+          isImage={isImage}
+          onRemove={handleRemove}
+          hasError={Boolean(error)}
+          disabled={disabled}
         />
-
-        {!fileUrl ? (
-          <label htmlFor={id} className={styles.uploadPlaceholder}>
-            <UploadCloud size={20} className={error ? styles.errorIcon : ""} />
-            <span>Upload File</span>
-          </label>
-        ) : (
-          <div className={styles.fileRowCard}>
-            <div className={styles.videoSide}>
-              {isVideo ? (
-                <video src={fileUrl} />
-              ) : isImage ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={fileUrl ?? undefined} alt={fileName || "Selected file preview"} />
-              ) : (
-                <div className={styles.fileIconPlaceholder}>
-                  <FileText size={32} color="#64748b" />
-                </div>
-              )}
-            </div>
-
-            <div className={styles.infoSide}>
-              <span className={styles.fileName} title={fileName}>
-                {fileName}
-              </span>
-              <div className={styles.actionRow}>
-                <label htmlFor={id} className={styles.changeBtn}>
-                  <Edit size={18} />
-                </label>
-                <button type="button" onClick={handleRemove} className={styles.removeBtn}>
-                  <Trash size={18} />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-      {error && (
-        <span id={errorId} className={styles.errorMessage} role="alert">
-          {error.message || "Invalid file"}
-        </span>
       )}
-    </div>
+
+      {error && (
+        <Typography id={errorId} role="alert" sx={{ fontSize: "12px", color: "#f64e34" }}>
+          {error.message || "Invalid file"}
+        </Typography>
+      )}
+    </Box>
   );
 }
