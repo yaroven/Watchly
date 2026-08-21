@@ -4,6 +4,7 @@ import ProgressBar from "@/features/transcoding/components/ProgressBar/ProgressB
 import FormField from "@/shared/ui/FormField";
 import FormFileInput from "@/shared/ui/FormFileInput";
 import Modal from "@/shared/ui/Modal/Modal";
+import Typography from "@mui/material/Typography";
 import Button from "@shared/ui/Button";
 import { useWatch } from "react-hook-form";
 import { useEpisodeManagerContext } from "../../context/EpisodeManagerContext";
@@ -33,7 +34,9 @@ export default function EpisodeModal() {
   return (
     <Modal isOpen={isModalOpen} onClose={closeEditor}>
       <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
-        <h3>{editingEpisode ? "Edit Episode" : "Add Episode"}</h3>
+        <Typography sx={{ fontSize: "24px", fontWeight: 700, color: "#ffffff", pr: "44px" }}>
+          {editingEpisode ? "Edit Episode" : "Add Episode"}
+        </Typography>
         <FormField
           label="Episode Number"
           type="number"
