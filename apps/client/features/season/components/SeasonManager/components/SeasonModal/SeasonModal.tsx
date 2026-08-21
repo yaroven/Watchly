@@ -3,6 +3,7 @@
 import FormField from "@/shared/ui/FormField";
 import FormFileInput from "@/shared/ui/FormFileInput";
 import Modal from "@/shared/ui/Modal/Modal";
+import Typography from "@mui/material/Typography";
 import Button from "@shared/ui/Button";
 import { useWatch } from "react-hook-form";
 import styles from "../../SeasonManager.module.scss";
@@ -30,7 +31,9 @@ export default function SeasonModal() {
   return (
     <Modal isOpen={isModalOpen} onClose={closeEditor}>
       <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
-        <h3>{editingSeason ? "Edit Season" : "Add Season"}</h3>
+        <Typography sx={{ fontSize: "24px", fontWeight: 700, color: "#ffffff", pr: "44px" }}>
+          {editingSeason ? "Edit Season" : "Add Season"}
+        </Typography>
         <FormField
           label="Season Number"
           type="number"

@@ -7,6 +7,8 @@ import FormFileInput from "@/shared/ui/FormFileInput";
 import Modal from "@/shared/ui/Modal";
 import Select from "@/shared/ui/Select";
 import { zodResolver } from "@hookform/resolvers/zod";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
 import Button from "@shared/ui/Button";
 import { CheckCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -159,22 +161,39 @@ export default function TitleForm({ initialData }: TitleFormProps) {
         {isPending ? (isUploading ? "Uploading Video..." : "Saving Title...") : isEditing ? "Update Title" : "Create Title"}
       </Button>
 
-      <Modal isOpen={isSuccessModalOpen} onClose={closeSuccessModal}>
-        <div className={styles.modalContent}>
-          <CheckCircle className={styles.successIcon} />
-          <h3>Title {initialData ? "updated" : "added"} successfully!</h3>
-          <div className={styles.modalActions}>
-            <button
-              type="button"
+      <Modal isOpen={isSuccessModalOpen} onClose={closeSuccessModal} size="sm">
+        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "18px" }}>
+          <Box
+            sx={{
+              width: 64,
+              height: 64,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "18px",
+              backgroundColor: "rgba(39,194,55,.16)",
+            }}
+          >
+            <CheckCircle size={30} color="#27c237" />
+          </Box>
+
+          <Typography sx={{ fontSize: "24px", fontWeight: 700, color: "#ffffff" }}>
+            Title {initialData ? "updated" : "added"} successfully!
+          </Typography>
+
+          <Box sx={{ display: "flex", gap: "12px", width: "100%", mt: "6px" }}>
+            <Button
+              variant="outlined"
+              sx={{ flex: 1 }}
               onClick={() => {
                 closeSuccessModal();
                 router.push("/admin/titles");
               }}
             >
               View All Titles
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              sx={{ flex: 1 }}
               onClick={() => {
                 const id = initialData?.id || createdTitleId;
                 if (id) {
@@ -184,9 +203,9 @@ export default function TitleForm({ initialData }: TitleFormProps) {
               }}
             >
               View Title
-            </button>
-          </div>
-        </div>
+            </Button>
+          </Box>
+        </Box>
       </Modal>
     </form>
   );
