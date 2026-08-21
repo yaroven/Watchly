@@ -156,7 +156,7 @@ export default function TitleForm({ initialData }: TitleFormProps) {
 
       {actionError && <div className={styles.errorAlert}>Error: {actionError.message}</div>}
       <Button disabled={isPending || (!isDirty && !isEditing)} type="submit">
-        {isPending ? (isUploading ? "Uploading Video..." : "Saving TitleCard...") : isEditing ? "Update TitleCard" : "Create TitleCard"}
+        {isPending ? (isUploading ? "Uploading Video..." : "Saving Title...") : isEditing ? "Update Title" : "Create Title"}
       </Button>
 
       <Modal isOpen={isSuccessModalOpen} onClose={closeSuccessModal}>
