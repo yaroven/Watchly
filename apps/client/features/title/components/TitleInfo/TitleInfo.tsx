@@ -2,7 +2,6 @@
 
 import { Title } from "@/features/title/schemas/title";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
-import { Skeleton } from "@/shared/ui/Skeleton";
 import Image from "next/image";
 import styles from "./TitleInfo.module.scss";
 
@@ -49,25 +48,6 @@ export default function TitleInfo({ title }: TitleInfoProps) {
         </div>
 
         <div className={styles.description}>{description || "Description will appear here once added."}</div>
-      </div>
-    </div>
-  );
-}
-
-export function TitleInfoSkeleton() {
-  return (
-    <div className={styles.titleInfoContainer}>
-      <div className={styles.posterContainer}>
-        <Skeleton width={250} height={400} />
-      </div>
-      <div className={styles.titleInfo} style={{ flex: 1 }}>
-        <Skeleton width="60%" height={40} />
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} width="40%" height={20} />
-          ))}
-        </div>
-        <Skeleton width="100%" height={100} />
       </div>
     </div>
   );
