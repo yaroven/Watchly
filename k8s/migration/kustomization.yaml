@@ -13,5 +13,5 @@ resources:
 # Must match the api tag in k8s/base/kustomization.yaml — the schema this Job
 # applies has to be the one the new code expects. Bump both together.
 images:
-  - name: razanka/watchly-api
-    newTag: 9032f64-dirty
+  - name: razanka/watchly-migrator
+    newTag: latest
