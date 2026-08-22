@@ -7,15 +7,21 @@ api/.git-backup/
 client/.git-backup/
 
 .codex
+.claude
+.vscode
 .next
 
 .env
 .fttemplates
 
+k8s/**/.env*
+!k8s/**/.env.example
+
 dist
 *.code-workspace
 tsconfig.build.tsbuildinfo
 tsconfig.tsbuildinfo
+.idea
 
 config/dev/volumes/api/*
 config/dev/volumes/client/*
@@ -26,6 +32,4 @@ config/dev/data/*
 !config/dev/volumes/api/.gitkeep
 !config/dev/volumes/client/.gitkeep
 !config/dev/volumes/grafana/.gitkeep
-!config/dev/volumes/grafana/provisioning/
-!config/dev/volumes/grafana/provisioning/**
 !config/dev/volumes/transcoder-worker/.gitkeep
