@@ -34,16 +34,26 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
     private readonly videoTranscoderService: VideoTranscoderService,
   ) {
     this.config = this.configService.getOrThrow<S3Config>(S3ConfigName);
-    const clientConfig = {
+    const credentials = {
+      accessKeyId: this.config.accessKeyId,
+      secretAccessKey: this.config.secretAccessKey,
+    };
+
+    // The two clients used to share one endpoint, which only ever worked
+    // under LocalStack. Omitting it lets the SDK derive the right regional
+    // host per service.
+    this.sqsClient = new SQSClient({
+      region: this.config.region,
+      credentials,
+      ...(this.config.sqsEndpoint ? { endpoint: this.config.sqsEndpoint } : {}),
+    });
+
+    this.s3Client = new S3Client({
       region: this.config.region,
       endpoint: this.config.internalEndpoint,
-      credentials: {
-        accessKeyId: this.config.accessKeyId,
-        secretAccessKey: this.config.secretAccessKey,
-      },
-    };
-    this.sqsClient = new SQSClient(clientConfig);
-    this.s3Client = new S3Client({ ...clientConfig, forcePathStyle: true });
+      credentials,
+      forcePathStyle: true,
+    });
   }
 
   async onModuleInit() {

@@ -7,7 +7,11 @@ import loggerConfig, {
   LoggerConfig,
   LoggerConfigName,
 } from "../config/logger.config";
-import redisConfig, { RedisConfig, RedisConfigName } from "../config/redis.config";
+import redisConfig, {
+  RedisConfig,
+  RedisConfigName,
+  redisConnectionOptions,
+} from "../config/redis.config";
 import s3Config from "../config/s3.config";
 import { PrismaModule } from "../prisma/prisma.module";
 import { S3Module } from "../s3/s3.module";
@@ -32,12 +36,7 @@ import { VideoTranscoderService } from "./video-transcoder.service";
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
         const redis = configService.get<RedisConfig>(RedisConfigName)!;
-        return {
-          connection: {
-            host: redis.host,
-            port: redis.port,
-          },
-        };
+        return { connection: redisConnectionOptions(redis) };
       },
     }),
     BullModule.registerQueue(VIDEO_TRANSCODE_QUEUE_OPTIONS),
