@@ -10,7 +10,11 @@ import loggerConfig, {
   LoggerConfig,
   LoggerConfigName,
 } from "./config/logger.config";
-import redisConfig, { RedisConfig, RedisConfigName } from "./config/redis.config";
+import redisConfig, {
+  RedisConfig,
+  RedisConfigName,
+  redisConnectionOptions,
+} from "./config/redis.config";
 import s3Config from "./config/s3.config";
 import { EpisodeModule } from "./episode/episode.module";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -34,12 +38,7 @@ import { VideoTranscoderModule } from "./video-transcoder/video-transcoder.modul
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
         const redis = configService.get<RedisConfig>(RedisConfigName)!;
-        return {
-          connection: {
-            host: redis.host,
-            port: redis.port,
-          },
-        };
+        return { connection: redisConnectionOptions(redis) };
       },
     }),
     LoggerModule.forRootAsync({
