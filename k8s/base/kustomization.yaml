@@ -1,0 +1,61 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - loki-config.yaml
+  - api.yaml
+  - client.yaml
+  - transcoder-worker.yaml
+  - loki.yaml
+  - grafana.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: watchly
+    includeSelectors: false
+
+# The manifests name images without a tag, which resolves to `:latest` — and
+# `latest` cannot be rolled back, since `kubectl apply` sees no spec change
+# when the tag stays the same. Pin the tag here instead; both images come out
+# of the same Dockerfile (different --target), so they move together.
+#
+# Client is deliberately absent: its NEXT_PUBLIC_* values are baked at build
+# time, so dev and prod need different builds. Its tag lives in each overlay.
+images:
+  - name: razanka/watchly-api
+    newTag: 9032f64-dirty
+  - name: razanka/watchly-transcoder-worker
+    newTag: 9032f64-dirty
+
+configMapGenerator:
+  - name: watchly-config
+    literals:
+      - REDIS_TLS=true
+      - S3_REGION=eu-north-1
+      - S3_RAW_BUCKET_NAME=watchly-raw-894041819490-eu-north-1-an
+      - S3_PROCESSED_BUCKET_NAME=watchly-content-894041819490-eu-north-1-an
+      - SQS_QUEUE_NAME=watchly-s3-event-queue
+      - LOG_LEVEL=info
+      - LOKI_URL=http://loki:3100
+
+  - name: watchly-client-config
+    literals:
+      - BACKEND_API_URL=http://api:3000
+
+  - name: grafana-datasources
+    files:
+      - grafana/provisioning/datasources/loki.yml
+  - name: grafana-dashboards
+    files:
+      - grafana/provisioning/dashboards/logs.yml
+      - grafana/provisioning/dashboards/application-logs.json
+secretGenerator:
+  - name: watchly-secrets
+    envs:
+      - .env.secrets
+    # The migration Job lives in its own kustomization (k8s/migration), so it
+    # cannot see a generated `watchly-secrets-<hash>` name. Pinning the name
+    # keeps that reference valid. Trade-off: editing the secret no longer
+    # rolls the pods by itself — follow it with `kubectl rollout restart`.
+    options:
+      disableNameSuffixHash: true
