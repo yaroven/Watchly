@@ -1,0 +1,10 @@
+# Two replicas so a rolling update has somewhere to send traffic while the old
+# pod is going away. Only the api gets this: the worker pulls from a queue
+# (scale it by raising replicas when the queue backs up), and the client is
+# cheap enough that one is fine until it is not.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+spec:
+  replicas: 2

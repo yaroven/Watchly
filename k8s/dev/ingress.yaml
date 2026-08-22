@@ -1,0 +1,59 @@
+# One entry point, three hostnames. Handled by ingress-nginx, which is NOT
+# preinstalled on DOKS — see the Makefile target `cluster-addons`.
+#
+# Installing the controller creates a DigitalOcean Load Balancer with its own
+# public IP. All three A records below point at THAT IP, not at a node.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: watchly
+  annotations:
+    # Remove this line until cert-manager is installed, or the Ingress will
+    # sit waiting for a certificate that nothing is issuing.
+    cert-manager.io/cluster-issuer: letsencrypt
+
+    # Default is 1m, which silently breaks video uploads with 413.
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    # Large uploads take longer than the 60s default.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: dev.REPLACE_ME.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: client
+                port:
+                  number: 4000
+    - host: api.dev.REPLACE_ME.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 3000
+    - host: grafana.dev.REPLACE_ME.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 3000
+  # Remove this block too until cert-manager is installed.
+  tls:
+    - hosts:
+        - dev.REPLACE_ME.com
+        - api.dev.REPLACE_ME.com
+        - grafana.dev.REPLACE_ME.com
+      secretName: watchly-tls

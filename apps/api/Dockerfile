@@ -1,3 +1,12 @@
+# The build context MUST be the monorepo root — this image needs the root
+# package.json / pnpm-lock.yaml / pnpm-workspace.yaml. Run from the repo root:
+#
+#   docker build -f apps/api/Dockerfile --target runner        -t watchly-api .
+#   docker build -f apps/api/Dockerfile --target worker-runner -t watchly-transcoder-worker .
+#
+# (or `pnpm docker:build:api` / `pnpm docker:build:worker`).
+# `cd apps/api && docker build .` cannot work: the root manifests are outside
+# that context.
 FROM node:22-alpine AS base
 RUN npm install -g pnpm
 WORKDIR /app
