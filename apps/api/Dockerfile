@@ -75,4 +75,4 @@ ENV NODE_ENV=production
 COPY --from=migrate-tree --chown=node:node /prod ./
 USER node
 
-CMD ["node", "node_modules/prisma/build/index.js", "migrate", "deploy"]
+CMD ["node_modules/.bin/prisma", "migrate", "deploy"]
