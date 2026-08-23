@@ -1,0 +1,10 @@
+# Nothing else creates this. Kustomize's `namespace:` directive only stamps
+# metadata.namespace onto the other resources — it does not bring the namespace
+# itself into existence, so the very first apply would fail without this file.
+#
+# Listed first in kustomization.yaml so it is created before anything that
+# needs it.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: watchly-prod
