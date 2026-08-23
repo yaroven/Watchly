@@ -44,7 +44,14 @@ export class VideoTranscoderProcessor extends WorkerHost {
       }
 
       await this.videoTranscodeService.updateStatus(id, type, TranscodingStatus.FAILED);
-      this.logger.error(`Job ${jobId} failed:`, error);
+      // The message must carry the error itself: nestjs-pino treats a second
+      // positional argument as the stack *string*, so passing the Error object
+      // there swallows it and the log ends at "failed:".
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Job ${jobId} failed: ${message}`,
+        error instanceof Error ? error.stack : undefined,
+      );
       throw error;
     } finally {
       await fs.remove(tempDir);

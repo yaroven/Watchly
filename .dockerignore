@@ -1,18 +1,30 @@
+# Patterns are matched against paths relative to the build context (the repo
+# root). Docker does NOT match a bare pattern recursively, so nested paths need
+# an explicit `**/` prefix.
+
+# VCS & local tooling
 .git
 .gitignore
+.github
 .husky
 .vscode
+
+# Dependencies and build output (root + every workspace package)
 node_modules
-client/node_modules
-api/node_modules
-client/.next
-api/dist
-api/coverage
-npm-debug.log
-yarn-error.log
-yarn-debug.log
-.env
-.env.*
-*.md
-docker-compose.yml
+**/node_modules
+**/dist
+**/.next
+**/coverage
+
+# Local env files — never bake these into an image
+**/.env
+**/.env.*
+
+# Logs
+**/npm-debug.log*
+**/yarn-error.log
+**/yarn-debug.log
+
+# Docs, and local docker state (config/dev/volumes holds bind-mounted node_modules)
+**/*.md
 config/

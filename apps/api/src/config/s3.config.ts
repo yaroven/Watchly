@@ -13,6 +13,13 @@ export interface S3Config {
   internalEndpoint: string;
   publicEndpoint: string;
   queueName: string;
+  /**
+   * Only LocalStack needs this: it serves S3 and SQS from the same port, so
+   * one endpoint covers both. Against real AWS it must stay undefined — SQS
+   * lives at sqs.<region>.amazonaws.com, and aiming its client at the S3
+   * endpoint makes every queue call fail.
+   */
+  sqsEndpoint?: string;
 }
 
 /**
@@ -50,4 +57,5 @@ export default registerAs(S3ConfigName, () => ({
     "http://localhost:4566",
   ),
   queueName: requireInProduction(process.env.SQS_QUEUE_NAME, "SQS_QUEUE_NAME", "s3-event-queue"),
+  sqsEndpoint: process.env.SQS_ENDPOINT || undefined,
 }));

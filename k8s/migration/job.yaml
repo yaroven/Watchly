@@ -1,0 +1,37 @@
+# Runs BEFORE the new code rolls out. Without it the api starts against an
+# empty or outdated schema — docker-compose ran `db:prepare` in the service
+# command, but the image's CMD is just `node apps/api/dist/src/main`.
+#
+# Built from the `migrator` target in apps/api/Dockerfile. It needs its own
+# image because the api image no longer ships the Prisma CLI — dropping it is
+# what keeps that image ~190MB smaller.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: watchly-migrate
+spec:
+  # No retries. A half-applied migration retried blindly is worse than a clean
+  # failure you look at.
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          # Tag comes from the `images:` block in kustomization.yaml — that is
+          # the single place to bump it.
+          image: razanka/watchly-migrator:latest
+          # No command override: the image's CMD already runs
+          # `prisma migrate deploy` from /app, which is where prisma.config.ts
+          # expects to find prisma/schema.prisma.
+          envFrom:
+            # DATABASE_URL lives here; nothing else is needed for a migration.
+            - secretRef:
+                name: watchly-secrets
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi

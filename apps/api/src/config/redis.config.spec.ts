@@ -1,4 +1,4 @@
-import redisConfig from "./redis.config";
+import redisConfig, { redisConnectionOptions } from "./redis.config";
 
 describe("redisConfig", () => {
   const originalEnv = { ...process.env };
@@ -45,5 +45,24 @@ describe("redisConfig", () => {
       expect(config.host).toBe("redis");
       expect(config.port).toBe(6380);
     });
+  });
+});
+
+describe("redisConnectionOptions", () => {
+  // Managed Redis rejects plaintext and anonymous connections; the local
+  // container accepts nothing else. Both shapes have to come out of one place.
+  test("should omit password and tls for a local Redis", () => {
+    const opts = redisConnectionOptions({ host: "localhost", port: 6379, tls: false });
+    expect(opts).toEqual({ host: "localhost", port: 6379 });
+  });
+
+  test("should enable tls and pass the password for managed Redis", () => {
+    const opts = redisConnectionOptions({
+      host: "db.ondigitalocean.com",
+      port: 25061,
+      password: "s3cret",
+      tls: true,
+    });
+    expect(opts).toMatchObject({ password: "s3cret", tls: {} });
   });
 });
