@@ -3,11 +3,10 @@
 import { type Title } from "@/features/title/schemas/title";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import { TranscodingStatus } from "@/types";
-import { Favorite as FavoriteIcon } from "@mui/icons-material";
+import { Favorite as FavoriteIcon, Star as StarIcon } from "@mui/icons-material";
 import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
-import { Star } from "lucide-react";
 import Image from "next/image";
 
 interface TitleProps extends Omit<Title, "seasons"> {
@@ -65,7 +64,7 @@ export default function TitleCard({ name, posterUrl, type, transcodingStatus, ra
               backdropFilter: "blur(12px)",
             }}
           >
-            <Star size={12} fill="#e7bc0f" color="#e7bc0f" />
+            <StarIcon sx={{ fontSize: "16px", color: "#e7bc0f" }} />
             <Typography component="span" sx={{ fontSize: 12, fontWeight: 400, color: "#ffffff" }}>
               {rating.toFixed(1)}
             </Typography>

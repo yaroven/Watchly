@@ -1,56 +1,45 @@
 "use client";
 
-import { Clapperboard, LogIn, Sparkles } from "lucide-react";
+import { Box, Tab } from "@mui/material";
+import Tabs from "@mui/material/Tabs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import styles from "./Header.module.scss";
+import Avatar from "./components/Avatar";
+import Notification from "./components/Notification";
+import SearchBar from "./components/SearchBar";
 
 export default function Header() {
   const pathname = usePathname();
-
   const navItems = [
-    { label: "Home", href: "/" },
+    { label: "All", href: "/" },
     { label: "Movies", href: "/movie" },
     { label: "Series", href: "/series" },
+    { label: "Genres", href: "/genres" },
   ];
-
-  const isActive = (href: string) => {
-    if (href === "/") return pathname === "/";
-    return pathname.startsWith(href);
-  };
+  const activeTab =
+    navItems
+      .filter((n) => (n.href === "/" ? pathname === "/" : pathname.startsWith(n.href)))
+      .sort((a, b) => b.href.length - a.href.length)[0]?.href ?? false;
 
   return (
-    <header className={styles.header}>
-      <div className={styles.navigationBar}>
-        <Link href="/" className={styles.brand}>
-          <span className={styles.brandIcon}>
-            <Clapperboard size={18} />
-          </span>
-          <span>
-            Watchly
-            <small>Cinematic dashboard vibe</small>
-          </span>
-        </Link>
-
-        <nav className={styles.navLinks} aria-label="Main navigation">
-          {navItems.map((item) => (
-            <Link key={item.label} className={`${styles.navLink} ${isActive(item.href) ? styles.active : ""}`} href={item.href}>
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-
-        <div className={styles.actions}>
-          <Link className={styles.secondaryAction} href="/admin/dashboard">
-            <Sparkles size={16} />
-            Admin
-          </Link>
-          <Link className={styles.primaryAction} href="/login">
-            <LogIn size={16} />
-            Login
-          </Link>
-        </div>
-      </div>
-    </header>
+    <Box sx={{ pl: "32px", pr: "24px", pt: "32px", pb: "24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <Tabs value={activeTab}>
+        {navItems.map((item) => (
+          <Tab
+            key={item.href}
+            sx={{ px: "11px", py: "9px", minWidth: "auto", width: "fit-content" }}
+            label={item.label}
+            value={item.href}
+            href={item.href}
+            component={Link}
+          />
+        ))}
+      </Tabs>
+      <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "20px" }}>
+        <SearchBar />
+        <Notification hasNotifications={false} />
+        <Avatar src="https://www.svgrepo.com/show/384670/account-avatar-profile-user.svg" alt="User profile" />
+      </Box>
+    </Box>
   );
 }
