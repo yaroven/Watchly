@@ -15,6 +15,8 @@ export default function DeleteModal({ isOpen, onClose, titleName, isDeleting, on
       onClose={onClose}
       onConfirm={onConfirm}
       isPending={isDeleting}
+      confirmLabel="Confirm Delete"
+      pendingLabel="Deleting..."
       title="Delete Title"
       description={
         <>

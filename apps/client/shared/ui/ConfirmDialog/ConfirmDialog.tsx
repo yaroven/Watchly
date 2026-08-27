@@ -1,11 +1,18 @@
 "use client";
 
+import {
+  CheckCircle as CheckCircleIcon,
+  Info as InfoIcon,
+  ReportProblem as ReportProblemIcon,
+  WarningAmber as WarningAmberIcon,
+} from "@mui/icons-material";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import Button from "@shared/ui/Button";
 import Modal from "@shared/ui/Modal";
-import { AlertTriangle } from "lucide-react";
 import type { ReactNode } from "react";
+
+export type ConfirmTone = "danger" | "warning" | "info" | "success";
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -14,22 +21,29 @@ interface ConfirmDialogProps {
   title: string;
   /** Body copy — a node, so callers can emphasise the item name. */
   description: ReactNode;
+  /** Picks the icon and accent; also makes the confirm button red on danger. */
+  tone?: ConfirmTone;
   confirmLabel?: string;
   pendingLabel?: string;
+  cancelLabel?: string;
   isPending?: boolean;
 }
 
-/** Destructive confirmation shared by the delete flows. */
+/** Confirmation dialog for actions that need a deliberate yes. */
 export default function ConfirmDialog({
   isOpen,
   onClose,
   onConfirm,
   title,
   description,
-  confirmLabel = "Confirm Delete",
-  pendingLabel = "Deleting...",
+  tone = "danger",
+  confirmLabel = "Confirm",
+  pendingLabel,
+  cancelLabel = "Cancel",
   isPending = false,
 }: ConfirmDialogProps) {
+  const { Icon, color, tint } = TONES[tone];
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="sm">
       <Box
@@ -50,10 +64,10 @@ export default function ConfirmDialog({
             alignItems: "center",
             justifyContent: "center",
             borderRadius: "18px",
-            backgroundColor: "rgba(246,78,52,.16)",
+            backgroundColor: tint,
           }}
         >
-          <AlertTriangle size={28} color="#f64e34" />
+          <Icon sx={{ fontSize: "28px", color }} />
         </Box>
 
         <Typography sx={{ fontSize: "24px", fontWeight: 700 }}>{title}</Typography>
@@ -64,13 +78,20 @@ export default function ConfirmDialog({
 
         <Box sx={{ display: "flex", gap: "12px", width: "100%", mt: "6px" }}>
           <Button variant="outlined" onClick={onClose} disabled={isPending} sx={{ flex: 1 }}>
-            Cancel
+            {cancelLabel}
           </Button>
-          <Button danger onClick={onConfirm} disabled={isPending} sx={{ flex: 1 }}>
-            {isPending ? pendingLabel : confirmLabel}
+          <Button danger={tone === "danger"} onClick={onConfirm} disabled={isPending} sx={{ flex: 1 }}>
+            {isPending && pendingLabel ? pendingLabel : confirmLabel}
           </Button>
         </Box>
       </Box>
     </Modal>
   );
 }
+
+const TONES = {
+  danger: { Icon: ReportProblemIcon, color: "#f64e34", tint: "rgba(246,78,52,.16)" },
+  warning: { Icon: WarningAmberIcon, color: "#eb8509", tint: "rgba(235,133,9,.16)" },
+  info: { Icon: InfoIcon, color: "#275bc2", tint: "rgba(39,91,194,.18)" },
+  success: { Icon: CheckCircleIcon, color: "#27c237", tint: "rgba(39,194,55,.16)" },
+} as const;

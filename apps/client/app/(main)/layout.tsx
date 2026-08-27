@@ -1,4 +1,5 @@
 import Header from "@/shared/ui/Header";
+import Sidebar from "@/shared/ui/Sidebar";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { Metadata } from "next";
 import "../globals.scss";
@@ -16,8 +17,11 @@ export default function MainLayout({
 }>) {
   return (
     <div className={styles.shell}>
-      <Header />
-      <main className={styles.content}>{children}</main>
+      <Sidebar />
+      <div className={styles.main}>
+        <Header />
+        <main className={styles.content}>{children}</main>
+      </div>
     </div>
   );
 }
