@@ -22,6 +22,8 @@ declare module "@mui/material/Paper" {
  * (see the component handoff doc). Font stays PT Sans to match the
  * app's real typography instead of the Figma mockup's Poppins.
  */
+const HEADING_FONT = "var(--font-heading), Arial, Helvetica, sans-serif";
+
 export const tmovieTheme = createTheme({
   palette: {
     mode: "dark",
@@ -55,9 +57,14 @@ export const tmovieTheme = createTheme({
     borderRadius: 12,
   },
   typography: {
-    fontFamily: '"PT Sans", Arial, Helvetica, sans-serif',
-    h1: { fontWeight: 700, fontSize: "24px" },
-    h2: { fontWeight: 400, fontSize: "18px" },
+    // Poppins carries the body copy; Fredoka is scoped to headings only.
+    fontFamily: "var(--font-body), Arial, Helvetica, sans-serif",
+    h1: { fontFamily: HEADING_FONT, fontWeight: 700, fontSize: "32px" },
+    h2: { fontFamily: HEADING_FONT, fontWeight: 700, fontSize: "24px" },
+    h3: { fontFamily: HEADING_FONT, fontWeight: 600, fontSize: "20px" },
+    h4: { fontFamily: HEADING_FONT, fontWeight: 600, fontSize: "18px" },
+    h5: { fontFamily: HEADING_FONT, fontWeight: 500, fontSize: "16px" },
+    h6: { fontFamily: HEADING_FONT, fontWeight: 500, fontSize: "14px" },
     body1: { fontSize: "16px", fontWeight: 400 },
     body2: { fontSize: "14px", fontWeight: 400, color: "#999999" },
     button: { textTransform: "none", fontWeight: 400 },

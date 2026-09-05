@@ -1,6 +1,7 @@
 services:
   client:
     container_name: "client"
+    mem_limit: 2g
     restart: unless-stopped
     build:
       context: ../../
@@ -19,8 +20,13 @@ services:
       NEXT_PUBLIC_APP_URL: "http://localhost:4000"
       NEXT_PUBLIC_REMOTE_IMAGE_HOSTNAME: "m.media-amazon.com"
       NEXT_PUBLIC_S3_IMAGE_PORT: "4000"
-      WATCHPACK_POLLING: "true"
-      CHOKIDAR_USEPOLLING: "true"
+      NEXT_PUBLIC_S3_IMAGE_INTERNAL_ORIGIN: "http://localstack:4566"
+      NODE_OPTIONS: "--max-old-space-size=1536"
+      # Polling keeps state for every watched file and re-scans it on a timer.
+      # Docker Desktop forwards filesystem events on macOS now, so try without
+      # it first; restore both if hot reload stops firing.
+      # WATCHPACK_POLLING: "true"
+      # CHOKIDAR_USEPOLLING: "true"
     volumes:
       - ../../apps/client:/app/apps/client
       - ../../package.json:/app/package.json
@@ -41,6 +47,7 @@ services:
 
   api:
     container_name: "api"
+    mem_limit: 768m
     build:
       context: ../../
       dockerfile: apps/api/Dockerfile
@@ -146,6 +153,7 @@ services:
   localstack:
     image: "gresau/localstack-persist:4"
     container_name: "localstack"
+    mem_limit: 512m
     ports:
       - "4510-4559:4510-4559"
       - "4566:4566"
@@ -165,6 +173,8 @@ services:
   grafana:
     image: "grafana/grafana-enterprise"
     container_name: "grafana"
+    profiles: ["observability"]
+    mem_limit: 384m
     restart: unless-stopped
     ports:
       - "3001:3000"
@@ -181,6 +191,7 @@ services:
   loki:
     image: grafana/loki:3.0.0
     container_name: "loki"
+    mem_limit: 256m
     ports:
       - "3100:3100"
     volumes:

@@ -1,5 +1,6 @@
 "use client";
 
+import { APP } from "@/shared/lib/routes";
 import { Box, Tab } from "@mui/material";
 import Tabs from "@mui/material/Tabs";
 import Link from "next/link";
@@ -11,15 +12,15 @@ import SearchBar from "./components/SearchBar";
 export default function Header() {
   const pathname = usePathname();
   const navItems = [
-    { label: "All", href: "/" },
-    { label: "Movies", href: "/movie" },
-    { label: "Series", href: "/series" },
-    { label: "Genres", href: "/genres" },
+    { label: "All", href: APP.DISCOVER },
+    { label: "Movies", href: APP.MOVIES },
+    { label: "Series", href: APP.SERIES_LIST },
+    { label: "Genres", href: APP.GENRES },
   ];
+  // Longest match wins, so /discover/movie selects Movies rather than All.
   const activeTab =
-    navItems
-      .filter((n) => (n.href === "/" ? pathname === "/" : pathname.startsWith(n.href)))
-      .sort((a, b) => b.href.length - a.href.length)[0]?.href ?? false;
+    navItems.filter((n) => pathname === n.href || pathname.startsWith(`${n.href}/`)).sort((a, b) => b.href.length - a.href.length)[0]
+      ?.href ?? false;
 
   return (
     <Box sx={{ pl: "32px", pr: "24px", pt: "32px", pb: "24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -27,7 +28,7 @@ export default function Header() {
         {navItems.map((item) => (
           <Tab
             key={item.href}
-            sx={{ px: "11px", py: "9px", minWidth: "auto", width: "fit-content" }}
+            sx={{ px: "11px", py: "9px", fontSize: "20px", minWidth: "auto", width: "fit-content" }}
             label={item.label}
             value={item.href}
             href={item.href}
