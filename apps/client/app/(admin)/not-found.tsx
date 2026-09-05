@@ -1,3 +1,4 @@
+import { ADMIN } from "@/shared/lib/routes";
 import Link from "next/link";
 import styles from "./not-found.module.scss";
 
@@ -14,7 +15,7 @@ export default function NotFound() {
             The record may have been deleted, the route may be incorrect, or the page may not exist in this admin section.
           </p>
         </div>
-        <Link href="/admin/dashboard" className={styles.homeButton}>
+        <Link href={ADMIN.DASHBOARD} className={styles.homeButton}>
           Back to Dashboard
         </Link>
       </div>

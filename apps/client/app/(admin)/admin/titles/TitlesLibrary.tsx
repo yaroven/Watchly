@@ -2,6 +2,7 @@
 
 import useTitles from "@/features/title/api/use-titles";
 import { TitleType } from "@/features/title/schemas/title";
+import { ADMIN } from "@/shared/lib/routes";
 import Pagination from "@/shared/ui/Pagination";
 import TranscodingStatus from "@/types/transcoding-status";
 import { useRouter } from "next/navigation";
@@ -87,7 +88,7 @@ export default function TitlesLibrary() {
 
   return (
     <div className={styles.container}>
-      <TitlesPageHero onCreate={() => router.push("/admin/titles/new")} />
+      <TitlesPageHero onCreate={() => router.push(ADMIN.TITLES_NEW)} />
 
       <TitlesFiltersPanel
         searchString={searchString}

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "commitlint": "commitlint",
-    "dev": "next dev --hostname 0.0.0.0 -p 4000",
+    "dev": "next dev --webpack --hostname 0.0.0.0 -p 4000",
     "build": "next build",
     "dev:up": "pnpm -w run dev:up",
     "dev:down": "pnpm -w run dev:down",
@@ -30,7 +30,6 @@
     "@emotion/cache": "^11.14.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
-    "@fortawesome/fontawesome-free": "^7.1.0",
     "@hookform/resolvers": "^5.2.2",
     "@mui/icons-material": "^9.3.1",
     "@mui/material": "^9.2.0",
@@ -48,6 +47,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@svgr/webpack": "^8.1.0",
     "@types/hls.js": "^1.0.0",
     "@types/node": "^20",
     "@types/react": "^19",

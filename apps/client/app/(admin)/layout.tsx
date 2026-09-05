@@ -1,6 +1,5 @@
 import Sidebar from "@/features/admin/components/Sidebar";
 import type { Metadata } from "next";
-import "../globals.scss";
 import styles from "./layout.module.scss";
 
 export const metadata: Metadata = {

@@ -1,22 +1,21 @@
-import "@fortawesome/fontawesome-free/css/all.min.css";
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, PT_Sans } from "next/font/google";
-import "./globals.scss";
+import { Fredoka, Poppins } from "next/font/google";
 import Providers from "./providers";
 
-const ptSans = PT_Sans({
-  weight: ["400", "700"],
-  subsets: ["latin", "cyrillic"],
-  display: "swap",
-});
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Body copy — the face used throughout the design file.
+const poppins = Poppins({
+  weight: ["300", "400", "500", "600", "700"],
   subsets: ["latin"],
+  display: "swap",
+  variable: "--font-body",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+// Section headings only; stands in for Moonjelly from the design.
+const fredoka = Fredoka({
+  weight: ["500", "600", "700"],
   subsets: ["latin"],
+  display: "swap",
+  variable: "--font-heading",
 });
 
 export const metadata: Metadata = {
@@ -32,7 +31,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${ptSans.className} ${geistMono.variable}`}>
+      <body className={`${poppins.variable} ${fredoka.variable}`}>
         <Providers>{children}</Providers>
       </body>
     </html>

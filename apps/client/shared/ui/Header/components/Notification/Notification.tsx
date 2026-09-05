@@ -3,9 +3,10 @@ import { Badge } from "@mui/material";
 
 interface NotificationProps {
   hasNotifications: boolean;
+  onClick?: () => void;
 }
 
-export default function Notification({ hasNotifications = false }: NotificationProps) {
+export default function Notification({ hasNotifications = false, onClick }: NotificationProps) {
   if (hasNotifications)
     return (
       <Badge
@@ -22,9 +23,9 @@ export default function Notification({ hasNotifications = false }: NotificationP
           },
         }}
       >
-        <NotificationsNoneIcon sx={{ fontSize: "32px" }} />
+        <NotificationsNoneIcon onClick={onClick} sx={{ fontSize: "32px", cursor: onClick ? "pointer" : "default" }} />
       </Badge>
     );
 
-  return <NotificationsNoneIcon sx={{ fontSize: "32px" }} />;
+  return <NotificationsNoneIcon onClick={onClick} sx={{ fontSize: "32px", cursor: onClick ? "pointer" : "default" }} />;
 }

@@ -2,6 +2,7 @@
 
 import { CreateTitleSchema, Title, TitleFormValues, TitleType, UpdateTitleSchema } from "@/features/title/schemas/title";
 import ProgressBar from "@/features/transcoding/components/ProgressBar";
+import { ADMIN } from "@/shared/lib/routes";
 import FormField from "@/shared/ui/FormField";
 import FormFileInput from "@/shared/ui/FormFileInput";
 import Modal from "@/shared/ui/Modal";
@@ -187,7 +188,7 @@ export default function TitleForm({ initialData }: TitleFormProps) {
               sx={{ flex: 1 }}
               onClick={() => {
                 closeSuccessModal();
-                router.push("/admin/titles");
+                router.push(ADMIN.TITLES);
               }}
             >
               View All Titles
@@ -198,7 +199,7 @@ export default function TitleForm({ initialData }: TitleFormProps) {
                 const id = initialData?.id || createdTitleId;
                 if (id) {
                   closeSuccessModal();
-                  router.push(`/admin/titles/${id}`);
+                  router.push(ADMIN.TITLES_EDIT(id));
                 }
               }}
             >

@@ -7,6 +7,7 @@ import useTitle from "@/features/title/api/use-title";
 import { useDeleteTitle, useTranscodeTitle } from "@/features/title/api/use-title-mutations";
 import useTitleStreamUrl from "@/features/title/api/use-title-stream-url";
 import { Title, TitleType } from "@/features/title/schemas/title";
+import { ADMIN } from "@/shared/lib/routes";
 import TranscodingStatus from "@/types/transcoding-status";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -45,7 +46,7 @@ export function useTitleDetailsController({ title, initialSeasons }: UseTitleDet
   const { isPending: isDeleting, mutateAsync: deleteTitle } = useDeleteTitle({
     onSuccess: () => {
       setIsDeleteModalOpen(false);
-      router.push("/admin/titles");
+      router.push(ADMIN.TITLES);
     },
   });
 
