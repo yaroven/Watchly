@@ -1,5 +1,6 @@
 "use client";
 import Catalog from "@/features/title/components/Catalog";
+import SpotlightGrid, { type SpotlightTitle } from "@/features/title/components/SpotlightGrid";
 import { APP } from "@/shared/lib/routes";
 import { TranscodingStatus } from "@/types";
 import useTitles from "@features/title/api/use-titles";
@@ -13,7 +14,7 @@ export default function Home() {
 
   const { data } = useTitles({
     page: 1,
-    limit: 6,
+    limit: 12,
     transcodingStatus: TranscodingStatus.COMPLETED,
   });
 
@@ -93,13 +94,53 @@ export default function Home() {
     },
   ];
 
+  const spotlight: Record<"feature" | "secondary" | "tall", SpotlightTitle> = {
+    feature: {
+      id: "shogun",
+      name: "Shogun",
+      tagline: "Uncovering Secrets, Shifting Powers",
+      description:
+        "When a mysterious European ship sinks near a nearby fishing village, Lord Yoshi Toranaga uncovers secrets that could tip the balance of power and devastate his enemies. He must act quickly to protect his realm from the looming threat.",
+      imageUrl: "/spotlight/banner_shogun.png",
+      watchLink: APP.DISCOVER,
+    },
+    secondary: {
+      id: "sympathizer",
+      name: "The Sympathizer",
+      genres: ["Historical", "Drama", "Thriller"],
+      imageUrl: "/spotlight/banner_the_sympathizer.png",
+      watchLink: APP.DISCOVER,
+    },
+    tall: {
+      id: "small-light",
+      name: "A Small Light",
+      tagline: "Risk Everything",
+      imageUrl: "/spotlight/banner_a_small_light.png",
+      watchLink: APP.DISCOVER,
+    },
+  };
+
   return (
-    <Box sx={{ display: "flex", gap: "32px" }}>
-      <Box sx={{ flex: "1 1 auto", minWidth: 0, display: "flex", flexDirection: "column", gap: "32px" }}>
-        <HeroSlider titles={heroSlides} />
-        <Catalog title="Recommended for you" items={data?.items || []} onViewAll={() => router.push(APP.MOVIES)} />
+    <Box>
+      <Box sx={{ display: "flex", gap: "32px", mb: "40px" }}>
+        <Box sx={{ flex: "1 1 auto", minWidth: 0, display: "flex", flexDirection: "column", gap: "32px" }}>
+          <HeroSlider titles={heroSlides} />
+          <Catalog title="Recommended for you" items={data?.items || []} onViewAll={() => router.push(APP.MOVIES)} />
+        </Box>
+        <HotNewsSection news={news} />
       </Box>
-      <HotNewsSection news={news} />
+      <Box sx={{ display: "flex", flexDirection: "column", gap: "34px" }}>
+        <Catalog title="Trending movies" bleed items={data?.items || []} onViewAll={() => router.push(APP.MOVIES)} />
+        <Catalog title="Trending series" bleed items={data?.items || []} onViewAll={() => router.push(APP.MOVIES)} />
+        <Catalog title="Genres" bleed items={data?.items || []} onViewAll={() => router.push(APP.MOVIES)} />
+        <Box sx={{ mt: "62px", mb: "56px" }}>
+          <SpotlightGrid {...spotlight} />
+        </Box>
+        <Catalog title="IMDB Top Movies" bleed items={data?.items || []} onViewAll={() => router.push(APP.MOVIES)} />
+        <Catalog title="IMDB Top Series" bleed items={data?.items || []} onViewAll={() => router.push(APP.MOVIES)} />
+        <Catalog title="Trending TV Shows" bleed items={data?.items || []} onViewAll={() => router.push(APP.MOVIES)} />
+        <Catalog title="My Watchlist" bleed items={data?.items || []} onViewAll={() => router.push(APP.MOVIES)} />
+      </Box>
     </Box>
   );
 }

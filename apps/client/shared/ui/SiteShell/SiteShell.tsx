@@ -19,7 +19,7 @@ export default function SiteShell({ children }: { children: ReactNode }) {
         <Sidebar />
         <Box sx={{ flex: "1 1 auto", minWidth: 0 }}>
           <Header />
-          <Box sx={{ px: "24px" }} component="main">
+          <Box sx={{ px: `24px` }} component="main">
             {children}
           </Box>
         </Box>

@@ -13,9 +13,11 @@ interface CatalogProps {
   items: Title[];
   onViewAll?: () => void;
   viewAllLabel?: string;
+  bleed?: boolean;
+  bleedSize?: number;
 }
 
-export default function Catalog({ items, title, onViewAll, viewAllLabel = "View All" }: CatalogProps) {
+export default function Catalog({ items, title, onViewAll, viewAllLabel = "View All", bleed = false, bleedSize = 24 }: CatalogProps) {
   const router = useRouter();
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -65,9 +67,9 @@ export default function Catalog({ items, title, onViewAll, viewAllLabel = "View 
           display: "flex",
           gap: "16px",
           overflowX: "auto",
-          // Cards keep their width instead of squeezing to fit the row.
+          marginRight: bleed ? `-${bleedSize}px` : 0,
+          paddingRight: bleed ? `${bleedSize}px` : 0,
           "& > *": { flexShrink: 0 },
-          // Room for the scrollbar so it never covers the cards.
           pb: "8px",
           scrollSnapType: "x proximity",
           "& > * ": { scrollSnapAlign: "start" },
