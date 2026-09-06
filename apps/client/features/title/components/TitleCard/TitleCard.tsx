@@ -2,12 +2,12 @@
 
 import { type Title } from "@/features/title/schemas/title";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
-import { TranscodingStatus } from "@/types";
 import { Favorite as FavoriteIcon, Star as StarIcon } from "@mui/icons-material";
 import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import Image from "next/image";
+import { useState } from "react";
 
 interface TitleProps extends Omit<Title, "seasons"> {
   onClick: () => void;
@@ -16,11 +16,11 @@ interface TitleProps extends Omit<Title, "seasons"> {
   genres?: string[];
 }
 
-export default function TitleCard({ name, posterUrl, type, transcodingStatus, rating, genres, onClick, isFavorite = false }: TitleProps) {
-  if (transcodingStatus !== TranscodingStatus.COMPLETED) return null;
-
+export default function TitleCard({ name, posterUrl, type, rating, genres, onClick, isFavorite = false }: TitleProps) {
   const posterSrc = getOptimizedImageSrc(posterUrl);
   const subtitle = genres?.length ? genres.join(", ") : type === "MOVIE" ? "Movie" : "Series";
+
+  const [favorite, setFavorite] = useState(isFavorite);
 
   return (
     <Card
@@ -30,7 +30,9 @@ export default function TitleCard({ name, posterUrl, type, transcodingStatus, ra
       onClick={onClick}
       aria-label={name}
       sx={{
-        width: 193,
+        // Grows smoothly with the viewport instead of stepping, so a row of
+        // cards never changes size all at once. 193 is the 1440-wide design.
+        width: "clamp(150px, 13vw, 260px)",
         cursor: "pointer",
         display: "block",
         textAlign: "left",
@@ -46,7 +48,13 @@ export default function TitleCard({ name, posterUrl, type, transcodingStatus, ra
           aspectRatio: "177 / 246",
         }}
       >
-        <Image src={posterSrc} alt="" fill sizes="193px" style={{ objectFit: "cover" }} />
+        <Image
+          src={posterSrc}
+          alt=""
+          fill
+          sizes="(max-width: 900px) 150px, (max-width: 2200px) 13vw, 260px"
+          style={{ objectFit: "cover" }}
+        />
 
         {rating !== undefined && (
           <Box
@@ -110,7 +118,13 @@ export default function TitleCard({ name, posterUrl, type, transcodingStatus, ra
               justifyContent: "center",
             }}
           >
-            <FavoriteIcon sx={{ fontSize: "12px", color: isFavorite ? "primary.main" : "#ffffff" }} />
+            <FavoriteIcon
+              sx={{ fontSize: "12px", color: favorite ? "primary.main" : "#ffffff" }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setFavorite((value) => !value);
+              }}
+            />
           </Box>
         </Box>
 

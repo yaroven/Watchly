@@ -1,19 +1,7 @@
-import { APP } from "@/shared/lib/routes";
-import TitleService from "@features/title/api/title.service";
-import { TitleType } from "@features/title/schemas/title";
-import { notFound, redirect } from "next/navigation";
+"use client";
 
-interface PageProps {
-  params: Promise<{ id: string }>;
-}
+import TitleOverview from "@features/title/components/TitleOverview/TitleOverview";
 
-export default async function TitlePage({ params }: PageProps) {
-  const { id } = await params;
-
-  try {
-    const title = await TitleService.getById(id);
-    redirect(title.type === TitleType.MOVIE ? APP.MOVIE(id) : APP.SERIES(id));
-  } catch {
-    notFound();
-  }
+export default function TitlePage() {
+  return <TitleOverview />;
 }

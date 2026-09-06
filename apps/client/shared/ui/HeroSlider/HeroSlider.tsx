@@ -44,7 +44,8 @@ export default function HeroSlider({ titles }: HeroSliderProps) {
         overflow: "hidden",
         flexGrow: 1,
         width: "100%",
-        height: "400px",
+        // 400 is the 1440-wide design; wider screens get proportionally taller.
+        height: { xs: 280, sm: 340, lg: 400, xl: 480, xxl: 560 },
         backgroundColor: "#111111",
         borderRadius: "20px",
         p: "15px",
@@ -87,17 +88,17 @@ export default function HeroSlider({ titles }: HeroSliderProps) {
             to: { opacity: 1, transform: "translateX(0)" },
           },
           "@media (prefers-reduced-motion: reduce)": { animation: "none" },
-          width: "405px",
-          height: "265px",
-          px: "30px",
-          py: "11px",
+          width: { xs: "100%", sm: 360, lg: 405, xl: 480, xxl: 560 },
+          height: { xs: "auto", sm: 240, lg: 265, xl: 300, xxl: 340 },
+          px: { xs: "20px", lg: "30px", xl: "36px" },
+          py: { xs: "16px", lg: "11px" },
           backdropFilter: "blur(12px)",
           borderRadius: "20px",
           display: "flex",
           flexDirection: "column",
         }}
       >
-        <Typography variant="h1" sx={{ fontSize: "32px", mb: "6px" }}>
+        <Typography variant="h1" sx={{ fontSize: "clamp(24px, 2.2vw, 44px)", mb: "6px" }}>
           {slide.title}
         </Typography>
 
@@ -128,7 +129,7 @@ export default function HeroSlider({ titles }: HeroSliderProps) {
           </Box>
         </Box>
 
-        <Typography sx={{ fontSize: "12px" }}>{slide.description}</Typography>
+        <Typography sx={{ fontSize: "clamp(12px, 0.85vw, 16px)" }}>{slide.description}</Typography>
 
         <Box sx={{ display: "flex", gap: "14px", px: "4px", mt: "auto" }}>
           <Button variant="contained" href={slide.watchLink} sx={{ fontWeight: 700, px: "44px", py: "8px" }}>

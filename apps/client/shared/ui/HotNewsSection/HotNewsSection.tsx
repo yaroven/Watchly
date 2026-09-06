@@ -2,6 +2,8 @@
 
 import { Box } from "@mui/material";
 import Typography from "@mui/material/Typography";
+import { Verified } from "@shared/assets/icons";
+import CustomIcon from "@shared/ui/CustomIcon";
 import SliderArrows from "@shared/ui/SliderArrows";
 import Image from "next/image";
 import { useState } from "react";
@@ -23,7 +25,6 @@ export default function HotNewsSection({ news }: HotNewsSectionProps) {
 
   if (!news.length) return null;
 
-  // Stops at the ends rather than wrapping — the arrows disable there.
   const go = (step: -1 | 1) => {
     setDirection(step);
     setIndex((current) => Math.min(Math.max(current + step, 0), news.length - 1));
@@ -36,7 +37,7 @@ export default function HotNewsSection({ news }: HotNewsSectionProps) {
   return (
     <Box
       sx={{
-        width: "300px",
+        width: { xs: 260, lg: 300, xl: 360, xxl: 420 },
         flexShrink: 0,
         background: "transparent",
         position: "relative",
@@ -59,7 +60,7 @@ export default function HotNewsSection({ news }: HotNewsSectionProps) {
           position: "relative",
           height: "100%",
           borderRadius: "20px",
-          p: "16px",
+          p: { xs: "14px", lg: "16px", xl: "20px", xxl: "24px" },
           background: "#000000",
           zIndex: 2,
           display: "flex",
@@ -67,10 +68,6 @@ export default function HotNewsSection({ news }: HotNewsSectionProps) {
           overflow: "hidden",
         }}
       >
-        <Typography component={"h1"} sx={{ fontSize: "18px", fontWeight: "bold", color: "primary.main", mb: "16px", order: 2 }}>
-          Hot News
-        </Typography>
-
         {/* Only the story itself animates; the heading, counter and arrows
             stay put. Remounting on id change restarts the animation. */}
         <Box
@@ -91,10 +88,28 @@ export default function HotNewsSection({ news }: HotNewsSectionProps) {
             "@media (prefers-reduced-motion: reduce)": { "& > *": { animation: "none" } },
           }}
         >
-          <Box sx={{ order: 1, mb: "32px" }}>
-            <Image style={{ borderRadius: "12px", display: "block" }} src={slide.image} width="268" height="170" alt="" />
+          <Box sx={{ order: 1, mb: "32px", position: "relative", width: "100%", aspectRatio: "268 / 170" }}>
+            {/* fill lets the image follow the panel width instead of staying
+                at the 268px from the 1440-wide design. */}
+            <Image
+              src={slide.image}
+              alt=""
+              fill
+              sizes="(max-width: 1200px) 260px, (max-width: 2200px) 360px, 420px"
+              style={{ borderRadius: "12px", objectFit: "cover" }}
+            />
           </Box>
-          <Typography sx={{ order: 3, mb: "16px", fontSize: "14px", fontWeight: 300, whiteSpace: "pre-line" }}>{slide.text}</Typography>
+          <Typography sx={{ order: 3, mb: "16px", fontSize: "clamp(13px, 0.95vw, 18px)", fontWeight: 300, whiteSpace: "pre-line" }}>
+            {slide.text}
+          </Typography>
+        </Box>
+
+        <Box sx={{ display: "flex", alignContent: "center", gap: "8px", mb: "16px", order: 2 }}>
+          <CustomIcon icon={Verified} />
+
+          <Typography component={"h1"} sx={{ fontSize: "clamp(16px, 1.3vw, 26px)", fontWeight: 700, color: "primary.main" }}>
+            Hot News
+          </Typography>
         </Box>
 
         <Box
@@ -104,7 +119,7 @@ export default function HotNewsSection({ news }: HotNewsSectionProps) {
             flexDirection: "row",
             justifyContent: "space-between",
             px: "8px",
-            fontSize: "12px",
+            fontSize: "clamp(12px, 0.85vw, 16px)",
             mt: "auto",
             // Siblings above carry explicit order values, so this needs one too
             // — an unset order counts as 0 and would jump to the top.
@@ -124,7 +139,7 @@ export default function HotNewsSection({ news }: HotNewsSectionProps) {
               size={18}
               sx={{ gap: "8px" }}
             />
-            <Typography sx={{ fontSize: "12px" }}>
+            <Typography sx={{ fontSize: "clamp(12px, 0.85vw, 16px)" }}>
               {index + 1}/{news.length}
             </Typography>
           </Box>

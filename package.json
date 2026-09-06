@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "license": "MIT",
+  "packageManager": "pnpm@10.30.0",
   "scripts": {
     "commitlint": "commitlint",
     "docker:dev": "docker compose --project-name watchly -f ./config/dev/docker-compose.yml",

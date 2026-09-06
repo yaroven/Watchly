@@ -18,13 +18,22 @@ declare module "@mui/material/Paper" {
 }
 
 /**
- * T.Movie design tokens, read directly off the Penpot source file
+ * design tokens, read directly off the Penpot source file
  * (see the component handoff doc). Font stays PT Sans to match the
  * app's real typography instead of the Figma mockup's Poppins.
  */
+declare module "@mui/material/styles" {
+  interface BreakpointOverrides {
+    xxl: true;
+  }
+}
+
 const HEADING_FONT = "var(--font-heading), Arial, Helvetica, sans-serif";
 
 export const tmovieTheme = createTheme({
+  breakpoints: {
+    values: { xs: 0, sm: 600, md: 900, lg: 1200, xl: 1536, xxl: 2200 },
+  },
   palette: {
     mode: "dark",
     background: {
@@ -59,14 +68,17 @@ export const tmovieTheme = createTheme({
   typography: {
     // Poppins carries the body copy; Fredoka is scoped to headings only.
     fontFamily: "var(--font-body), Arial, Helvetica, sans-serif",
-    h1: { fontFamily: HEADING_FONT, fontWeight: 700, fontSize: "32px" },
-    h2: { fontFamily: HEADING_FONT, fontWeight: 700, fontSize: "24px" },
-    h3: { fontFamily: HEADING_FONT, fontWeight: 600, fontSize: "20px" },
-    h4: { fontFamily: HEADING_FONT, fontWeight: 600, fontSize: "18px" },
-    h5: { fontFamily: HEADING_FONT, fontWeight: 500, fontSize: "16px" },
-    h6: { fontFamily: HEADING_FONT, fontWeight: 500, fontSize: "14px" },
-    body1: { fontSize: "16px", fontWeight: 400 },
-    body2: { fontSize: "14px", fontWeight: 400, color: "#999999" },
+    // Sizes clamp between a small-screen floor and a wide-screen ceiling, with
+    // the middle value tracking viewport width. The design's 1440 numbers sit
+    // roughly in the middle of each range.
+    h1: { fontFamily: HEADING_FONT, fontWeight: 700, fontSize: "clamp(26px, 2.2vw, 44px)" },
+    h2: { fontFamily: HEADING_FONT, fontWeight: 700, fontSize: "clamp(20px, 1.7vw, 34px)" },
+    h3: { fontFamily: HEADING_FONT, fontWeight: 600, fontSize: "clamp(18px, 1.4vw, 28px)" },
+    h4: { fontFamily: HEADING_FONT, fontWeight: 600, fontSize: "clamp(16px, 1.25vw, 24px)" },
+    h5: { fontFamily: HEADING_FONT, fontWeight: 500, fontSize: "clamp(15px, 1.1vw, 21px)" },
+    h6: { fontFamily: HEADING_FONT, fontWeight: 500, fontSize: "clamp(14px, 1vw, 19px)" },
+    body1: { fontSize: "clamp(14px, 1.1vw, 21px)", fontWeight: 400 },
+    body2: { fontSize: "clamp(13px, 0.95vw, 18px)", fontWeight: 400, color: "#999999" },
     button: { textTransform: "none", fontWeight: 400 },
   },
   components: {
@@ -78,18 +90,18 @@ export const tmovieTheme = createTheme({
         // Contained = "Submit Btn" / "Play Button": r5, gold fill, black label
         contained: {
           borderRadius: 5,
-          minHeight: 44,
-          paddingInline: 25,
+          minHeight: "clamp(40px, 3vw, 56px)",
+          paddingInline: "clamp(18px, 1.8vw, 34px)",
           paddingBlock: 10,
-          fontSize: "16px",
+          fontSize: "clamp(14px, 1.1vw, 21px)",
         },
         // Outlined = "Trailer Button" / "Load More": r8, 1px gold border, gold label
         outlined: {
           borderRadius: 8,
-          minHeight: 33,
-          paddingInline: 12,
+          minHeight: "clamp(32px, 2.4vw, 44px)",
+          paddingInline: "clamp(12px, 1vw, 20px)",
           paddingBlock: 8,
-          fontSize: "14px",
+          fontSize: "clamp(13px, 0.95vw, 18px)",
           borderWidth: 1,
         },
       },
