@@ -2,7 +2,6 @@ import EpisodeService from "@features/episodes/api/episode.service";
 import SeasonService from "@features/season/api/season.service";
 import TitleService from "@features/title/api/title.service";
 import TitleInfo from "@features/title/components/TitleInfo";
-import JsonLd from "@shared/ui/JsonLd";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import SeriesDetailsClient from "./SeriesDetailsClient";
@@ -67,7 +66,6 @@ export default async function Page({ params, searchParams }: PageProps) {
 
   return (
     <div className={styles.container}>
-      <JsonLd data={title} />
       <TitleInfo title={title} />
       <SeriesDetailsClient
         seasons={seasons}
