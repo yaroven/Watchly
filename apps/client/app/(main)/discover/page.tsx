@@ -4,6 +4,7 @@ import SpotlightGrid, { type SpotlightTitle } from "@/features/title/components/
 import { APP } from "@/shared/lib/routes";
 import { TranscodingStatus } from "@/types";
 import useTitles from "@features/title/api/use-titles";
+import TitleOverview from "@features/title/components/TitleOverview/TitleOverview";
 import { Box } from "@mui/material";
 import HeroSlider, { type SliderTitle } from "@shared/ui/HeroSlider";
 import HotNewsSection from "@shared/ui/HotNewsSection";
@@ -122,6 +123,7 @@ export default function Home() {
 
   return (
     <Box>
+      <TitleOverview />
       <Box sx={{ display: "flex", gap: "32px", mb: "40px" }}>
         <Box sx={{ flex: "1 1 auto", minWidth: 0, display: "flex", flexDirection: "column", gap: "32px" }}>
           <HeroSlider titles={heroSlides} />
