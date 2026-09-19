@@ -1,8 +1,9 @@
 import Box from "@mui/material/Box";
 import MenuItem from "@mui/material/MenuItem";
 import MuiSelect, { type SelectProps as MuiSelectProps } from "@mui/material/Select";
+import { alpha } from "@mui/material/styles";
 import Typography from "@mui/material/Typography";
-import { inputVariants, type InputVariant } from "@shared/mui/theme";
+import { inputVariants, tokens, type InputVariant } from "@shared/mui/theme";
 import { Controller, type Control, type FieldError, type FieldValues, type Path } from "react-hook-form";
 
 export interface SelectOption {
@@ -45,7 +46,7 @@ export default function Select<T extends FieldValues>({
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "6px" }}>
       {label && (
-        <Typography component="label" htmlFor={fieldId} sx={{ fontSize: "14px", fontWeight: 400, color: "#999999" }}>
+        <Typography component="label" htmlFor={fieldId} sx={{ fontSize: "14px", fontWeight: 400, color: tokens.text.secondary }}>
           {label}
         </Typography>
       )}
@@ -69,9 +70,9 @@ export default function Select<T extends FieldValues>({
                   sx: {
                     mt: "4px",
                     borderRadius: "12px",
-                    backgroundColor: "#333333",
+                    backgroundColor: tokens.surface.fill,
                     backgroundImage: "none",
-                    border: "1px solid #666666",
+                    border: `1px solid ${tokens.border.faint}`,
                   },
                 },
               },
@@ -88,7 +89,7 @@ export default function Select<T extends FieldValues>({
                   alignItems: "center",
                   "&:focus": { backgroundColor: "transparent" },
                 },
-                "& .MuiSelect-icon": { color: "#ffffff", right: "12px" },
+                "& .MuiSelect-icon": { color: tokens.text.primary, right: "12px" },
               },
               ...(Array.isArray(sx) ? sx : [sx]),
             ]}
@@ -107,7 +108,7 @@ export default function Select<T extends FieldValues>({
       />
 
       {error && (
-        <Typography id={errorId} role="alert" sx={{ fontSize: "12px", fontWeight: 400, color: "#f64e34" }}>
+        <Typography id={errorId} role="alert" sx={{ fontSize: "12px", fontWeight: 400, color: tokens.feedback.error }}>
           {error.message}
         </Typography>
       )}
@@ -117,11 +118,11 @@ export default function Select<T extends FieldValues>({
 
 const menuItemSx = {
   fontSize: "14px",
-  color: "#e5e5e5",
-  "&:hover": { backgroundColor: "rgba(231,188,15,.12)" },
+  color: tokens.text.field,
+  "&:hover": { backgroundColor: alpha(tokens.accent.primary, 0.12) },
   "&.Mui-selected": {
-    backgroundColor: "rgba(231,188,15,.16)",
-    color: "#e7bc0f",
-    "&:hover": { backgroundColor: "rgba(231,188,15,.22)" },
+    backgroundColor: alpha(tokens.accent.primary, 0.16),
+    color: tokens.accent.primary,
+    "&:hover": { backgroundColor: alpha(tokens.accent.primary, 0.22) },
   },
 } as const;

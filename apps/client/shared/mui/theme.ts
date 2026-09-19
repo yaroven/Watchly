@@ -30,6 +30,19 @@ declare module "@mui/material/styles" {
 
 const HEADING_FONT = "var(--font-heading), Arial, Helvetica, sans-serif";
 
+/**
+ * Semantic tokens, named by meaning rather than colour. Form components
+ * (FormField, Select, FormFileInput and friends) import this directly
+ * instead of hardcoding hex, so recolouring the app is a one-file change.
+ */
+export const tokens = {
+  accent: { primary: "#e7bc0f" },
+  border: { default: "#cccccc", subtle: "#333333", faint: "#666666" },
+  feedback: { error: "#f64e34", success: "#27c237", warning: "#eb8509", info: "#275bc2" },
+  text: { primary: "#ffffff", secondary: "#999999", field: "#e5e5e5", placeholder: "#666666" },
+  surface: { paper: "#000000", default: "#191919", fill: "#333333", dropzone: "#111111" },
+} as const;
+
 export const tmovieTheme = createTheme({
   breakpoints: {
     values: { xs: 0, sm: 600, md: 900, lg: 1200, xl: 1536, xxl: 2200 },
@@ -37,30 +50,30 @@ export const tmovieTheme = createTheme({
   palette: {
     mode: "dark",
     background: {
-      default: "#191919",
-      paper: "#000000",
+      default: tokens.surface.default,
+      paper: tokens.surface.paper,
     },
     primary: {
-      main: "#e7bc0f",
-      contrastText: "#191919",
+      main: tokens.accent.primary,
+      contrastText: tokens.surface.default,
     },
     error: {
-      main: "#f64e34",
+      main: tokens.feedback.error,
     },
     success: {
-      main: "#27c237",
+      main: tokens.feedback.success,
     },
     warning: {
-      main: "#eb8509",
+      main: tokens.feedback.warning,
     },
     info: {
-      main: "#275bc2",
+      main: tokens.feedback.info,
     },
     text: {
-      primary: "#ffffff",
-      secondary: "#999999",
+      primary: tokens.text.primary,
+      secondary: tokens.text.secondary,
     },
-    divider: "#333333",
+    divider: tokens.border.subtle,
   },
   shape: {
     borderRadius: 12,
@@ -166,9 +179,9 @@ export const tmovieTheme = createTheme({
       },
       styleOverrides: {
         root: {
-          color: "#e5e5e5",
+          color: tokens.text.field,
           "& input::placeholder, & textarea::placeholder": {
-            color: "#666666",
+            color: tokens.text.placeholder,
             opacity: 1,
           },
         },
@@ -202,35 +215,39 @@ export const tmovieTheme = createTheme({
  * prop, so these are applied through `sx` rather than `theme.components`.
  */
 const fieldBase = {
-  color: "#e5e5e5",
-  "& input::placeholder, & textarea::placeholder": { color: "#666666", opacity: 1 },
+  color: tokens.text.field,
+  "& input::placeholder, & textarea::placeholder": { color: tokens.text.placeholder, opacity: 1 },
   // Native <select> renders its popup with the OS palette unless told otherwise.
-  "& select": { color: "#e5e5e5", backgroundColor: "transparent" },
-  "& select option": { backgroundColor: "#333333", color: "#e5e5e5" },
+  "& select": { color: tokens.text.field, backgroundColor: "transparent" },
+  "& select option": { backgroundColor: tokens.surface.fill, color: tokens.text.field },
 } as const;
 
 export const inputVariants = {
-  // Login Form field: 466×48, square, 1px #cccccc frame, 20px/500 text
+  // Login Form field: 466×48, square, 1px frame, 20px/500 text
   bordered: {
     ...fieldBase,
     height: 48,
     borderRadius: 0,
-    border: "1px solid #cccccc",
+    border: `1px solid ${tokens.border.default}`,
     paddingInline: "14px",
     fontSize: "20px",
     fontWeight: 500,
-    "&.Mui-error": { borderColor: "#f64e34" },
+    // Error wins over focus — declared after it.
+    "&.Mui-focused": { borderColor: tokens.accent.primary },
+    "&.Mui-error": { borderColor: tokens.feedback.error },
   },
-  // Admin form field: h36, r24, #333333 fill, 14px/400 text
+  // Admin form field: h36, r24, fill, 14px/400 text
   pill: {
     ...fieldBase,
     height: 36,
     borderRadius: "24px",
-    backgroundColor: "#333333",
+    backgroundColor: tokens.surface.fill,
     paddingInline: "18px",
     fontSize: "14px",
     fontWeight: 400,
-    "&.Mui-error": { outline: "1px solid #f64e34" },
+    // Error wins over focus — declared after it.
+    "&.Mui-focused": { outline: `1px solid ${tokens.accent.primary}` },
+    "&.Mui-error": { outline: `1px solid ${tokens.feedback.error}` },
   },
 } as const;
 

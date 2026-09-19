@@ -1,6 +1,7 @@
 import { Delete as DeleteIcon, Description as DescriptionIcon, Edit as EditIcon } from "@mui/icons-material";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import { tokens } from "@shared/mui/theme";
 
 interface FilePreviewCardProps {
   /** Id of the hidden file input the replace action opens. */
@@ -31,9 +32,9 @@ export default function FilePreviewCard({
         display: "flex",
         flexDirection: "row",
         gap: "24px",
-        background: "#000000",
+        background: tokens.surface.paper,
         borderRadius: "12px",
-        border: `1px solid ${hasError ? "#f64e34" : "#333333"}`,
+        border: `1px solid ${hasError ? tokens.feedback.error : tokens.border.subtle}`,
         p: "14px",
         opacity: disabled ? 0.5 : 1,
       }}
@@ -45,7 +46,7 @@ export default function FilePreviewCard({
           height: "78px",
           borderRadius: "8px",
           overflow: "hidden",
-          backgroundColor: "#333333",
+          backgroundColor: tokens.surface.fill,
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
@@ -60,7 +61,7 @@ export default function FilePreviewCard({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={fileUrl} alt={fileName || "Selected file preview"} />
         ) : (
-          <DescriptionIcon sx={{ fontSize: "32px", color: "#666666" }} />
+          <DescriptionIcon sx={{ fontSize: "32px", color: tokens.text.placeholder }} />
         )}
       </Box>
 
@@ -72,7 +73,7 @@ export default function FilePreviewCard({
           sx={{
             fontSize: "14px",
             fontWeight: 400,
-            color: "#e5e5e5",
+            color: tokens.text.field,
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
@@ -87,7 +88,7 @@ export default function FilePreviewCard({
             aria-label="Replace file"
             sx={{
               ...actionSx,
-              color: "#e7bc0f",
+              color: tokens.accent.primary,
               cursor: disabled ? "not-allowed" : "pointer",
               ...(disabled && { ":hover": { opacity: 0.75, transform: "none" } }),
             }}
@@ -102,7 +103,7 @@ export default function FilePreviewCard({
             aria-label="Remove file"
             sx={{
               ...actionSx,
-              color: "#f64e34",
+              color: tokens.feedback.error,
               border: "none",
               font: "inherit",
               ":disabled": { cursor: "not-allowed" },
@@ -125,7 +126,7 @@ const actionSx = {
   height: "36px",
   cursor: "pointer",
   borderRadius: "8px",
-  background: "#333333",
+  background: tokens.surface.fill,
   opacity: 0.75,
   transition: "opacity .1s ease-in-out, transform .1s ease-in-out",
   ":hover": { opacity: 1, transform: "scale(1.1)" },
