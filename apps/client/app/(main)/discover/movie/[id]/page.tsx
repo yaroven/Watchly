@@ -1,7 +1,6 @@
 import CustomVideoPlayer from "@features/player/components/CustomVideoPlayer";
 import TitleService from "@features/title/api/title.service";
 import TitleInfo from "@features/title/components/TitleInfo";
-import JsonLd from "@shared/ui/JsonLd";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import styles from "./page.module.scss";
@@ -40,7 +39,6 @@ export default async function Page({ params }: PageProps) {
 
   return (
     <div className={styles.container}>
-      <JsonLd data={title} />
       <TitleInfo title={title} />
       <div className={styles.playerShell}>
         <CustomVideoPlayer src={movieUrl} />
