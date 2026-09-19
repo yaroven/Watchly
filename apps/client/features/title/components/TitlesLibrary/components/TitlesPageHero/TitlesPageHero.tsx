@@ -1,7 +1,7 @@
 "use client";
 
 import { Plus } from "lucide-react";
-import styles from "../page.module.scss";
+import styles from "../../TitlesLibrary.module.scss";
 
 interface TitlesPageHeroProps {
   onCreate: () => void;

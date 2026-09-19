@@ -2,7 +2,7 @@
 
 import AdminTitle from "@/features/title/components/AdminTitle";
 import { Title } from "@/features/title/schemas/title";
-import styles from "../page.module.scss";
+import styles from "../../TitlesLibrary.module.scss";
 
 interface TitlesTableProps {
   titles: Title[];

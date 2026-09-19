@@ -1,11 +1,9 @@
 import EpisodeService from "@features/episodes/api/episode.service";
 import SeasonService from "@features/season/api/season.service";
+import { SeriesDetails } from "@features/title";
 import TitleService from "@features/title/api/title.service";
-import TitleInfo from "@features/title/components/TitleInfo";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
-import SeriesDetailsClient from "./SeriesDetailsClient";
-import styles from "./page.module.scss";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -17,7 +15,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   try {
     const title = await TitleService.getById(id);
     return {
-      title: `${title.name} | Watchly`,
+      title: `${title.name}`,
       description: title.description,
     };
   } catch {
@@ -55,25 +53,14 @@ export default async function Page({ params, searchParams }: PageProps) {
     return notFound();
   }
 
-  if (!seasons?.length) {
-    return (
-      <div className={styles.container}>
-        <TitleInfo title={title} />
-        <div className={styles.noContent}>No seasons found for this series.</div>
-      </div>
-    );
-  }
-
   return (
-    <div className={styles.container}>
-      <TitleInfo title={title} />
-      <SeriesDetailsClient
-        seasons={seasons}
-        episodes={episodes}
-        initialEpisodeUrl={episodeUrl}
-        initialEpisodeId={currentEpisodeId}
-        currentSeasonId={currentSeasonId}
-      />
-    </div>
+    <SeriesDetails
+      title={title}
+      seasons={seasons}
+      episodes={episodes}
+      initialEpisodeUrl={episodeUrl}
+      initialEpisodeId={currentEpisodeId}
+      currentSeasonId={currentSeasonId}
+    />
   );
 }

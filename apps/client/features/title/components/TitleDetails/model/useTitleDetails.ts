@@ -17,7 +17,7 @@ interface UseTitleDetailsControllerProps {
   initialSeasons: Season[];
 }
 
-export function useTitleDetailsController({ title, initialSeasons }: UseTitleDetailsControllerProps) {
+export function useTitleDetails({ title, initialSeasons }: UseTitleDetailsControllerProps) {
   const router = useRouter();
   const [selectedSeasonId, setSelectedSeasonId] = useState<string | undefined>(() =>
     title.type === TitleType.SERIES ? initialSeasons[0]?.id : undefined,

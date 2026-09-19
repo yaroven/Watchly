@@ -1,6 +1,6 @@
+import Providers from "@shared/providers";
 import type { Metadata } from "next";
 import { Alumni_Sans, Anton, Fredoka, Poppins } from "next/font/google";
-import Providers from "./providers";
 
 // Body copy — the face used throughout the design file.
 const poppins = Poppins({

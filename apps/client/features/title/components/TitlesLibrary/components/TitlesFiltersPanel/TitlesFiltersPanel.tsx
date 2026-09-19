@@ -3,8 +3,8 @@
 import { TitleType } from "@/features/title/schemas/title";
 import TranscodingStatus from "@/types/transcoding-status";
 import { Filter, RotateCcw, Search } from "lucide-react";
-import styles from "../page.module.scss";
-import { TitlesPageFilters } from "./types";
+import styles from "../../TitlesLibrary.module.scss";
+import { TitlesPageFilters } from "../../types";
 
 interface TitlesFiltersPanelProps {
   searchString: string;

@@ -1,9 +1,7 @@
-import CustomVideoPlayer from "@features/player/components/CustomVideoPlayer";
+import { MovieDetails } from "@features/title";
 import TitleService from "@features/title/api/title.service";
-import TitleInfo from "@features/title/components/TitleInfo";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
-import styles from "./page.module.scss";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -37,12 +35,5 @@ export default async function Page({ params }: PageProps) {
     return notFound();
   }
 
-  return (
-    <div className={styles.container}>
-      <TitleInfo title={title} />
-      <div className={styles.playerShell}>
-        <CustomVideoPlayer src={movieUrl} />
-      </div>
-    </div>
-  );
+  return <MovieDetails title={title} streamUrl={movieUrl} />;
 }

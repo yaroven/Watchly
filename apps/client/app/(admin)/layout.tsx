@@ -1,4 +1,4 @@
-import Sidebar from "@/features/admin/components/Sidebar";
+import { Sidebar } from "@/features/admin";
 import type { Metadata } from "next";
 import styles from "./layout.module.scss";
 

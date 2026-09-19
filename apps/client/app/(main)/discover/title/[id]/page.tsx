@@ -1,7 +1,5 @@
-"use client";
+import { TitleOverview } from "@features/title";
 
-import TitleOverview from "@features/title/components/TitleOverview/TitleOverview";
-
-export default function TitlePage() {
+export default function Page() {
   return <TitleOverview />;
 }
