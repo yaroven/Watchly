@@ -1,6 +1,7 @@
 "use client";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import { tokens } from "@shared/mui/theme";
 import { ChangeEvent, useEffect, useMemo, useRef } from "react";
 import { FieldError, FieldValues, Path, PathValue, UseFormRegister, UseFormSetValue } from "react-hook-form";
 import FilePreviewCard from "./components/FilePreviewCard";
@@ -88,7 +89,7 @@ export default function FormFileInput<T extends FieldValues>({
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "6px" }}>
       {label && (
-        <Typography component="label" htmlFor={id} sx={{ fontSize: "14px", fontWeight: 400, color: "#999999" }}>
+        <Typography component="label" htmlFor={id} sx={{ fontSize: "14px", fontWeight: 400, color: tokens.text.secondary }}>
           {label}
         </Typography>
       )}
@@ -126,7 +127,7 @@ export default function FormFileInput<T extends FieldValues>({
       )}
 
       {error && (
-        <Typography id={errorId} role="alert" sx={{ fontSize: "12px", color: "#f64e34" }}>
+        <Typography id={errorId} role="alert" sx={{ fontSize: "12px", color: tokens.feedback.error }}>
           {error.message || "Invalid file"}
         </Typography>
       )}

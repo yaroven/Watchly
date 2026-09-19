@@ -1,7 +1,7 @@
 import Box from "@mui/material/Box";
 import Input, { InputProps as MuiInputProps } from "@mui/material/Input";
 import Typography from "@mui/material/Typography";
-import { inputVariants, type InputVariant } from "@shared/mui/theme";
+import { inputVariants, tokens, type InputVariant } from "@shared/mui/theme";
 import type { ReactNode } from "react";
 import { FieldError, FieldValues, Path, UseFormRegister } from "react-hook-form";
 
@@ -49,7 +49,7 @@ export default function FormField<T extends FieldValues>({
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "6px" }}>
       {label && (
-        <Typography component="label" htmlFor={fieldId} sx={{ fontSize: "14px", fontWeight: 400, color: "#999999" }}>
+        <Typography component="label" htmlFor={fieldId} sx={{ fontSize: "14px", fontWeight: 400, color: tokens.text.secondary }}>
           {label}
         </Typography>
       )}
@@ -73,7 +73,7 @@ export default function FormField<T extends FieldValues>({
         {...register(name, { valueAsNumber })}
       />
       {error && (
-        <Typography id={errorId} role="alert" sx={{ fontSize: "12px", fontWeight: 400, color: "#f64e34" }}>
+        <Typography id={errorId} role="alert" sx={{ fontSize: "12px", fontWeight: 400, color: tokens.feedback.error }}>
           {error.message}
         </Typography>
       )}
