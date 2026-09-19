@@ -9,9 +9,9 @@ import SeasonTabs from "@features/season/components/SeasonTabs";
 import { Season } from "@features/season/schemas/season";
 import { useQueryState } from "nuqs";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import styles from "./page.module.scss";
+import styles from "../../SeriesDetails.module.scss";
 
-interface SeriesDetailsClientProps {
+interface SeriesEpisodeBrowserProps {
   seasons: Season[];
   episodes: Episode[];
   initialEpisodeUrl?: string;
@@ -19,13 +19,13 @@ interface SeriesDetailsClientProps {
   currentSeasonId: string;
 }
 
-export default function SeriesDetailsClient({
+export default function SeriesEpisodeBrowser({
   seasons,
   episodes,
   initialEpisodeUrl,
   initialEpisodeId,
   currentSeasonId,
-}: SeriesDetailsClientProps) {
+}: SeriesEpisodeBrowserProps) {
   const [episodeId, setEpisodeId] = useQueryState("episode", {
     history: "replace",
     shallow: true,

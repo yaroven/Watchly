@@ -10,15 +10,15 @@ import TranscodingStatus from "@/types/transcoding-status";
 import { Play, RotateCcw } from "lucide-react";
 import type { ReactNode } from "react";
 import DeleteModal from "./components/DeleteModal";
-import styles from "./page.module.scss";
-import { useTitleDetailsController } from "./useTitleDetailsController";
+import { useTitleDetails } from "./model/useTitleDetails";
+import styles from "./TitleDetails.module.scss";
 
-interface TitleDetailsContentProps {
+interface TitleDetailsProps {
   title: Title;
   initialSeasons: Season[];
 }
 
-export default function TitleDetailsContent({ title, initialSeasons }: TitleDetailsContentProps) {
+export default function TitleDetails({ title, initialSeasons }: TitleDetailsProps) {
   const {
     title: currentTitle,
     isSeries,
@@ -39,7 +39,7 @@ export default function TitleDetailsContent({ title, initialSeasons }: TitleDeta
     deleteTitle,
     streamUrl,
     isPreviewLoading,
-  } = useTitleDetailsController({
+  } = useTitleDetails({
     title,
     initialSeasons,
   });
@@ -150,7 +150,7 @@ function SeriesManagementSection({
   seasons: Season[];
   selectedSeasonId?: string;
   onSelectSeason: (seasonId: string) => void;
-  episodes: ReturnType<typeof useTitleDetailsController>["episodes"];
+  episodes: ReturnType<typeof useTitleDetails>["episodes"];
 }) {
   return (
     <div className={styles.contentColumn}>
