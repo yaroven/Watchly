@@ -2,8 +2,10 @@
 
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import { Play } from "@shared/assets/icons";
+import Button from "@shared/ui/Button";
+import CustomIcon from "@shared/ui/CustomIcon";
 import GenreList from "@shared/ui/GenreList";
-import WatchNowButton from "@shared/ui/WatchNowButton";
 import Image from "next/image";
 
 export interface SpotlightTitle {
@@ -82,7 +84,14 @@ export default function SpotlightTile({ title, variant, actionPosition, titleSca
       />
 
       <Box sx={{ position: "absolute", zIndex: 1, ...ACTION_POSITIONS[actionPosition] }}>
-        <WatchNowButton href={watchLink} />
+        <Button
+          isPill
+          startIcon={<CustomIcon icon={Play} sx={{ fontSize: "20px" }} />}
+          href={watchLink}
+          sx={{ minHeight: "unset", paddingBlock: "8px", paddingInline: "16px", fontSize: "clamp(13px, 0.95vw, 17px)", fontWeight: 600 }}
+        >
+          Watch now
+        </Button>
       </Box>
 
       <Box

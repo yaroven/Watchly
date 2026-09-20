@@ -102,18 +102,18 @@ export const tmovieTheme = createTheme({
       styleOverrides: {
         // Contained = "Submit Btn" / "Play Button": r5, gold fill, black label
         contained: {
-          borderRadius: 5,
-          minHeight: "clamp(40px, 3vw, 56px)",
+          borderRadius: 8,
+          minHeight: "clamp(32px, 2.4vw, 44px)",
           paddingInline: "clamp(18px, 1.8vw, 34px)",
           paddingBlock: 10,
-          fontSize: "clamp(14px, 1.1vw, 21px)",
+          fontSize: "clamp(13px, 0.95vw, 18px)",
         },
         // Outlined = "Trailer Button" / "Load More": r8, 1px gold border, gold label
         outlined: {
           borderRadius: 8,
           minHeight: "clamp(32px, 2.4vw, 44px)",
           paddingInline: "clamp(12px, 1vw, 20px)",
-          paddingBlock: 8,
+          paddingBlock: 10,
           fontSize: "clamp(13px, 0.95vw, 18px)",
           borderWidth: 1,
         },

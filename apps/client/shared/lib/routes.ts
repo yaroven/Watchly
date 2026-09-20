@@ -11,11 +11,11 @@ export const APP = {
   ROOT: "/",
   DISCOVER: DISCOVER_BASE,
   MOVIES: createDiscoverPath("movie"),
-  MOVIE: (id: string) => createDiscoverPath(`movie/${id}`),
   SERIES_LIST: createDiscoverPath("series"),
-  SERIES: (id: string) => createDiscoverPath(`series/${id}`),
-  /** Redirects to MOVIE or SERIES depending on the title type. */
+  /** One detail route for both movies and series — the page branches on title type internally. */
   TITLE: (id: string) => createDiscoverPath(`title/${id}`),
+  /** Pass `episodeId` to deep-link a specific episode; otherwise the page picks up where it left off (or the movie's only stream). */
+  WATCH: (id: string, episodeId?: string) => `${createDiscoverPath(`title/${id}/watch`)}${episodeId ? `?episode=${episodeId}` : ""}`,
   GENRES: createDiscoverPath("genres"),
   WATCHLIST: "/watchlist",
   LOGIN: "/login",

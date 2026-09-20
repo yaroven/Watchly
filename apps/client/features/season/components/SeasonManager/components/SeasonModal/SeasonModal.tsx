@@ -3,10 +3,10 @@
 import FormField from "@/shared/ui/FormField";
 import FormFileInput from "@/shared/ui/FormFileInput";
 import Modal from "@/shared/ui/Modal/Modal";
+import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import Button from "@shared/ui/Button";
 import { useWatch } from "react-hook-form";
-import styles from "../../SeasonManager.module.scss";
 import { useSeasonManagerContext } from "../../context/SeasonManagerContext";
 
 export default function SeasonModal() {
@@ -30,7 +30,7 @@ export default function SeasonModal() {
 
   return (
     <Modal isOpen={isModalOpen} onClose={closeEditor}>
-      <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
+      <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ display: "flex", flexDirection: "column", gap: "20px", minWidth: 300 }}>
         <Typography sx={{ fontSize: "24px", fontWeight: 700, color: "#ffffff", pr: "44px" }}>
           {editingSeason ? "Edit Season" : "Add Season"}
         </Typography>
@@ -58,7 +58,7 @@ export default function SeasonModal() {
         <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
           {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingSeason ? "Update" : "Create"}
         </Button>
-      </form>
+      </Box>
     </Modal>
   );
 }

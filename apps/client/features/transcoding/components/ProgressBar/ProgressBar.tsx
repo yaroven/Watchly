@@ -1,4 +1,4 @@
-import styles from "./ProgressBar.module.scss";
+import Box from "@mui/material/Box";
 
 interface ProgressBarProps {
   bgColor?: string;
@@ -7,10 +7,21 @@ interface ProgressBarProps {
 
 export default function ProgressBar({ bgColor, progress }: ProgressBarProps) {
   return (
-    <div className={styles.progressBar}>
-      <div className={styles.filler} style={{ width: `${progress}%`, backgroundColor: bgColor || "#ca563f" }}>
-        <span className={styles.label}>{progress}%</span>
-      </div>
-    </div>
+    <Box sx={{ height: "20px", width: "100%", backgroundColor: "#e0e0de", borderRadius: "50px" }}>
+      <Box
+        sx={{
+          height: "100%",
+          borderRadius: "inherit",
+          textAlign: "right",
+          transition: "width 0.5s ease-in-out",
+          backgroundColor: bgColor || "#ca563f",
+          width: `${progress}%`,
+        }}
+      >
+        <Box component="span" sx={{ padding: "5px", color: "#ffffff", fontWeight: "bold" }}>
+          {progress}%
+        </Box>
+      </Box>
+    </Box>
   );
 }

@@ -13,10 +13,12 @@ interface SliderArrowsProps {
   disablePrev?: boolean;
   disableNext?: boolean;
   size?: number;
+  /** "circle" (default) is the hero/news slider look; "square" is the r10 pill-square used by carousels like Episodes. */
+  shape?: "circle" | "square";
   sx?: SxProps<Theme>;
 }
 
-/** Paired prev/next controls shared by the hero and news sliders. */
+/** Paired prev/next controls shared by the hero, news, and episode sliders. */
 export default function SliderArrows({
   onPrev,
   onNext,
@@ -24,38 +26,38 @@ export default function SliderArrows({
   disablePrev = false,
   disableNext = false,
   size = 21,
+  shape = "circle",
   sx,
 }: SliderArrowsProps) {
   return (
     <Box sx={[{ display: "flex", alignItems: "center", gap: "24px" }, ...(Array.isArray(sx) ? sx : [sx])]}>
-      <IconButton onClick={onPrev} disabled={disablePrev} aria-label={`Previous ${itemLabel}`} sx={arrowButtonSx(-1, size)}>
-        <KeyboardArrowLeftIcon sx={{ fontSize: size * 0.85, color: "#000000" }} />
+      <IconButton onClick={onPrev} disabled={disablePrev} aria-label={`Previous ${itemLabel}`} sx={arrowButtonSx(-1, size, shape)}>
+        <KeyboardArrowLeftIcon sx={{ fontSize: size * 0.85, color: shape === "square" && disablePrev ? "#666666" : "#000000" }} />
       </IconButton>
-      <IconButton onClick={onNext} disabled={disableNext} aria-label={`Next ${itemLabel}`} sx={arrowButtonSx(1, size)}>
-        <KeyboardArrowRightIcon sx={{ fontSize: size * 0.85, color: "#000000" }} />
+      <IconButton onClick={onNext} disabled={disableNext} aria-label={`Next ${itemLabel}`} sx={arrowButtonSx(1, size, shape)}>
+        <KeyboardArrowRightIcon sx={{ fontSize: size * 0.85, color: shape === "square" && disableNext ? "#666666" : "#000000" }} />
       </IconButton>
     </Box>
   );
 }
 
-const arrowButtonSx = (dir: -1 | 1, size: number) => ({
+const arrowButtonSx = (dir: -1 | 1, size: number, shape: "circle" | "square") => ({
   backgroundColor: "primary.main",
   display: "flex",
   justifyContent: "center",
   alignItems: "center",
-  borderRadius: "100%",
+  borderRadius: shape === "square" ? "10px" : "100%",
   width: `${size}px`,
   height: `${size}px`,
   transition: "transform .15s ease-out, background-color .15s ease-out",
   // Nudging toward the arrow's own direction hints at where the content goes.
   ":hover": { backgroundColor: "#f2c832", transform: `translateX(${dir * 2}px)` },
   ":active": { transform: "scale(0.94)" },
-  // Dimmed rather than hidden, so the row keeps its width at either end.
-  ":disabled": {
-    backgroundColor: "primary.main",
-    opacity: 0.35,
-    cursor: "not-allowed",
-    transform: "none",
-  },
+  // Dimmed rather than hidden, so the row keeps its width at either end. The
+  // square shape swaps to a neutral grey tile instead, matching its design.
+  ":disabled":
+    shape === "square"
+      ? { backgroundColor: "#333333", opacity: 1, cursor: "not-allowed", transform: "none" }
+      : { backgroundColor: "primary.main", opacity: 0.35, cursor: "not-allowed", transform: "none" },
   "@media (prefers-reduced-motion: reduce)": { transition: "none" },
 });

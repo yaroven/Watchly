@@ -1,6 +1,5 @@
+import Box from "@mui/material/Box";
 import { MouseEvent } from "react";
-
-import styles from "../../CustomVideoPlayer.module.scss";
 
 interface VideoTapZonesProps {
   onTap: () => void;
@@ -8,12 +7,12 @@ interface VideoTapZonesProps {
   onFullscreen: () => void;
 }
 
-type TapZone = { className: string; type: "skip"; offset: number } | { className: string; type: "fullscreen" };
+type TapZone = { key: string; width: string; type: "skip"; offset: number } | { key: string; width: string; type: "fullscreen" };
 
 const TAP_ZONES: TapZone[] = [
-  { className: styles.dcLeft, type: "skip", offset: -10 },
-  { className: styles.dcCenter, type: "fullscreen" },
-  { className: styles.dcRight, type: "skip", offset: 10 },
+  { key: "left", width: "30%", type: "skip", offset: -10 },
+  { key: "center", width: "40%", type: "fullscreen" },
+  { key: "right", width: "30%", type: "skip", offset: 10 },
 ];
 
 export default function VideoTapZones({ onTap, onSkip, onFullscreen }: VideoTapZonesProps) {
@@ -29,10 +28,15 @@ export default function VideoTapZones({ onTap, onSkip, onFullscreen }: VideoTapZ
   };
 
   return (
-    <div className={styles.doubleClickLayer}>
+    <Box sx={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", zIndex: 5, display: "flex" }}>
       {TAP_ZONES.map((zone) => (
-        <div key={zone.className} className={zone.className} onClick={onTap} onDoubleClick={(event) => handleDoubleClick(event, zone)} />
+        <Box
+          key={zone.key}
+          sx={{ height: "100%", width: zone.width }}
+          onClick={onTap}
+          onDoubleClick={(event) => handleDoubleClick(event, zone)}
+        />
       ))}
-    </div>
+    </Box>
   );
 }

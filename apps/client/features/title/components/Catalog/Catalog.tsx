@@ -1,6 +1,6 @@
 "use client";
 
-import { Title, TitleType } from "@/features/title/schemas/title";
+import { Title } from "@/features/title/schemas/title";
 import { APP } from "@/shared/lib/routes";
 import TitleCard from "@features/title/components/TitleCard";
 import { ArrowForward as ArrowForwardIcon } from "@mui/icons-material";
@@ -82,11 +82,7 @@ export default function Catalog({ items, title, onViewAll, viewAllLabel = "View 
         }}
       >
         {items.map((item) => (
-          <TitleCard
-            key={item.id}
-            onClick={() => router.push(item.type === TitleType.SERIES ? APP.SERIES(item.id) : APP.MOVIE(item.id))}
-            {...item}
-          ></TitleCard>
+          <TitleCard key={item.id} onClick={() => router.push(APP.TITLE(item.id))} {...item}></TitleCard>
         ))}
       </Box>
     </Box>

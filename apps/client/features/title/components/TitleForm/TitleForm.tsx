@@ -8,14 +8,14 @@ import FormFileInput from "@/shared/ui/FormFileInput";
 import Modal from "@/shared/ui/Modal";
 import Select from "@/shared/ui/Select";
 import { zodResolver } from "@hookform/resolvers/zod";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import Button from "@shared/ui/Button";
-import { CheckCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Activity, useEffect, useState } from "react";
 import { Resolver, useForm, useWatch } from "react-hook-form";
-import styles from "./TitleForm.module.scss";
 import { useTitleSubmissionWorkflow } from "./useTitleSubmissionWorkflow";
 
 interface TitleFormProps {
@@ -111,7 +111,7 @@ export default function TitleForm({ initialData }: TitleFormProps) {
   const closeSuccessModal = () => setIsSuccessModalOpen(false);
 
   return (
-    <form className={styles.titleForm} onSubmit={handleSubmit(onSubmit)}>
+    <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       <FormField label="Name" placeholder="Name" name="name" register={register} error={errors.name} />
       <FormField label="Description" placeholder="Description" name="description" register={register} error={errors.description} />
       <FormFileInput
@@ -157,7 +157,7 @@ export default function TitleForm({ initialData }: TitleFormProps) {
 
       {isUploading && <ProgressBar progress={uploadProgress} />}
 
-      {actionError && <div className={styles.errorAlert}>Error: {actionError.message}</div>}
+      {actionError && <Alert severity="error">Error: {actionError.message}</Alert>}
       <Button disabled={isPending || (!isDirty && !isEditing)} type="submit">
         {isPending ? (isUploading ? "Uploading Video..." : "Saving Title...") : isEditing ? "Update Title" : "Create Title"}
       </Button>
@@ -175,7 +175,7 @@ export default function TitleForm({ initialData }: TitleFormProps) {
               backgroundColor: "rgba(39,194,55,.16)",
             }}
           >
-            <CheckCircle size={30} color="#27c237" />
+            <CheckCircleIcon sx={{ fontSize: 30, color: "#27c237" }} />
           </Box>
 
           <Typography sx={{ fontSize: "24px", fontWeight: 700, color: "#ffffff" }}>
@@ -208,6 +208,6 @@ export default function TitleForm({ initialData }: TitleFormProps) {
           </Box>
         </Box>
       </Modal>
-    </form>
+    </Box>
   );
 }

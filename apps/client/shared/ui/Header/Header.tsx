@@ -38,7 +38,9 @@ export default function Header() {
       </Tabs>
       <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "20px" }}>
         <SearchBar />
+        {/* PLACEHOLDER: no notifications endpoint yet — always renders as read */}
         <Notification hasNotifications={false} />
+        {/* PLACEHOLDER: no auth/session yet — needs a real logged-in user (name + avatarUrl) endpoint */}
         <Avatar src="https://www.svgrepo.com/show/384670/account-avatar-profile-user.svg" alt="User profile" />
       </Box>
     </Box>

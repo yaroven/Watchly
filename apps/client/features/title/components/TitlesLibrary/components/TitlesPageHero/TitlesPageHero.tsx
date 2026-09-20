@@ -1,7 +1,9 @@
 "use client";
 
-import { Plus } from "lucide-react";
-import styles from "../../TitlesLibrary.module.scss";
+import AddIcon from "@mui/icons-material/Add";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
+import Button from "@shared/ui/Button";
 
 interface TitlesPageHeroProps {
   onCreate: () => void;
@@ -9,16 +11,30 @@ interface TitlesPageHeroProps {
 
 export default function TitlesPageHero({ onCreate }: TitlesPageHeroProps) {
   return (
-    <div className={styles.hero}>
-      <div>
-        <h1 className={styles.title}>Content Library</h1>
-        <p className={styles.subtitle}>Manage movies, series, and publishing workflow from one place.</p>
-      </div>
+    <Box
+      sx={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        width: "100%",
+        gap: "24px",
+        pb: "28px",
+        borderBottom: "1px solid",
+        borderColor: "divider",
+      }}
+    >
+      <Box>
+        <Typography component="h1" variant="h2" sx={{ color: "#ffffff" }}>
+          Content Library
+        </Typography>
+        <Typography sx={{ mt: "14px", maxWidth: "640px", color: "text.secondary" }}>
+          Manage movies, series, and publishing workflow from one place.
+        </Typography>
+      </Box>
 
-      <button className={styles.addTitleButton} onClick={onCreate}>
-        <Plus size={22} />
-        <span>Add New</span>
-      </button>
-    </div>
+      <Button variant="contained" onClick={onCreate} startIcon={<AddIcon sx={{ fontSize: 22 }} />}>
+        Add New
+      </Button>
+    </Box>
   );
 }

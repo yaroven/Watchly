@@ -9,15 +9,9 @@ import { Box } from "@mui/material";
 import HeroSlider from "@shared/ui/HeroSlider";
 import HotNewsSection from "@shared/ui/HotNewsSection";
 import { useRouter } from "next/navigation";
-import type { ReactNode } from "react";
 import { heroSlides, news, spotlight } from "./mocks";
 
-interface DiscoverScreenProps {
-  /** Rendered above the hero — used by /discover for the title overview panel. */
-  header?: ReactNode;
-}
-
-export default function DiscoverScreen({ header }: DiscoverScreenProps) {
+export default function DiscoverScreen() {
   const router = useRouter();
 
   const { data } = useTitles({
@@ -31,7 +25,6 @@ export default function DiscoverScreen({ header }: DiscoverScreenProps) {
 
   return (
     <Box>
-      {header}
       <Box sx={{ display: "flex", gap: "32px", mb: "40px" }}>
         <Box sx={{ flex: "1 1 auto", minWidth: 0, display: "flex", flexDirection: "column", gap: "32px" }}>
           <HeroSlider titles={heroSlides} />
@@ -39,6 +32,9 @@ export default function DiscoverScreen({ header }: DiscoverScreenProps) {
         </Box>
         <HotNewsSection news={news} />
       </Box>
+      {/* PLACEHOLDER: every row below reuses the same generic `items` fetch — none of these
+          are actually trending/genre/IMDB-ranked/watchlist queries yet; needs dedicated
+          backend endpoints (or query params) per row */}
       <Box sx={{ display: "flex", flexDirection: "column", gap: "34px" }}>
         <Catalog title="Trending movies" bleed items={items} onViewAll={viewAll} />
         <Catalog title="Trending series" bleed items={items} onViewAll={viewAll} />

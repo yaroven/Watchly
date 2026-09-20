@@ -1,24 +1,31 @@
 import { ADMIN } from "@/shared/lib/routes";
-import Link from "next/link";
-import styles from "./not-found.module.scss";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
+import Button from "@shared/ui/Button";
+import GradientCard from "@shared/ui/GradientCard";
 
 export default function NotFound() {
   return (
-    <div className={styles.container}>
-      <div className={styles.content}>
-        <div className={styles.codeBadge}>404</div>
-        <div className={styles.textGroup}>
-          <p className={styles.eyebrow}>Admin Panel</p>
-          <h1 className={styles.title}>This admin page is missing</h1>
-          <p className={styles.subtitle}>The panel could not find the resource you requested.</p>
-          <p className={styles.description}>
+    <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "70vh", padding: "40px" }}>
+      <GradientCard sx={{ p: "48px", display: "flex", flexDirection: "column", alignItems: "center", gap: "20px", textAlign: "center" }}>
+        <Typography sx={{ fontSize: "72px", fontWeight: 800, color: "primary.main", lineHeight: 1 }}>404</Typography>
+
+        <Box sx={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <Typography
+            sx={{ fontSize: "12px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "text.secondary" }}
+          >
+            Admin Panel
+          </Typography>
+          <Typography component="h1" variant="h4" sx={{ color: "#ffffff" }}>
+            This admin page is missing
+          </Typography>
+          <Typography sx={{ color: "text.secondary", maxWidth: "420px" }}>
             The record may have been deleted, the route may be incorrect, or the page may not exist in this admin section.
-          </p>
-        </div>
-        <Link href={ADMIN.DASHBOARD} className={styles.homeButton}>
-          Back to Dashboard
-        </Link>
-      </div>
-    </div>
+          </Typography>
+        </Box>
+
+        <Button href={ADMIN.DASHBOARD}>Back to Dashboard</Button>
+      </GradientCard>
+    </Box>
   );
 }

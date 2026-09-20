@@ -3,12 +3,12 @@
 import useTitles from "@/features/title/api/use-titles";
 import { ADMIN } from "@/shared/lib/routes";
 import Pagination from "@/shared/ui/Pagination";
+import Box from "@mui/material/Box";
 import { useRouter } from "next/navigation";
 import TitlesFiltersPanel from "./components/TitlesFiltersPanel";
 import TitlesPageHero from "./components/TitlesPageHero";
 import TitlesTable from "./components/TitlesTable";
 import { useTitlesFilters } from "./model/useTitlesFilters";
-import styles from "./TitlesLibrary.module.scss";
 
 const LIMIT = 12;
 
@@ -16,7 +16,7 @@ export default function TitlesLibrary() {
   const router = useRouter();
   const { searchString, typeFilter, statusFilter, page, hasActiveFilters, updateFilters, resetFilters } = useTitlesFilters();
 
-  const { data } = useTitles({
+  const { data, isPending, isFetching } = useTitles({
     page,
     limit: LIMIT,
     searchString,
@@ -29,7 +29,7 @@ export default function TitlesLibrary() {
   const totalPages = Math.ceil(totalCount / LIMIT);
 
   return (
-    <div className={styles.container}>
+    <Box sx={{ display: "flex", flexDirection: "column", width: "100%", gap: "28px", p: { xs: "24px 16px 40px", md: "40px 36px 56px" } }}>
       <TitlesPageHero onCreate={() => router.push(ADMIN.TITLES_NEW)} />
 
       <TitlesFiltersPanel
@@ -42,11 +42,11 @@ export default function TitlesLibrary() {
         onResetFilters={resetFilters}
       />
 
-      <TitlesTable titles={titles} />
+      <TitlesTable titles={titles} loading={isPending || isFetching} />
 
-      <div className={styles.pagination}>
+      <Box sx={{ display: "flex", justifyContent: "center" }}>
         <Pagination currentPage={page} totalPages={totalPages} onPageChange={(p) => updateFilters({ page: Number(p) })} />
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }
