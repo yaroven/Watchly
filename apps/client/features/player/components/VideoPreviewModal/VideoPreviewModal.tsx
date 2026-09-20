@@ -2,9 +2,9 @@
 
 import CustomVideoPlayer from "@/features/player/components/CustomVideoPlayer";
 import Modal from "@/shared/ui/Modal";
+import AutorenewIcon from "@mui/icons-material/Autorenew";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
-import { LoaderCircle } from "lucide-react";
 
 interface VideoPreviewModalProps {
   isOpen: boolean;
@@ -41,7 +41,7 @@ export default function VideoPreviewModal({ isOpen, onClose, streamUrl, title, i
                   "@media (prefers-reduced-motion: reduce)": { animation: "none" },
                 }}
               >
-                <LoaderCircle size={48} color="#e7bc0f" />
+                <AutorenewIcon sx={{ fontSize: 48, color: "#e7bc0f" }} />
               </Box>
               <Typography sx={{ fontSize: "14px" }}>Fetching stream URL...</Typography>
             </Box>

@@ -1,5 +1,5 @@
-import { DiscoverScreen, TitleOverview } from "@features/title";
+import { DiscoverScreen } from "@features/title";
 
 export default function Page() {
-  return <DiscoverScreen header={<TitleOverview />} />;
+  return <DiscoverScreen />;
 }

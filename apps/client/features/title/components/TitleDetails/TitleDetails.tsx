@@ -7,11 +7,16 @@ import { Season } from "@/features/season/schemas/season";
 import TitleForm from "@/features/title/components/TitleForm";
 import { Title, TitleType } from "@/features/title/schemas/title";
 import TranscodingStatus from "@/types/transcoding-status";
-import { Play, RotateCcw } from "lucide-react";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import ReplayIcon from "@mui/icons-material/Replay";
+import Box from "@mui/material/Box";
+import Divider from "@mui/material/Divider";
+import Typography from "@mui/material/Typography";
+import Button from "@shared/ui/Button";
+import GradientCard from "@shared/ui/GradientCard";
 import type { ReactNode } from "react";
 import DeleteModal from "./components/DeleteModal";
 import { useTitleDetails } from "./model/useTitleDetails";
-import styles from "./TitleDetails.module.scss";
 
 interface TitleDetailsProps {
   title: Title;
@@ -45,12 +50,25 @@ export default function TitleDetails({ title, initialSeasons }: TitleDetailsProp
   });
 
   return (
-    <div className={styles.container}>
-      <div className={styles.hero}>
-        <div className={styles.headerTitleGroup}>
-          <h1 className={styles.pageTitle}>Manage Title</h1>
-          <p className={styles.pageSubtitle}>Update metadata, review the stream, and manage seasons or episodes from one screen.</p>
-        </div>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: "28px", padding: { xs: "24px 16px 40px", md: "40px 36px 56px" } }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          width: "100%",
+          gap: "24px",
+          flexDirection: { xs: "column", md: "row" },
+        }}
+      >
+        <Box sx={{ display: "flex", flexDirection: "column" }}>
+          <Typography component="h1" variant="h2" sx={{ color: "#ffffff" }}>
+            Manage Title
+          </Typography>
+          <Typography sx={{ mt: "14px", maxWidth: "680px", color: "text.secondary" }}>
+            Update metadata, review the stream, and manage seasons or episodes from one screen.
+          </Typography>
+        </Box>
 
         <TitleDetailsActions
           title={currentTitle}
@@ -61,14 +79,21 @@ export default function TitleDetails({ title, initialSeasons }: TitleDetailsProp
           onPreview={openPreviewModal}
           onRestartTranscoding={() => restartTranscoding(title.id)}
         />
-      </div>
+      </Box>
 
-      <div className={styles.grid}>
-        <div className={styles.mainColumn}>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", md: "minmax(0, 1.15fr) minmax(0, 1fr)" },
+          gap: "24px",
+          alignItems: "start",
+        }}
+      >
+        <Box sx={{ display: "flex", flexDirection: "column", gap: "24px" }}>
           <SectionCard title="Details" description="Edit the primary metadata for this title.">
             <TitleForm initialData={currentTitle} />
           </SectionCard>
-        </div>
+        </Box>
 
         {isSeries && (
           <SeriesManagementSection
@@ -79,7 +104,7 @@ export default function TitleDetails({ title, initialSeasons }: TitleDetailsProp
             episodes={episodes}
           />
         )}
-      </div>
+      </Box>
 
       <DeleteModal
         isOpen={isDeleteModalOpen}
@@ -96,7 +121,7 @@ export default function TitleDetails({ title, initialSeasons }: TitleDetailsProp
         title={currentTitle.name}
         isLoading={isPreviewLoading}
       />
-    </div>
+    </Box>
   );
 }
 
@@ -117,25 +142,30 @@ function TitleDetailsActions({
   onPreview: () => void;
   onRestartTranscoding: () => void;
 }) {
-  return (
-    <div className={styles.headerActions}>
-      <button onClick={onDelete} className={styles.deleteButton} disabled={isDeleting}>
-        Delete Title
-      </button>
+  const hasSecondaryAction =
+    (title.type === TitleType.MOVIE && currentTranscodingStatus === TranscodingStatus.FAILED) ||
+    (title.type === TitleType.MOVIE && currentTranscodingStatus === TranscodingStatus.COMPLETED);
 
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
       {title.type === TitleType.MOVIE && currentTranscodingStatus === TranscodingStatus.FAILED && (
-        <button onClick={onRestartTranscoding} className={styles.transcodeButton} disabled={isTranscoding}>
-          <RotateCcw size={16} />
+        <Button variant="outlined" onClick={onRestartTranscoding} disabled={isTranscoding} startIcon={<ReplayIcon sx={{ fontSize: 16 }} />}>
           {isTranscoding ? "Restarting..." : "Restart Transcoding"}
-        </button>
+        </Button>
       )}
 
       {title.type === TitleType.MOVIE && currentTranscodingStatus === TranscodingStatus.COMPLETED && (
-        <button onClick={onPreview} className={styles.previewButton}>
-          <Play size={16} /> Preview
-        </button>
+        <Button variant="outlined" onClick={onPreview} startIcon={<PlayArrowIcon sx={{ fontSize: 16 }} />}>
+          Preview
+        </Button>
       )}
-    </div>
+
+      {hasSecondaryAction && <Divider orientation="vertical" flexItem sx={{ borderColor: "#333333", my: "4px" }} />}
+
+      <Button variant="contained" danger onClick={onDelete} disabled={isDeleting}>
+        Delete Title
+      </Button>
+    </Box>
   );
 }
 
@@ -153,7 +183,7 @@ function SeriesManagementSection({
   episodes: ReturnType<typeof useTitleDetails>["episodes"];
 }) {
   return (
-    <div className={styles.contentColumn}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: "24px" }}>
       <SectionCard title="Seasons" description="Organize the structure of your series before managing episodes.">
         <SeasonManager seasons={seasons} titleId={titleId} selectedSeasonId={selectedSeasonId} onSelectSeason={onSelectSeason} />
       </SectionCard>
@@ -163,18 +193,23 @@ function SeriesManagementSection({
           <EpisodeManager seasonId={selectedSeasonId} episodes={episodes} />
         </SectionCard>
       )}
-    </div>
+    </Box>
   );
 }
 
 function SectionCard({ title, description, children }: { title: string; description: string; children: ReactNode }) {
   return (
-    <div className={styles.card}>
-      <div className={styles.cardHeader}>
-        <h2>{title}</h2>
-        <p>{description}</p>
-      </div>
-      {children}
-    </div>
+    <GradientCard sx={{ width: "100%" }}>
+      <Box sx={{ px: "28px", pt: "24px" }}>
+        <Typography component="h2" variant="h4" sx={{ color: "#ffffff" }}>
+          {title}
+        </Typography>
+        <Typography sx={{ mt: "8px", color: "text.secondary" }}>{description}</Typography>
+      </Box>
+
+      <Box sx={{ borderBottom: "1px solid", borderColor: "divider", mt: "20px" }} />
+
+      <Box sx={{ p: "28px", display: "flex", flexDirection: "column", gap: "16px" }}>{children}</Box>
+    </GradientCard>
   );
 }
