@@ -30,7 +30,11 @@ import { VideoTranscoderModule } from "./video-transcoder/video-transcoder.modul
       throttlers: [
         {
           ttl: 60000,
-          limit: 10,
+          // A single Discover page load alone fires 7-10+ GET /title
+          // requests (one per catalog row); 10/min was tripping normal
+          // browsing within seconds. This keeps basic abuse protection
+          // while giving real usage enough headroom.
+          limit: 300,
         },
       ],
     }),
