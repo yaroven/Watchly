@@ -11,3 +11,9 @@ allowBuilds:
   "prisma": true
   "sharp": true
   "unrs-resolver": true
+
+# electron-to-chromium ships almost daily; a fresh release trips the
+# minimumReleaseAge policy and breaks docker builds. Pin the transitive
+# dependency to a version that already cleared the window.
+overrides:
+  electron-to-chromium: 1.5.389

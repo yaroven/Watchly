@@ -1,74 +1,90 @@
 "use client";
 
-import useTitles from "@/features/title/api/use-titles";
-import { TitleType } from "@/features/title/schemas/title";
-import Pagination from "@/shared/ui/Pagination";
-import { TranscodingStatus } from "@/types";
+import { Title } from "@/features/title/schemas/title";
+import { APP } from "@/shared/lib/routes";
+import TitleCard from "@features/title/components/TitleCard";
+import { ArrowForward as ArrowForwardIcon } from "@mui/icons-material";
+import { Box } from "@mui/material";
+import Typography from "@mui/material/Typography";
 import { useRouter } from "next/navigation";
-import { useQueryState } from "nuqs";
-import TitleList from "../TitleList";
-import styles from "./Catalog.module.scss";
 
 interface CatalogProps {
-  type?: TitleType;
-  eyebrow?: string;
-  title?: string;
-  description?: string;
+  title: string;
+  items: Title[];
+  onViewAll?: () => void;
+  viewAllLabel?: string;
+  bleed?: boolean;
+  bleedSize?: number;
 }
 
-export default function Catalog({
-  type,
-  eyebrow = "Streaming library",
-  title = "Fresh picks for tonight",
-  description = "Browse the latest additions, open a title instantly, and keep the same clean dashboard energy outside the admin panel.",
-}: CatalogProps) {
+export default function Catalog({ items, title, onViewAll, viewAllLabel = "View All", bleed = false, bleedSize = 24 }: CatalogProps) {
   const router = useRouter();
-  const limit = 18;
-  const [page, setPage] = useQueryState("page");
-  const currentPage = page ? parseInt(page) : 1;
-
-  const { data } = useTitles({
-    page: currentPage,
-    limit,
-    type,
-    transcodingStatus: TranscodingStatus.COMPLETED,
-  });
-  const titles = data?.items || [];
-  const totalCount = data?.totalCount || 0;
-  const totalPages = Math.ceil(totalCount / limit);
-
   return (
-    <div className={styles.catalog}>
-      <section className={styles.hero}>
-        <div className={styles.heroCopy}>
-          <span className={styles.eyebrow}>{eyebrow}</span>
-          <h1>{title}</h1>
-          <p>{description}</p>
-        </div>
-        <div className={styles.heroStats}>
-          <div className={styles.statCard}>
-            <strong>{totalCount}</strong>
-            <span>Titles available</span>
-          </div>
-          <div className={styles.statCard}>
-            <strong>{type === TitleType.SERIES ? "Series" : type === TitleType.MOVIE ? "Movies" : "All"}</strong>
-            <span>Current catalog view</span>
-          </div>
-        </div>
-      </section>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
+        {title && (
+          <Typography component="span" sx={{ fontSize: 24, fontWeight: 700, color: "#ffffff" }}>
+            {title}
+          </Typography>
+        )}
 
-      <TitleList
-        titles={titles}
-        onClick={(id: string, type: TitleType) => {
-          if (type === "MOVIE") return router.push(`/movie/${id}`);
-          return router.push(`/series/${id}`);
+        {onViewAll && (
+          <Box
+            component="button"
+            type="button"
+            onClick={onViewAll}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              px: 0,
+              border: "none",
+              background: "none",
+              font: "inherit",
+              fontSize: "16px",
+              color: "#ffffff",
+              cursor: "pointer",
+              transition: "color .15s ease-out",
+              ":hover": { color: "primary.main" },
+              // Nudging the arrow on hover echoes the slider controls.
+              ":hover .catalog-view-all-arrow": { transform: "translateX(3px)" },
+              "@media (prefers-reduced-motion: reduce)": {
+                transition: "none",
+                ":hover .catalog-view-all-arrow": { transform: "none" },
+              },
+            }}
+          >
+            {viewAllLabel}
+            <ArrowForwardIcon
+              className="catalog-view-all-arrow"
+              sx={{ fontSize: "20px", color: "primary.main", transition: "transform .15s ease-out" }}
+            />
+          </Box>
+        )}
+      </Box>
+      <Box
+        sx={{
+          display: "flex",
+          gap: "16px",
+          overflowX: "auto",
+          marginRight: bleed ? `-${bleedSize}px` : 0,
+          paddingRight: bleed ? `${bleedSize}px` : 0,
+          "& > *": { flexShrink: 0 },
+          pb: "8px",
+          scrollSnapType: "x proximity",
+          "& > * ": { scrollSnapAlign: "start" },
+          scrollbarWidth: "thin",
+          scrollbarColor: "#333333 transparent",
+          "&::-webkit-scrollbar": { height: "6px" },
+          "&::-webkit-scrollbar-track": { background: "transparent" },
+          "&::-webkit-scrollbar-thumb": { background: "#333333", borderRadius: "3px" },
+          "&::-webkit-scrollbar-thumb:hover": { background: "#4a4a4a" },
         }}
-      />
-      {totalPages > 1 && (
-        <div className={styles.pagination}>
-          <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setPage} />
-        </div>
-      )}
-    </div>
+      >
+        {items.map((item) => (
+          <TitleCard key={item.id} onClick={() => router.push(APP.TITLE(item.id))} {...item}></TitleCard>
+        ))}
+      </Box>
+    </Box>
   );
 }

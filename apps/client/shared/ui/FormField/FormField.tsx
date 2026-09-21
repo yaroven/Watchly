@@ -1,23 +1,25 @@
+import Box from "@mui/material/Box";
+import Input, { InputProps as MuiInputProps } from "@mui/material/Input";
+import Typography from "@mui/material/Typography";
+import { inputVariants, tokens, type InputVariant } from "@shared/mui/theme";
 import type { ReactNode } from "react";
 import { FieldError, FieldValues, Path, UseFormRegister } from "react-hook-form";
-import styles from "./FormField.module.scss";
 
-interface FormFieldProps<T extends FieldValues> {
+// `error` and `name` are re-typed below, so they have to be dropped from the
+// MUI props first — intersecting them would produce `boolean & FieldError`.
+type InputProps<T extends FieldValues> = Omit<MuiInputProps, "error" | "name"> & {
   type?: string;
-  id?: string;
   label?: string;
-  placeholder?: string;
   name: Path<T>;
   register: UseFormRegister<T>;
   error: FieldError | undefined;
   valueAsNumber?: boolean;
+  variant?: InputVariant;
   as?: "input" | "select" | "textarea";
   children?: ReactNode;
-  disabled?: boolean;
-}
+};
 
 export default function FormField<T extends FieldValues>({
-  type = "text",
   id,
   label,
   placeholder,
@@ -25,40 +27,56 @@ export default function FormField<T extends FieldValues>({
   register,
   error,
   valueAsNumber,
-  as: Component = "input",
+  variant = "pill",
+  as = "input",
   children,
-  disabled,
-}: FormFieldProps<T>) {
+  sx,
+  ...rest
+}: InputProps<T>) {
   const fieldId = id ?? String(name).replace(/\./g, "-");
   const errorId = error ? `${fieldId}-error` : undefined;
-  const inputClassName = [styles.input, Component === "textarea" ? styles.textarea : "", Component === "select" ? styles.select : ""]
-    .filter(Boolean)
-    .join(" ");
+
+  // InputBase renders `inputComponent`, not its own children — the <option>
+  // elements have to travel through inputProps to land inside the <select>.
+  const selectProps =
+    as === "select"
+      ? {
+          inputComponent: "select" as unknown as MuiInputProps["inputComponent"],
+          inputProps: { children },
+        }
+      : null;
 
   return (
-    <div className={styles.fieldWrapper}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: "6px" }}>
       {label && (
-        <label htmlFor={fieldId} className={styles.label}>
+        <Typography component="label" htmlFor={fieldId} sx={{ fontSize: "14px", fontWeight: 400, color: tokens.text.secondary }}>
           {label}
-        </label>
+        </Typography>
       )}
-      <Component
+      <Input
         id={fieldId}
-        className={inputClassName}
-        type={Component === "input" ? type : undefined}
         placeholder={placeholder}
-        disabled={disabled}
-        aria-invalid={error ? "true" : "false"}
+        error={Boolean(error)}
         aria-describedby={errorId}
+        multiline={as === "textarea"}
+        // Both variants draw their own frame. Set here rather than only in the
+        // theme, so the field looks right even outside MuiThemeProvider.
+        disableUnderline
+        sx={[
+          inputVariants[variant],
+          // A textarea has to grow, so the fixed height is dropped for it.
+          as === "textarea" && { height: "auto", paddingBlock: "10px" },
+          ...(Array.isArray(sx) ? sx : [sx]),
+        ]}
+        {...selectProps}
+        {...rest}
         {...register(name, { valueAsNumber })}
-      >
-        {children}
-      </Component>
+      />
       {error && (
-        <span id={errorId} className={styles.errorMessage} role="alert">
+        <Typography id={errorId} role="alert" sx={{ fontSize: "12px", fontWeight: 400, color: tokens.feedback.error }}>
           {error.message}
-        </span>
+        </Typography>
       )}
-    </div>
+    </Box>
   );
 }

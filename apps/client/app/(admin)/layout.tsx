@@ -1,7 +1,7 @@
-import Sidebar from "@/features/admin/components/Sidebar";
+import { AdminHeader, Sidebar } from "@/features/admin";
+import { SidebarProvider } from "@/shared/ui/Sidebar/SidebarContext";
+import Box from "@mui/material/Box";
 import type { Metadata } from "next";
-import "../globals.scss";
-import styles from "./layout.module.scss";
 
 export const metadata: Metadata = {
   title: "Watchly Admin",
@@ -14,11 +14,14 @@ export default function AdminLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className={styles.adminLayout}>
-      <Sidebar />
-      <div className={styles.adminContent}>
-        <main className={styles.adminMain}>{children}</main>
-      </div>
-    </div>
+    <SidebarProvider>
+      <Box sx={{ display: "flex", minHeight: "100vh" }}>
+        <Sidebar />
+        <Box sx={{ flex: "1 1 auto", minWidth: 0 }} component="main">
+          <AdminHeader />
+          {children}
+        </Box>
+      </Box>
+    </SidebarProvider>
   );
 }

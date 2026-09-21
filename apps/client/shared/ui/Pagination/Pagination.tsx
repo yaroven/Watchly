@@ -1,5 +1,8 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import styles from "./Pagination.module.scss";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import Box from "@mui/material/Box";
+import IconButton from "@mui/material/IconButton";
+import Button from "@shared/ui/Button";
 
 interface PaginationProps {
   currentPage: number;
@@ -7,40 +10,55 @@ interface PaginationProps {
   onPageChange: (page: string) => void;
 }
 
+const arrowSx = {
+  width: 36,
+  height: 36,
+  borderRadius: "10px",
+  backgroundColor: "#333333",
+  color: "#ffffff",
+  transition: "background-color .15s ease-out",
+  ":hover": { backgroundColor: "primary.main", color: "#000000" },
+  ":disabled": { backgroundColor: "#191919", color: "#666666" },
+};
+
 export default function Pagination({ currentPage, totalPages, onPageChange }: PaginationProps) {
   if (totalPages <= 1) return null;
 
   const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
 
   return (
-    <div className={styles.pagination}>
-      <button
-        className={styles.arrowButton}
+    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
+      <IconButton
+        aria-label="Previous page"
         onClick={() => onPageChange(Math.max(1, currentPage - 1).toString())}
         disabled={currentPage === 1}
+        sx={arrowSx}
       >
-        <ChevronLeft size={20} />
-      </button>
+        <ChevronLeftIcon sx={{ fontSize: 20 }} />
+      </IconButton>
 
-      <div className={styles.pageNumbers}>
+      <Box sx={{ display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "center" }}>
         {pageNumbers.map((num) => (
-          <button
+          <Button
             key={num}
-            className={currentPage === num ? styles.activePage : styles.pageButton}
+            variant={currentPage === num ? "contained" : "outlined"}
+            size="small"
             onClick={() => onPageChange(num.toString())}
+            sx={{ minWidth: 36, height: 36, paddingInline: 0, borderRadius: "10px" }}
           >
             {num}
-          </button>
+          </Button>
         ))}
-      </div>
+      </Box>
 
-      <button
-        className={styles.arrowButton}
+      <IconButton
+        aria-label="Next page"
         onClick={() => onPageChange(Math.min(totalPages, currentPage + 1).toString())}
         disabled={currentPage === totalPages}
+        sx={arrowSx}
       >
-        <ChevronRight size={20} />
-      </button>
-    </div>
+        <ChevronRightIcon sx={{ fontSize: 20 }} />
+      </IconButton>
+    </Box>
   );
 }

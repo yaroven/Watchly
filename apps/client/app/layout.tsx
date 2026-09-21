@@ -1,22 +1,38 @@
-import "@fortawesome/fontawesome-free/css/all.min.css";
+import Providers from "@shared/providers";
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, PT_Sans } from "next/font/google";
-import "./globals.scss";
-import Providers from "./providers";
+import { Alumni_Sans, Anton, Fredoka, Poppins } from "next/font/google";
 
-const ptSans = PT_Sans({
-  weight: ["400", "700"],
-  subsets: ["latin", "cyrillic"],
+// Body copy — the face used throughout the design file.
+const poppins = Poppins({
+  weight: ["300", "400", "500", "600", "700"],
+  subsets: ["latin"],
   display: "swap",
-});
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+  variable: "--font-body",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+// Section headings only; stands in for Moonjelly from the design.
+const fredoka = Fredoka({
+  weight: ["500", "600", "700"],
   subsets: ["latin"],
+  display: "swap",
+  variable: "--font-heading",
+});
+
+// Title treatment on the spotlight tiles. Anton stands in for Impact, which
+// ships with Windows and macOS but not with Linux or Android, so it cannot be
+// relied on over the web; it stays in the stack as a fallback.
+const anton = Anton({
+  weight: "400",
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-display",
+});
+
+// Taglines above those titles.
+const alumniSans = Alumni_Sans({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-tagline",
 });
 
 export const metadata: Metadata = {
@@ -32,9 +48,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${ptSans.className} ${geistMono.variable}`}>
+      <body className={`${poppins.variable} ${fredoka.variable} ${anton.variable} ${alumniSans.variable}`}>
         <Providers>{children}</Providers>
-        <div id="modal-portal" />
       </body>
     </html>
   );

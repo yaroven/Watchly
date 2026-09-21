@@ -8,7 +8,7 @@ export interface Episode {
   number: number;
   name: string;
   description: string;
-  season: string;
+  seasonId: string;
   transcodingStatus: TranscodingStatus;
 }
 

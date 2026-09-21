@@ -1,6 +1,6 @@
 import { Season } from "@/features/season/schemas/season";
+import Box from "@mui/material/Box";
 import SeasonTabItem from "../SeasonTabItem";
-import styles from "./SeasonTabs.module.scss";
 
 interface SeasonTabsProps {
   seasons: Season[];
@@ -10,10 +10,10 @@ interface SeasonTabsProps {
 
 export default function SeasonTabs({ seasons, currentSeasonId, onClick }: SeasonTabsProps) {
   return (
-    <div className={styles.tabs}>
+    <Box sx={{ display: "flex", alignItems: "flex-end", flexWrap: "wrap" }}>
       {seasons.map(({ id, number }) => (
         <SeasonTabItem onClick={() => onClick(id)} key={id} number={number} isActive={id === currentSeasonId} />
       ))}
-    </div>
+    </Box>
   );
 }
