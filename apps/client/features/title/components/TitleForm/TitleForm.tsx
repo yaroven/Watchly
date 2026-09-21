@@ -2,16 +2,20 @@
 
 import { CreateTitleSchema, Title, TitleFormValues, TitleType, UpdateTitleSchema } from "@/features/title/schemas/title";
 import ProgressBar from "@/features/transcoding/components/ProgressBar";
-import FormButton from "@/shared/ui/FormButton";
+import { ADMIN } from "@/shared/lib/routes";
 import FormField from "@/shared/ui/FormField";
 import FormFileInput from "@/shared/ui/FormFileInput";
 import Modal from "@/shared/ui/Modal";
+import Select from "@/shared/ui/Select";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckCircle } from "lucide-react";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import Alert from "@mui/material/Alert";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
+import Button from "@shared/ui/Button";
 import { useRouter } from "next/navigation";
 import { Activity, useEffect, useState } from "react";
 import { Resolver, useForm, useWatch } from "react-hook-form";
-import styles from "./TitleForm.module.scss";
 import { useTitleSubmissionWorkflow } from "./useTitleSubmissionWorkflow";
 
 interface TitleFormProps {
@@ -107,7 +111,7 @@ export default function TitleForm({ initialData }: TitleFormProps) {
   const closeSuccessModal = () => setIsSuccessModalOpen(false);
 
   return (
-    <form className={styles.titleForm} onSubmit={handleSubmit(onSubmit)}>
+    <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       <FormField label="Name" placeholder="Name" name="name" register={register} error={errors.name} />
       <FormField label="Description" placeholder="Description" name="description" register={register} error={errors.description} />
       <FormFileInput
@@ -117,15 +121,24 @@ export default function TitleForm({ initialData }: TitleFormProps) {
         selectedFile={selectedPosterFile}
         name="posterFile"
         accept="image/*"
+        hint="Any image format"
+        disabled={isPending}
         error={errors.posterFile}
         id="title-poster-file"
       />
 
-      <FormField label="Type" name="type" register={register} error={errors.type} as="select" disabled={isEditing}>
-        <option value="">Select type</option>
-        <option value={TitleType.MOVIE}>Movie</option>
-        <option value={TitleType.SERIES}>Series</option>
-      </FormField>
+      <Select
+        label="Type"
+        name="type"
+        control={control}
+        error={errors.type}
+        disabled={isEditing}
+        placeholder="Select type"
+        options={[
+          { value: TitleType.MOVIE, label: "Movie" },
+          { value: TitleType.SERIES, label: "Series" },
+        ]}
+      />
 
       <Activity mode={selectedType === TitleType.MOVIE && !isEditing ? "visible" : "hidden"}>
         <FormFileInput
@@ -135,6 +148,8 @@ export default function TitleForm({ initialData }: TitleFormProps) {
           selectedFile={selectedVideoFile}
           name="videoFile"
           accept="video/*"
+          hint="Any video format"
+          disabled={isPending}
           error={errors.videoFile}
           id="title-video-file"
         />
@@ -142,40 +157,57 @@ export default function TitleForm({ initialData }: TitleFormProps) {
 
       {isUploading && <ProgressBar progress={uploadProgress} />}
 
-      {actionError && <div className={styles.errorAlert}>Error: {actionError.message}</div>}
-      <FormButton disabled={isPending || (!isDirty && !isEditing)} type="submit">
+      {actionError && <Alert severity="error">Error: {actionError.message}</Alert>}
+      <Button disabled={isPending || (!isDirty && !isEditing)} type="submit">
         {isPending ? (isUploading ? "Uploading Video..." : "Saving Title...") : isEditing ? "Update Title" : "Create Title"}
-      </FormButton>
+      </Button>
 
-      <Modal isOpen={isSuccessModalOpen} onClose={closeSuccessModal}>
-        <div className={styles.modalContent}>
-          <CheckCircle className={styles.successIcon} />
-          <h3>Title {initialData ? "updated" : "added"} successfully!</h3>
-          <div className={styles.modalActions}>
-            <button
-              type="button"
+      <Modal isOpen={isSuccessModalOpen} onClose={closeSuccessModal} size="sm">
+        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "18px" }}>
+          <Box
+            sx={{
+              width: 64,
+              height: 64,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "18px",
+              backgroundColor: "rgba(39,194,55,.16)",
+            }}
+          >
+            <CheckCircleIcon sx={{ fontSize: 30, color: "#27c237" }} />
+          </Box>
+
+          <Typography sx={{ fontSize: "24px", fontWeight: 700, color: "#ffffff" }}>
+            Title {initialData ? "updated" : "added"} successfully!
+          </Typography>
+
+          <Box sx={{ display: "flex", gap: "12px", width: "100%", mt: "6px" }}>
+            <Button
+              variant="outlined"
+              sx={{ flex: 1 }}
               onClick={() => {
                 closeSuccessModal();
-                router.push("/admin/titles");
+                router.push(ADMIN.TITLES);
               }}
             >
               View All Titles
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              sx={{ flex: 1 }}
               onClick={() => {
                 const id = initialData?.id || createdTitleId;
                 if (id) {
                   closeSuccessModal();
-                  router.push(`/admin/titles/${id}`);
+                  router.push(ADMIN.TITLES_EDIT(id));
                 }
               }}
             >
               View Title
-            </button>
-          </div>
-        </div>
+            </Button>
+          </Box>
+        </Box>
       </Modal>
-    </form>
+    </Box>
   );
 }

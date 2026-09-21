@@ -1,8 +1,5 @@
-import Header from "@/shared/ui/Header";
-import "@fortawesome/fontawesome-free/css/all.min.css";
+import SiteShell from "@/shared/ui/SiteShell";
 import { Metadata } from "next";
-import "../globals.scss";
-import styles from "./layout.module.scss";
 
 export const metadata: Metadata = {
   title: "Watchly",
@@ -14,10 +11,5 @@ export default function MainLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return (
-    <div className={styles.shell}>
-      <Header />
-      <main className={styles.content}>{children}</main>
-    </div>
-  );
+  return <SiteShell>{children}</SiteShell>;
 }

@@ -1,13 +1,14 @@
 "use client";
 
 import ProgressBar from "@/features/transcoding/components/ProgressBar/ProgressBar";
-import FormButton from "@/shared/ui/FormButton";
 import FormField from "@/shared/ui/FormField";
 import FormFileInput from "@/shared/ui/FormFileInput";
 import Modal from "@/shared/ui/Modal/Modal";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
+import Button from "@shared/ui/Button";
 import { useWatch } from "react-hook-form";
 import { useEpisodeManagerContext } from "../../context/EpisodeManagerContext";
-import styles from "./EpisodeModal.module.scss";
 
 export default function EpisodeModal() {
   const {
@@ -32,8 +33,10 @@ export default function EpisodeModal() {
 
   return (
     <Modal isOpen={isModalOpen} onClose={closeEditor}>
-      <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
-        <h3>{editingEpisode ? "Edit Episode" : "Add Episode"}</h3>
+      <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ display: "flex", flexDirection: "column", gap: "20px", minWidth: 300 }}>
+        <Typography sx={{ fontSize: "24px", fontWeight: 700, color: "#ffffff", pr: "44px" }}>
+          {editingEpisode ? "Edit Episode" : "Add Episode"}
+        </Typography>
         <FormField
           label="Episode Number"
           type="number"
@@ -61,10 +64,10 @@ export default function EpisodeModal() {
 
         {isUploading && <ProgressBar progress={uploadProgress} />}
 
-        <FormButton type="submit" disabled={isUploading || createMutation.isPending || updateMutation.isPending}>
+        <Button type="submit" disabled={isUploading || createMutation.isPending || updateMutation.isPending}>
           {createMutation.isPending || updateMutation.isPending || isUploading ? "Uploading..." : editingEpisode ? "Update" : "Create"}
-        </FormButton>
-      </form>
+        </Button>
+      </Box>
     </Modal>
   );
 }

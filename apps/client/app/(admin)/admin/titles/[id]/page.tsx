@@ -1,9 +1,9 @@
 import SeasonService from "@/features/season/api/season.service";
 import type { Season } from "@/features/season/schemas/season";
+import { TitleDetails } from "@/features/title";
 import TitleService from "@/features/title/api/title.service";
 import { TitleType } from "@/features/title/schemas/title";
 import { notFound } from "next/navigation";
-import TitleDetailsContent from "./TitleDetailsContent";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -24,5 +24,5 @@ export default async function Page({ params }: PageProps) {
     return notFound();
   }
 
-  return <TitleDetailsContent title={title} initialSeasons={seasons} />;
+  return <TitleDetails title={title} initialSeasons={seasons} />;
 }
