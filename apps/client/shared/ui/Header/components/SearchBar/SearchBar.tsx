@@ -5,7 +5,7 @@ import Input, { InputProps } from "@mui/material/Input";
 import InputAdornment from "@mui/material/InputAdornment";
 import { inputVariants } from "@shared/mui/theme";
 
-interface SearchBarProps extends Pick<InputProps, "value" | "onChange"> {
+interface SearchBarProps extends Pick<InputProps, "value" | "onChange" | "onKeyDown"> {
   placeholder?: string;
 }
 

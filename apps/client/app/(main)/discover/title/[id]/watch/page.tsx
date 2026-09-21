@@ -49,7 +49,8 @@ export default async function Page({ params, searchParams }: PageProps) {
       const seasons = await SeasonService.getAll(id);
       if (!seasons.length) return notFound();
 
-      season = [...seasons].sort(byNumberDesc)[0];
+      const seasonsByNumberDesc = [...seasons].sort(byNumberDesc);
+      season = seasonsByNumberDesc[0];
 
       if (episodeParam) {
         try {
@@ -62,6 +63,23 @@ export default async function Page({ params, searchParams }: PageProps) {
       }
 
       episodes = await EpisodeService.getAll(season.id);
+
+      // No specific episode was requested and the "latest" season happens to
+      // be empty (e.g. just created in admin, not populated yet) — walk back
+      // through older seasons for the newest one that actually has episodes
+      // instead of 404ing on an empty season nobody asked for.
+      if (!episodes.length && !episodeParam) {
+        for (const candidate of seasonsByNumberDesc) {
+          if (candidate.id === season.id) continue;
+          const candidateEpisodes = await EpisodeService.getAll(candidate.id);
+          if (candidateEpisodes.length) {
+            season = candidate;
+            episodes = candidateEpisodes;
+            break;
+          }
+        }
+      }
+
       if (!episodes.length) return notFound();
 
       const currentEpisode =

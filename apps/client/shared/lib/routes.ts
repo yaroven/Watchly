@@ -17,6 +17,14 @@ export const APP = {
   /** Pass `episodeId` to deep-link a specific episode; otherwise the page picks up where it left off (or the movie's only stream). */
   WATCH: (id: string, episodeId?: string) => `${createDiscoverPath(`title/${id}/watch`)}${episodeId ? `?episode=${episodeId}` : ""}`,
   GENRES: createDiscoverPath("genres"),
+  /** With no args, browses everything; `type` alone browses one type with no text query (e.g. a catalog row's "View All"). */
+  SEARCH: (params?: { q?: string; type?: "MOVIE" | "SERIES" }) => {
+    const search = new URLSearchParams();
+    if (params?.q) search.set("q", params.q);
+    if (params?.type) search.set("type", params.type);
+    const query = search.toString();
+    return `${createDiscoverPath("search")}${query ? `?${query}` : ""}`;
+  },
   WATCHLIST: "/watchlist",
   LOGIN: "/login",
   REGISTER: "/register",
