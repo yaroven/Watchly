@@ -12,6 +12,14 @@ const nextConfig: NextConfig = {
   output: "standalone",
   // SVGR turns .svg imports into React components, so icons inherit
   // currentColor and can be recoloured through sx/CSS.
+  turbopack: {
+    rules: {
+      "*.svg": {
+        loaders: [{ loader: "@svgr/webpack", options: { svgo: false, titleProp: true } }],
+        as: "*.js",
+      },
+    },
+  },
   webpack: (config) => {
     config.module.rules.push({
       test: /\.svg$/i,
