@@ -2,7 +2,7 @@ import Header from "@/shared/ui/Header";
 import Sidebar from "@/shared/ui/Sidebar";
 import { SidebarProvider } from "@/shared/ui/Sidebar/SidebarContext";
 import Box from "@mui/material/Box";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 /**
  * Sidebar + header frame for the public site.
@@ -18,7 +18,11 @@ export default function SiteShell({ children }: { children: ReactNode }) {
       <Box sx={{ display: "flex", minHeight: "100vh" }}>
         <Sidebar />
         <Box sx={{ flex: "1 1 auto", minWidth: 0 }}>
-          <Header />
+          {/* Header reads useSearchParams (SearchBar) — needs a Suspense boundary so
+              statically-generated routes like /_not-found can prerender. */}
+          <Suspense>
+            <Header />
+          </Suspense>
           <Box sx={{ px: `24px` }} component="main">
             {children}
           </Box>
