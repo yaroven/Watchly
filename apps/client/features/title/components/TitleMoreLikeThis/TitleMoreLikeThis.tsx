@@ -34,7 +34,7 @@ export default function TitleMoreLikeThis({ items }: TitleMoreLikeThisProps) {
         <Box
           component="button"
           type="button"
-          onClick={() => router.push(APP.MOVIES)}
+          onClick={() => router.push(APP.SEARCH())}
           sx={{
             display: "flex",
             alignItems: "center",

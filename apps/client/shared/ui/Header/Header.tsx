@@ -4,13 +4,26 @@ import { APP } from "@/shared/lib/routes";
 import { Box, Tab } from "@mui/material";
 import Tabs from "@mui/material/Tabs";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
 import Avatar from "./components/Avatar";
 import Notification from "./components/Notification";
 import SearchBar from "./components/SearchBar";
 
 export default function Header() {
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const isSearchPage = pathname === APP.SEARCH();
+  // Keyed by the URL's own query string below, so navigating (including
+  // back/forward) resets this to match `?q=` instead of needing an effect.
+  const [query, setQuery] = useState(() => (isSearchPage ? (searchParams.get("q") ?? "") : ""));
+
+  const submitSearch = () => {
+    const trimmed = query.trim();
+    if (trimmed) router.push(APP.SEARCH({ q: trimmed }));
+  };
+
   const navItems = [
     { label: "All", href: APP.DISCOVER },
     { label: "Movies", href: APP.MOVIES },
@@ -37,7 +50,14 @@ export default function Header() {
         ))}
       </Tabs>
       <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "20px" }}>
-        <SearchBar />
+        <SearchBar
+          key={isSearchPage ? searchParams.toString() : "idle"}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") submitSearch();
+          }}
+        />
         {/* PLACEHOLDER: no notifications endpoint yet — always renders as read */}
         <Notification hasNotifications={false} />
         {/* PLACEHOLDER: no auth/session yet — needs a real logged-in user (name + avatarUrl) endpoint */}

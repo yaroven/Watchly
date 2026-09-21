@@ -1,8 +1,10 @@
+import { RegisterForm } from "@features/auth";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Register | Watchly",
+};
+
 export default function RegisterPage() {
-  return (
-    <main>
-      <h1>Register</h1>
-      <p>Registration UI will live here.</p>
-    </main>
-  );
+  return <RegisterForm />;
 }

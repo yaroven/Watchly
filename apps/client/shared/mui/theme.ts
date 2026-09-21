@@ -223,18 +223,18 @@ const fieldBase = {
 } as const;
 
 export const inputVariants = {
-  // Login Form field: 466×48, square, 1px frame, 20px/500 text
+  // Login/Register form field: 466×48, underline only, 16px/500 text
   bordered: {
     ...fieldBase,
     height: 48,
     borderRadius: 0,
-    border: `1px solid ${tokens.border.default}`,
-    paddingInline: "14px",
-    fontSize: "20px",
+    borderBottom: `1px solid ${tokens.border.default}`,
+    paddingInline: "2px",
+    fontSize: "16px",
     fontWeight: 500,
     // Error wins over focus — declared after it.
-    "&.Mui-focused": { borderColor: tokens.accent.primary },
-    "&.Mui-error": { borderColor: tokens.feedback.error },
+    "&.Mui-focused": { borderBottomColor: tokens.accent.primary },
+    "&.Mui-error": { borderBottomColor: tokens.feedback.error },
   },
   // Admin form field: h36, r24, fill, 14px/400 text
   pill: {

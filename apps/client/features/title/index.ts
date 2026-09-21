@@ -4,6 +4,7 @@ export { default as Catalog } from "./components/Catalog";
 export { default as DiscoverScreen } from "./components/DiscoverScreen";
 export { default as MovieDetails } from "./components/MovieDetails";
 export { default as MovieStream } from "./components/MovieStream";
+export { default as SearchResults } from "./components/SearchResults";
 export { default as SeriesDetails } from "./components/SeriesDetails";
 export { default as SeriesStream } from "./components/SeriesStream";
 export { default as SpotlightGrid, type SpotlightTitle } from "./components/SpotlightGrid";
