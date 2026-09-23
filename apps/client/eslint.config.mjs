@@ -25,6 +25,7 @@ const ROUTE_FILES = [
   "twitter-image",
   "icon",
   "apple-icon",
+  "middleware",
 ];
 
 const eslintConfig = defineConfig([

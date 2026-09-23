@@ -1,12 +1,14 @@
 "use client";
 
-import { APP } from "@/shared/lib/routes";
-import { Bookmark as BookmarkIcon, Explore as ExploreIcon } from "@mui/icons-material";
+import { ADMIN, APP } from "@/shared/lib/routes";
+import Role from "@/types/role";
+import { AdminPanelSettings as AdminPanelSettingsIcon, Bookmark as BookmarkIcon, Explore as ExploreIcon } from "@mui/icons-material";
 import { Box, Drawer, List, Typography } from "@mui/material";
+import { useAuthStore } from "@shared/lib/auth-store";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMemo, useRef } from "react";
+import { ReactNode, useMemo, useRef } from "react";
 import CollapseButton from "./components/CollapseButton";
 import NavItem from "./components/NavItem";
 import { useSidebar } from "./SidebarContext";
@@ -15,17 +17,34 @@ import { useActiveIndicator } from "./useActiveIndicator";
 const INDICATOR_HEIGHT = 32;
 const BORDER_GRADIENT = `linear-gradient(180deg, #6e6e6e 0%, rgba(178, 178, 178, 0.12) 100%)`;
 
-const menuItems = [
+interface MenuItemConfig {
+  text: string;
+  href: string;
+  icon: ReactNode;
+  /** Omit for a public item — visible whether or not the visitor is signed in. */
+  roles?: Role[];
+}
+
+const menuItems: MenuItemConfig[] = [
   { text: "Discover", href: APP.DISCOVER, icon: <ExploreIcon /> },
-  { text: "Watchlist", href: APP.WATCHLIST, icon: <BookmarkIcon /> },
+  { text: "Watchlist", href: APP.WATCHLIST, icon: <BookmarkIcon />, roles: [Role.USER, Role.ADMIN] },
+  { text: "Admin", href: ADMIN.ROOT, icon: <AdminPanelSettingsIcon />, roles: [Role.ADMIN] },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const userRole = useAuthStore((state) => state.role);
+
+  // No `roles` means public; otherwise the visitor's role must be in the list.
+  const visibleItems = useMemo(
+    () => menuItems.filter((item) => !item.roles || (userRole !== null && item.roles.includes(userRole))),
+    [userRole],
+  );
+
   // Nested routes such as /discover/movie still belong to Discover, so this
   // matches by prefix and keeps the longest match when several apply.
   const activeIndex =
-    menuItems
+    visibleItems
       .map((item, index) => ({ index, href: item.href }))
       .filter(({ href }) => pathname === href || pathname.startsWith(`${href}/`))
       .sort((a, b) => b.href.length - a.href.length)[0]?.index ?? -1;
@@ -38,10 +57,10 @@ export default function Sidebar() {
 
   const itemRefCallbacks = useMemo(
     () =>
-      menuItems.map((_, index) => (el: HTMLAnchorElement | null) => {
+      visibleItems.map((_, index) => (el: HTMLAnchorElement | null) => {
         itemRefs.current[index] = el;
       }),
-    [],
+    [visibleItems],
   );
 
   return (
@@ -113,7 +132,7 @@ export default function Sidebar() {
             opacity: indicator.opacity,
           }}
         />
-        {menuItems.map((item, index) => (
+        {visibleItems.map((item, index) => (
           <NavItem
             key={item.text}
             href={item.href}

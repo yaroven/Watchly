@@ -9,27 +9,46 @@ import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import InputAdornment from "@mui/material/InputAdornment";
 import Typography from "@mui/material/Typography";
+import { authStore } from "@shared/lib/auth-store";
+import { decodeAccessToken } from "@shared/lib/decode-jwt";
 import Button from "@shared/ui/Button";
 import FormField from "@shared/ui/FormField";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import AuthService from "../../api/auth.service";
 import { RegisterFormValues, RegisterSchema } from "../../schemas/auth";
 import SocialAuthButtons from "../SocialAuthButtons";
 
 export default function RegisterForm() {
-  const [submitted, setSubmitted] = useState(false);
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<RegisterFormValues>({
     resolver: zodResolver(RegisterSchema),
     defaultValues: { name: "", email: "", password: "", confirmPassword: "" },
   });
 
-  // PLACEHOLDER: no auth/session endpoint exists yet — form only validates client-side.
-  const onSubmit = () => setSubmitted(true);
+  // `name`/`confirmPassword` only drive client-side validation — the API takes email/password.
+  const onSubmit = async ({ email, password }: RegisterFormValues) => {
+    setError(null);
+    try {
+      const session = await AuthService.register({ email, password });
+      const claims = decodeAccessToken(session.accessToken);
+      authStore.getState().setSession({
+        token: session.accessToken,
+        userId: claims?.userId ?? session.userId,
+        role: claims?.role ?? session.role,
+      });
+      router.push(APP.DISCOVER);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    }
+  };
 
   return (
     <Box
@@ -109,18 +128,19 @@ export default function RegisterForm() {
         />
       </Box>
 
-      {submitted && (
-        <Alert severity="info" onClose={() => setSubmitted(false)}>
-          Sign-up isn&apos;t wired up to a backend yet — this form only validates client-side for now.
+      {error && (
+        <Alert severity="error" onClose={() => setError(null)}>
+          {error}
         </Alert>
       )}
 
       <Button
         type="submit"
         isPill
+        disabled={isSubmitting}
         sx={{ height: "52px", backgroundColor: "#e5e5e5", color: "#191919", "&:hover": { backgroundColor: "#ffffff" } }}
       >
-        Register
+        {isSubmitting ? "Creating account…" : "Register"}
       </Button>
 
       <SocialAuthButtons />
