@@ -1,5 +1,6 @@
 import { BadRequestException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
+import { FilterRule } from "../common/pagination/filter-rule.enum";
 import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
@@ -79,7 +80,7 @@ describe("SeasonService", () => {
   });
 
   describe("findAll", () => {
-    describe("when titleId is provided", () => {
+    describe("when a titleId filter is provided", () => {
       const seasons = [{ id: "season-1" }, { id: "season-2" }];
 
       beforeEach(() => {
@@ -87,7 +88,9 @@ describe("SeasonService", () => {
       });
 
       test("should return seasons for the specific title", async () => {
-        const result = await service.findAll("title-1");
+        const result = await service.findAll([
+          { property: "titleId", rule: FilterRule.EQ, value: "title-1" },
+        ]);
         expect(prismaMock.season.findMany).toHaveBeenCalledWith({
           where: { titleId: "title-1" },
           orderBy: { number: "asc" },
@@ -96,7 +99,7 @@ describe("SeasonService", () => {
       });
     });
 
-    describe("when titleId is not provided", () => {
+    describe("when no filters are provided", () => {
       const seasons = [{ id: "season-1" }, { id: "season-2" }];
 
       beforeEach(() => {

@@ -8,7 +8,6 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
-  Query,
 } from "@nestjs/common";
 import {
   ApiCreatedResponse,
@@ -16,12 +15,14 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
-  ApiQuery,
   ApiTags,
 } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import { AdminOnly } from "../auth/decorators/roles.decorator";
 import { UrlResponseDto } from "../common/dto/url-response.dto";
+import { FilteringParams } from "../common/pagination/filtering-params.decorator";
+import { Filter, Sorting } from "../common/pagination/pagination.types";
+import { SortingParams } from "../common/pagination/sorting-params.decorator";
 import { CreateEpisodeDto } from "./dto/request/create-episode.dto";
 import { UpdateEpisodeDto } from "./dto/request/update-episode.dto";
 import { EpisodeResponseDto } from "./dto/response/episode-response.dto";
@@ -40,12 +41,19 @@ export class EpisodeController {
     return this.episodeService.create(createEpisodeDto);
   }
 
-  @ApiOperation({ summary: "List episodes, optionally filtered by season" })
-  @ApiQuery({ name: "seasonId", required: false, format: "uuid" })
+  @ApiOperation({
+    summary: "List episodes, filterable and sortable",
+    description:
+      "`filter` (repeatable): `property:rule:value`, e.g. `filter=seasonId:eq:<uuid>`. Filterable: seasonId, number, name. " +
+      "`sort`: `property:direction`, defaults to number:asc. Sortable: number, name, createdAt.",
+  })
   @ApiOkResponse({ type: [EpisodeResponseDto] })
   @Get()
-  async findAll(@Query("seasonId") seasonId?: string) {
-    return this.episodeService.findAll(seasonId);
+  async findAll(
+    @FilteringParams(["seasonId", "number", "name"]) filters: Filter[],
+    @SortingParams(["number", "name", "createdAt"]) sort?: Sorting,
+  ) {
+    return this.episodeService.findAll(filters, sort);
   }
 
   @ApiOperation({ summary: "Get an episode by id" })

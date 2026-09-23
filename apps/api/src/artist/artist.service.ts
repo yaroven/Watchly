@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
+import { Filter, Sorting } from "../common/pagination/pagination.types";
+import { buildOrderBy, buildWhere } from "../common/pagination/prisma-query.util";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateArtistDto } from "./dto/request/create-artist.dto";
 import { GetAllArtistDto } from "./dto/request/get-all-artist.dto";
@@ -15,25 +17,15 @@ export class ArtistService {
     return new ArtistResponseDto(artist);
   }
 
-  async findAll({
-    search,
-    page = 1,
-    limit = 10,
-    sort,
-    sortBy,
-  }: GetAllArtistDto): Promise<{ items: ArtistResponseDto[]; totalCount: number }> {
-    const where: Prisma.ArtistWhereInput = {};
-    const orderBy: Prisma.ArtistOrderByWithRelationInput = {};
-
-    if (sortBy && Object.keys(Prisma.ArtistScalarFieldEnum).includes(sortBy)) {
-      orderBy[sortBy] = sort || "desc";
-    } else {
-      orderBy["createdAt"] = "desc";
-    }
-
-    if (search) {
-      where.name = { contains: search, mode: "insensitive" };
-    }
+  async findAll(
+    { page = 1, limit = 10 }: GetAllArtistDto,
+    sort?: Sorting,
+    filters: Filter[] = [],
+  ): Promise<{ items: ArtistResponseDto[]; totalCount: number }> {
+    const where = buildWhere(filters) as Prisma.ArtistWhereInput;
+    const orderBy = (buildOrderBy(sort) ?? {
+      createdAt: "desc",
+    }) as Prisma.ArtistOrderByWithRelationInput;
 
     const [items, totalCount] = await Promise.all([
       this.prisma.artist.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy }),
