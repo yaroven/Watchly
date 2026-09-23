@@ -19,9 +19,8 @@ const mapSeason = (season: ApiSeason): Season => ({
 const SeasonService = {
   getAll: async (titleId: string): Promise<Season[]> => {
     const { data } = await api.get<ApiSeason[]>(`/${prefix}`, {
-      params: {
-        titleId,
-      },
+      params: { filter: [`titleId:eq:${titleId}`] },
+      paramsSerializer: { indexes: null },
     });
     return data.map(mapSeason);
   },

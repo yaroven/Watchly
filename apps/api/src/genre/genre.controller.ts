@@ -19,6 +19,9 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { AdminOnly } from "../auth/decorators/roles.decorator";
+import { FilteringParams } from "../common/pagination/filtering-params.decorator";
+import { Filter, Sorting } from "../common/pagination/pagination.types";
+import { SortingParams } from "../common/pagination/sorting-params.decorator";
 import { CreateGenreDto } from "./dto/request/create-genre.dto";
 import { GetAllGenreDto } from "./dto/request/get-all-genre.dto";
 import { UpdateGenreDto } from "./dto/request/update-genre.dto";
@@ -39,11 +42,19 @@ export class GenreController {
     return this.genreService.create(data);
   }
 
-  @ApiOperation({ summary: "List genres with search, sort, and pagination" })
+  @ApiOperation({
+    summary: "List genres with filter, sort, and pagination",
+    description:
+      "`filter` (repeatable): `property:rule:value`. Filterable: name. `sort`: `property:direction`. Sortable: name, createdAt.",
+  })
   @ApiOkResponse({ type: GenreListResponseDto })
   @Get()
-  findAll(@Query() query: GetAllGenreDto) {
-    return this.genreService.findAll(query);
+  findAll(
+    @Query() query: GetAllGenreDto,
+    @SortingParams(["name", "createdAt"]) sort?: Sorting,
+    @FilteringParams(["name"]) filters?: Filter[],
+  ) {
+    return this.genreService.findAll(query, sort, filters);
   }
 
   @ApiOperation({ summary: "Get a genre by id" })

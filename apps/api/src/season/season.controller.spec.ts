@@ -1,5 +1,6 @@
 import { NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
+import { FilterRule } from "../common/pagination/filter-rule.enum";
 import { SeasonController } from "./season.controller";
 import { SeasonService } from "./season.service";
 
@@ -55,15 +56,16 @@ describe("SeasonController", () => {
       (seasonServiceMock.findAll as jest.Mock).mockResolvedValue(seasonsResponse);
     });
 
-    test("should return list of seasons for titleId", async () => {
-      const result = await controller.findAll("title-1");
-      expect(seasonServiceMock.findAll).toHaveBeenCalledWith("title-1");
+    test("should return list of seasons for a titleId filter", async () => {
+      const filters = [{ property: "titleId", rule: FilterRule.EQ, value: "title-1" }];
+      const result = await controller.findAll(filters);
+      expect(seasonServiceMock.findAll).toHaveBeenCalledWith(filters, undefined);
       expect(result).toEqual(seasonsResponse);
     });
 
-    test("should return list of seasons without titleId", async () => {
-      const result = await controller.findAll();
-      expect(seasonServiceMock.findAll).toHaveBeenCalledWith(undefined);
+    test("should return list of seasons without filters", async () => {
+      const result = await controller.findAll([]);
+      expect(seasonServiceMock.findAll).toHaveBeenCalledWith([], undefined);
       expect(result).toEqual(seasonsResponse);
     });
   });

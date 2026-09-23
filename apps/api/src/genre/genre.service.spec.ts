@@ -1,6 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { Prisma } from "@prisma/client";
+import { FilterRule } from "../common/pagination/filter-rule.enum";
 import { PrismaService } from "../prisma/prisma.service";
 import { GenreService } from "./genre.service";
 
@@ -87,8 +88,10 @@ describe("GenreService", () => {
       expect(result).toEqual({ items: genres, totalCount: 1 });
     });
 
-    test("should filter by search term", async () => {
-      await service.findAll({ search: "Act", page: 1, limit: 10 });
+    test("should filter by name (LIKE)", async () => {
+      await service.findAll({ page: 1, limit: 10 }, undefined, [
+        { property: "name", rule: FilterRule.LIKE, value: "Act" },
+      ]);
       expect(prismaMock.genre.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { name: { contains: "Act", mode: "insensitive" } },

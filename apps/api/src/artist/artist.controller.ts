@@ -19,6 +19,9 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { AdminOnly } from "../auth/decorators/roles.decorator";
+import { FilteringParams } from "../common/pagination/filtering-params.decorator";
+import { Filter, Sorting } from "../common/pagination/pagination.types";
+import { SortingParams } from "../common/pagination/sorting-params.decorator";
 import { ArtistService } from "./artist.service";
 import { CreateArtistDto } from "./dto/request/create-artist.dto";
 import { GetAllArtistDto } from "./dto/request/get-all-artist.dto";
@@ -39,11 +42,19 @@ export class ArtistController {
     return this.artistService.create(data);
   }
 
-  @ApiOperation({ summary: "List artists with search, sort, and pagination" })
+  @ApiOperation({
+    summary: "List artists with filter, sort, and pagination",
+    description:
+      "`filter` (repeatable): `property:rule:value`. Filterable: name. `sort`: `property:direction`. Sortable: name, createdAt.",
+  })
   @ApiOkResponse({ type: ArtistListResponseDto })
   @Get()
-  findAll(@Query() query: GetAllArtistDto) {
-    return this.artistService.findAll(query);
+  findAll(
+    @Query() query: GetAllArtistDto,
+    @SortingParams(["name", "createdAt"]) sort?: Sorting,
+    @FilteringParams(["name"]) filters?: Filter[],
+  ) {
+    return this.artistService.findAll(query, sort, filters);
   }
 
   @ApiOperation({ summary: "Get an artist by id" })

@@ -1,6 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { Prisma } from "@prisma/client";
+import { FilterRule } from "../common/pagination/filter-rule.enum";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
@@ -99,13 +100,15 @@ describe("EpisodeService", () => {
   describe("findAll", () => {
     const episodes = [{ id: "episode-1" }, { id: "episode-2" }];
 
-    describe("when seasonId is provided", () => {
+    describe("when a seasonId filter is provided", () => {
       beforeEach(() => {
         (prismaMock.episode.findMany as jest.Mock).mockResolvedValue(episodes);
       });
 
       test("should return episodes for the season", async () => {
-        const result = await service.findAll("season-1");
+        const result = await service.findAll([
+          { property: "seasonId", rule: FilterRule.EQ, value: "season-1" },
+        ]);
         expect(prismaMock.episode.findMany).toHaveBeenCalledWith({
           where: { seasonId: "season-1" },
           orderBy: { number: "asc" },
@@ -114,7 +117,7 @@ describe("EpisodeService", () => {
       });
     });
 
-    describe("when seasonId is not provided", () => {
+    describe("when no filters are provided", () => {
       beforeEach(() => {
         (prismaMock.episode.findMany as jest.Mock).mockResolvedValue(episodes);
       });

@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
+import { Filter, Sorting } from "../common/pagination/pagination.types";
+import { buildOrderBy, buildWhere } from "../common/pagination/prisma-query.util";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateGenreDto } from "./dto/request/create-genre.dto";
 import { GetAllGenreDto } from "./dto/request/get-all-genre.dto";
@@ -22,25 +24,15 @@ export class GenreService {
     }
   }
 
-  async findAll({
-    search,
-    page = 1,
-    limit = 10,
-    sort,
-    sortBy,
-  }: GetAllGenreDto): Promise<{ items: GenreResponseDto[]; totalCount: number }> {
-    const where: Prisma.GenreWhereInput = {};
-    const orderBy: Prisma.GenreOrderByWithRelationInput = {};
-
-    if (sortBy && Object.keys(Prisma.GenreScalarFieldEnum).includes(sortBy)) {
-      orderBy[sortBy] = sort || "desc";
-    } else {
-      orderBy["createdAt"] = "desc";
-    }
-
-    if (search) {
-      where.name = { contains: search, mode: "insensitive" };
-    }
+  async findAll(
+    { page = 1, limit = 10 }: GetAllGenreDto,
+    sort?: Sorting,
+    filters: Filter[] = [],
+  ): Promise<{ items: GenreResponseDto[]; totalCount: number }> {
+    const where = buildWhere(filters) as Prisma.GenreWhereInput;
+    const orderBy = (buildOrderBy(sort) ?? {
+      createdAt: "desc",
+    }) as Prisma.GenreOrderByWithRelationInput;
 
     const [items, totalCount] = await Promise.all([
       this.prisma.genre.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy }),

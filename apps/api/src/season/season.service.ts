@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { Episode, Prisma, Season } from "@prisma/client";
+import { Filter, Sorting } from "../common/pagination/pagination.types";
+import { buildOrderBy, buildWhere } from "../common/pagination/prisma-query.util";
 import { settleAllOrLog } from "../common/settle-all-or-throw.util";
 import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -34,12 +36,13 @@ export class SeasonService {
     }
   }
 
-  async findAll(titleId?: string): Promise<SeasonResponseDto[]> {
-    const where = titleId ? { titleId } : {};
-    const seasons = await this.prisma.season.findMany({
-      where,
-      orderBy: { number: "asc" },
-    });
+  async findAll(filters: Filter[] = [], sort?: Sorting): Promise<SeasonResponseDto[]> {
+    const where = buildWhere(filters) as Prisma.SeasonWhereInput;
+    const orderBy = (buildOrderBy(sort) ?? {
+      number: "asc",
+    }) as Prisma.SeasonOrderByWithRelationInput;
+
+    const seasons = await this.prisma.season.findMany({ where, orderBy });
     return seasons.map((season) => new SeasonResponseDto(season));
   }
 

@@ -57,7 +57,7 @@ describe("GenreController", () => {
 
     test("should return list of genres", async () => {
       const result = await controller.findAll(query);
-      expect(genreServiceMock.findAll).toHaveBeenCalledWith(query);
+      expect(genreServiceMock.findAll).toHaveBeenCalledWith(query, undefined, undefined);
       expect(result).toEqual(genresResponse);
     });
   });

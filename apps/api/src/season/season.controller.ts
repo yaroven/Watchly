@@ -8,7 +8,6 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
-  Query,
 } from "@nestjs/common";
 import {
   ApiCreatedResponse,
@@ -16,12 +15,14 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
-  ApiQuery,
   ApiTags,
 } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import { AdminOnly } from "../auth/decorators/roles.decorator";
 import { UploadUrlResponseDto } from "../common/dto/upload-url-response.dto";
+import { FilteringParams } from "../common/pagination/filtering-params.decorator";
+import { Filter, Sorting } from "../common/pagination/pagination.types";
+import { SortingParams } from "../common/pagination/sorting-params.decorator";
 import { CreateSeasonDto } from "./dto/request/create-season.dto";
 import { UpdateSeasonDto } from "./dto/request/update-season.dto";
 import { SeasonResponseDto } from "./dto/response/season-response.dto";
@@ -40,12 +41,19 @@ export class SeasonController {
     return this.seasonService.create(createSeasonDto);
   }
 
-  @ApiOperation({ summary: "List seasons, optionally filtered by title" })
-  @ApiQuery({ name: "titleId", required: false, format: "uuid" })
+  @ApiOperation({
+    summary: "List seasons, filterable and sortable",
+    description:
+      "`filter` (repeatable): `property:rule:value`, e.g. `filter=titleId:eq:<uuid>`. Filterable: titleId, number, name. " +
+      "`sort`: `property:direction`, defaults to number:asc. Sortable: number, name, createdAt.",
+  })
   @ApiOkResponse({ type: [SeasonResponseDto] })
   @Get()
-  async findAll(@Query("titleId") titleId?: string) {
-    return this.seasonService.findAll(titleId);
+  async findAll(
+    @FilteringParams(["titleId", "number", "name"]) filters: Filter[],
+    @SortingParams(["number", "name", "createdAt"]) sort?: Sorting,
+  ) {
+    return this.seasonService.findAll(filters, sort);
   }
 
   @ApiOperation({ summary: "Get a season by id" })

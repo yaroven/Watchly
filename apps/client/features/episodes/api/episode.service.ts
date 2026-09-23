@@ -19,9 +19,8 @@ const mapEpisode = (episode: ApiEpisode): Episode => ({
 const EpisodeService = {
   getAll: async (seasonId: string): Promise<Episode[]> => {
     const { data } = await api.get<ApiEpisode[]>(`/${prefix}`, {
-      params: {
-        seasonId,
-      },
+      params: { filter: [`seasonId:eq:${seasonId}`] },
+      paramsSerializer: { indexes: null },
     });
     return data.map(mapEpisode);
   },

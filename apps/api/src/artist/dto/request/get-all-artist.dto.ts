@@ -1,11 +1,8 @@
-import { ApiPropertyOptional } from "@nestjs/swagger";
-import { IsOptional, IsString, MaxLength } from "class-validator";
+import { IntersectionType, OmitType } from "@nestjs/swagger";
 import { PaginatedQueryDto } from "../../../common/dto/paginated-query.dto";
+import { QueryWithFilterSortDto } from "../../../common/pagination/query-with-filter-sort.dto";
 
-export class GetAllArtistDto extends PaginatedQueryDto {
-  @ApiPropertyOptional({ maxLength: 255, description: "Case-insensitive substring match on name" })
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  search?: string;
-}
+export class GetAllArtistDto extends IntersectionType(
+  OmitType(PaginatedQueryDto, ["sort", "sortBy"]),
+  QueryWithFilterSortDto,
+) {}
