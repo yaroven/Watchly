@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
-import { Episode, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { settleAllOrLog } from "../common/settle-all-or-throw.util";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
@@ -8,6 +8,7 @@ import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
 import { CreateEpisodeDto } from "./dto/request/create-episode.dto";
 import { UpdateEpisodeDto } from "./dto/request/update-episode.dto";
+import { EpisodeResponseDto } from "./dto/response/episode-response.dto";
 import { getEpisodeTitleAndSeasonId } from "./episode-path.util";
 
 @Injectable()
@@ -20,9 +21,10 @@ export class EpisodeService {
     private readonly s3Service: S3Service,
   ) {}
 
-  async create(data: CreateEpisodeDto): Promise<Episode> {
+  async create(data: CreateEpisodeDto): Promise<EpisodeResponseDto> {
     try {
-      return await this.prisma.episode.create({ data });
+      const episode = await this.prisma.episode.create({ data });
+      return new EpisodeResponseDto(episode);
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -38,12 +40,13 @@ export class EpisodeService {
     }
   }
 
-  async findAll(seasonId?: string): Promise<Episode[]> {
+  async findAll(seasonId?: string): Promise<EpisodeResponseDto[]> {
     const where = seasonId ? { seasonId } : {};
-    return this.prisma.episode.findMany({
+    const episodes = await this.prisma.episode.findMany({
       where,
       orderBy: { number: "asc" },
     });
+    return episodes.map((episode) => new EpisodeResponseDto(episode));
   }
 
   async findOneDetailed(id: string) {
@@ -53,31 +56,31 @@ export class EpisodeService {
     });
   }
 
-  async findOne(id: string): Promise<Episode | null> {
-    return this.prisma.episode.findUnique({ where: { id } });
+  async findOne(id: string): Promise<EpisodeResponseDto | null> {
+    const episode = await this.prisma.episode.findUnique({ where: { id } });
+    return episode ? new EpisodeResponseDto(episode) : null;
   }
 
-  async update(id: string, data: UpdateEpisodeDto): Promise<Episode> {
-    if (data.number) {
-      const episode = await this.findOne(id);
-      if (!episode) throw new BadRequestException(`Episode with id ${id} not found`);
+  async update(id: string, data: UpdateEpisodeDto): Promise<EpisodeResponseDto> {
+    const episode = await this.findOne(id);
+    if (!episode) throw new BadRequestException(`Episode with id ${id} not found`);
 
-      const existingEpisode = await this.prisma.episode.findFirst({
-        where: {
-          seasonId: episode.seasonId,
-          number: data.number,
-          id: { not: id },
-        },
-      });
+    const existingEpisode = await this.prisma.episode.findFirst({
+      where: {
+        seasonId: episode.seasonId,
+        number: data.number,
+        id: { not: id },
+      },
+    });
 
-      if (existingEpisode)
-        throw new BadRequestException(
-          `Episode with number ${data.number} already exists in this season`,
-        );
-    }
+    if (existingEpisode)
+      throw new BadRequestException(
+        `Episode with number ${data.number} already exists in this season`,
+      );
 
     try {
-      return await this.prisma.episode.update({ where: { id }, data });
+      const updated = await this.prisma.episode.update({ where: { id }, data });
+      return new EpisodeResponseDto(updated);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         throw new BadRequestException(
@@ -88,7 +91,7 @@ export class EpisodeService {
     }
   }
 
-  async delete(id: string): Promise<Episode> {
+  async delete(id: string): Promise<EpisodeResponseDto> {
     const episode = await this.findOneDetailed(id);
     if (!episode) throw new BadRequestException(`Episode with id ${id} not found`);
 
@@ -118,7 +121,7 @@ export class EpisodeService {
       { itemLabel: "asset", parentLabel: "episode", parentId: id },
     );
 
-    return deleted;
+    return new EpisodeResponseDto(deleted);
   }
 
   async transcode(id: string): Promise<void> {

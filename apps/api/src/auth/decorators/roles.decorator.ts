@@ -13,3 +13,6 @@ export const ROLES_KEY = Reflector.createDecorator<Role[]>();
  */
 export const Roles = (roles: Role[]) =>
   applyDecorators(ROLES_KEY(roles), UseGuards(JwtAuthGuard, RolesGuard));
+
+/** `@Roles([Role.ADMIN])` — the only role ever gated on today. */
+export const AdminOnly = () => Roles([Role.ADMIN]);

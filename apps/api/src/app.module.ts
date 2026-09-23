@@ -6,6 +6,7 @@ import { JwtModule, JwtModuleOptions } from "@nestjs/jwt";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { LoggerModule } from "nestjs-pino";
 import { AppController } from "./app.controller";
+import { ArtistModule } from "./artist/artist.module";
 import { AuthModule } from "./auth/auth.module";
 import jwtConfig, { JwtConfig, JwtConfigName } from "./config/jwt.config";
 import loggerConfig, {
@@ -20,6 +21,7 @@ import redisConfig, {
 } from "./config/redis.config";
 import s3Config from "./config/s3.config";
 import { EpisodeModule } from "./episode/episode.module";
+import { GenreModule } from "./genre/genre.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { S3EventModule } from "./s3-event/s3-event.module";
 import { S3Module } from "./s3/s3.module";
@@ -78,6 +80,8 @@ import { VideoTranscoderModule } from "./video-transcoder/video-transcoder.modul
     S3EventModule,
     AuthModule,
     UserModule,
+    ArtistModule,
+    GenreModule,
   ],
   controllers: [AppController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

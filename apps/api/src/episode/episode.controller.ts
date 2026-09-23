@@ -20,8 +20,7 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
-import { Role } from "@prisma/client";
-import { Roles } from "../auth/decorators/roles.decorator";
+import { AdminOnly } from "../auth/decorators/roles.decorator";
 import { UrlResponseDto } from "../common/dto/url-response.dto";
 import { CreateEpisodeDto } from "./dto/request/create-episode.dto";
 import { UpdateEpisodeDto } from "./dto/request/update-episode.dto";
@@ -35,11 +34,10 @@ export class EpisodeController {
 
   @ApiOperation({ summary: "Create an episode for a season" })
   @ApiCreatedResponse({ type: EpisodeResponseDto })
-  @Roles([Role.ADMIN])
+  @AdminOnly()
   @Post()
   async create(@Body() createEpisodeDto: CreateEpisodeDto) {
-    const episode = await this.episodeService.create(createEpisodeDto);
-    return new EpisodeResponseDto(episode);
+    return this.episodeService.create(createEpisodeDto);
   }
 
   @ApiOperation({ summary: "List episodes, optionally filtered by season" })
@@ -47,8 +45,7 @@ export class EpisodeController {
   @ApiOkResponse({ type: [EpisodeResponseDto] })
   @Get()
   async findAll(@Query("seasonId") seasonId?: string) {
-    const episodes = await this.episodeService.findAll(seasonId);
-    return episodes.map((episode) => new EpisodeResponseDto(episode));
+    return this.episodeService.findAll(seasonId);
   }
 
   @ApiOperation({ summary: "Get an episode by id" })
@@ -61,36 +58,34 @@ export class EpisodeController {
 
     if (!episode) throw new NotFoundException(`Episode with id ${id} not found`);
 
-    return new EpisodeResponseDto(episode);
+    return episode;
   }
 
   @ApiOperation({ summary: "Update an episode" })
   @ApiParam({ name: "id", format: "uuid" })
   @ApiOkResponse({ type: EpisodeResponseDto })
   @ApiNotFoundResponse({ description: "Episode not found" })
-  @Roles([Role.ADMIN])
+  @AdminOnly()
   @Patch(":id")
   async update(@Param("id", ParseUUIDPipe) id: string, @Body() updateEpisodeDto: UpdateEpisodeDto) {
-    const episode = await this.episodeService.update(id, updateEpisodeDto);
-    return new EpisodeResponseDto(episode);
+    return this.episodeService.update(id, updateEpisodeDto);
   }
 
   @ApiOperation({ summary: "Delete an episode" })
   @ApiParam({ name: "id", format: "uuid" })
   @ApiOkResponse({ type: EpisodeResponseDto })
   @ApiNotFoundResponse({ description: "Episode not found" })
-  @Roles([Role.ADMIN])
+  @AdminOnly()
   @Delete(":id")
   async delete(@Param("id", ParseUUIDPipe) id: string) {
-    const episode = await this.episodeService.delete(id);
-    return new EpisodeResponseDto(episode);
+    return this.episodeService.delete(id);
   }
 
   @ApiOperation({ summary: "Schedule HLS transcoding for an episode" })
   @ApiParam({ name: "id", format: "uuid" })
   @ApiOkResponse({ description: "Transcoding scheduled" })
   @ApiNotFoundResponse({ description: "Episode not found" })
-  @Roles([Role.ADMIN])
+  @AdminOnly()
   @Throttle({ default: { limit: 3, ttl: 60000 } })
   @Post(":id/transcode")
   transcode(@Param("id", ParseUUIDPipe) id: string) {
@@ -101,7 +96,7 @@ export class EpisodeController {
   @ApiParam({ name: "id", format: "uuid" })
   @ApiOkResponse({ type: UrlResponseDto })
   @ApiNotFoundResponse({ description: "Episode not found" })
-  @Roles([Role.ADMIN])
+  @AdminOnly()
   @Throttle({ default: { limit: 3, ttl: 60000 } })
   @Get(":id/upload-url")
   getUploadUrl(@Param("id", ParseUUIDPipe) id: string) {

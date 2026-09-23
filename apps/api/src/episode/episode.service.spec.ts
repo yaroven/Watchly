@@ -178,92 +178,74 @@ describe("EpisodeService", () => {
   });
 
   describe("update", () => {
-    describe("when number is provided", () => {
-      describe("when episode not found", () => {
-        beforeEach(() => {
-          (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
-        });
+    const updateData = { number: 2, name: "New Name", description: "New Desc" };
 
-        test("should throw BadRequestException", async () => {
-          const action = service.update("non-existent", { number: 2 });
-          await expect(action).rejects.toThrow(BadRequestException);
-        });
+    describe("when episode does not exist", () => {
+      beforeEach(() => {
+        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
       });
 
-      describe("when episode found but number already taken", () => {
-        const episode = { id: "episode-1", seasonId: "season-1" };
-        beforeEach(() => {
-          (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(episode);
-          (prismaMock.episode.findFirst as jest.Mock).mockResolvedValue({ id: "existing-id" });
-        });
-
-        test("should throw BadRequestException", async () => {
-          const action = service.update("episode-1", { number: 2 });
-          await expect(action).rejects.toThrow(BadRequestException);
-        });
-      });
-
-      describe("when episode found and number is available", () => {
-        const episode = { id: "episode-1", seasonId: "season-1" };
-        const updatedEpisode = { ...episode, number: 2 };
-        beforeEach(() => {
-          (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(episode);
-          (prismaMock.episode.findFirst as jest.Mock).mockResolvedValue(null);
-          (prismaMock.episode.update as jest.Mock).mockResolvedValue(updatedEpisode);
-        });
-
-        test("should update and return the episode", async () => {
-          const result = await service.update("episode-1", { number: 2 });
-          expect(prismaMock.episode.findFirst).toHaveBeenCalledWith({
-            where: {
-              seasonId: "season-1",
-              number: 2,
-              id: { not: "episode-1" },
-            },
-          });
-          expect(prismaMock.episode.update).toHaveBeenCalledWith({
-            where: { id: "episode-1" },
-            data: { number: 2 },
-          });
-          expect(result).toEqual(updatedEpisode);
-        });
-      });
-
-      describe("when a concurrent request wins the race after the pre-check", () => {
-        const episode = { id: "episode-1", seasonId: "season-1" };
-        beforeEach(() => {
-          (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(episode);
-          (prismaMock.episode.findFirst as jest.Mock).mockResolvedValue(null);
-          (prismaMock.episode.update as jest.Mock).mockRejectedValue(
-            new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
-              code: "P2002",
-              clientVersion: "test",
-            }),
-          );
-        });
-
-        test("should throw BadRequestException instead of the raw Prisma error", async () => {
-          const action = service.update("episode-1", { number: 2 });
-          await expect(action).rejects.toThrow(BadRequestException);
-        });
+      test("should throw BadRequestException", async () => {
+        const action = service.update("non-existent", updateData);
+        await expect(action).rejects.toThrow(BadRequestException);
       });
     });
 
-    describe("when number is not provided", () => {
-      const updatedEpisode = { id: "episode-1", name: "New Name" };
+    describe("when episode exists but the number is already taken by another episode", () => {
+      const episode = { id: "episode-1", seasonId: "season-1" };
       beforeEach(() => {
+        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(episode);
+        (prismaMock.episode.findFirst as jest.Mock).mockResolvedValue({ id: "existing-id" });
+      });
+
+      test("should throw BadRequestException", async () => {
+        const action = service.update("episode-1", updateData);
+        await expect(action).rejects.toThrow(BadRequestException);
+      });
+    });
+
+    describe("when episode exists and the number is available", () => {
+      const episode = { id: "episode-1", seasonId: "season-1" };
+      const updatedEpisode = { ...episode, ...updateData };
+      beforeEach(() => {
+        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(episode);
+        (prismaMock.episode.findFirst as jest.Mock).mockResolvedValue(null);
         (prismaMock.episode.update as jest.Mock).mockResolvedValue(updatedEpisode);
       });
 
-      test("should update and return without checking number availability", async () => {
-        const result = await service.update("episode-1", { name: "New Name" });
-        expect(prismaMock.episode.findUnique).not.toHaveBeenCalled();
-        expect(prismaMock.episode.findFirst).not.toHaveBeenCalled();
+      test("should update and return the episode", async () => {
+        const result = await service.update("episode-1", updateData);
+        expect(prismaMock.episode.findFirst).toHaveBeenCalledWith({
+          where: {
+            seasonId: "season-1",
+            number: updateData.number,
+            id: { not: "episode-1" },
+          },
+        });
         expect(prismaMock.episode.update).toHaveBeenCalledWith({
           where: { id: "episode-1" },
-          data: { name: "New Name" },
+          data: updateData,
         });
         expect(result).toEqual(updatedEpisode);
+      });
+    });
+
+    describe("when a concurrent request wins the race after the pre-check", () => {
+      const episode = { id: "episode-1", seasonId: "season-1" };
+      beforeEach(() => {
+        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(episode);
+        (prismaMock.episode.findFirst as jest.Mock).mockResolvedValue(null);
+        (prismaMock.episode.update as jest.Mock).mockRejectedValue(
+          new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+            code: "P2002",
+            clientVersion: "test",
+          }),
+        );
+      });
+
+      test("should throw BadRequestException instead of the raw Prisma error", async () => {
+        const action = service.update("episode-1", updateData);
+        await expect(action).rejects.toThrow(BadRequestException);
       });
     });
   });
@@ -309,7 +291,7 @@ describe("EpisodeService", () => {
         );
         expect(prismaMock.episode.delete).toHaveBeenCalledWith({ where: { id: "episode-1" } });
 
-        expect(result).toEqual(episode);
+        expect(result).toEqual({ id: episode.id, seasonId: episode.seasonId });
       });
     });
   });

@@ -96,7 +96,7 @@ describe("SeasonController", () => {
   });
 
   describe("update", () => {
-    const updateData = { name: "New Season" };
+    const updateData = { number: 1, name: "New Season", description: "Desc", titleId: "title-1" };
     const updatedSeason = { id: "season-1", name: "New Season" };
 
     beforeEach(() => {
