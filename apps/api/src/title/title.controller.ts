@@ -19,13 +19,15 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
+import { Role } from "@prisma/client";
+import { Roles } from "../auth/decorators/roles.decorator";
 import { UploadUrlResponseDto } from "../common/dto/upload-url-response.dto";
 import { UrlResponseDto } from "../common/dto/url-response.dto";
 import { CreateTitleDto } from "./dto/request/create-title.dto";
 import { GetAllTitleDto } from "./dto/request/get-all-title.dto";
 import { UpdateTitleDto } from "./dto/request/update-title.dto";
 import { TitleListResponseDto } from "./dto/response/title-list.response.dto";
-import { TitleEntity } from "./entities/title.entity";
+import { TitleResponseDto } from "./dto/response/title-response.dto";
 import { TitleService } from "./title.service";
 
 @ApiTags("titles")
@@ -34,10 +36,12 @@ export class TitleController {
   constructor(private readonly titleService: TitleService) {}
 
   @ApiOperation({ summary: "Create a title (movie or series)" })
-  @ApiCreatedResponse({ type: TitleEntity })
+  @ApiCreatedResponse({ type: TitleResponseDto })
+  @Roles([Role.ADMIN])
   @Post()
-  create(@Body() data: CreateTitleDto) {
-    return this.titleService.create(data);
+  async create(@Body() data: CreateTitleDto) {
+    const title = await this.titleService.create(data);
+    return new TitleResponseDto(title);
   }
 
   @ApiOperation({ summary: "Get a presigned playback URL for a movie" })
@@ -51,13 +55,14 @@ export class TitleController {
   @ApiOperation({ summary: "List titles with search, filter, sort, and pagination" })
   @ApiOkResponse({ type: TitleListResponseDto })
   @Get()
-  findAll(@Query() query: GetAllTitleDto) {
-    return this.titleService.findAll(query);
+  async findAll(@Query() query: GetAllTitleDto) {
+    const { items, totalCount } = await this.titleService.findAll(query);
+    return { items: items.map((title) => new TitleResponseDto(title)), totalCount };
   }
 
   @ApiOperation({ summary: "Get a title by id" })
   @ApiParam({ name: "id", format: "uuid" })
-  @ApiOkResponse({ type: TitleEntity })
+  @ApiOkResponse({ type: TitleResponseDto })
   @ApiNotFoundResponse({ description: "Title not found" })
   @Get(":id")
   async findOne(@Param("id", ParseUUIDPipe) id: string) {
@@ -65,16 +70,18 @@ export class TitleController {
 
     if (!title) throw new NotFoundException(`Title with id ${id} not found`);
 
-    return title;
+    return new TitleResponseDto(title);
   }
 
   @ApiOperation({ summary: "Update a title" })
   @ApiParam({ name: "id", format: "uuid" })
-  @ApiOkResponse({ type: TitleEntity })
+  @ApiOkResponse({ type: TitleResponseDto })
   @ApiNotFoundResponse({ description: "Title not found" })
+  @Roles([Role.ADMIN])
   @Patch(":id")
-  update(@Param("id", ParseUUIDPipe) id: string, @Body() data: UpdateTitleDto) {
-    return this.titleService.update(id, data);
+  async update(@Param("id", ParseUUIDPipe) id: string, @Body() data: UpdateTitleDto) {
+    const title = await this.titleService.update(id, data);
+    return new TitleResponseDto(title);
   }
 
   @ApiOperation({ summary: "Get a presigned URL to upload the raw movie file" })
@@ -82,6 +89,7 @@ export class TitleController {
   @ApiOkResponse({ type: UrlResponseDto })
   @ApiNotFoundResponse({ description: "Title not found" })
   @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @Roles([Role.ADMIN])
   @Get(":id/upload-url")
   getUploadUrl(@Param("id", ParseUUIDPipe) id: string) {
     return this.titleService.createMovieUploadingUrl(id);
@@ -92,6 +100,7 @@ export class TitleController {
   @ApiOkResponse({ type: UploadUrlResponseDto })
   @ApiNotFoundResponse({ description: "Title not found" })
   @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @Roles([Role.ADMIN])
   @Get(":id/poster-upload-url")
   getPosterUploadUrl(@Param("id", ParseUUIDPipe) id: string) {
     return this.titleService.createPosterUploadingUrl(id);
@@ -102,6 +111,7 @@ export class TitleController {
   @ApiOkResponse({ description: "Transcoding scheduled" })
   @ApiNotFoundResponse({ description: "Title not found" })
   @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @Roles([Role.ADMIN])
   @Post(":id/transcode")
   transcodeMovie(@Param("id", ParseUUIDPipe) id: string) {
     return this.titleService.transcode(id);
@@ -109,10 +119,12 @@ export class TitleController {
 
   @ApiOperation({ summary: "Delete a title and cascade-delete its seasons/episodes" })
   @ApiParam({ name: "id", format: "uuid" })
-  @ApiOkResponse({ type: TitleEntity })
+  @ApiOkResponse({ type: TitleResponseDto })
   @ApiNotFoundResponse({ description: "Title not found" })
+  @Roles([Role.ADMIN])
   @Delete(":id")
-  delete(@Param("id", ParseUUIDPipe) id: string) {
-    return this.titleService.delete(id);
+  async delete(@Param("id", ParseUUIDPipe) id: string) {
+    const title = await this.titleService.delete(id);
+    return new TitleResponseDto(title);
   }
 }

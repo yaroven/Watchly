@@ -1,25 +1,8 @@
-import { ApiPropertyOptional } from "@nestjs/swagger";
-import { IsInt, IsOptional, IsString, MaxLength, Min } from "class-validator";
+import { ApiPropertyOptional, PartialType } from "@nestjs/swagger";
+import { IsOptional, IsString, MaxLength } from "class-validator";
+import { CreateSeasonDto } from "./create-season.dto";
 
-export class UpdateSeasonDto {
-  @ApiPropertyOptional({ minimum: 1 })
-  @IsInt()
-  @IsOptional()
-  @Min(1)
-  number?: number;
-
-  @ApiPropertyOptional({ maxLength: 255 })
-  @IsString()
-  @IsOptional()
-  @MaxLength(255)
-  name?: string;
-
-  @ApiPropertyOptional({ maxLength: 2000 })
-  @IsString()
-  @IsOptional()
-  @MaxLength(2000)
-  description?: string;
-
+export class UpdateSeasonDto extends PartialType(CreateSeasonDto) {
   @ApiPropertyOptional({ maxLength: 2048, description: "Must be a backend-generated poster URL" })
   @IsString()
   @IsOptional()

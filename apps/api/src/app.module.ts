@@ -2,9 +2,12 @@ import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
+import { JwtModule, JwtModuleOptions } from "@nestjs/jwt";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { LoggerModule } from "nestjs-pino";
 import { AppController } from "./app.controller";
+import { AuthModule } from "./auth/auth.module";
+import jwtConfig, { JwtConfig, JwtConfigName } from "./config/jwt.config";
 import loggerConfig, {
   buildLoggerParams,
   LoggerConfig,
@@ -22,6 +25,7 @@ import { S3EventModule } from "./s3-event/s3-event.module";
 import { S3Module } from "./s3/s3.module";
 import { SeasonModule } from "./season/season.module";
 import { TitleModule } from "./title/title.module";
+import { UserModule } from "./user/user.module";
 import { VideoTranscoderModule } from "./video-transcoder/video-transcoder.module";
 
 @Module({
@@ -38,6 +42,17 @@ import { VideoTranscoderModule } from "./video-transcoder/video-transcoder.modul
         },
       ],
     }),
+    JwtModule.registerAsync({
+      global: true,
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const jwt = configService.get<JwtConfig>(JwtConfigName)!;
+        return {
+          secret: jwt.secret,
+          signOptions: { expiresIn: jwt.expiresIn } as JwtModuleOptions["signOptions"],
+        };
+      },
+    }),
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
@@ -52,7 +67,7 @@ import { VideoTranscoderModule } from "./video-transcoder/video-transcoder.modul
     }),
     S3Module,
     ConfigModule.forRoot({
-      load: [s3Config, redisConfig, loggerConfig],
+      load: [s3Config, redisConfig, loggerConfig, jwtConfig],
       isGlobal: true,
     }),
     VideoTranscoderModule,
@@ -61,6 +76,8 @@ import { VideoTranscoderModule } from "./video-transcoder/video-transcoder.modul
     EpisodeModule,
     SeasonModule,
     S3EventModule,
+    AuthModule,
+    UserModule,
   ],
   controllers: [AppController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

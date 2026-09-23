@@ -34,7 +34,7 @@ describe("VideoTranscoderController", () => {
   describe("getProgress", () => {
     describe("when type is episode", () => {
       describe("when progress is found", () => {
-        const progressData = { progress: 50 };
+        const progressData = { id: "progress-1", episodeId: "vid-1", progressPercentage: 50 };
 
         beforeEach(() => {
           (videoTranscoderServiceMock.getProgress as jest.Mock).mockResolvedValue(progressData);
@@ -63,7 +63,7 @@ describe("VideoTranscoderController", () => {
     });
 
     describe("when type is movie", () => {
-      const progressData = { progress: 80 };
+      const progressData = { id: "progress-2", titleId: "vid-1", progressPercentage: 80 };
 
       beforeEach(() => {
         (videoTranscoderServiceMock.getProgress as jest.Mock).mockResolvedValue(progressData);

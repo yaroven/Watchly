@@ -1,25 +1,8 @@
-import { ApiPropertyOptional } from "@nestjs/swagger";
-import { TitleType } from "@prisma/client";
-import { IsEnum, IsOptional, IsString, MaxLength } from "class-validator";
+import { ApiPropertyOptional, PartialType } from "@nestjs/swagger";
+import { IsOptional, IsString, MaxLength } from "class-validator";
+import { CreateTitleDto } from "./create-title.dto";
 
-export class UpdateTitleDto {
-  @ApiPropertyOptional({ maxLength: 255 })
-  @IsString()
-  @IsOptional()
-  @MaxLength(255)
-  name?: string;
-
-  @ApiPropertyOptional({ maxLength: 2000 })
-  @IsString()
-  @IsOptional()
-  @MaxLength(2000)
-  description?: string;
-
-  @ApiPropertyOptional({ enum: TitleType })
-  @IsEnum(TitleType)
-  @IsOptional()
-  type?: TitleType;
-
+export class UpdateTitleDto extends PartialType(CreateTitleDto) {
   @ApiPropertyOptional({ maxLength: 2048, description: "Must be a backend-generated poster URL" })
   @IsString()
   @IsOptional()

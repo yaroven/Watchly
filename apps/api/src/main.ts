@@ -1,6 +1,7 @@
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { Logger } from "nestjs-pino";
 import { AppModule } from "./app.module";
@@ -17,7 +18,7 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
-
+  app.use(cookieParser());
   app.useLogger(app.get(Logger));
 
   app.use(helmet());
@@ -28,7 +29,11 @@ async function bootstrap() {
     DEV_DEFAULTS.CORS_ALLOWED_ORIGINS,
   );
   const allowedOrigins = corsAllowedOrigins.split(",").map((origin) => origin.trim());
-  app.enableCors({ origin: allowedOrigins });
+  // credentials: true is required for the browser to accept the response at all when the
+  // client sends withCredentials: true (needed to carry the httpOnly refresh-token cookie).
+  // Without it, the request still succeeds server-side but the browser silently blocks the
+  // response as a CORS violation.
+  app.enableCors({ origin: allowedOrigins, credentials: true });
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle("Watchly API")
