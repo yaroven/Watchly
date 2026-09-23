@@ -1,9 +1,9 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { TitleEntity } from "../../entities/title.entity";
+import { TitleResponseDto } from "./title-response.dto";
 
 export class TitleListResponseDto {
-  @ApiProperty({ type: [TitleEntity] })
-  items: TitleEntity[];
+  @ApiProperty({ type: [TitleResponseDto] })
+  items: TitleResponseDto[];
 
   @ApiProperty()
   totalCount: number;
