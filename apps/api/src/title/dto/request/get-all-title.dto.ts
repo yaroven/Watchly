@@ -1,9 +1,9 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import { TitleType, TranscodingStatus } from "@prisma/client";
-import { Transform } from "class-transformer";
-import { IsEnum, IsInt, IsOptional, IsString, Max, MaxLength, Min } from "class-validator";
+import { IsEnum, IsOptional, IsString, MaxLength } from "class-validator";
+import { PaginatedQueryDto } from "../../../common/dto/paginated-query.dto";
 
-export class GetAllTitleDto {
+export class GetAllTitleDto extends PaginatedQueryDto {
   @ApiPropertyOptional({ maxLength: 255, description: "Case-insensitive substring match on name" })
   @IsOptional()
   @IsString()
@@ -19,30 +19,4 @@ export class GetAllTitleDto {
   @IsOptional()
   @IsEnum(TranscodingStatus)
   transcodingStatus?: TranscodingStatus;
-
-  @ApiPropertyOptional({ minimum: 1, default: 1 })
-  @IsOptional()
-  @Transform(({ value }) => parseInt(value as string))
-  @IsInt()
-  @Min(1)
-  page?: number;
-
-  @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 10 })
-  @IsOptional()
-  @Transform(({ value }) => parseInt(value as string))
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit?: number;
-
-  @ApiPropertyOptional({ enum: ["asc", "desc"] })
-  @IsOptional()
-  @IsEnum(["asc", "desc"])
-  sort?: "asc" | "desc";
-
-  @ApiPropertyOptional({ maxLength: 100, description: "Title field name to sort by" })
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  sortBy?: string;
 }
