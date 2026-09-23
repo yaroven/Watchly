@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { TitleType, TranscodingStatus } from "@prisma/client";
+import { Title, TitleType, TranscodingStatus } from "@prisma/client";
 
-export class TitleEntity {
+export class TitleResponseDto {
   @ApiProperty({ format: "uuid" })
   id: string;
 
@@ -28,4 +28,16 @@ export class TitleEntity {
 
   @ApiProperty({ enum: TranscodingStatus })
   transcodingStatus: TranscodingStatus;
+
+  constructor(title: Title) {
+    this.id = title.id;
+    this.createdAt = title.createdAt;
+    this.updatedAt = title.updatedAt;
+    this.name = title.name;
+    this.description = title.description;
+    this.type = title.type;
+    this.posterUrl = title.posterUrl;
+    this.hlsUrl = title.hlsUrl;
+    this.transcodingStatus = title.transcodingStatus;
+  }
 }

@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { Season } from "@prisma/client";
 
-export class SeasonEntity {
+export class SeasonResponseDto {
   @ApiProperty({ format: "uuid" })
   id: string;
 
@@ -24,4 +25,15 @@ export class SeasonEntity {
 
   @ApiProperty({ format: "uuid" })
   titleId: string;
+
+  constructor(season: Season) {
+    this.id = season.id;
+    this.createdAt = season.createdAt;
+    this.updatedAt = season.updatedAt;
+    this.number = season.number;
+    this.name = season.name;
+    this.description = season.description;
+    this.posterUrl = season.posterUrl;
+    this.titleId = season.titleId;
+  }
 }

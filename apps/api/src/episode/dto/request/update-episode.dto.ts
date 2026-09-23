@@ -1,22 +1,5 @@
-import { ApiPropertyOptional } from "@nestjs/swagger";
-import { IsInt, IsOptional, IsString, MaxLength, Min } from "class-validator";
+import { OmitType, PartialType } from "@nestjs/swagger";
+import { CreateEpisodeDto } from "./create-episode.dto";
 
-export class UpdateEpisodeDto {
-  @ApiPropertyOptional({ minimum: 1 })
-  @IsInt()
-  @IsOptional()
-  @Min(1)
-  number?: number;
-
-  @ApiPropertyOptional({ maxLength: 255 })
-  @IsString()
-  @IsOptional()
-  @MaxLength(255)
-  name?: string;
-
-  @ApiPropertyOptional({ maxLength: 2000 })
-  @IsString()
-  @IsOptional()
-  @MaxLength(2000)
-  description?: string;
-}
+/** `seasonId` is deliberately excluded — an episode doesn't move between seasons via update. */
+export class UpdateEpisodeDto extends PartialType(OmitType(CreateEpisodeDto, ["seasonId"])) {}
