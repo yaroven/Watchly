@@ -98,7 +98,7 @@ describe("EpisodeController", () => {
   });
 
   describe("update", () => {
-    const updateData = { name: "New Episode" };
+    const updateData = { number: 1, name: "New Episode", description: "Desc" };
     const updatedEpisode = { id: "episode-1", name: "New Episode" };
 
     beforeEach(() => {

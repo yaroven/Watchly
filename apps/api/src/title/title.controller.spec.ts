@@ -1,5 +1,6 @@
 import { NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
+import { FilterRule } from "../common/pagination/filter-rule.enum";
 import { TitleController } from "./title.controller";
 import { TitleService } from "./title.service";
 
@@ -37,7 +38,20 @@ describe("TitleController", () => {
   });
 
   describe("create", () => {
-    const createData = { name: "Title", type: "MOVIE" as any, description: "Desc" };
+    const createData = {
+      name: "Title",
+      type: "MOVIE" as any,
+      description: "Desc",
+      ageRating: "AGE_0" as any,
+      country: "US",
+      releaseDate: "2026-01-01",
+      language: "en",
+      trailerUrl: "https://example.com/trailer.mp4",
+      runtime: 120,
+      network: "Netflix",
+      director: "Jane Doe",
+      closedCaption: true,
+    };
     const createdTitle = { id: "title-1", ...createData };
 
     beforeEach(() => {
@@ -67,6 +81,8 @@ describe("TitleController", () => {
 
   describe("findAll", () => {
     const query = { page: 1, limit: 10 };
+    const sort = { property: "name", direction: "asc" as const };
+    const filters = [{ property: "type", rule: FilterRule.EQ, value: "MOVIE" }];
     const titlesResponse = { items: [{ id: "title-1" }], totalCount: 1 };
 
     beforeEach(() => {
@@ -74,8 +90,8 @@ describe("TitleController", () => {
     });
 
     test("should return list of titles", async () => {
-      const result = await controller.findAll(query);
-      expect(titleServiceMock.findAll).toHaveBeenCalledWith(query);
+      const result = await controller.findAll(query, sort, filters);
+      expect(titleServiceMock.findAll).toHaveBeenCalledWith(query, sort, filters);
       expect(result).toEqual(titlesResponse);
     });
   });

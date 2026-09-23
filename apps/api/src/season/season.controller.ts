@@ -20,8 +20,7 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
-import { Role } from "@prisma/client";
-import { Roles } from "../auth/decorators/roles.decorator";
+import { AdminOnly } from "../auth/decorators/roles.decorator";
 import { UploadUrlResponseDto } from "../common/dto/upload-url-response.dto";
 import { CreateSeasonDto } from "./dto/request/create-season.dto";
 import { UpdateSeasonDto } from "./dto/request/update-season.dto";
@@ -35,11 +34,10 @@ export class SeasonController {
 
   @ApiOperation({ summary: "Create a season for a title" })
   @ApiCreatedResponse({ type: SeasonResponseDto })
-  @Roles([Role.ADMIN])
+  @AdminOnly()
   @Post()
   async create(@Body() createSeasonDto: CreateSeasonDto) {
-    const season = await this.seasonService.create(createSeasonDto);
-    return new SeasonResponseDto(season);
+    return this.seasonService.create(createSeasonDto);
   }
 
   @ApiOperation({ summary: "List seasons, optionally filtered by title" })
@@ -47,8 +45,7 @@ export class SeasonController {
   @ApiOkResponse({ type: [SeasonResponseDto] })
   @Get()
   async findAll(@Query("titleId") titleId?: string) {
-    const seasons = await this.seasonService.findAll(titleId);
-    return seasons.map((season) => new SeasonResponseDto(season));
+    return this.seasonService.findAll(titleId);
   }
 
   @ApiOperation({ summary: "Get a season by id" })
@@ -63,25 +60,24 @@ export class SeasonController {
       throw new NotFoundException(`Season with id ${id} not found`);
     }
 
-    return new SeasonResponseDto(season);
+    return season;
   }
 
   @ApiOperation({ summary: "Update a season" })
   @ApiParam({ name: "id", format: "uuid" })
   @ApiOkResponse({ type: SeasonResponseDto })
   @ApiNotFoundResponse({ description: "Season not found" })
-  @Roles([Role.ADMIN])
+  @AdminOnly()
   @Patch(":id")
   async update(@Param("id", ParseUUIDPipe) id: string, @Body() updateSeasonDto: UpdateSeasonDto) {
-    const season = await this.seasonService.update(id, updateSeasonDto);
-    return new SeasonResponseDto(season);
+    return this.seasonService.update(id, updateSeasonDto);
   }
 
   @ApiOperation({ summary: "Get a presigned URL to upload the season's poster" })
   @ApiParam({ name: "id", format: "uuid" })
   @ApiOkResponse({ type: UploadUrlResponseDto })
   @ApiNotFoundResponse({ description: "Season not found" })
-  @Roles([Role.ADMIN])
+  @AdminOnly()
   @Throttle({ default: { limit: 3, ttl: 60000 } })
   @Get(":id/poster-upload-url")
   getPosterUploadUrl(@Param("id", ParseUUIDPipe) id: string) {
@@ -92,10 +88,9 @@ export class SeasonController {
   @ApiParam({ name: "id", format: "uuid" })
   @ApiOkResponse({ type: SeasonResponseDto })
   @ApiNotFoundResponse({ description: "Season not found" })
-  @Roles([Role.ADMIN])
+  @AdminOnly()
   @Delete(":id")
   async delete(@Param("id", ParseUUIDPipe) id: string) {
-    const season = await this.seasonService.delete(id);
-    return new SeasonResponseDto(season);
+    return this.seasonService.delete(id);
   }
 }

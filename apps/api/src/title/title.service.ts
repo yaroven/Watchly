@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
-import { Prisma, Title, TitleType } from "@prisma/client";
+import { Prisma, TitleType } from "@prisma/client";
+import { Filter, Sorting } from "../common/pagination/pagination.types";
+import { buildOrderBy, buildWhere } from "../common/pagination/prisma-query.util";
 import { settleAllOrLog } from "../common/settle-all-or-throw.util";
 import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -10,7 +12,10 @@ import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
 import { CreateTitleDto } from "./dto/request/create-title.dto";
 import { GetAllTitleDto } from "./dto/request/get-all-title.dto";
+import { CastCreditInputDto } from "./dto/request/set-title-cast.dto";
 import { UpdateTitleDto } from "./dto/request/update-title.dto";
+import { CastCreditResponseDto } from "./dto/response/cast-credit-response.dto";
+import { TitleResponseDto } from "./dto/response/title-response.dto";
 import { DEFAULT_TITLE_POSTER_URL } from "./title.constants";
 
 @Injectable()
@@ -25,79 +30,89 @@ export class TitleService {
     private readonly seasonService: SeasonService,
   ) {}
 
-  async create(data: CreateTitleDto): Promise<Title> {
-    return await this.prisma.title.create({
-      data: {
-        ...data,
-        posterUrl: DEFAULT_TITLE_POSTER_URL,
-      },
-    });
+  async create(data: CreateTitleDto): Promise<TitleResponseDto> {
+    const { genreIds, ...rest } = data;
+
+    try {
+      const title = await this.prisma.title.create({
+        data: {
+          ...rest,
+          posterUrl: DEFAULT_TITLE_POSTER_URL,
+          genres: genreIds?.length ? { connect: genreIds.map((id) => ({ id })) } : undefined,
+        },
+        include: { genres: true },
+      });
+      return new TitleResponseDto(title);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+        throw new BadRequestException("One or more genreIds do not exist");
+      }
+      throw error;
+    }
   }
 
-  async findAll({
-    search,
-    type,
-    transcodingStatus,
-    page = 1,
-    limit = 10,
-    sort,
-    sortBy,
-  }: GetAllTitleDto): Promise<{ items: Title[]; totalCount: number }> {
-    const where: Prisma.TitleWhereInput = {};
-    const orderBy: Prisma.TitleOrderByWithRelationInput = {};
+  async findAll(
+    { page = 1, limit = 10 }: GetAllTitleDto,
+    sort?: Sorting,
+    filters: Filter[] = [],
+  ): Promise<{ items: TitleResponseDto[]; totalCount: number }> {
+    const where = buildWhere(filters) as Prisma.TitleWhereInput;
+    const orderBy = (buildOrderBy(sort) ?? {
+      createdAt: "desc",
+    }) as Prisma.TitleOrderByWithRelationInput;
 
-    if (sortBy && Object.keys(Prisma.TitleScalarFieldEnum).includes(sortBy)) {
-      orderBy[sortBy] = sort || "desc";
-    } else {
-      orderBy["createdAt"] = "desc";
-    }
-
-    if (search) {
-      where.name = {
-        contains: search,
-        mode: "insensitive",
-      };
-    }
-
-    if (type) {
-      where.type = type;
-    }
-
-    if (transcodingStatus) {
-      where.transcodingStatus = transcodingStatus;
-    }
     const [items, totalCount] = await Promise.all([
       this.prisma.title.findMany({
         where,
         skip: (page - 1) * limit,
         take: limit,
         orderBy,
+        include: { genres: true },
       }),
       this.prisma.title.count({ where }),
     ]);
 
-    return { items, totalCount };
+    return { items: items.map((title) => new TitleResponseDto(title)), totalCount };
   }
 
-  async findOne(id: string): Promise<Title | null> {
-    return this.prisma.title.findUnique({ where: { id } });
+  async findOne(id: string): Promise<TitleResponseDto | null> {
+    const title = await this.prisma.title.findUnique({ where: { id }, include: { genres: true } });
+    return title ? new TitleResponseDto(title) : null;
   }
 
-  async update(id: string, data: UpdateTitleDto): Promise<Title> {
+  async update(id: string, data: UpdateTitleDto): Promise<TitleResponseDto> {
     const title = await this.findOne(id);
     if (!title) {
       throw new BadRequestException(`Title with id ${id} not found`);
     }
-    if (data.posterUrl !== undefined) {
-      await this.posterService.assertManagedPosterUrl(
-        "titles",
-        id,
-        data.posterUrl,
-        DEFAULT_TITLE_POSTER_URL,
-      );
-    }
+    await this.posterService.assertManagedPosterUrl(
+      "titles",
+      id,
+      data.posterUrl,
+      DEFAULT_TITLE_POSTER_URL,
+    );
 
-    return this.prisma.title.update({ where: { id }, data });
+    const { genreIds, ...rest } = data;
+
+    try {
+      const updated = await this.prisma.title.update({
+        where: { id },
+        data: {
+          ...rest,
+          genres:
+            genreIds !== undefined
+              ? { set: genreIds.map((genreId) => ({ id: genreId })) }
+              : undefined,
+        },
+        include: { genres: true },
+      });
+      return new TitleResponseDto(updated);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+        throw new BadRequestException("One or more genreIds do not exist");
+      }
+      throw error;
+    }
   }
 
   async createMovieUploadingUrl(id: string): Promise<{ url: string }> {
@@ -139,7 +154,7 @@ export class TitleService {
     return { url };
   }
 
-  async delete(id: string) {
+  async delete(id: string): Promise<TitleResponseDto> {
     const title = await this.prisma.title.findUnique({
       where: { id },
       include: {
@@ -151,7 +166,7 @@ export class TitleService {
       throw new BadRequestException(`Title with id ${id} not found`);
     }
 
-    const deleted = await this.prisma.title.delete({ where: { id } });
+    const deleted = await this.prisma.title.delete({ where: { id }, include: { genres: true } });
 
     await Promise.all([
       settleAllOrLog(
@@ -182,6 +197,49 @@ export class TitleService {
         : Promise.resolve(),
     ]);
 
-    return deleted;
+    return new TitleResponseDto(deleted);
+  }
+
+  async getCast(id: string): Promise<CastCreditResponseDto[]> {
+    const title = await this.findOne(id);
+    if (!title) {
+      throw new BadRequestException(`Title with id ${id} not found`);
+    }
+
+    const credits = await this.prisma.castCredit.findMany({
+      where: { titleId: id },
+      include: { artist: true },
+      orderBy: { order: "asc" },
+    });
+
+    return credits.map((credit) => new CastCreditResponseDto(credit));
+  }
+
+  async setCast(id: string, credits: CastCreditInputDto[]): Promise<CastCreditResponseDto[]> {
+    const title = await this.findOne(id);
+    if (!title) {
+      throw new BadRequestException(`Title with id ${id} not found`);
+    }
+
+    try {
+      await this.prisma.$transaction([
+        this.prisma.castCredit.deleteMany({ where: { titleId: id } }),
+        this.prisma.castCredit.createMany({
+          data: credits.map((credit, index) => ({
+            titleId: id,
+            artistId: credit.artistId,
+            character: credit.character,
+            order: credit.order ?? index,
+          })),
+        }),
+      ]);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+        throw new BadRequestException("One or more artistId values do not exist");
+      }
+      throw error;
+    }
+
+    return this.getCast(id);
   }
 }

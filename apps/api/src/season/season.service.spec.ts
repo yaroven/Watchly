@@ -153,7 +153,12 @@ describe("SeasonService", () => {
       });
 
       test("should throw BadRequestException", async () => {
-        const action = service.update("non-existent", { name: "New Title" });
+        const action = service.update("non-existent", {
+          number: 1,
+          name: "New Title",
+          description: "Desc",
+          titleId: "title-1",
+        });
         await expect(action).rejects.toThrow(BadRequestException);
       });
     });
@@ -177,17 +182,21 @@ describe("SeasonService", () => {
         });
 
         test("should assert poster URL and update the season", async () => {
-          const result = await service.update("season-1", {
+          const updateData = {
+            number: 1,
             name: "New Title",
+            description: "Desc",
+            titleId: "title-1",
             posterUrl: submittedPoster,
-          });
+          };
+          const result = await service.update("season-1", updateData);
           expect(s3ServiceMock.getReadPresignedUrl).toHaveBeenCalledWith(
             "posters/seasons/season-1",
             BucketType.PROCESSED,
           );
           expect(prismaMock.season.update).toHaveBeenCalledWith({
             where: { id: "season-1" },
-            data: { name: "New Title", posterUrl: submittedPoster },
+            data: updateData,
           });
           expect(result).toEqual({ ...season, name: "New Title" });
         });
@@ -201,7 +210,10 @@ describe("SeasonService", () => {
 
         test("should throw BadRequestException", async () => {
           const action = service.update("season-1", {
+            number: 1,
             name: "New Title",
+            description: "Desc",
+            titleId: "title-1",
             posterUrl: "https://s3.example.com/some/other/path",
           });
           await expect(action).rejects.toThrow(BadRequestException);
@@ -222,11 +234,17 @@ describe("SeasonService", () => {
       });
 
       test("should update the season without checking poster URL", async () => {
-        const result = await service.update("season-1", { name: "New Title" });
+        const updateData = {
+          number: 1,
+          name: "New Title",
+          description: "Desc",
+          titleId: "title-1",
+        };
+        const result = await service.update("season-1", updateData);
         expect(s3ServiceMock.getReadPresignedUrl).not.toHaveBeenCalled();
         expect(prismaMock.season.update).toHaveBeenCalledWith({
           where: { id: "season-1" },
-          data: { name: "New Title" },
+          data: updateData,
         });
         expect(result).toEqual({ ...season, name: "New Title" });
       });
@@ -329,7 +347,7 @@ describe("SeasonService", () => {
         expect(prismaMock.season.delete).toHaveBeenCalledWith({
           where: { id: "season-1" },
         });
-        expect(result).toEqual(season);
+        expect(result).toEqual({ id: season.id, titleId: season.titleId });
       });
     });
   });

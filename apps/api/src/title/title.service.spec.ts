@@ -1,6 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
-import { TitleType } from "@prisma/client";
+import { AgeRating, TitleType } from "@prisma/client";
+import { FilterRule } from "../common/pagination/filter-rule.enum";
 import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
@@ -76,8 +77,21 @@ describe("TitleService", () => {
 
   describe("create", () => {
     describe("when valid data is provided", () => {
-      const createData = { name: "Title", type: TitleType.MOVIE, description: "Desc" };
-      const createdTitle = { id: "title-1", ...createData, posterUrl: "/cat.webp" };
+      const createData = {
+        name: "Title",
+        type: TitleType.MOVIE,
+        description: "Desc",
+        ageRating: AgeRating.AGE_0,
+        country: "US",
+        releaseDate: "2026-01-01",
+        language: "en",
+        trailerUrl: "https://example.com/trailer.mp4",
+        runtime: 120,
+        network: "Netflix",
+        director: "Jane Doe",
+        closedCaption: true,
+      };
+      const createdTitle = { id: "title-1", ...createData, posterUrl: "/cat.webp", genres: [] };
 
       beforeEach(() => {
         (prismaServiceMock.title.create as jest.Mock).mockResolvedValue(createdTitle);
@@ -86,7 +100,8 @@ describe("TitleService", () => {
       test("should return created title with default poster", async () => {
         const result = await service.create(createData);
         expect(prismaServiceMock.title.create).toHaveBeenCalledWith({
-          data: { ...createData, posterUrl: "/cat.webp" },
+          data: { ...createData, posterUrl: "/cat.webp", genres: undefined },
+          include: { genres: true },
         });
         expect(result).toEqual(createdTitle);
       });
@@ -95,7 +110,7 @@ describe("TitleService", () => {
 
   describe("findAll", () => {
     describe("when fetching without filters", () => {
-      const titles = [{ id: "title-1", name: "Title 1" }];
+      const titles = [{ id: "title-1", name: "Title 1", genres: [] }];
 
       beforeEach(() => {
         (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue(titles);
@@ -109,19 +124,22 @@ describe("TitleService", () => {
           skip: 0,
           take: 10,
           orderBy: { createdAt: "desc" },
+          include: { genres: true },
         });
         expect(result).toEqual({ items: titles, totalCount: 1 });
       });
     });
 
-    describe("when searching by text", () => {
+    describe("when filtering by name (LIKE)", () => {
       beforeEach(() => {
         (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([]);
         (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(0);
       });
 
-      test("should filter by search term", async () => {
-        await service.findAll({ search: "Test", page: 1, limit: 10 });
+      test("should filter by substring match", async () => {
+        await service.findAll({ page: 1, limit: 10 }, undefined, [
+          { property: "name", rule: FilterRule.LIKE, value: "Test" },
+        ]);
         expect(prismaServiceMock.title.findMany).toHaveBeenCalledWith(
           expect.objectContaining({
             where: { name: { contains: "Test", mode: "insensitive" } },
@@ -137,7 +155,7 @@ describe("TitleService", () => {
       });
 
       test("should sort ascending by name", async () => {
-        await service.findAll({ sortBy: "name", sort: "asc", page: 1, limit: 10 });
+        await service.findAll({ page: 1, limit: 10 }, { property: "name", direction: "asc" });
         expect(prismaServiceMock.title.findMany).toHaveBeenCalledWith(
           expect.objectContaining({
             orderBy: { name: "asc" },
@@ -153,7 +171,9 @@ describe("TitleService", () => {
       });
 
       test("should filter by TitleType.MOVIE", async () => {
-        await service.findAll({ type: TitleType.MOVIE, page: 1, limit: 10 });
+        await service.findAll({ page: 1, limit: 10 }, undefined, [
+          { property: "type", rule: FilterRule.EQ, value: TitleType.MOVIE },
+        ]);
         expect(prismaServiceMock.title.findMany).toHaveBeenCalledWith(
           expect.objectContaining({
             where: expect.objectContaining({ type: TitleType.MOVIE }),
@@ -162,7 +182,9 @@ describe("TitleService", () => {
       });
 
       test("should filter by TitleType.SERIES", async () => {
-        await service.findAll({ type: TitleType.SERIES, page: 1, limit: 10 });
+        await service.findAll({ page: 1, limit: 10 }, undefined, [
+          { property: "type", rule: FilterRule.EQ, value: TitleType.SERIES },
+        ]);
         expect(prismaServiceMock.title.findMany).toHaveBeenCalledWith(
           expect.objectContaining({
             where: expect.objectContaining({ type: TitleType.SERIES }),
@@ -178,7 +200,9 @@ describe("TitleService", () => {
       });
 
       test("should filter by transcodingStatus", async () => {
-        await service.findAll({ transcodingStatus: "COMPLETED", page: 1, limit: 10 });
+        await service.findAll({ page: 1, limit: 10 }, undefined, [
+          { property: "transcodingStatus", rule: FilterRule.EQ, value: "COMPLETED" },
+        ]);
         expect(prismaServiceMock.title.findMany).toHaveBeenCalledWith(
           expect.objectContaining({
             where: expect.objectContaining({ transcodingStatus: "COMPLETED" }),
@@ -190,7 +214,7 @@ describe("TitleService", () => {
 
   describe("findOne", () => {
     describe("when title exists", () => {
-      const title = { id: "title-1" };
+      const title = { id: "title-1", genres: [] };
 
       beforeEach(() => {
         (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(title);
@@ -200,6 +224,7 @@ describe("TitleService", () => {
         const result = await service.findOne("title-1");
         expect(prismaServiceMock.title.findUnique).toHaveBeenCalledWith({
           where: { id: "title-1" },
+          include: { genres: true },
         });
         expect(result).toEqual(title);
       });
@@ -230,7 +255,7 @@ describe("TitleService", () => {
     });
 
     describe("when updating with default poster url", () => {
-      const title = { id: "title-1", name: "Old Name" };
+      const title = { id: "title-1", name: "Old Name", genres: [] };
       const updateData = { name: "New Name", posterUrl: "/cat.webp" };
       const updatedTitle = { ...title, ...updateData };
 
@@ -244,14 +269,15 @@ describe("TitleService", () => {
         expect(s3ServiceMock.getReadPresignedUrl).not.toHaveBeenCalled();
         expect(prismaServiceMock.title.update).toHaveBeenCalledWith({
           where: { id: "title-1" },
-          data: updateData,
+          data: { ...updateData, genres: undefined },
+          include: { genres: true },
         });
         expect(result).toEqual(updatedTitle);
       });
     });
 
     describe("when updating with external poster url", () => {
-      const title = { id: "title-1" };
+      const title = { id: "title-1", genres: [] };
       const updateData = { posterUrl: "https://external.com/poster.jpg" };
 
       beforeEach(() => {
@@ -269,7 +295,7 @@ describe("TitleService", () => {
     });
 
     describe("when updating with managed poster url", () => {
-      const title = { id: "title-1" };
+      const title = { id: "title-1", genres: [] };
       const updateData = { posterUrl: "https://s3.amazonaws.com/poster" };
 
       beforeEach(() => {
@@ -295,7 +321,10 @@ describe("TitleService", () => {
       const urlResponse = "https://s3.com/upload";
 
       beforeEach(() => {
-        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({ id: "title-1" });
+        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
+          id: "title-1",
+          genres: [],
+        });
         (s3ServiceMock.getUploadPresignedUrl as jest.Mock).mockResolvedValue(urlResponse);
       });
 
@@ -328,7 +357,10 @@ describe("TitleService", () => {
       const posterUrl = "poster-url";
 
       beforeEach(() => {
-        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({ id: "title-1" });
+        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
+          id: "title-1",
+          genres: [],
+        });
         (s3ServiceMock.getUploadPresignedUrl as jest.Mock).mockResolvedValue(uploadUrl);
         (s3ServiceMock.getReadPresignedUrl as jest.Mock).mockResolvedValue(posterUrl);
       });
@@ -352,7 +384,10 @@ describe("TitleService", () => {
   describe("transcode", () => {
     describe("when title exists", () => {
       beforeEach(() => {
-        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({ id: "title-1" });
+        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
+          id: "title-1",
+          genres: [],
+        });
       });
 
       test("should schedule transcoding", async () => {
@@ -397,7 +432,7 @@ describe("TitleService", () => {
 
   describe("delete", () => {
     describe("when title exists as MOVIE", () => {
-      const title = { id: "title-1", type: TitleType.MOVIE, seasons: [] };
+      const title = { id: "title-1", type: TitleType.MOVIE, seasons: [], genres: [] };
 
       beforeEach(() => {
         (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(title);
@@ -418,8 +453,11 @@ describe("TitleService", () => {
           "videos/title-1/",
           BucketType.PROCESSED,
         );
-        expect(prismaServiceMock.title.delete).toHaveBeenCalledWith({ where: { id: "title-1" } });
-        expect(result).toEqual(title);
+        expect(prismaServiceMock.title.delete).toHaveBeenCalledWith({
+          where: { id: "title-1" },
+          include: { genres: true },
+        });
+        expect(result).toEqual({ id: title.id, type: title.type, genres: [] });
       });
     });
 
@@ -428,6 +466,7 @@ describe("TitleService", () => {
         id: "title-1",
         type: TitleType.SERIES,
         seasons: [{ id: "season-1" }, { id: "season-2" }],
+        genres: [],
       };
 
       beforeEach(() => {
@@ -437,7 +476,10 @@ describe("TitleService", () => {
 
       test("should clean up assets for each season after the title row is deleted", async () => {
         await service.delete("title-1");
-        expect(prismaServiceMock.title.delete).toHaveBeenCalledWith({ where: { id: "title-1" } });
+        expect(prismaServiceMock.title.delete).toHaveBeenCalledWith({
+          where: { id: "title-1" },
+          include: { genres: true },
+        });
         expect(seasonServiceMock.cleanupAssets).toHaveBeenCalledWith(title.seasons[0]);
         expect(seasonServiceMock.cleanupAssets).toHaveBeenCalledWith(title.seasons[1]);
       });
