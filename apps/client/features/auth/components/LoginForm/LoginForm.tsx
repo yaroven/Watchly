@@ -10,28 +10,46 @@ import Checkbox from "@mui/material/Checkbox";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import InputAdornment from "@mui/material/InputAdornment";
 import Typography from "@mui/material/Typography";
+import { authStore } from "@shared/lib/auth-store";
+import { decodeAccessToken } from "@shared/lib/decode-jwt";
 import Button from "@shared/ui/Button";
 import FormField from "@shared/ui/FormField";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
+import AuthService from "../../api/auth.service";
 import { LoginFormValues, LoginSchema } from "../../schemas/auth";
 import SocialAuthButtons from "../SocialAuthButtons";
 
 export default function LoginForm() {
-  const [submitted, setSubmitted] = useState(false);
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
   const {
     register,
     control,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(LoginSchema),
     defaultValues: { email: "", password: "", rememberMe: false },
   });
 
-  // PLACEHOLDER: no auth/session endpoint exists yet — form only validates client-side.
-  const onSubmit = () => setSubmitted(true);
+  const onSubmit = async ({ email, password }: LoginFormValues) => {
+    setError(null);
+    try {
+      const session = await AuthService.login({ email, password });
+      const claims = decodeAccessToken(session.accessToken);
+      authStore.getState().setSession({
+        token: session.accessToken,
+        userId: claims?.userId ?? session.userId,
+        role: claims?.role ?? session.role,
+      });
+      router.push(APP.DISCOVER);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    }
+  };
 
   return (
     <Box
@@ -101,18 +119,19 @@ export default function LoginForm() {
         <Typography sx={{ fontSize: "14px", color: "text.secondary", cursor: "default" }}>Forgot Password?</Typography>
       </Box>
 
-      {submitted && (
-        <Alert severity="info" onClose={() => setSubmitted(false)}>
-          Sign-in isn&apos;t wired up to a backend yet — this form only validates client-side for now.
+      {error && (
+        <Alert severity="error" onClose={() => setError(null)}>
+          {error}
         </Alert>
       )}
 
       <Button
         type="submit"
         isPill
+        disabled={isSubmitting}
         sx={{ height: "52px", backgroundColor: "#e5e5e5", color: "#191919", "&:hover": { backgroundColor: "#ffffff" } }}
       >
-        Login
+        {isSubmitting ? "Logging in…" : "Login"}
       </Button>
 
       <SocialAuthButtons />
