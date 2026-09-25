@@ -1,5 +1,6 @@
 import { NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
+import { CastCreditService } from "../cast-credit/cast-credit.service";
 import { FilterRule } from "../common/pagination/filter-rule.enum";
 import { TitleController } from "./title.controller";
 import { TitleService } from "./title.service";
@@ -7,6 +8,7 @@ import { TitleService } from "./title.service";
 describe("TitleController", () => {
   let controller: TitleController;
   let titleServiceMock: jest.Mocked<TitleService>;
+  let castCreditServiceMock: jest.Mocked<CastCreditService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -20,10 +22,19 @@ describe("TitleController", () => {
             findAll: jest.fn(),
             findOne: jest.fn(),
             update: jest.fn(),
-            createMovieUploadingUrl: jest.fn(),
+            startMovieUpload: jest.fn(),
+            completeMovieUpload: jest.fn(),
+            abortMovieUpload: jest.fn(),
             createPosterUploadingUrl: jest.fn(),
             transcode: jest.fn(),
             delete: jest.fn(),
+          },
+        },
+        {
+          provide: CastCreditService,
+          useValue: {
+            getCast: jest.fn(),
+            setCast: jest.fn(),
           },
         },
       ],
@@ -31,6 +42,7 @@ describe("TitleController", () => {
 
     controller = module.get<TitleController>(TitleController);
     titleServiceMock = module.get(TitleService) as jest.Mocked<TitleService>;
+    castCreditServiceMock = module.get(CastCreditService) as jest.Mocked<CastCreditService>;
   });
 
   afterEach(() => {
@@ -138,17 +150,36 @@ describe("TitleController", () => {
     });
   });
 
-  describe("getUploadUrl", () => {
-    const urlResponse = { url: "upload-url" };
+  describe("startUpload", () => {
+    const startResponse = { uploadId: "upload-1", partSize: 8, parts: [] };
 
     beforeEach(() => {
-      (titleServiceMock.createMovieUploadingUrl as jest.Mock).mockResolvedValue(urlResponse);
+      (titleServiceMock.startMovieUpload as jest.Mock).mockResolvedValue(startResponse);
     });
 
-    test("should return upload URL", async () => {
-      const result = await controller.getUploadUrl("title-1");
-      expect(titleServiceMock.createMovieUploadingUrl).toHaveBeenCalledWith("title-1");
-      expect(result).toEqual(urlResponse);
+    test("should start a multipart upload", async () => {
+      const result = await controller.startUpload("title-1", { fileSize: 1000 });
+      expect(titleServiceMock.startMovieUpload).toHaveBeenCalledWith("title-1", 1000);
+      expect(result).toEqual(startResponse);
+    });
+  });
+
+  describe("completeUpload", () => {
+    test("should complete a multipart upload", async () => {
+      const dto = { uploadId: "upload-1", parts: [{ partNumber: 1, eTag: "etag-1" }] };
+      await controller.completeUpload("title-1", dto);
+      expect(titleServiceMock.completeMovieUpload).toHaveBeenCalledWith(
+        "title-1",
+        "upload-1",
+        dto.parts,
+      );
+    });
+  });
+
+  describe("abortUpload", () => {
+    test("should abort a multipart upload", async () => {
+      await controller.abortUpload("title-1", "upload-1");
+      expect(titleServiceMock.abortMovieUpload).toHaveBeenCalledWith("title-1", "upload-1");
     });
   });
 
@@ -188,6 +219,35 @@ describe("TitleController", () => {
       const result = await controller.delete("title-1");
       expect(titleServiceMock.delete).toHaveBeenCalledWith("title-1");
       expect(result).toEqual(deletedTitle);
+    });
+  });
+
+  describe("getCast", () => {
+    const cast = [{ id: "credit-1", character: "Neo", order: 0, artist: { id: "artist-1" } }];
+
+    beforeEach(() => {
+      (castCreditServiceMock.getCast as jest.Mock).mockResolvedValue(cast);
+    });
+
+    test("should return the title's cast", async () => {
+      const result = await controller.getCast("title-1");
+      expect(castCreditServiceMock.getCast).toHaveBeenCalledWith("title-1");
+      expect(result).toEqual(cast);
+    });
+  });
+
+  describe("setCast", () => {
+    const dto = { credits: [{ artistId: "artist-1", character: "Neo" }] };
+    const cast = [{ id: "credit-1", character: "Neo", order: 0, artist: { id: "artist-1" } }];
+
+    beforeEach(() => {
+      (castCreditServiceMock.setCast as jest.Mock).mockResolvedValue(cast);
+    });
+
+    test("should replace the title's cast", async () => {
+      const result = await controller.setCast("title-1", dto);
+      expect(castCreditServiceMock.setCast).toHaveBeenCalledWith("title-1", dto.credits);
+      expect(result).toEqual(cast);
     });
   });
 });

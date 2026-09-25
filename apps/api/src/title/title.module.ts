@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { CastCreditModule } from "../cast-credit/cast-credit.module";
 import { PosterModule } from "../poster/poster.module";
 import { PrismaModule } from "../prisma/prisma.module";
 import { S3Module } from "../s3/s3.module";
@@ -8,7 +9,14 @@ import { TitleController } from "./title.controller";
 import { TitleService } from "./title.service";
 
 @Module({
-  imports: [PrismaModule, S3Module, PosterModule, VideoTranscoderModule, SeasonModule],
+  imports: [
+    PrismaModule,
+    S3Module,
+    PosterModule,
+    VideoTranscoderModule,
+    SeasonModule,
+    CastCreditModule,
+  ],
   providers: [TitleService],
   controllers: [TitleController],
   exports: [TitleService],

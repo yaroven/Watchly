@@ -44,6 +44,7 @@ describe("SeasonService", () => {
           provide: VideoTranscoderService,
           useValue: {
             cancelScheduledTranscodes: jest.fn(),
+            cleanupVideoAsset: jest.fn(),
           },
         },
         PosterService,
@@ -314,7 +315,7 @@ describe("SeasonService", () => {
         (prismaMock.season.findUnique as jest.Mock).mockResolvedValue(season);
         s3ServiceMock.deleteObject.mockResolvedValue(undefined as any);
         s3ServiceMock.deleteFolder.mockResolvedValue(undefined as any);
-        videoTranscoderServiceMock.cancelScheduledTranscodes.mockResolvedValue(undefined as any);
+        videoTranscoderServiceMock.cleanupVideoAsset.mockResolvedValue(undefined as any);
         (prismaMock.season.delete as jest.Mock).mockResolvedValue(season);
       });
 
@@ -326,17 +327,14 @@ describe("SeasonService", () => {
           include: { episodes: true },
         });
 
-        expect(videoTranscoderServiceMock.cancelScheduledTranscodes).toHaveBeenCalledWith(
+        expect(videoTranscoderServiceMock.cleanupVideoAsset).toHaveBeenCalledWith(
           "episode-1",
           VideoType.EPISODE,
         );
-        expect(videoTranscoderServiceMock.cancelScheduledTranscodes).toHaveBeenCalledWith(
+        expect(videoTranscoderServiceMock.cleanupVideoAsset).toHaveBeenCalledWith(
           "episode-2",
           VideoType.EPISODE,
         );
-
-        expect(s3ServiceMock.deleteObject).toHaveBeenCalledWith("episode-1", BucketType.RAW);
-        expect(s3ServiceMock.deleteObject).toHaveBeenCalledWith("episode-2", BucketType.RAW);
 
         expect(s3ServiceMock.deleteObject).toHaveBeenCalledWith(
           "posters/seasons/season-1",

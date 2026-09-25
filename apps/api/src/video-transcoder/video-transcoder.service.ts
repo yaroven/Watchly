@@ -8,6 +8,7 @@ import * as path from "path";
 import { Readable } from "stream";
 
 import pMap from "p-map";
+import { settleAllOrLog } from "../common/settle-all-or-throw.util";
 import { getEpisodeTitleAndSeasonId } from "../episode/episode-path.util";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
@@ -59,6 +60,35 @@ export class VideoTranscoderService {
     if (cancellableStates.includes(state)) {
       await job.remove();
     }
+  }
+
+  /**
+   * Best-effort cleanup of a video entity's queue/storage footprint: cancels any
+   * still-queued transcode job, deletes its raw source object, and (when a
+   * processed-folder prefix is given) deletes its processed HLS output. Pass no
+   * processedPath when the caller already deletes that prefix itself at a wider
+   * scope (e.g. a season deleting the whole season folder covers its episodes).
+   */
+  async cleanupVideoAsset(id: string, type: VideoType, processedPath?: string): Promise<void> {
+    const tasks: { id: string; run: () => Promise<unknown> }[] = [
+      { id: "scheduled-transcodes", run: () => this.cancelScheduledTranscodes(id, type) },
+      { id: "raw-video", run: () => this.s3Service.deleteObject(id, BucketType.RAW) },
+    ];
+
+    if (processedPath !== undefined) {
+      tasks.push({
+        id: "processed-folder",
+        run: () => this.s3Service.deleteFolder(processedPath, BucketType.PROCESSED),
+      });
+    }
+
+    await settleAllOrLog(
+      tasks,
+      (task) => task.run(),
+      (task) => task.id,
+      this.logger,
+      { itemLabel: "video-asset", parentLabel: VideoType[type].toLowerCase(), parentId: id },
+    );
   }
 
   async transcodeVideo(id: string, inputPath: string, outputDir: string, type: VideoType) {

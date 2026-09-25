@@ -21,6 +21,12 @@ import {
 } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import { AdminOnly } from "../auth/decorators/roles.decorator";
+import { CastCreditService } from "../cast-credit/cast-credit.service";
+import { SetTitleCastDto } from "../cast-credit/dto/request/set-title-cast.dto";
+import { CastCreditResponseDto } from "../cast-credit/dto/response/cast-credit-response.dto";
+import { CompleteMultipartUploadDto } from "../common/dto/request/complete-multipart-upload.dto";
+import { StartMultipartUploadDto } from "../common/dto/request/start-multipart-upload.dto";
+import { MultipartUploadResponseDto } from "../common/dto/response/multipart-upload-response.dto";
 import { UploadUrlResponseDto } from "../common/dto/upload-url-response.dto";
 import { UrlResponseDto } from "../common/dto/url-response.dto";
 import { FilteringParams } from "../common/pagination/filtering-params.decorator";
@@ -28,9 +34,7 @@ import { Filter, Sorting } from "../common/pagination/pagination.types";
 import { SortingParams } from "../common/pagination/sorting-params.decorator";
 import { CreateTitleDto } from "./dto/request/create-title.dto";
 import { GetAllTitleDto } from "./dto/request/get-all-title.dto";
-import { SetTitleCastDto } from "./dto/request/set-title-cast.dto";
 import { UpdateTitleDto } from "./dto/request/update-title.dto";
-import { CastCreditResponseDto } from "./dto/response/cast-credit-response.dto";
 import { TitleListResponseDto } from "./dto/response/title-list.response.dto";
 import { TitleResponseDto } from "./dto/response/title-response.dto";
 import { TitleService } from "./title.service";
@@ -38,7 +42,10 @@ import { TitleService } from "./title.service";
 @ApiTags("titles")
 @Controller("title")
 export class TitleController {
-  constructor(private readonly titleService: TitleService) {}
+  constructor(
+    private readonly titleService: TitleService,
+    private readonly castCreditService: CastCreditService,
+  ) {}
 
   @ApiOperation({ summary: "Create a title (movie or series)" })
   @ApiCreatedResponse({ type: TitleResponseDto })
@@ -97,15 +104,32 @@ export class TitleController {
     return this.titleService.update(id, data);
   }
 
-  @ApiOperation({ summary: "Get a presigned URL to upload the raw movie file" })
+  @ApiOperation({ summary: "Start a multipart upload for the raw movie file" })
   @ApiParam({ name: "id", format: "uuid" })
-  @ApiOkResponse({ type: UrlResponseDto })
+  @ApiOkResponse({ type: MultipartUploadResponseDto })
   @ApiNotFoundResponse({ description: "Title not found" })
   @Throttle({ default: { limit: 3, ttl: 60000 } })
   @AdminOnly()
-  @Get(":id/upload-url")
-  getUploadUrl(@Param("id", ParseUUIDPipe) id: string) {
-    return this.titleService.createMovieUploadingUrl(id);
+  @Post(":id/upload-url")
+  startUpload(@Param("id", ParseUUIDPipe) id: string, @Body() dto: StartMultipartUploadDto) {
+    return this.titleService.startMovieUpload(id, dto.fileSize);
+  }
+
+  @ApiOperation({ summary: "Complete a multipart upload for the raw movie file" })
+  @ApiParam({ name: "id", format: "uuid" })
+  @ApiNotFoundResponse({ description: "Title not found" })
+  @AdminOnly()
+  @Post(":id/upload-url/complete")
+  completeUpload(@Param("id", ParseUUIDPipe) id: string, @Body() dto: CompleteMultipartUploadDto) {
+    return this.titleService.completeMovieUpload(id, dto.uploadId, dto.parts);
+  }
+
+  @ApiOperation({ summary: "Abort a multipart upload for the raw movie file" })
+  @ApiParam({ name: "id", format: "uuid" })
+  @AdminOnly()
+  @Delete(":id/upload-url/:uploadId")
+  abortUpload(@Param("id", ParseUUIDPipe) id: string, @Param("uploadId") uploadId: string) {
+    return this.titleService.abortMovieUpload(id, uploadId);
   }
 
   @ApiOperation({ summary: "Get a presigned URL to upload the title's poster" })
@@ -145,7 +169,7 @@ export class TitleController {
   @ApiOkResponse({ type: [CastCreditResponseDto] })
   @Get(":id/cast")
   getCast(@Param("id", ParseUUIDPipe) id: string) {
-    return this.titleService.getCast(id);
+    return this.castCreditService.getCast(id);
   }
 
   @ApiOperation({ summary: "Replace a title's cast" })
@@ -154,6 +178,6 @@ export class TitleController {
   @AdminOnly()
   @Put(":id/cast")
   setCast(@Param("id", ParseUUIDPipe) id: string, @Body() dto: SetTitleCastDto) {
-    return this.titleService.setCast(id, dto.credits);
+    return this.castCreditService.setCast(id, dto.credits);
   }
 }

@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { Artist, Prisma } from "@prisma/client";
+import { paginate } from "../common/pagination/paginate.util";
 import { Filter, Sorting } from "../common/pagination/pagination.types";
 import { buildOrderBy, buildWhere } from "../common/pagination/prisma-query.util";
 import { PrismaService } from "../prisma/prisma.service";
@@ -27,10 +28,12 @@ export class ArtistService {
       createdAt: "desc",
     }) as Prisma.ArtistOrderByWithRelationInput;
 
-    const [items, totalCount] = await Promise.all([
-      this.prisma.artist.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy }),
-      this.prisma.artist.count({ where }),
-    ]);
+    const { items, totalCount } = await paginate<Artist>(this.prisma.artist, {
+      where,
+      orderBy,
+      page,
+      limit,
+    });
 
     return { items: items.map((artist) => new ArtistResponseDto(artist)), totalCount };
   }
