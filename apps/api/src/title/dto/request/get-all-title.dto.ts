@@ -1,8 +1,5 @@
-import { IntersectionType, OmitType } from "@nestjs/swagger";
+import { IntersectionType } from "@nestjs/swagger";
 import { PaginatedQueryDto } from "../../../common/dto/paginated-query.dto";
 import { QueryWithFilterSortDto } from "../../../common/pagination/query-with-filter-sort.dto";
 
-export class GetAllTitleDto extends IntersectionType(
-  OmitType(PaginatedQueryDto, ["sort", "sortBy"]),
-  QueryWithFilterSortDto,
-) {}
+export class GetAllTitleDto extends IntersectionType(PaginatedQueryDto, QueryWithFilterSortDto) {}
