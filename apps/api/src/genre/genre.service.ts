@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { Genre, Prisma } from "@prisma/client";
+import { paginate } from "../common/pagination/paginate.util";
 import { Filter, Sorting } from "../common/pagination/pagination.types";
 import { buildOrderBy, buildWhere } from "../common/pagination/prisma-query.util";
 import { PrismaService } from "../prisma/prisma.service";
@@ -34,10 +35,12 @@ export class GenreService {
       createdAt: "desc",
     }) as Prisma.GenreOrderByWithRelationInput;
 
-    const [items, totalCount] = await Promise.all([
-      this.prisma.genre.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy }),
-      this.prisma.genre.count({ where }),
-    ]);
+    const { items, totalCount } = await paginate<Genre>(this.prisma.genre, {
+      where,
+      orderBy,
+      page,
+      limit,
+    });
 
     return { items: items.map((genre) => new GenreResponseDto(genre)), totalCount };
   }

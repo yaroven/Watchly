@@ -40,6 +40,9 @@ describe("TitleService", () => {
           useValue: {
             getUploadPresignedUrl: jest.fn(),
             getReadPresignedUrl: jest.fn(),
+            startMultipartUpload: jest.fn(),
+            completeMultipartUpload: jest.fn(),
+            abortMultipartUpload: jest.fn(),
             deleteObject: jest.fn(),
             deleteFolder: jest.fn(),
           },
@@ -50,6 +53,7 @@ describe("TitleService", () => {
           useValue: {
             scheduleTranscodeVideo: jest.fn(),
             cancelScheduledTranscodes: jest.fn(),
+            cleanupVideoAsset: jest.fn(),
           },
         },
         {
@@ -316,26 +320,31 @@ describe("TitleService", () => {
     });
   });
 
-  describe("createMovieUploadingUrl", () => {
+  describe("startMovieUpload", () => {
     describe("when title exists", () => {
-      const urlResponse = "https://s3.com/upload";
+      const startResponse = {
+        uploadId: "upload-1",
+        partSize: 8,
+        parts: [{ partNumber: 1, url: "u" }],
+      };
 
       beforeEach(() => {
         (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
           id: "title-1",
           genres: [],
         });
-        (s3ServiceMock.getUploadPresignedUrl as jest.Mock).mockResolvedValue(urlResponse);
+        (s3ServiceMock.startMultipartUpload as jest.Mock).mockResolvedValue(startResponse);
       });
 
-      test("should return upload url", async () => {
-        const result = await service.createMovieUploadingUrl("title-1");
-        expect(s3ServiceMock.getUploadPresignedUrl).toHaveBeenCalledWith(
+      test("should start a multipart upload", async () => {
+        const result = await service.startMovieUpload("title-1", 1000);
+        expect(s3ServiceMock.startMultipartUpload).toHaveBeenCalledWith(
           "title-1",
           expect.any(String),
-          120,
+          1000,
+          3600,
         );
-        expect(result).toEqual({ url: urlResponse });
+        expect(result).toEqual(startResponse);
       });
     });
 
@@ -345,9 +354,53 @@ describe("TitleService", () => {
       });
 
       test("should throw BadRequestException", async () => {
-        const action = service.createMovieUploadingUrl("non-existent");
+        const action = service.startMovieUpload("non-existent", 1000);
         await expect(action).rejects.toThrow(BadRequestException);
       });
+    });
+  });
+
+  describe("completeMovieUpload", () => {
+    describe("when title exists", () => {
+      beforeEach(() => {
+        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
+          id: "title-1",
+          genres: [],
+        });
+      });
+
+      test("should complete the multipart upload", async () => {
+        const parts = [{ partNumber: 1, eTag: "etag-1" }];
+        await service.completeMovieUpload("title-1", "upload-1", parts);
+        expect(s3ServiceMock.completeMultipartUpload).toHaveBeenCalledWith(
+          "title-1",
+          expect.any(String),
+          "upload-1",
+          parts,
+        );
+      });
+    });
+
+    describe("when title does not exist", () => {
+      beforeEach(() => {
+        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(null);
+      });
+
+      test("should throw BadRequestException", async () => {
+        const action = service.completeMovieUpload("non-existent", "upload-1", []);
+        await expect(action).rejects.toThrow(BadRequestException);
+      });
+    });
+  });
+
+  describe("abortMovieUpload", () => {
+    test("should abort the multipart upload", async () => {
+      await service.abortMovieUpload("title-1", "upload-1");
+      expect(s3ServiceMock.abortMultipartUpload).toHaveBeenCalledWith(
+        "title-1",
+        expect.any(String),
+        "upload-1",
+      );
     });
   });
 
@@ -441,16 +494,13 @@ describe("TitleService", () => {
 
       test("should delete title and cleanup resources", async () => {
         const result = await service.delete("title-1");
-        expect(videoTranscoderServiceMock.cancelScheduledTranscodes).toHaveBeenCalledWith(
+        expect(videoTranscoderServiceMock.cleanupVideoAsset).toHaveBeenCalledWith(
           "title-1",
           VideoType.MOVIE,
+          "videos/title-1/",
         );
         expect(s3ServiceMock.deleteObject).toHaveBeenCalledWith(
           "posters/titles/title-1",
-          BucketType.PROCESSED,
-        );
-        expect(s3ServiceMock.deleteFolder).toHaveBeenCalledWith(
-          "videos/title-1/",
           BucketType.PROCESSED,
         );
         expect(prismaServiceMock.title.delete).toHaveBeenCalledWith({
@@ -484,22 +534,19 @@ describe("TitleService", () => {
         expect(seasonServiceMock.cleanupAssets).toHaveBeenCalledWith(title.seasons[1]);
       });
 
-      test("should cancel scheduled transcode jobs", async () => {
+      test("should clean up the movie's own video asset", async () => {
         await service.delete("title-1");
-        expect(videoTranscoderServiceMock.cancelScheduledTranscodes).toHaveBeenCalledWith(
+        expect(videoTranscoderServiceMock.cleanupVideoAsset).toHaveBeenCalledWith(
           "title-1",
           VideoType.MOVIE,
+          "videos/title-1/",
         );
       });
 
-      test("should cleanup S3 resources (poster and video folder)", async () => {
+      test("should cleanup the poster", async () => {
         await service.delete("title-1");
         expect(s3ServiceMock.deleteObject).toHaveBeenCalledWith(
           "posters/titles/title-1",
-          BucketType.PROCESSED,
-        );
-        expect(s3ServiceMock.deleteFolder).toHaveBeenCalledWith(
-          "videos/title-1/",
           BucketType.PROCESSED,
         );
       });

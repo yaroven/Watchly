@@ -37,6 +37,9 @@ describe("EpisodeService", () => {
           useValue: {
             getReadPresignedUrl: jest.fn(),
             getUploadPresignedUrl: jest.fn(),
+            startMultipartUpload: jest.fn(),
+            completeMultipartUpload: jest.fn(),
+            abortMultipartUpload: jest.fn(),
             deleteObject: jest.fn(),
             deleteFolder: jest.fn(),
           },
@@ -46,6 +49,7 @@ describe("EpisodeService", () => {
           useValue: {
             scheduleTranscodeVideo: jest.fn(),
             cancelScheduledTranscodes: jest.fn(),
+            cleanupVideoAsset: jest.fn(),
           },
         },
       ],
@@ -274,23 +278,17 @@ describe("EpisodeService", () => {
 
       beforeEach(() => {
         (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(episode);
-        videoTranscoderServiceMock.cancelScheduledTranscodes.mockResolvedValue(undefined as any);
-        s3ServiceMock.deleteObject.mockResolvedValue(undefined as any);
-        s3ServiceMock.deleteFolder.mockResolvedValue(undefined as any);
+        videoTranscoderServiceMock.cleanupVideoAsset.mockResolvedValue(undefined as any);
         (prismaMock.episode.delete as jest.Mock).mockResolvedValue(episode);
       });
 
       test("should delete episode and related media", async () => {
         const result = await service.delete("episode-1");
 
-        expect(videoTranscoderServiceMock.cancelScheduledTranscodes).toHaveBeenCalledWith(
+        expect(videoTranscoderServiceMock.cleanupVideoAsset).toHaveBeenCalledWith(
           "episode-1",
           VideoType.EPISODE,
-        );
-        expect(s3ServiceMock.deleteObject).toHaveBeenCalledWith("episode-1", BucketType.RAW);
-        expect(s3ServiceMock.deleteFolder).toHaveBeenCalledWith(
           "videos/title-1/season-1/episode-1/",
-          BucketType.PROCESSED,
         );
         expect(prismaMock.episode.delete).toHaveBeenCalledWith({ where: { id: "episode-1" } });
 
@@ -328,34 +326,76 @@ describe("EpisodeService", () => {
     });
   });
 
-  describe("getUploadUrl", () => {
+  describe("startUpload", () => {
     describe("when episode does not exist", () => {
       beforeEach(() => {
         (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
       });
 
       test("should throw BadRequestException", async () => {
-        const action = service.getUploadUrl("non-existent");
+        const action = service.startUpload("non-existent", 1000);
         await expect(action).rejects.toThrow(BadRequestException);
       });
     });
 
     describe("when episode exists", () => {
       const episode = { id: "episode-1" };
-      const url = "upload-url";
+      const startResponse = { uploadId: "upload-1", partSize: 8, parts: [] };
       beforeEach(() => {
         (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(episode);
-        s3ServiceMock.getUploadPresignedUrl.mockResolvedValue(url);
+        (s3ServiceMock.startMultipartUpload as jest.Mock).mockResolvedValue(startResponse);
       });
 
-      test("should return upload url", async () => {
-        const result = await service.getUploadUrl("episode-1");
-        expect(s3ServiceMock.getUploadPresignedUrl).toHaveBeenCalledWith(
+      test("should start a multipart upload", async () => {
+        const result = await service.startUpload("episode-1", 1000);
+        expect(s3ServiceMock.startMultipartUpload).toHaveBeenCalledWith(
           "episode-1",
           BucketType.RAW,
+          1000,
         );
-        expect(result).toEqual({ url });
+        expect(result).toEqual(startResponse);
       });
+    });
+  });
+
+  describe("completeUpload", () => {
+    describe("when episode does not exist", () => {
+      beforeEach(() => {
+        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
+      });
+
+      test("should throw BadRequestException", async () => {
+        const action = service.completeUpload("non-existent", "upload-1", []);
+        await expect(action).rejects.toThrow(BadRequestException);
+      });
+    });
+
+    describe("when episode exists", () => {
+      beforeEach(() => {
+        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue({ id: "episode-1" });
+      });
+
+      test("should complete the multipart upload", async () => {
+        const parts = [{ partNumber: 1, eTag: "etag-1" }];
+        await service.completeUpload("episode-1", "upload-1", parts);
+        expect(s3ServiceMock.completeMultipartUpload).toHaveBeenCalledWith(
+          "episode-1",
+          BucketType.RAW,
+          "upload-1",
+          parts,
+        );
+      });
+    });
+  });
+
+  describe("abortUpload", () => {
+    test("should abort the multipart upload", async () => {
+      await service.abortUpload("episode-1", "upload-1");
+      expect(s3ServiceMock.abortMultipartUpload).toHaveBeenCalledWith(
+        "episode-1",
+        BucketType.RAW,
+        "upload-1",
+      );
     });
   });
 

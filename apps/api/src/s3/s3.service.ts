@@ -1,23 +1,30 @@
 import {
+  AbortMultipartUploadCommand,
   BucketAlreadyExists,
   BucketAlreadyOwnedByYou,
+  CompleteMultipartUploadCommand,
   CreateBucketCommand,
+  CreateMultipartUploadCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
   GetObjectCommand,
   HeadBucketCommand,
   ListObjectsV2Command,
   NotFound,
+  PutBucketCorsCommand,
   PutObjectCommand,
   S3Client,
+  UploadPartCommand,
 } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Injectable, InternalServerErrorException, Logger, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import pMap from "p-map";
 import { Readable } from "stream";
 import { S3Config, S3ConfigName } from "../config/s3.config";
 import BucketType from "./enums/bucket-type.enum";
+import { MULTIPART_PART_SIZE, MultipartUploadPart } from "./multipart.constants";
 
 @Injectable()
 export class S3Service implements OnModuleInit {
@@ -79,14 +86,41 @@ export class S3Service implements OnModuleInit {
     } catch (error: any) {
       if (error instanceof NotFound) {
         this.logger.log(`Bucket "${bucketName}" not found. Creating it now...`);
-        return this.createBucket(bucketName);
+        await this.createBucket(bucketName);
+      } else {
+        this.logger.error(`Unexpected Error: ${error}`);
+        throw new InternalServerErrorException(
+          "An unexpected error occurred during S3 initialization",
+        );
       }
-
-      this.logger.error(`Unexpected Error: ${error}`);
-      throw new InternalServerErrorException(
-        "An unexpected error occurred during S3 initialization",
-      );
     }
+
+    await this.configureBucketCors(bucketName);
+  }
+
+  /**
+   * The browser needs to read the `ETag` response header of each multipart-part PUT (it's
+   * how a part is identified when completing the upload) — browsers only expose response
+   * headers a CORS policy explicitly lists in `ExposeHeaders`, so without this the upload
+   * flow silently gets `undefined` ETags and fails at the complete step.
+   */
+  private async configureBucketCors(bucketName: string) {
+    await this.s3Client.send(
+      new PutBucketCorsCommand({
+        Bucket: bucketName,
+        CORSConfiguration: {
+          CORSRules: [
+            {
+              AllowedMethods: ["PUT", "GET", "HEAD"],
+              AllowedOrigins: ["*"],
+              AllowedHeaders: ["*"],
+              ExposeHeaders: ["ETag"],
+              MaxAgeSeconds: 3600,
+            },
+          ],
+        },
+      }),
+    );
   }
   private async createBucket(bucketName: string) {
     try {
@@ -136,6 +170,85 @@ export class S3Service implements OnModuleInit {
     const command = new PutObjectCommand({ Bucket: this.getBucketName(type), Key: key });
     const signedUrl = await getSignedUrl(this.s3Client, command, { expiresIn });
     return this.mapSignedUrlToPublicEndpoint(signedUrl);
+  }
+
+  /**
+   * Starts a multipart upload and presigns every part up front, so the browser can PUT parts
+   * directly to S3 (and retry a single failed part) without another round trip to this API.
+   */
+  async startMultipartUpload(
+    key: string,
+    type: BucketType,
+    fileSize: number,
+    expiresIn: number = 3600,
+  ): Promise<{ uploadId: string; partSize: number; parts: { partNumber: number; url: string }[] }> {
+    const { UploadId } = await this.s3Client.send(
+      new CreateMultipartUploadCommand({ Bucket: this.getBucketName(type), Key: key }),
+    );
+    if (!UploadId) {
+      throw new InternalServerErrorException("Failed to start multipart upload");
+    }
+
+    const partCount = Math.max(1, Math.ceil(fileSize / MULTIPART_PART_SIZE));
+    const partNumbers = Array.from({ length: partCount }, (_, index) => index + 1);
+
+    const parts = await pMap(
+      partNumbers,
+      async (partNumber) => ({
+        partNumber,
+        url: await this.getUploadPartPresignedUrl(key, type, UploadId, partNumber, expiresIn),
+      }),
+      { concurrency: 8 },
+    );
+
+    return { uploadId: UploadId, partSize: MULTIPART_PART_SIZE, parts };
+  }
+
+  private async getUploadPartPresignedUrl(
+    key: string,
+    type: BucketType,
+    uploadId: string,
+    partNumber: number,
+    expiresIn: number,
+  ): Promise<string> {
+    const command = new UploadPartCommand({
+      Bucket: this.getBucketName(type),
+      Key: key,
+      UploadId: uploadId,
+      PartNumber: partNumber,
+    });
+    const signedUrl = await getSignedUrl(this.s3Client, command, { expiresIn });
+    return this.mapSignedUrlToPublicEndpoint(signedUrl);
+  }
+
+  async completeMultipartUpload(
+    key: string,
+    type: BucketType,
+    uploadId: string,
+    parts: MultipartUploadPart[],
+  ): Promise<void> {
+    await this.s3Client.send(
+      new CompleteMultipartUploadCommand({
+        Bucket: this.getBucketName(type),
+        Key: key,
+        UploadId: uploadId,
+        MultipartUpload: {
+          Parts: [...parts]
+            .sort((a, b) => a.partNumber - b.partNumber)
+            .map((part) => ({ PartNumber: part.partNumber, ETag: part.eTag })),
+        },
+      }),
+    );
+  }
+
+  async abortMultipartUpload(key: string, type: BucketType, uploadId: string): Promise<void> {
+    await this.s3Client.send(
+      new AbortMultipartUploadCommand({
+        Bucket: this.getBucketName(type),
+        Key: key,
+        UploadId: uploadId,
+      }),
+    );
   }
 
   async getReadPresignedUrl(key: string, type: BucketType, expiresIn: number = 3600) {

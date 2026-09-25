@@ -21,7 +21,9 @@ describe("EpisodeController", () => {
             update: jest.fn(),
             delete: jest.fn(),
             transcode: jest.fn(),
-            getUploadUrl: jest.fn(),
+            startUpload: jest.fn(),
+            completeUpload: jest.fn(),
+            abortUpload: jest.fn(),
             getStreamUrl: jest.fn(),
           },
         },
@@ -139,17 +141,36 @@ describe("EpisodeController", () => {
     });
   });
 
-  describe("getUploadUrl", () => {
-    const urlResponse = { url: "upload-url" };
+  describe("startUpload", () => {
+    const startResponse = { uploadId: "upload-1", partSize: 8, parts: [] };
 
     beforeEach(() => {
-      (episodeServiceMock.getUploadUrl as jest.Mock).mockResolvedValue(urlResponse);
+      (episodeServiceMock.startUpload as jest.Mock).mockResolvedValue(startResponse);
     });
 
-    test("should return upload URL", async () => {
-      const result = await controller.getUploadUrl("episode-1");
-      expect(episodeServiceMock.getUploadUrl).toHaveBeenCalledWith("episode-1");
-      expect(result).toEqual(urlResponse);
+    test("should start a multipart upload", async () => {
+      const result = await controller.startUpload("episode-1", { fileSize: 1000 });
+      expect(episodeServiceMock.startUpload).toHaveBeenCalledWith("episode-1", 1000);
+      expect(result).toEqual(startResponse);
+    });
+  });
+
+  describe("completeUpload", () => {
+    test("should complete a multipart upload", async () => {
+      const dto = { uploadId: "upload-1", parts: [{ partNumber: 1, eTag: "etag-1" }] };
+      await controller.completeUpload("episode-1", dto);
+      expect(episodeServiceMock.completeUpload).toHaveBeenCalledWith(
+        "episode-1",
+        "upload-1",
+        dto.parts,
+      );
+    });
+  });
+
+  describe("abortUpload", () => {
+    test("should abort a multipart upload", async () => {
+      await controller.abortUpload("episode-1", "upload-1");
+      expect(episodeServiceMock.abortUpload).toHaveBeenCalledWith("episode-1", "upload-1");
     });
   });
 

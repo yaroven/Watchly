@@ -94,6 +94,8 @@ describe("VideoTranscoderService", () => {
           useValue: {
             get: jest.fn(),
             uploadStream: jest.fn(),
+            deleteObject: jest.fn(),
+            deleteFolder: jest.fn(),
           },
         },
       ],
@@ -148,6 +150,38 @@ describe("VideoTranscoderService", () => {
       await service.cancelScheduledTranscodes("vid-1", VideoType.MOVIE);
 
       expect(queueMock.getJob).toHaveBeenCalledWith(`transcode-${VideoType.MOVIE}-vid-1`);
+    });
+  });
+
+  describe("cleanupVideoAsset", () => {
+    beforeEach(() => {
+      queueMock.getJob.mockResolvedValue(undefined);
+      s3ServiceMock.deleteObject.mockResolvedValue(undefined as any);
+      s3ServiceMock.deleteFolder.mockResolvedValue(undefined as any);
+    });
+
+    test("should cancel scheduled transcode and delete the raw video", async () => {
+      await service.cleanupVideoAsset("vid-1", VideoType.MOVIE);
+
+      expect(queueMock.getJob).toHaveBeenCalledWith(`transcode-${VideoType.MOVIE}-vid-1`);
+      expect(s3ServiceMock.deleteObject).toHaveBeenCalledWith("vid-1", BucketType.RAW);
+      expect(s3ServiceMock.deleteFolder).not.toHaveBeenCalled();
+    });
+
+    test("should also delete the processed folder when a path is given", async () => {
+      await service.cleanupVideoAsset("ep-1", VideoType.EPISODE, "videos/title-1/season-1/ep-1/");
+
+      expect(s3ServiceMock.deleteObject).toHaveBeenCalledWith("ep-1", BucketType.RAW);
+      expect(s3ServiceMock.deleteFolder).toHaveBeenCalledWith(
+        "videos/title-1/season-1/ep-1/",
+        BucketType.PROCESSED,
+      );
+    });
+
+    test("should log and swallow a failure instead of throwing", async () => {
+      s3ServiceMock.deleteObject.mockRejectedValue(new Error("boom"));
+
+      await expect(service.cleanupVideoAsset("vid-1", VideoType.MOVIE)).resolves.toBeUndefined();
     });
   });
 

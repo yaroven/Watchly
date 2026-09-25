@@ -98,10 +98,7 @@ export class SeasonService {
   async cleanupAssets(season: Season & { episodes: Episode[] }): Promise<void> {
     await settleAllOrLog(
       season.episodes,
-      async (episode) => {
-        await this.videoTranscoderService.cancelScheduledTranscodes(episode.id, VideoType.EPISODE);
-        await this.s3Service.deleteObject(episode.id, BucketType.RAW);
-      },
+      (episode) => this.videoTranscoderService.cleanupVideoAsset(episode.id, VideoType.EPISODE),
       (episode) => episode.id,
       this.logger,
       { itemLabel: "episode", parentLabel: "season", parentId: season.id },

@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { ApiProperty } from "@nestjs/swagger";
 import { AgeRating, Genre, Title, TitleType, TranscodingStatus } from "@prisma/client";
 import { GenreResponseDto } from "../../../genre/dto/response/genre-response.dto";
 
@@ -23,9 +23,6 @@ export class TitleResponseDto {
 
   @ApiProperty()
   posterUrl: string;
-
-  @ApiPropertyOptional()
-  hlsUrl?: string | null;
 
   @ApiProperty({ enum: AgeRating })
   ageRating: AgeRating;
@@ -68,7 +65,6 @@ export class TitleResponseDto {
     this.description = title.description;
     this.type = title.type;
     this.posterUrl = title.posterUrl;
-    this.hlsUrl = title.hlsUrl;
     this.ageRating = title.ageRating;
     this.country = title.country;
     this.releaseDate = title.releaseDate;

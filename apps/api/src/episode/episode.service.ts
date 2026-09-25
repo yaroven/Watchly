@@ -2,9 +2,9 @@ import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { Filter, Sorting } from "../common/pagination/pagination.types";
 import { buildOrderBy, buildWhere } from "../common/pagination/prisma-query.util";
-import { settleAllOrLog } from "../common/settle-all-or-throw.util";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
+import { MultipartUploadPart } from "../s3/multipart.constants";
 import { S3Service } from "../s3/s3.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
@@ -102,26 +102,10 @@ export class EpisodeService {
 
     const deleted = await this.prisma.episode.delete({ where: { id } });
 
-    await settleAllOrLog(
-      [
-        {
-          id: "scheduled-transcodes",
-          run: () => this.videoTranscoderService.cancelScheduledTranscodes(id, VideoType.EPISODE),
-        },
-        { id: "raw-video", run: () => this.s3Service.deleteObject(id, BucketType.RAW) },
-        {
-          id: "processed-folder",
-          run: () =>
-            this.s3Service.deleteFolder(
-              `videos/${titleId}/${seasonId}/${id}/`,
-              BucketType.PROCESSED,
-            ),
-        },
-      ],
-      (task) => task.run(),
-      (task) => task.id,
-      this.logger,
-      { itemLabel: "asset", parentLabel: "episode", parentId: id },
+    await this.videoTranscoderService.cleanupVideoAsset(
+      id,
+      VideoType.EPISODE,
+      `videos/${titleId}/${seasonId}/${id}/`,
     );
 
     return new EpisodeResponseDto(deleted);
@@ -138,13 +122,22 @@ export class EpisodeService {
     });
   }
 
-  async getUploadUrl(id: string): Promise<{ url: string }> {
+  async startUpload(id: string, fileSize: number) {
     const episode = await this.findOne(id);
-
     if (!episode) throw new BadRequestException(`Episode with id ${id} not found`);
 
-    const url = await this.s3Service.getUploadPresignedUrl(id, BucketType.RAW);
-    return { url };
+    return this.s3Service.startMultipartUpload(id, BucketType.RAW, fileSize);
+  }
+
+  async completeUpload(id: string, uploadId: string, parts: MultipartUploadPart[]): Promise<void> {
+    const episode = await this.findOne(id);
+    if (!episode) throw new BadRequestException(`Episode with id ${id} not found`);
+
+    await this.s3Service.completeMultipartUpload(id, BucketType.RAW, uploadId, parts);
+  }
+
+  async abortUpload(id: string, uploadId: string): Promise<void> {
+    await this.s3Service.abortMultipartUpload(id, BucketType.RAW, uploadId);
   }
 
   async getStreamUrl(id: string): Promise<{ url: string }> {

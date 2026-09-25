@@ -246,8 +246,8 @@ describe("S3Service", () => {
 
       await service.onModuleInit();
 
-      // Both buckets verified
-      expect(mockSend).toHaveBeenCalledTimes(2);
+      // Both buckets verified + CORS configured on each
+      expect(mockSend).toHaveBeenCalledTimes(4);
     });
 
     test("should create bucket when NotFound is thrown", async () => {
@@ -263,8 +263,8 @@ describe("S3Service", () => {
 
       await service.onModuleInit();
 
-      // 2 head-bucket failures + 2 create-bucket calls = 4
-      expect(mockSend).toHaveBeenCalledTimes(4);
+      // 2 head-bucket failures + 2 create-bucket calls + 2 CORS configs = 6
+      expect(mockSend).toHaveBeenCalledTimes(6);
     });
 
     test("should rethrow non-NotFound errors from initializeBucket", async () => {
