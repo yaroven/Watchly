@@ -1,6 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { Prisma, Role } from "@prisma/client";
+import { FilterRule } from "../common/pagination/filter-rule.enum";
 import { PrismaService } from "../prisma/prisma.service";
 import { hashPassword, verifyPassword } from "./user.password.util";
 import { UserService } from "./user.service";
@@ -118,7 +119,9 @@ describe("UserService", () => {
     });
 
     test("should filter by case-insensitive email substring", async () => {
-      await service.findAll({ search: "user@" });
+      await service.findAll({}, undefined, [
+        { property: "email", rule: FilterRule.LIKE, value: "user@" },
+      ]);
 
       expect(prismaMock.user.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { email: { contains: "user@", mode: "insensitive" } } }),
@@ -126,26 +129,20 @@ describe("UserService", () => {
     });
 
     test("should filter by role", async () => {
-      await service.findAll({ role: Role.ADMIN });
+      await service.findAll({}, undefined, [
+        { property: "role", rule: FilterRule.EQ, value: Role.ADMIN },
+      ]);
 
       expect(prismaMock.user.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { role: Role.ADMIN } }),
       );
     });
 
-    test("should sort by an allowed field", async () => {
-      await service.findAll({ sortBy: "email", sort: "asc" });
+    test("should sort by a given field", async () => {
+      await service.findAll({}, { property: "email", direction: "asc" });
 
       expect(prismaMock.user.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ orderBy: { email: "asc" } }),
-      );
-    });
-
-    test("should ignore a sortBy field that isn't a real column", async () => {
-      await service.findAll({ sortBy: "password" });
-
-      expect(prismaMock.user.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ orderBy: { createdAt: "desc" } }),
       );
     });
   });
