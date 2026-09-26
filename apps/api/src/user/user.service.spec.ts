@@ -1,6 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { Prisma, Role } from "@prisma/client";
+import { FilterRule } from "../common/pagination/filter-rule.enum";
 import { PrismaService } from "../prisma/prisma.service";
 import { hashPassword, verifyPassword } from "./user.password.util";
 import { UserService } from "./user.service";
@@ -54,12 +55,10 @@ describe("UserService", () => {
   describe("create", () => {
     const createData = { email: "user@example.com", password: "plaintext-pw" };
 
-    describe("when the email is not taken", () => {
-      beforeEach(() => {
+    describe("should hash the password and create the user", () => {
+      it("if the email is not taken", async () => {
         (prismaMock.user.create as jest.Mock).mockResolvedValue(safeUser);
-      });
 
-      test("should hash the password and create the user", async () => {
         const result = await service.create(createData);
 
         expect(hashPassword).toHaveBeenCalledWith("plaintext-pw");
@@ -69,163 +68,204 @@ describe("UserService", () => {
         });
         expect(result).toEqual(safeUser);
       });
+    });
 
-      test("should default role to USER when not provided", async () => {
+    describe("should default role to USER", () => {
+      it("if no role is provided", async () => {
+        (prismaMock.user.create as jest.Mock).mockResolvedValue(safeUser);
+
         await service.create(createData);
+
         expect(prismaMock.user.create).toHaveBeenCalledWith(
           expect.objectContaining({ data: expect.objectContaining({ role: Role.USER }) }),
         );
       });
+    });
 
-      test("should respect an explicit role", async () => {
+    describe("should respect an explicit role", () => {
+      it("if a role is provided", async () => {
+        (prismaMock.user.create as jest.Mock).mockResolvedValue(safeUser);
+
         await service.create({ ...createData, role: Role.ADMIN });
+
         expect(prismaMock.user.create).toHaveBeenCalledWith(
           expect.objectContaining({ data: expect.objectContaining({ role: Role.ADMIN }) }),
         );
       });
     });
 
-    describe("when the email is already taken", () => {
-      beforeEach(() => {
+    describe("should throw BadRequestException instead of the raw Prisma error", () => {
+      it("if the email is already taken", async () => {
         (prismaMock.user.create as jest.Mock).mockRejectedValue(
           new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
             code: "P2002",
             clientVersion: "test",
           }),
         );
-      });
 
-      test("should throw BadRequestException instead of the raw Prisma error", async () => {
         const action = service.create(createData);
+
         await expect(action).rejects.toThrow(BadRequestException);
       });
     });
   });
 
   describe("findAll", () => {
-    beforeEach(() => {
-      (prismaMock.user.findMany as jest.Mock).mockResolvedValue([safeUser]);
-      (prismaMock.user.count as jest.Mock).mockResolvedValue(1);
+    describe("should paginate with defaults", () => {
+      it("if called without filters", async () => {
+        (prismaMock.user.findMany as jest.Mock).mockResolvedValue([safeUser]);
+        (prismaMock.user.count as jest.Mock).mockResolvedValue(1);
+
+        const result = await service.findAll({});
+
+        expect(prismaMock.user.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ skip: 0, take: 10, orderBy: { createdAt: "desc" } }),
+        );
+        expect(result).toEqual({ items: [safeUser], totalCount: 1 });
+      });
     });
 
-    test("should paginate with defaults", async () => {
-      const result = await service.findAll({});
+    describe("should filter by case-insensitive email substring", () => {
+      it("if filtering by email (LIKE)", async () => {
+        (prismaMock.user.findMany as jest.Mock).mockResolvedValue([safeUser]);
+        (prismaMock.user.count as jest.Mock).mockResolvedValue(1);
 
-      expect(prismaMock.user.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ skip: 0, take: 10, orderBy: { createdAt: "desc" } }),
-      );
-      expect(result).toEqual({ items: [safeUser], totalCount: 1 });
+        await service.findAll({}, undefined, [
+          { property: "email", rule: FilterRule.LIKE, value: "user@" },
+        ]);
+
+        expect(prismaMock.user.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { email: { contains: "user@", mode: "insensitive" } } }),
+        );
+      });
     });
 
-    test("should filter by case-insensitive email substring", async () => {
-      await service.findAll({ search: "user@" });
+    describe("should filter by role", () => {
+      it("if filtering by role", async () => {
+        (prismaMock.user.findMany as jest.Mock).mockResolvedValue([safeUser]);
+        (prismaMock.user.count as jest.Mock).mockResolvedValue(1);
 
-      expect(prismaMock.user.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { email: { contains: "user@", mode: "insensitive" } } }),
-      );
+        await service.findAll({}, undefined, [
+          { property: "role", rule: FilterRule.EQ, value: Role.ADMIN },
+        ]);
+
+        expect(prismaMock.user.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { role: Role.ADMIN } }),
+        );
+      });
     });
 
-    test("should filter by role", async () => {
-      await service.findAll({ role: Role.ADMIN });
+    describe("should sort by a given field", () => {
+      it("if sorting by that field", async () => {
+        (prismaMock.user.findMany as jest.Mock).mockResolvedValue([safeUser]);
+        (prismaMock.user.count as jest.Mock).mockResolvedValue(1);
 
-      expect(prismaMock.user.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { role: Role.ADMIN } }),
-      );
-    });
+        await service.findAll({}, { property: "email", direction: "asc" });
 
-    test("should sort by an allowed field", async () => {
-      await service.findAll({ sortBy: "email", sort: "asc" });
-
-      expect(prismaMock.user.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ orderBy: { email: "asc" } }),
-      );
-    });
-
-    test("should ignore a sortBy field that isn't a real column", async () => {
-      await service.findAll({ sortBy: "password" });
-
-      expect(prismaMock.user.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ orderBy: { createdAt: "desc" } }),
-      );
+        expect(prismaMock.user.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ orderBy: { email: "asc" } }),
+        );
+      });
     });
   });
 
   describe("findOne", () => {
-    test("should return the user when found", async () => {
-      (prismaMock.user.findUnique as jest.Mock).mockResolvedValue(safeUser);
+    describe("should return the user", () => {
+      it("if found", async () => {
+        (prismaMock.user.findUnique as jest.Mock).mockResolvedValue(safeUser);
 
-      const result = await service.findOne("user-1");
+        const result = await service.findOne("user-1");
 
-      expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
-        where: { id: "user-1" },
-        select: { id: true, email: true, role: true, createdAt: true },
+        expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
+          where: { id: "user-1" },
+          select: { id: true, email: true, role: true, createdAt: true },
+        });
+        expect(result).toEqual(safeUser);
       });
-      expect(result).toEqual(safeUser);
     });
 
-    test("should return null when not found", async () => {
-      (prismaMock.user.findUnique as jest.Mock).mockResolvedValue(null);
+    describe("should return null", () => {
+      it("if not found", async () => {
+        (prismaMock.user.findUnique as jest.Mock).mockResolvedValue(null);
 
-      const result = await service.findOne("missing");
-      expect(result).toBeNull();
+        const result = await service.findOne("missing");
+
+        expect(result).toBeNull();
+      });
     });
   });
 
   describe("validateUser", () => {
     const userWithPassword = { ...safeUser, password: "salt:hash" };
 
-    test("should return the user without the password on a valid password", async () => {
-      (prismaMock.user.findUnique as jest.Mock).mockResolvedValue(userWithPassword);
-      (verifyPassword as jest.Mock).mockResolvedValue(true);
+    describe("should return the user without the password", () => {
+      it("if the password is valid", async () => {
+        (prismaMock.user.findUnique as jest.Mock).mockResolvedValue(userWithPassword);
+        (verifyPassword as jest.Mock).mockResolvedValue(true);
 
-      const result = await service.validateUser("user@example.com", "correct-plaintext");
+        const result = await service.validateUser("user@example.com", "correct-plaintext");
 
-      expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
-        where: { email: "user@example.com" },
+        expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
+          where: { email: "user@example.com" },
+        });
+        expect(verifyPassword).toHaveBeenCalledWith("correct-plaintext", "salt:hash");
+        expect(result).toEqual(safeUser);
+        expect(result).not.toHaveProperty("password");
       });
-      expect(verifyPassword).toHaveBeenCalledWith("correct-plaintext", "salt:hash");
-      expect(result).toEqual(safeUser);
-      expect(result).not.toHaveProperty("password");
     });
 
-    test("should return null on an invalid password", async () => {
-      (prismaMock.user.findUnique as jest.Mock).mockResolvedValue(userWithPassword);
-      (verifyPassword as jest.Mock).mockResolvedValue(false);
+    describe("should return null", () => {
+      it("if the password is invalid", async () => {
+        (prismaMock.user.findUnique as jest.Mock).mockResolvedValue(userWithPassword);
+        (verifyPassword as jest.Mock).mockResolvedValue(false);
 
-      const result = await service.validateUser("user@example.com", "wrong-plaintext");
-      expect(result).toBeNull();
-    });
+        const result = await service.validateUser("user@example.com", "wrong-plaintext");
 
-    test("should return null when no user has that email", async () => {
-      (prismaMock.user.findUnique as jest.Mock).mockResolvedValue(null);
+        expect(result).toBeNull();
+      });
 
-      const result = await service.validateUser("missing@example.com", "whatever");
+      it("if no user has that email", async () => {
+        (prismaMock.user.findUnique as jest.Mock).mockResolvedValue(null);
 
-      expect(result).toBeNull();
-      expect(verifyPassword).not.toHaveBeenCalled();
+        const result = await service.validateUser("missing@example.com", "whatever");
+
+        expect(result).toBeNull();
+        expect(verifyPassword).not.toHaveBeenCalled();
+      });
     });
   });
 
   describe("update", () => {
-    describe("when the user does not exist", () => {
-      beforeEach(() => {
+    describe("should throw BadRequestException", () => {
+      it("if the user does not exist", async () => {
         (prismaMock.user.findUnique as jest.Mock).mockResolvedValue(null);
-      });
 
-      test("should throw BadRequestException", async () => {
         const action = service.update("missing", { email: "new@example.com" });
+
         await expect(action).rejects.toThrow(BadRequestException);
         expect(prismaMock.user.update).not.toHaveBeenCalled();
       });
+
+      it("if there's a duplicate email", async () => {
+        (prismaMock.user.findUnique as jest.Mock).mockResolvedValue(safeUser);
+        (prismaMock.user.update as jest.Mock).mockRejectedValue(
+          new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+            code: "P2002",
+            clientVersion: "test",
+          }),
+        );
+
+        const action = service.update("user-1", { email: "taken@example.com" });
+
+        await expect(action).rejects.toThrow(BadRequestException);
+      });
     });
 
-    describe("when the user exists", () => {
-      beforeEach(() => {
+    describe("should update without touching the password", () => {
+      it("if none is given", async () => {
         (prismaMock.user.findUnique as jest.Mock).mockResolvedValue(safeUser);
         (prismaMock.user.update as jest.Mock).mockResolvedValue(safeUser);
-      });
 
-      test("should update without touching the password when none is given", async () => {
         await service.update("user-1", { email: "new@example.com" });
 
         expect(hashPassword).not.toHaveBeenCalled();
@@ -235,8 +275,13 @@ describe("UserService", () => {
           select: { id: true, email: true, role: true, createdAt: true },
         });
       });
+    });
 
-      test("should hash a newly provided password", async () => {
+    describe("should hash a newly provided password", () => {
+      it("if one is given", async () => {
+        (prismaMock.user.findUnique as jest.Mock).mockResolvedValue(safeUser);
+        (prismaMock.user.update as jest.Mock).mockResolvedValue(safeUser);
+
         await service.update("user-1", { password: "new-plaintext" });
 
         expect(hashPassword).toHaveBeenCalledWith("new-plaintext");
@@ -244,41 +289,26 @@ describe("UserService", () => {
           expect.objectContaining({ data: expect.objectContaining({ password: "salt:hash" }) }),
         );
       });
-
-      test("should throw BadRequestException on a duplicate email", async () => {
-        (prismaMock.user.update as jest.Mock).mockRejectedValue(
-          new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
-            code: "P2002",
-            clientVersion: "test",
-          }),
-        );
-
-        const action = service.update("user-1", { email: "taken@example.com" });
-        await expect(action).rejects.toThrow(BadRequestException);
-      });
     });
   });
 
   describe("delete", () => {
-    describe("when the user does not exist", () => {
-      beforeEach(() => {
+    describe("should throw BadRequestException", () => {
+      it("if the user does not exist", async () => {
         (prismaMock.user.findUnique as jest.Mock).mockResolvedValue(null);
-      });
 
-      test("should throw BadRequestException", async () => {
         const action = service.delete("missing");
+
         await expect(action).rejects.toThrow(BadRequestException);
         expect(prismaMock.user.delete).not.toHaveBeenCalled();
       });
     });
 
-    describe("when the user exists", () => {
-      beforeEach(() => {
+    describe("should delete and return the user", () => {
+      it("if the user exists", async () => {
         (prismaMock.user.findUnique as jest.Mock).mockResolvedValue(safeUser);
         (prismaMock.user.delete as jest.Mock).mockResolvedValue(safeUser);
-      });
 
-      test("should delete and return the user", async () => {
         const result = await service.delete("user-1");
 
         expect(prismaMock.user.delete).toHaveBeenCalledWith({

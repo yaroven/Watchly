@@ -1,5 +1,8 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
-import { Prisma, Role } from "@prisma/client";
+import { Prisma, Role, User } from "@prisma/client";
+import { paginate } from "../common/pagination/paginate.util";
+import { Filter, Sorting } from "../common/pagination/pagination.types";
+import { buildOrderBy, buildWhere } from "../common/pagination/prisma-query.util";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateUserDto } from "./dto/request/create-user.dto";
 import { GetAllUserDto } from "./dto/request/get-all-user.dto";
@@ -14,11 +17,6 @@ const USER_SAFE_SELECT = {
   role: true,
   createdAt: true,
 } satisfies Prisma.UserSelect;
-
-/** Excludes `password` — sorting by a hash is pointless and leaks the field's existence. */
-const SORTABLE_FIELDS = Object.keys(Prisma.UserScalarFieldEnum).filter(
-  (field) => field !== "password",
-);
 
 @Injectable()
 export class UserService {
@@ -41,44 +39,26 @@ export class UserService {
     }
   }
 
-  async findAll({
-    search,
-    role,
-    page = 1,
-    limit = 10,
-    sort,
-    sortBy,
-  }: GetAllUserDto): Promise<{ items: UserResponseDto[]; totalCount: number }> {
-    const where: Prisma.UserWhereInput = {};
-    const orderBy: Prisma.UserOrderByWithRelationInput = {};
+  async findAll(
+    { page = 1, limit = 10 }: GetAllUserDto,
+    sort?: Sorting,
+    filters: Filter[] = [],
+  ): Promise<{ items: UserResponseDto[]; totalCount: number }> {
+    const where = buildWhere(filters) as Prisma.UserWhereInput;
+    const orderBy = (buildOrderBy(sort) ?? {
+      createdAt: "desc",
+    }) as Prisma.UserOrderByWithRelationInput;
 
-    if (sortBy && SORTABLE_FIELDS.includes(sortBy)) {
-      orderBy[sortBy] = sort || "desc";
-    } else {
-      orderBy["createdAt"] = "desc";
-    }
-
-    if (search) {
-      where.email = {
-        contains: search,
-        mode: "insensitive",
-      };
-    }
-
-    if (role) {
-      where.role = role;
-    }
-
-    const [items, totalCount] = await Promise.all([
-      this.prisma.user.findMany({
+    const { items, totalCount } = await paginate<Pick<User, "id" | "email" | "role" | "createdAt">>(
+      this.prisma.user,
+      {
         where,
-        skip: (page - 1) * limit,
-        take: limit,
         orderBy,
-        select: USER_SAFE_SELECT,
-      }),
-      this.prisma.user.count({ where }),
-    ]);
+        page,
+        limit,
+        extra: { select: USER_SAFE_SELECT },
+      },
+    );
 
     return { items: items.map((user) => new UserResponseDto(user)), totalCount };
   }

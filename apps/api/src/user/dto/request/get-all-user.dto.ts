@@ -1,17 +1,5 @@
-import { ApiPropertyOptional } from "@nestjs/swagger";
-import { Role } from "@prisma/client";
-import { IsEnum, IsOptional, IsString, MaxLength } from "class-validator";
+import { IntersectionType } from "@nestjs/swagger";
 import { PaginatedQueryDto } from "../../../common/dto/paginated-query.dto";
+import { QueryWithFilterSortDto } from "../../../common/pagination/query-with-filter-sort.dto";
 
-export class GetAllUserDto extends PaginatedQueryDto {
-  @ApiPropertyOptional({ maxLength: 255, description: "Case-insensitive substring match on email" })
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  search?: string;
-
-  @ApiPropertyOptional({ enum: Role })
-  @IsOptional()
-  @IsEnum(Role)
-  role?: Role;
-}
+export class GetAllUserDto extends IntersectionType(PaginatedQueryDto, QueryWithFilterSortDto) {}

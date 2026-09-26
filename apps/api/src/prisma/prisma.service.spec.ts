@@ -35,16 +35,16 @@ describe("PrismaService", () => {
     jest.clearAllMocks();
   });
 
-  test("should initialize PrismaPg adapter", () => {
+  it("should initialize PrismaPg adapter", () => {
     expect(PrismaPg).toHaveBeenCalledWith({ connectionString: process.env.DATABASE_URL });
   });
 
-  test("onModuleInit should call $connect", async () => {
+  it("onModuleInit should call $connect", async () => {
     await service.onModuleInit();
     expect(mockConnect).toHaveBeenCalled();
   });
 
-  test("onModuleDestroy should call $disconnect", async () => {
+  it("onModuleDestroy should call $disconnect", async () => {
     await service.onModuleDestroy();
     expect(mockDisconnect).toHaveBeenCalled();
   });

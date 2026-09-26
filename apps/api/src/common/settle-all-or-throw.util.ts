@@ -1,5 +1,5 @@
 import { InternalServerErrorException, Logger } from "@nestjs/common";
-import { mapWithConcurrencyLimit } from "./concurrency.util";
+import pSettle from "p-settle";
 
 export interface SettleAllOrThrowContext {
   itemLabel: string;
@@ -9,25 +9,6 @@ export interface SettleAllOrThrowContext {
 
 const DEFAULT_CONCURRENCY = 8;
 
-async function settleAll<T>(
-  items: T[],
-  fn: (item: T) => Promise<unknown>,
-  concurrency: number,
-): Promise<PromiseSettledResult<unknown>[]> {
-  return mapWithConcurrencyLimit(
-    items,
-    concurrency,
-    async (item): Promise<PromiseSettledResult<unknown>> => {
-      try {
-        await fn(item);
-        return { status: "fulfilled", value: undefined };
-      } catch (reason: unknown) {
-        return { status: "rejected", reason };
-      }
-    },
-  );
-}
-
 export async function settleAllOrThrow<T>(
   items: T[],
   fn: (item: T) => Promise<unknown>,
@@ -36,13 +17,16 @@ export async function settleAllOrThrow<T>(
   context: SettleAllOrThrowContext,
   concurrency: number = DEFAULT_CONCURRENCY,
 ): Promise<void> {
-  const results = await settleAll(items, fn, concurrency);
+  const results = await pSettle(
+    items.map((item) => () => fn(item)),
+    { concurrency },
+  );
 
   const failed = results
     .map((result, index) => ({ result, id: getId(items[index]) }))
     .filter(
-      (entry): entry is { result: PromiseRejectedResult; id: string } =>
-        entry.result.status === "rejected",
+      (entry): entry is { result: pSettle.PromiseRejectedResult; id: string } =>
+        entry.result.isRejected,
     );
 
   if (failed.length === 0) return;
@@ -74,10 +58,13 @@ export async function settleAllOrLog<T>(
   context: SettleAllOrThrowContext,
   concurrency: number = DEFAULT_CONCURRENCY,
 ): Promise<void> {
-  const results = await settleAll(items, fn, concurrency);
+  const results = await pSettle(
+    items.map((item) => () => fn(item)),
+    { concurrency },
+  );
 
   results.forEach((result, index) => {
-    if (result.status === "rejected") {
+    if (result.isRejected) {
       logger.error(
         `Failed to clean up ${context.itemLabel} ${getId(items[index])} after deleting ${context.parentLabel} ${context.parentId}`,
         result.reason,
