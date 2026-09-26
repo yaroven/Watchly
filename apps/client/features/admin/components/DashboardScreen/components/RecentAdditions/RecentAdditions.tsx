@@ -54,7 +54,7 @@ export default function RecentAdditions() {
             >
               <Box sx={{ display: "flex", alignItems: "center", gap: "14px", minWidth: 0 }}>
                 <Image
-                  src={getOptimizedImageSrc(posterUrl || "/cat.webp")}
+                  src={getOptimizedImageSrc(posterUrl)}
                   alt={name}
                   width={40}
                   height={56}

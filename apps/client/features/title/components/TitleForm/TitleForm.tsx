@@ -1,6 +1,6 @@
 "use client";
 
-import { CreateTitleSchema, Title, TitleFormValues, TitleType, UpdateTitleSchema } from "@/features/title/schemas/title";
+import { AgeRating, CreateTitleSchema, Title, TitleFormValues, TitleType, UpdateTitleSchema } from "@/features/title/schemas/title";
 import ProgressBar from "@/features/transcoding/components/ProgressBar";
 import { ADMIN } from "@/shared/lib/routes";
 import FormField from "@/shared/ui/FormField";
@@ -31,6 +31,11 @@ export default function TitleForm({ initialData }: TitleFormProps) {
         name: initialData.name,
         description: initialData.description,
         type: initialData.type,
+        ageRating: initialData.ageRating,
+        country: initialData.country,
+        releaseDate: initialData.releaseDate.slice(0, 10),
+        language: initialData.language,
+        trailerUrl: initialData.trailerUrl,
       }
     : undefined;
 
@@ -56,6 +61,11 @@ export default function TitleForm({ initialData }: TitleFormProps) {
         name: initialData.name,
         description: initialData.description,
         type: initialData.type,
+        ageRating: initialData.ageRating,
+        country: initialData.country,
+        releaseDate: initialData.releaseDate.slice(0, 10),
+        language: initialData.language,
+        trailerUrl: initialData.trailerUrl,
         posterFile: undefined,
         videoFile: undefined,
       });
@@ -66,6 +76,11 @@ export default function TitleForm({ initialData }: TitleFormProps) {
       name: "",
       description: "",
       type: TitleType.MOVIE,
+      ageRating: undefined,
+      country: "",
+      releaseDate: "",
+      language: "",
+      trailerUrl: "",
       posterFile: undefined,
       videoFile: undefined,
     });
@@ -95,12 +110,22 @@ export default function TitleForm({ initialData }: TitleFormProps) {
               name: data.name,
               description: data.description,
               type: data.type,
+              ageRating: data.ageRating,
+              country: data.country,
+              releaseDate: data.releaseDate,
+              language: data.language,
+              trailerUrl: data.trailerUrl,
               posterFile: undefined,
             }
           : {
               name: "",
               description: "",
               type: TitleType.MOVIE,
+              ageRating: undefined,
+              country: "",
+              releaseDate: "",
+              language: "",
+              trailerUrl: "",
               posterFile: undefined,
             },
       );
@@ -139,6 +164,25 @@ export default function TitleForm({ initialData }: TitleFormProps) {
           { value: TitleType.SERIES, label: "Series" },
         ]}
       />
+
+      <Select
+        label="Age Rating"
+        name="ageRating"
+        control={control}
+        error={errors.ageRating}
+        placeholder="Select age rating"
+        options={[
+          { value: AgeRating.AGE_0, label: "All Ages" },
+          { value: AgeRating.AGE_12, label: "12+" },
+          { value: AgeRating.AGE_16, label: "16+" },
+          { value: AgeRating.AGE_18, label: "18+" },
+        ]}
+      />
+
+      <FormField label="Country" placeholder="Country of origin" name="country" register={register} error={errors.country} />
+      <FormField type="date" label="Release Date" name="releaseDate" register={register} error={errors.releaseDate} />
+      <FormField label="Language" placeholder="Language" name="language" register={register} error={errors.language} />
+      <FormField type="url" label="Trailer URL" placeholder="https://..." name="trailerUrl" register={register} error={errors.trailerUrl} />
 
       <Activity mode={selectedType === TitleType.MOVIE && !isEditing ? "visible" : "hidden"}>
         <FormFileInput
