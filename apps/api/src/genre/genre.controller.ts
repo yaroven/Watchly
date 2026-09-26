@@ -22,10 +22,10 @@ import { AdminOnly } from "../auth/decorators/roles.decorator";
 import { FilteringParams } from "../common/pagination/filtering-params.decorator";
 import { Filter, Sorting } from "../common/pagination/pagination.types";
 import { SortingParams } from "../common/pagination/sorting-params.decorator";
+import { PaginatedResponseOf } from "../common/utils/paginated-response-of.util";
 import { CreateGenreDto } from "./dto/request/create-genre.dto";
 import { GetAllGenreDto } from "./dto/request/get-all-genre.dto";
 import { UpdateGenreDto } from "./dto/request/update-genre.dto";
-import { GenreListResponseDto } from "./dto/response/genre-list.response.dto";
 import { GenreResponseDto } from "./dto/response/genre-response.dto";
 import { GenreService } from "./genre.service";
 
@@ -47,7 +47,7 @@ export class GenreController {
     description:
       "`filter` (repeatable): `property:rule:value`. Filterable: name. `sort`: `property:direction`. Sortable: name, createdAt.",
   })
-  @ApiOkResponse({ type: GenreListResponseDto })
+  @ApiOkResponse({ type: PaginatedResponseOf(GenreResponseDto) })
   @Get()
   findAll(
     @Query() query: GetAllGenreDto,

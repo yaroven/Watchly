@@ -38,109 +38,115 @@ describe("GenreService", () => {
   });
 
   describe("create", () => {
-    describe("when name is unique", () => {
-      const createdGenre = { id: "genre-1", name: "Action" };
-
-      beforeEach(() => {
+    describe("should create and return the genre", () => {
+      it("if the name is unique", async () => {
+        const createdGenre = { id: "genre-1", name: "Action" };
         (prismaMock.genre.create as jest.Mock).mockResolvedValue(createdGenre);
-      });
 
-      test("should create and return the genre", async () => {
         const result = await service.create({ name: "Action" });
+
         expect(prismaMock.genre.create).toHaveBeenCalledWith({ data: { name: "Action" } });
         expect(result).toEqual(createdGenre);
       });
     });
 
-    describe("when name already exists", () => {
-      beforeEach(() => {
+    describe("should throw BadRequestException instead of the raw Prisma error", () => {
+      it("if the name already exists", async () => {
         (prismaMock.genre.create as jest.Mock).mockRejectedValue(
           new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
             code: "P2002",
             clientVersion: "test",
           }),
         );
-      });
 
-      test("should throw BadRequestException instead of the raw Prisma error", async () => {
         const action = service.create({ name: "Action" });
+
         await expect(action).rejects.toThrow(BadRequestException);
       });
     });
   });
 
   describe("findAll", () => {
-    const genres = [{ id: "genre-1", name: "Action" }];
+    describe("should return paginated genres", () => {
+      it("if fetching without filters", async () => {
+        const genres = [{ id: "genre-1", name: "Action" }];
+        (prismaMock.genre.findMany as jest.Mock).mockResolvedValue(genres);
+        (prismaMock.genre.count as jest.Mock).mockResolvedValue(1);
 
-    beforeEach(() => {
-      (prismaMock.genre.findMany as jest.Mock).mockResolvedValue(genres);
-      (prismaMock.genre.count as jest.Mock).mockResolvedValue(1);
-    });
+        const result = await service.findAll({ page: 1, limit: 10 });
 
-    test("should return paginated genres", async () => {
-      const result = await service.findAll({ page: 1, limit: 10 });
-      expect(prismaMock.genre.findMany).toHaveBeenCalledWith({
-        where: {},
-        skip: 0,
-        take: 10,
-        orderBy: { createdAt: "desc" },
+        expect(prismaMock.genre.findMany).toHaveBeenCalledWith({
+          where: {},
+          skip: 0,
+          take: 10,
+          orderBy: { createdAt: "desc" },
+        });
+        expect(result).toEqual({ items: genres, totalCount: 1 });
       });
-      expect(result).toEqual({ items: genres, totalCount: 1 });
     });
 
-    test("should filter by name (LIKE)", async () => {
-      await service.findAll({ page: 1, limit: 10 }, undefined, [
-        { property: "name", rule: FilterRule.LIKE, value: "Act" },
-      ]);
-      expect(prismaMock.genre.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { name: { contains: "Act", mode: "insensitive" } },
-        }),
-      );
+    describe("should filter by substring match", () => {
+      it("if filtering by name (LIKE)", async () => {
+        (prismaMock.genre.findMany as jest.Mock).mockResolvedValue([]);
+        (prismaMock.genre.count as jest.Mock).mockResolvedValue(0);
+
+        await service.findAll({ page: 1, limit: 10 }, undefined, [
+          { property: "name", rule: FilterRule.LIKE, value: "Act" },
+        ]);
+
+        expect(prismaMock.genre.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { name: { contains: "Act", mode: "insensitive" } },
+          }),
+        );
+      });
     });
   });
 
   describe("findOne", () => {
-    test("should return the genre when it exists", async () => {
-      const genre = { id: "genre-1", name: "Action" };
-      (prismaMock.genre.findUnique as jest.Mock).mockResolvedValue(genre);
+    describe("should return the genre", () => {
+      it("if it exists", async () => {
+        const genre = { id: "genre-1", name: "Action" };
+        (prismaMock.genre.findUnique as jest.Mock).mockResolvedValue(genre);
 
-      const result = await service.findOne("genre-1");
-      expect(prismaMock.genre.findUnique).toHaveBeenCalledWith({ where: { id: "genre-1" } });
-      expect(result).toEqual(genre);
+        const result = await service.findOne("genre-1");
+
+        expect(prismaMock.genre.findUnique).toHaveBeenCalledWith({ where: { id: "genre-1" } });
+        expect(result).toEqual(genre);
+      });
     });
 
-    test("should return null when it does not exist", async () => {
-      (prismaMock.genre.findUnique as jest.Mock).mockResolvedValue(null);
+    describe("should return null", () => {
+      it("if it does not exist", async () => {
+        (prismaMock.genre.findUnique as jest.Mock).mockResolvedValue(null);
 
-      const result = await service.findOne("non-existent");
-      expect(result).toBeNull();
+        const result = await service.findOne("non-existent");
+
+        expect(result).toBeNull();
+      });
     });
   });
 
   describe("update", () => {
-    describe("when genre does not exist", () => {
-      beforeEach(() => {
+    describe("should throw BadRequestException", () => {
+      it("if the genre does not exist", async () => {
         (prismaMock.genre.findUnique as jest.Mock).mockResolvedValue(null);
-      });
 
-      test("should throw BadRequestException", async () => {
         const action = service.update("non-existent", { name: "New Name" });
+
         await expect(action).rejects.toThrow(BadRequestException);
       });
     });
 
-    describe("when genre exists", () => {
-      const genre = { id: "genre-1", name: "Action" };
-      const updated = { ...genre, name: "Adventure" };
-
-      beforeEach(() => {
+    describe("should update and return the genre", () => {
+      it("if the genre exists", async () => {
+        const genre = { id: "genre-1", name: "Action" };
+        const updated = { ...genre, name: "Adventure" };
         (prismaMock.genre.findUnique as jest.Mock).mockResolvedValue(genre);
         (prismaMock.genre.update as jest.Mock).mockResolvedValue(updated);
-      });
 
-      test("should update and return the genre", async () => {
         const result = await service.update("genre-1", { name: "Adventure" });
+
         expect(prismaMock.genre.update).toHaveBeenCalledWith({
           where: { id: "genre-1" },
           data: { name: "Adventure" },
@@ -149,10 +155,9 @@ describe("GenreService", () => {
       });
     });
 
-    describe("when renaming to a name that already exists", () => {
-      const genre = { id: "genre-1", name: "Action" };
-
-      beforeEach(() => {
+    describe("should throw BadRequestException instead of the raw Prisma error", () => {
+      it("if renaming to a name that already exists", async () => {
+        const genre = { id: "genre-1", name: "Action" };
         (prismaMock.genre.findUnique as jest.Mock).mockResolvedValue(genre);
         (prismaMock.genre.update as jest.Mock).mockRejectedValue(
           new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
@@ -160,37 +165,33 @@ describe("GenreService", () => {
             clientVersion: "test",
           }),
         );
-      });
 
-      test("should throw BadRequestException instead of the raw Prisma error", async () => {
         const action = service.update("genre-1", { name: "Adventure" });
+
         await expect(action).rejects.toThrow(BadRequestException);
       });
     });
   });
 
   describe("delete", () => {
-    describe("when genre does not exist", () => {
-      beforeEach(() => {
+    describe("should throw BadRequestException", () => {
+      it("if the genre does not exist", async () => {
         (prismaMock.genre.findUnique as jest.Mock).mockResolvedValue(null);
-      });
 
-      test("should throw BadRequestException", async () => {
         const action = service.delete("non-existent");
+
         await expect(action).rejects.toThrow(BadRequestException);
       });
     });
 
-    describe("when genre exists", () => {
-      const genre = { id: "genre-1", name: "Action" };
-
-      beforeEach(() => {
+    describe("should delete and return the genre", () => {
+      it("if the genre exists", async () => {
+        const genre = { id: "genre-1", name: "Action" };
         (prismaMock.genre.findUnique as jest.Mock).mockResolvedValue(genre);
         (prismaMock.genre.delete as jest.Mock).mockResolvedValue(genre);
-      });
 
-      test("should delete and return the genre", async () => {
         const result = await service.delete("genre-1");
+
         expect(prismaMock.genre.delete).toHaveBeenCalledWith({ where: { id: "genre-1" } });
         expect(result).toEqual(genre);
       });

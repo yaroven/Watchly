@@ -45,7 +45,7 @@ model Title {
   name              String
   description       String
   type              TitleType
-  posterUrl         String
+  posterUrl         String?
   ageRating         AgeRating
   country           String
   releaseDate       DateTime

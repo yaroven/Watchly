@@ -13,7 +13,7 @@ describe("AppController", () => {
   });
 
   describe("health", () => {
-    test("should return OK", () => {
+    it("should return OK", () => {
       const result = controller.health();
       expect(result).toBe("OK");
     });

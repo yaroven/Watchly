@@ -15,27 +15,35 @@ describe("JwtAuthGuard", () => {
   });
 
   describe("handleRequest", () => {
-    test("attaches the user's id to request.userId and returns the user on success", () => {
-      const user = { id: "user-1", email: "user@example.com" };
+    describe("should attach the user's id to request.userId and return the user", () => {
+      it("on success", () => {
+        const user = { id: "user-1", email: "user@example.com" };
 
-      const result = guard.handleRequest(null, user, null, context);
+        const result = guard.handleRequest(null, user, null, context);
 
-      expect(result).toBe(user);
-      expect(request.userId).toBe("user-1");
+        expect(result).toBe(user);
+        expect(request.userId).toBe("user-1");
+      });
     });
 
-    test("throws UnauthorizedException and leaves request.userId unset when there is no user (missing/expired/invalid token)", () => {
-      expect(() => guard.handleRequest(null, null, { message: "No auth token" }, context)).toThrow(
-        UnauthorizedException,
-      );
-      expect(request.userId).toBeUndefined();
+    describe("should throw UnauthorizedException and leave request.userId unset", () => {
+      it("when there is no user (missing/expired/invalid token)", () => {
+        expect(() =>
+          guard.handleRequest(null, null, { message: "No auth token" }, context),
+        ).toThrow(UnauthorizedException);
+        expect(request.userId).toBeUndefined();
+      });
     });
 
-    test("rethrows a strategy-provided error instead of swallowing it", () => {
-      const strategyError = new Error("jwt malformed");
+    describe("should rethrow a strategy-provided error instead of swallowing it", () => {
+      it("when the strategy provides an error", () => {
+        const strategyError = new Error("jwt malformed");
 
-      expect(() => guard.handleRequest(strategyError, null, null, context)).toThrow(strategyError);
-      expect(request.userId).toBeUndefined();
+        expect(() => guard.handleRequest(strategyError, null, null, context)).toThrow(
+          strategyError,
+        );
+        expect(request.userId).toBeUndefined();
+      });
     });
   });
 });

@@ -22,7 +22,7 @@ export class TitleResponseDto {
   type: TitleType;
 
   @ApiProperty()
-  posterUrl: string;
+  posterUrl: string | null;
 
   @ApiProperty({ enum: AgeRating })
   ageRating: AgeRating;

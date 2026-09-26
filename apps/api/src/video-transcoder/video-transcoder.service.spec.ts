@@ -111,140 +111,138 @@ describe("VideoTranscoderService", () => {
   });
 
   describe("scheduleTranscodeVideo", () => {
-    test("should add job to queue", async () => {
-      const payload = { id: "vid-1", type: VideoType.MOVIE };
-      await service.scheduleTranscodeVideo(payload);
-      expect(queueMock.add).toHaveBeenCalledWith("transcode-video", payload, expect.any(Object));
+    describe("should add the job to the queue", () => {
+      it("always", async () => {
+        const payload = { id: "vid-1", type: VideoType.MOVIE };
+
+        await service.scheduleTranscodeVideo(payload);
+
+        expect(queueMock.add).toHaveBeenCalledWith("transcode-video", payload, expect.any(Object));
+      });
     });
   });
 
   describe("cancelScheduledTranscodes", () => {
-    test("should remove job when it is in a cancellable state", async () => {
-      const job = {
-        getState: jest.fn().mockResolvedValue("waiting"),
-        remove: jest.fn().mockResolvedValue(true),
-      };
-      queueMock.getJob.mockResolvedValue(job);
+    describe("should remove the job", () => {
+      it("if it is in a cancellable state", async () => {
+        const job = {
+          getState: jest.fn().mockResolvedValue("waiting"),
+          remove: jest.fn().mockResolvedValue(true),
+        };
+        queueMock.getJob.mockResolvedValue(job);
 
-      await service.cancelScheduledTranscodes("vid-1", VideoType.MOVIE);
+        await service.cancelScheduledTranscodes("vid-1", VideoType.MOVIE);
 
-      expect(queueMock.getJob).toHaveBeenCalledWith(`transcode-${VideoType.MOVIE}-vid-1`);
-      expect(job.remove).toHaveBeenCalled();
+        expect(queueMock.getJob).toHaveBeenCalledWith(`transcode-${VideoType.MOVIE}-vid-1`);
+        expect(job.remove).toHaveBeenCalled();
+      });
     });
 
-    test("should not remove job when it is already active", async () => {
-      const job = {
-        getState: jest.fn().mockResolvedValue("active"),
-        remove: jest.fn().mockResolvedValue(true),
-      };
-      queueMock.getJob.mockResolvedValue(job);
+    describe("should not remove the job", () => {
+      it("if it is already active", async () => {
+        const job = {
+          getState: jest.fn().mockResolvedValue("active"),
+          remove: jest.fn().mockResolvedValue(true),
+        };
+        queueMock.getJob.mockResolvedValue(job);
 
-      await service.cancelScheduledTranscodes("vid-1", VideoType.MOVIE);
+        await service.cancelScheduledTranscodes("vid-1", VideoType.MOVIE);
 
-      expect(job.remove).not.toHaveBeenCalled();
+        expect(job.remove).not.toHaveBeenCalled();
+      });
     });
 
-    test("should do nothing when no job is scheduled", async () => {
-      queueMock.getJob.mockResolvedValue(undefined);
+    describe("should do nothing", () => {
+      it("if no job is scheduled", async () => {
+        queueMock.getJob.mockResolvedValue(undefined);
 
-      await service.cancelScheduledTranscodes("vid-1", VideoType.MOVIE);
+        await service.cancelScheduledTranscodes("vid-1", VideoType.MOVIE);
 
-      expect(queueMock.getJob).toHaveBeenCalledWith(`transcode-${VideoType.MOVIE}-vid-1`);
-    });
-  });
-
-  describe("cleanupVideoAsset", () => {
-    beforeEach(() => {
-      queueMock.getJob.mockResolvedValue(undefined);
-      s3ServiceMock.deleteObject.mockResolvedValue(undefined as any);
-      s3ServiceMock.deleteFolder.mockResolvedValue(undefined as any);
-    });
-
-    test("should cancel scheduled transcode and delete the raw video", async () => {
-      await service.cleanupVideoAsset("vid-1", VideoType.MOVIE);
-
-      expect(queueMock.getJob).toHaveBeenCalledWith(`transcode-${VideoType.MOVIE}-vid-1`);
-      expect(s3ServiceMock.deleteObject).toHaveBeenCalledWith("vid-1", BucketType.RAW);
-      expect(s3ServiceMock.deleteFolder).not.toHaveBeenCalled();
-    });
-
-    test("should also delete the processed folder when a path is given", async () => {
-      await service.cleanupVideoAsset("ep-1", VideoType.EPISODE, "videos/title-1/season-1/ep-1/");
-
-      expect(s3ServiceMock.deleteObject).toHaveBeenCalledWith("ep-1", BucketType.RAW);
-      expect(s3ServiceMock.deleteFolder).toHaveBeenCalledWith(
-        "videos/title-1/season-1/ep-1/",
-        BucketType.PROCESSED,
-      );
-    });
-
-    test("should log and swallow a failure instead of throwing", async () => {
-      s3ServiceMock.deleteObject.mockRejectedValue(new Error("boom"));
-
-      await expect(service.cleanupVideoAsset("vid-1", VideoType.MOVIE)).resolves.toBeUndefined();
+        expect(queueMock.getJob).toHaveBeenCalledWith(`transcode-${VideoType.MOVIE}-vid-1`);
+      });
     });
   });
 
   describe("updateStatus", () => {
-    test("should update status for EPISODE", async () => {
-      (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue({
-        season: { titleId: "title-1" },
-      });
+    describe("should update status for both the episode and its title", () => {
+      it("if type is EPISODE and the episode exists", async () => {
+        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue({
+          season: { titleId: "title-1" },
+        });
 
-      await service.updateStatus("ep-1", VideoType.EPISODE, "COMPLETED");
-      expect(prismaMock.episode.updateMany).toHaveBeenCalledWith({
-        where: { id: "ep-1" },
-        data: { transcodingStatus: "COMPLETED" },
-      });
-      expect(prismaMock.title.updateMany).toHaveBeenCalledWith({
-        where: { id: "title-1" },
-        data: { transcodingStatus: "COMPLETED" },
+        await service.updateStatus("ep-1", VideoType.EPISODE, "COMPLETED");
+
+        expect(prismaMock.episode.updateMany).toHaveBeenCalledWith({
+          where: { id: "ep-1" },
+          data: { transcodingStatus: "COMPLETED" },
+        });
+        expect(prismaMock.title.updateMany).toHaveBeenCalledWith({
+          where: { id: "title-1" },
+          data: { transcodingStatus: "COMPLETED" },
+        });
       });
     });
 
-    test("should do nothing for EPISODE when episode no longer exists", async () => {
-      (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
+    describe("should do nothing", () => {
+      it("if type is EPISODE and the episode no longer exists", async () => {
+        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
 
-      await service.updateStatus("ep-1", VideoType.EPISODE, "COMPLETED");
-      expect(prismaMock.episode.updateMany).not.toHaveBeenCalled();
-      expect(prismaMock.title.updateMany).not.toHaveBeenCalled();
+        await service.updateStatus("ep-1", VideoType.EPISODE, "COMPLETED");
+
+        expect(prismaMock.episode.updateMany).not.toHaveBeenCalled();
+        expect(prismaMock.title.updateMany).not.toHaveBeenCalled();
+      });
     });
 
-    test("should update status for MOVIE", async () => {
-      await service.updateStatus("mov-1", VideoType.MOVIE, "COMPLETED");
-      expect(prismaMock.title.updateMany).toHaveBeenCalledWith({
-        where: { id: "mov-1" },
-        data: { transcodingStatus: "COMPLETED" },
+    describe("should update status for the title", () => {
+      it("if type is MOVIE", async () => {
+        await service.updateStatus("mov-1", VideoType.MOVIE, "COMPLETED");
+
+        expect(prismaMock.title.updateMany).toHaveBeenCalledWith({
+          where: { id: "mov-1" },
+          data: { transcodingStatus: "COMPLETED" },
+        });
       });
     });
   });
 
   describe("getProgress and updateProgress", () => {
-    test("should get progress", async () => {
-      const prog = { progressPercentage: 50 };
-      (prismaMock.videoTranscodingProgress.findUnique as jest.Mock).mockResolvedValue(prog);
+    describe("should return the progress", () => {
+      it("always", async () => {
+        const prog = { progressPercentage: 50 };
+        (prismaMock.videoTranscodingProgress.findUnique as jest.Mock).mockResolvedValue(prog);
 
-      const result = await service.getProgress("vid-1", VideoType.MOVIE);
-      expect(prismaMock.videoTranscodingProgress.findUnique).toHaveBeenCalledWith({
-        where: { titleId: "vid-1" },
-      });
-      expect(result).toEqual(prog);
-    });
+        const result = await service.getProgress("vid-1", VideoType.MOVIE);
 
-    test("should update progress if entity exists", async () => {
-      (prismaMock.title.findUnique as jest.Mock).mockResolvedValue({ id: "vid-1" });
-      await service.updateProgress("vid-1", VideoType.MOVIE, 80);
-      expect(prismaMock.videoTranscodingProgress.upsert).toHaveBeenCalledWith({
-        where: { titleId: "vid-1" },
-        update: { progressPercentage: 80 },
-        create: { titleId: "vid-1", progressPercentage: 80 },
+        expect(prismaMock.videoTranscodingProgress.findUnique).toHaveBeenCalledWith({
+          where: { titleId: "vid-1" },
+        });
+        expect(result).toEqual(prog);
       });
     });
 
-    test("should not update progress if entity does not exist", async () => {
-      (prismaMock.title.findUnique as jest.Mock).mockResolvedValue(null);
-      await service.updateProgress("vid-1", VideoType.MOVIE, 80);
-      expect(prismaMock.videoTranscodingProgress.upsert).not.toHaveBeenCalled();
+    describe("should update the progress", () => {
+      it("if the entity exists", async () => {
+        (prismaMock.title.findUnique as jest.Mock).mockResolvedValue({ id: "vid-1" });
+
+        await service.updateProgress("vid-1", VideoType.MOVIE, 80);
+
+        expect(prismaMock.videoTranscodingProgress.upsert).toHaveBeenCalledWith({
+          where: { titleId: "vid-1" },
+          update: { progressPercentage: 80 },
+          create: { titleId: "vid-1", progressPercentage: 80 },
+        });
+      });
+    });
+
+    describe("should not update the progress", () => {
+      it("if the entity does not exist", async () => {
+        (prismaMock.title.findUnique as jest.Mock).mockResolvedValue(null);
+
+        await service.updateProgress("vid-1", VideoType.MOVIE, 80);
+
+        expect(prismaMock.videoTranscodingProgress.upsert).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -270,45 +268,52 @@ describe("VideoTranscoderService", () => {
       s3ServiceMock.uploadStream.mockResolvedValue(undefined as any);
     });
 
-    test("should transcode movie successfully", async () => {
-      await service.transcodeVideo("vid-1", "input.mp4", "out", VideoType.MOVIE);
+    describe("should transcode the video successfully", () => {
+      it("if type is MOVIE", async () => {
+        await service.transcodeVideo("vid-1", "input.mp4", "out", VideoType.MOVIE);
 
-      expect(prismaMock.title.findUnique).toHaveBeenCalled();
-      expect(s3ServiceMock.get).toHaveBeenCalledWith("vid-1", BucketType.RAW);
-      expect(ffmpeg).toHaveBeenCalledWith("input.mp4");
+        expect(prismaMock.title.findUnique).toHaveBeenCalled();
+        expect(s3ServiceMock.get).toHaveBeenCalledWith("vid-1", BucketType.RAW);
+        expect(ffmpeg).toHaveBeenCalledWith("input.mp4");
 
-      // uploads 2 files (m3u8, ts), ignores folder
-      expect(s3ServiceMock.uploadStream).toHaveBeenCalledTimes(2);
-    });
-
-    test("should transcode episode successfully", async () => {
-      (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue({
-        id: "ep-1",
-        seasonId: "s-1",
-        season: { titleId: "t-1" },
+        // uploads 2 files (m3u8, ts), ignores folder
+        expect(s3ServiceMock.uploadStream).toHaveBeenCalledTimes(2);
       });
 
-      await service.transcodeVideo("ep-1", "input.mp4", "out", VideoType.EPISODE);
+      it("if type is EPISODE", async () => {
+        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue({
+          id: "ep-1",
+          seasonId: "s-1",
+          season: { titleId: "t-1" },
+        });
 
-      expect(s3ServiceMock.get).toHaveBeenCalledWith("ep-1", BucketType.RAW);
-      expect(s3ServiceMock.uploadStream).toHaveBeenCalledTimes(2);
+        await service.transcodeVideo("ep-1", "input.mp4", "out", VideoType.EPISODE);
+
+        expect(s3ServiceMock.get).toHaveBeenCalledWith("ep-1", BucketType.RAW);
+        expect(s3ServiceMock.uploadStream).toHaveBeenCalledTimes(2);
+      });
     });
 
-    test("should throw TranscodeAbortedError if entity deleted before download", async () => {
-      (prismaMock.title.findUnique as jest.Mock).mockResolvedValue(null);
-      await expect(
-        service.transcodeVideo("vid-1", "input.mp4", "out", VideoType.MOVIE),
-      ).rejects.toThrow(TranscodeAbortedError);
+    describe("should throw TranscodeAbortedError", () => {
+      it("if the entity was deleted before download", async () => {
+        (prismaMock.title.findUnique as jest.Mock).mockResolvedValue(null);
+
+        await expect(
+          service.transcodeVideo("vid-1", "input.mp4", "out", VideoType.MOVIE),
+        ).rejects.toThrow(TranscodeAbortedError);
+      });
     });
 
-    test("should throw BadRequestException if episode without relation found in uploadPath", async () => {
-      (prismaMock.episode.findUnique as jest.Mock)
-        .mockResolvedValueOnce({ id: "ep-1" }) // first check entityExists
-        .mockResolvedValueOnce(null); // inside uploadPath
+    describe("should throw BadRequestException", () => {
+      it("if the episode's season/title relation is missing when building the upload path", async () => {
+        (prismaMock.episode.findUnique as jest.Mock)
+          .mockResolvedValueOnce({ id: "ep-1" }) // first check entityExists
+          .mockResolvedValueOnce(null); // inside uploadPath
 
-      await expect(
-        service.transcodeVideo("ep-1", "input.mp4", "out", VideoType.EPISODE),
-      ).rejects.toThrow(BadRequestException);
+        await expect(
+          service.transcodeVideo("ep-1", "input.mp4", "out", VideoType.EPISODE),
+        ).rejects.toThrow(BadRequestException);
+      });
     });
   });
 });

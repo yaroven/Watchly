@@ -64,13 +64,13 @@ describe("S3Service", () => {
   });
 
   describe("getBucketName", () => {
-    test("should return rawBucketName for BucketType.RAW", () => {
+    it("should return rawBucketName for BucketType.RAW", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const bucketName = (service as any).getBucketName(BucketType.RAW);
       expect(bucketName).toBe("watchly-raw");
     });
 
-    test("should return processedBucketName for BucketType.PROCESSED", () => {
+    it("should return processedBucketName for BucketType.PROCESSED", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const bucketName = (service as any).getBucketName(BucketType.PROCESSED);
       expect(bucketName).toBe("watchly-processed");
@@ -78,7 +78,7 @@ describe("S3Service", () => {
   });
 
   describe("mapSignedUrlToPublicEndpoint", () => {
-    test("should replace protocol and hostname from internal to public endpoint", () => {
+    it("should replace protocol and hostname from internal to public endpoint", () => {
       const internalUrl = "http://localhost:9000/bucket/key?signature=abc";
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = (service as any).mapSignedUrlToPublicEndpoint(internalUrl);
@@ -89,7 +89,7 @@ describe("S3Service", () => {
   });
 
   describe("get", () => {
-    test("should return readable stream from S3", async () => {
+    it("should return readable stream from S3", async () => {
       const mockBody = new Readable({ read() {} });
       mockSend.mockResolvedValueOnce({ Body: mockBody });
 
@@ -101,7 +101,7 @@ describe("S3Service", () => {
   });
 
   describe("uploadStream", () => {
-    test("should upload stream using Upload", async () => {
+    it("should upload stream using Upload", async () => {
       const mockStream = new Readable({ read() {} });
       const mockDone = { key: "uploaded-key" };
       (Upload as unknown as jest.Mock).mockImplementation(() => ({
@@ -129,7 +129,7 @@ describe("S3Service", () => {
   });
 
   describe("getUploadPresignedUrl", () => {
-    test("should return presigned URL with public endpoint mapping", async () => {
+    it("should return presigned URL with public endpoint mapping", async () => {
       const signedUrl = "http://localhost:9000/bucket/key?signature=abc";
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (getSignedUrl as jest.Mock).mockResolvedValueOnce(signedUrl);
@@ -143,7 +143,7 @@ describe("S3Service", () => {
       expect(mapped.hostname).toBe("cdn.example.com");
     });
 
-    test("should use default expiresIn of 3600 when not provided", async () => {
+    it("should use default expiresIn of 3600 when not provided", async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (getSignedUrl as jest.Mock).mockResolvedValueOnce("http://localhost:9000/bucket/key");
 
@@ -156,7 +156,7 @@ describe("S3Service", () => {
   });
 
   describe("getReadPresignedUrl", () => {
-    test("should return presigned URL with public endpoint mapping", async () => {
+    it("should return presigned URL with public endpoint mapping", async () => {
       const signedUrl = "http://localhost:9000/bucket/key?signature=abc";
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (getSignedUrl as jest.Mock).mockResolvedValueOnce(signedUrl);
@@ -172,7 +172,7 @@ describe("S3Service", () => {
   });
 
   describe("deleteObject", () => {
-    test("should delete object and log success", async () => {
+    it("should delete object and log success", async () => {
       mockSend.mockResolvedValueOnce({});
 
       await service.deleteObject("my-key", BucketType.RAW);
@@ -180,7 +180,7 @@ describe("S3Service", () => {
       expect(mockSend).toHaveBeenCalledWith(expect.any(DeleteObjectCommand));
     });
 
-    test("should rethrow on delete error", async () => {
+    it("should rethrow on delete error", async () => {
       mockSend.mockRejectedValueOnce(new Error("delete failed"));
 
       await expect(service.deleteObject("my-key", BucketType.RAW)).rejects.toThrow("delete failed");
@@ -188,7 +188,7 @@ describe("S3Service", () => {
   });
 
   describe("deleteFolder", () => {
-    test("should list, delete objects in batches, and continue with continuation token", async () => {
+    it("should list, delete objects in batches, and continue with continuation token", async () => {
       const batch1 = [{ Key: "key1" }, { Key: "key2" }];
       const batch2 = [{ Key: "key3" }];
       mockSend
@@ -203,7 +203,7 @@ describe("S3Service", () => {
       expect(mockSend).toHaveBeenCalledWith(expect.any(DeleteObjectsCommand));
     });
 
-    test("should handle folder with no objects", async () => {
+    it("should handle folder with no objects", async () => {
       mockSend.mockResolvedValueOnce({ Contents: undefined });
 
       await service.deleteFolder("empty-folder/", BucketType.RAW);
@@ -211,13 +211,13 @@ describe("S3Service", () => {
       expect(mockSend).toHaveBeenCalledTimes(1);
     });
 
-    test("should rethrow on list error", async () => {
+    it("should rethrow on list error", async () => {
       mockSend.mockRejectedValueOnce(new Error("list failed"));
 
       await expect(service.deleteFolder("folder", BucketType.RAW)).rejects.toThrow("list failed");
     });
 
-    test("should append trailing slash if missing", async () => {
+    it("should append trailing slash if missing", async () => {
       mockSend.mockResolvedValueOnce({ Contents: [] });
 
       await service.deleteFolder("no-trailing", BucketType.RAW);
@@ -241,7 +241,7 @@ describe("S3Service", () => {
       });
     };
 
-    test("should verify existing bucket without creating", async () => {
+    it("should verify existing bucket without creating", async () => {
       createHeadBucketMock(null);
 
       await service.onModuleInit();
@@ -250,7 +250,7 @@ describe("S3Service", () => {
       expect(mockSend).toHaveBeenCalledTimes(4);
     });
 
-    test("should create bucket when NotFound is thrown", async () => {
+    it("should create bucket when NotFound is thrown", async () => {
       mockSend.mockImplementation((command) => {
         if (command instanceof HeadBucketCommand) {
           throw new NotFound({ message: "not found", $metadata: {} });
@@ -267,7 +267,7 @@ describe("S3Service", () => {
       expect(mockSend).toHaveBeenCalledTimes(6);
     });
 
-    test("should rethrow non-NotFound errors from initializeBucket", async () => {
+    it("should rethrow non-NotFound errors from initializeBucket", async () => {
       mockSend.mockImplementation((command) => {
         if (command instanceof HeadBucketCommand) {
           throw new Error("unexpected error");
@@ -280,7 +280,7 @@ describe("S3Service", () => {
       );
     });
 
-    test("should retry initializeBucket up to 3 times when a non-NotFound error keeps occurring, then succeed", async () => {
+    it("should retry initializeBucket up to 3 times when a non-NotFound error keeps occurring, then succeed", async () => {
       jest.useFakeTimers();
       let attempts = 0;
       mockSend.mockImplementation((command) => {
@@ -301,7 +301,7 @@ describe("S3Service", () => {
       jest.useRealTimers();
     });
 
-    test("should throw after exhausting all retries when errors persist", async () => {
+    it("should throw after exhausting all retries when errors persist", async () => {
       jest.useFakeTimers();
       mockSend.mockImplementation((command) => {
         if (command instanceof HeadBucketCommand) {
@@ -328,7 +328,7 @@ describe("S3Service", () => {
       createBucketMethod = (service as any).createBucket.bind(service);
     });
 
-    test("should create bucket successfully", async () => {
+    it("should create bucket successfully", async () => {
       mockSend.mockResolvedValueOnce({});
 
       await createBucketMethod("new-bucket");
@@ -336,7 +336,7 @@ describe("S3Service", () => {
       expect(mockSend).toHaveBeenCalledWith(expect.any(CreateBucketCommand));
     });
 
-    test("should handle BucketAlreadyExists gracefully", async () => {
+    it("should handle BucketAlreadyExists gracefully", async () => {
       mockSend.mockRejectedValueOnce(
         new BucketAlreadyExists({ message: "already exists", $metadata: {} }),
       );
@@ -344,7 +344,7 @@ describe("S3Service", () => {
       await expect(createBucketMethod("existing-bucket")).resolves.not.toThrow();
     });
 
-    test("should handle BucketAlreadyOwnedByYou gracefully", async () => {
+    it("should handle BucketAlreadyOwnedByYou gracefully", async () => {
       mockSend.mockRejectedValueOnce(
         new BucketAlreadyOwnedByYou({ message: "already owned", $metadata: {} }),
       );
@@ -352,7 +352,7 @@ describe("S3Service", () => {
       await expect(createBucketMethod("owned-bucket")).resolves.not.toThrow();
     });
 
-    test("should throw InternalServerErrorException for other errors", async () => {
+    it("should throw InternalServerErrorException for other errors", async () => {
       mockSend.mockRejectedValueOnce(new Error("permission denied"));
 
       await expect(createBucketMethod("bad-bucket")).rejects.toThrow(InternalServerErrorException);

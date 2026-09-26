@@ -1,22 +1,21 @@
-import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { Genre, Prisma, Title, TitleType } from "@prisma/client";
 import { paginate } from "../common/pagination/paginate.util";
 import { Filter, Sorting } from "../common/pagination/pagination.types";
 import { buildOrderBy, buildWhere } from "../common/pagination/prisma-query.util";
 import { settleAllOrLog } from "../common/settle-all-or-throw.util";
+import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
-import BucketType from "../s3/enums/bucket-type.enum";
 import { MultipartUploadPart } from "../s3/multipart.constants";
-import { S3Service } from "../s3/s3.service";
 import { SeasonService } from "../season/season.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
-import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
 import { CreateTitleDto } from "./dto/request/create-title.dto";
 import { GetAllTitleDto } from "./dto/request/get-all-title.dto";
+import { CastCreditInputDto } from "./dto/request/set-title-cast.dto";
 import { UpdateTitleDto } from "./dto/request/update-title.dto";
+import { CastCreditResponseDto } from "./dto/response/cast-credit-response.dto";
 import { TitleResponseDto } from "./dto/response/title-response.dto";
-import { DEFAULT_TITLE_POSTER_URL } from "./title.constants";
 
 @Injectable()
 export class TitleService {
@@ -24,10 +23,9 @@ export class TitleService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly s3Service: S3Service,
     private readonly posterService: PosterService,
-    private readonly videoTranscoderService: VideoTranscoderService,
     private readonly seasonService: SeasonService,
+    private readonly mediaAssetService: MediaAssetService,
   ) {}
 
   async create(data: CreateTitleDto): Promise<TitleResponseDto> {
@@ -37,7 +35,6 @@ export class TitleService {
       const title = await this.prisma.title.create({
         data: {
           ...rest,
-          posterUrl: DEFAULT_TITLE_POSTER_URL,
           genres: genreIds?.length ? { connect: genreIds.map((id) => ({ id })) } : undefined,
         },
         include: { genres: true },
@@ -82,12 +79,9 @@ export class TitleService {
     if (!title) {
       throw new BadRequestException(`Title with id ${id} not found`);
     }
-    await this.posterService.assertManagedPosterUrl(
-      "titles",
-      id,
-      data.posterUrl,
-      DEFAULT_TITLE_POSTER_URL,
-    );
+    if (data.posterUrl !== undefined) {
+      await this.posterService.assertManagedPosterUrl("titles", id, data.posterUrl);
+    }
 
     const { genreIds, ...rest } = data;
 
@@ -117,7 +111,7 @@ export class TitleService {
     if (!movie) {
       throw new BadRequestException(`Movie with id ${id} not found`);
     }
-    return this.s3Service.startMultipartUpload(id, BucketType.RAW, fileSize, 3600);
+    return this.mediaAssetService.startUpload(id, fileSize);
   }
 
   async completeMovieUpload(
@@ -129,11 +123,11 @@ export class TitleService {
     if (!movie) {
       throw new BadRequestException(`Movie with id ${id} not found`);
     }
-    await this.s3Service.completeMultipartUpload(id, BucketType.RAW, uploadId, parts);
+    await this.mediaAssetService.completeUpload(id, uploadId, parts);
   }
 
   async abortMovieUpload(id: string, uploadId: string): Promise<void> {
-    await this.s3Service.abortMultipartUpload(id, BucketType.RAW, uploadId);
+    await this.mediaAssetService.abortUpload(id, uploadId);
   }
 
   async createPosterUploadingUrl(id: string): Promise<{ uploadUrl: string; posterUrl: string }> {
@@ -152,18 +146,15 @@ export class TitleService {
       throw new BadRequestException(`Movie with id ${id} not found`);
     }
 
-    await this.videoTranscoderService.scheduleTranscodeVideo({
-      id,
-      type: VideoType.MOVIE,
-    });
+    await this.mediaAssetService.scheduleTranscode(id, VideoType.MOVIE);
   }
 
   async getMovieUrl(id: string): Promise<{ url: string }> {
-    const url = await this.s3Service.getReadPresignedUrl(
-      `videos/${id}/master.m3u8`,
-      BucketType.PROCESSED,
-    );
-    return { url };
+    const url = await this.mediaAssetService.getReadUrl(`videos/${id}/master.m3u8`);
+    if (!url) {
+      throw new NotFoundException(`No media for title ${id}`);
+    }
+    return url;
   }
 
   async delete(id: string): Promise<TitleResponseDto> {
@@ -186,7 +177,7 @@ export class TitleService {
         .catch((error: unknown) =>
           this.logger.error(`Failed to clean up poster after deleting title ${id}`, error),
         ),
-      this.videoTranscoderService.cleanupVideoAsset(id, VideoType.MOVIE, `videos/${id}/`),
+      this.mediaAssetService.cleanupVideoAsset(id, VideoType.MOVIE, `videos/${id}/`),
       title.type === TitleType.SERIES &&
         settleAllOrLog(
           title.seasons,
@@ -198,5 +189,48 @@ export class TitleService {
     ]);
 
     return new TitleResponseDto(deleted);
+  }
+
+  async getCast(id: string): Promise<CastCreditResponseDto[]> {
+    const title = await this.findOne(id);
+    if (!title) {
+      throw new BadRequestException(`Title with id ${id} not found`);
+    }
+
+    const credits = await this.prisma.castCredit.findMany({
+      where: { titleId: id },
+      include: { artist: true },
+      orderBy: { order: "asc" },
+    });
+
+    return credits.map((credit) => new CastCreditResponseDto(credit));
+  }
+
+  async setCast(id: string, credits: CastCreditInputDto[]): Promise<CastCreditResponseDto[]> {
+    const title = await this.findOne(id);
+    if (!title) {
+      throw new BadRequestException(`Title with id ${id} not found`);
+    }
+
+    try {
+      await this.prisma.$transaction([
+        this.prisma.castCredit.deleteMany({ where: { titleId: id } }),
+        this.prisma.castCredit.createMany({
+          data: credits.map((credit, index) => ({
+            titleId: id,
+            artistId: credit.artistId,
+            character: credit.character,
+            order: credit.order ?? index,
+          })),
+        }),
+      ]);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+        throw new BadRequestException("One or more artistId values do not exist");
+      }
+      throw error;
+    }
+
+    return this.getCast(id);
   }
 }

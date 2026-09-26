@@ -22,11 +22,11 @@ import { AdminOnly } from "../auth/decorators/roles.decorator";
 import { FilteringParams } from "../common/pagination/filtering-params.decorator";
 import { Filter, Sorting } from "../common/pagination/pagination.types";
 import { SortingParams } from "../common/pagination/sorting-params.decorator";
+import { PaginatedResponseOf } from "../common/utils/paginated-response-of.util";
 import { ArtistService } from "./artist.service";
 import { CreateArtistDto } from "./dto/request/create-artist.dto";
 import { GetAllArtistDto } from "./dto/request/get-all-artist.dto";
 import { UpdateArtistDto } from "./dto/request/update-artist.dto";
-import { ArtistListResponseDto } from "./dto/response/artist-list.response.dto";
 import { ArtistResponseDto } from "./dto/response/artist-response.dto";
 
 @ApiTags("artists")
@@ -47,7 +47,7 @@ export class ArtistController {
     description:
       "`filter` (repeatable): `property:rule:value`. Filterable: name. `sort`: `property:direction`. Sortable: name, createdAt.",
   })
-  @ApiOkResponse({ type: ArtistListResponseDto })
+  @ApiOkResponse({ type: PaginatedResponseOf(ArtistResponseDto) })
   @Get()
   findAll(
     @Query() query: GetAllArtistDto,

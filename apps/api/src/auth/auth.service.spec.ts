@@ -61,24 +61,31 @@ describe("AuthService", () => {
   describe("login", () => {
     const loginData = { email: "user@example.com", password: "correct-password" };
 
-    describe("when the credentials are valid", () => {
-      beforeEach(() => {
+    describe("should sign an access token with the default (global) options", () => {
+      it("if the credentials are valid", async () => {
         (userServiceMock.validateUser as jest.Mock).mockResolvedValue(user);
         (jwtServiceMock.sign as jest.Mock)
           .mockReturnValueOnce("access-token")
           .mockReturnValueOnce("refresh-token");
-      });
 
-      test("signs an access token with the default (global) options", async () => {
         await service.login(loginData);
+
         expect(jwtServiceMock.sign).toHaveBeenNthCalledWith(1, {
           userId: "user-1",
           role: Role.USER,
         });
       });
+    });
 
-      test("signs a refresh token with the separate refresh secret and TTL", async () => {
+    describe("should sign a refresh token with the separate refresh secret and TTL", () => {
+      it("if the credentials are valid", async () => {
+        (userServiceMock.validateUser as jest.Mock).mockResolvedValue(user);
+        (jwtServiceMock.sign as jest.Mock)
+          .mockReturnValueOnce("access-token")
+          .mockReturnValueOnce("refresh-token");
+
         await service.login(loginData);
+
         expect(jwtServiceMock.sign).toHaveBeenNthCalledWith(
           2,
           { userId: "user-1", role: Role.USER },
@@ -88,9 +95,17 @@ describe("AuthService", () => {
           },
         );
       });
+    });
 
-      test("returns both tokens plus the user's id and role", async () => {
+    describe("should return both tokens plus the user's id and role", () => {
+      it("if the credentials are valid", async () => {
+        (userServiceMock.validateUser as jest.Mock).mockResolvedValue(user);
+        (jwtServiceMock.sign as jest.Mock)
+          .mockReturnValueOnce("access-token")
+          .mockReturnValueOnce("refresh-token");
+
         const result = await service.login(loginData);
+
         expect(result).toEqual({
           accessToken: "access-token",
           refreshToken: "refresh-token",
@@ -100,12 +115,10 @@ describe("AuthService", () => {
       });
     });
 
-    describe("when the credentials are invalid", () => {
-      beforeEach(() => {
+    describe("should throw BadRequestException without signing any token", () => {
+      it("if the credentials are invalid", async () => {
         (userServiceMock.validateUser as jest.Mock).mockResolvedValue(null);
-      });
 
-      test("throws BadRequestException without signing any token", async () => {
         await expect(service.login(loginData)).rejects.toThrow(BadRequestException);
         expect(jwtServiceMock.sign).not.toHaveBeenCalled();
       });
@@ -115,22 +128,30 @@ describe("AuthService", () => {
   describe("register", () => {
     const registerData = { email: "new@example.com", password: "new-password" };
 
-    describe("when the email is free", () => {
-      beforeEach(() => {
+    describe("should create the user with the USER role", () => {
+      it("if the email is free", async () => {
         (userServiceMock.findByEmail as jest.Mock).mockResolvedValue(null);
         (userServiceMock.create as jest.Mock).mockResolvedValue(user);
         (jwtServiceMock.sign as jest.Mock)
           .mockReturnValueOnce("access-token")
           .mockReturnValueOnce("refresh-token");
-      });
 
-      test("creates the user with the USER role", async () => {
         await service.register(registerData);
+
         expect(userServiceMock.create).toHaveBeenCalledWith({ ...registerData, role: Role.USER });
       });
+    });
 
-      test("signs the new user straight in", async () => {
+    describe("should sign the new user straight in", () => {
+      it("if the email is free", async () => {
+        (userServiceMock.findByEmail as jest.Mock).mockResolvedValue(null);
+        (userServiceMock.create as jest.Mock).mockResolvedValue(user);
+        (jwtServiceMock.sign as jest.Mock)
+          .mockReturnValueOnce("access-token")
+          .mockReturnValueOnce("refresh-token");
+
         const result = await service.register(registerData);
+
         expect(result).toEqual({
           accessToken: "access-token",
           refreshToken: "refresh-token",
@@ -140,33 +161,43 @@ describe("AuthService", () => {
       });
     });
 
-    test("throws ConflictException when the email is already taken", async () => {
-      (userServiceMock.findByEmail as jest.Mock).mockResolvedValue(user);
+    describe("should throw ConflictException", () => {
+      it("if the email is already taken", async () => {
+        (userServiceMock.findByEmail as jest.Mock).mockResolvedValue(user);
 
-      await expect(service.register(registerData)).rejects.toThrow(ConflictException);
-      expect(userServiceMock.create).not.toHaveBeenCalled();
+        await expect(service.register(registerData)).rejects.toThrow(ConflictException);
+        expect(userServiceMock.create).not.toHaveBeenCalled();
+      });
     });
   });
 
   describe("refreshTokens", () => {
-    describe("when the refresh token is valid and the user still exists", () => {
-      beforeEach(() => {
+    describe("should verify with the refresh secret, not the access secret", () => {
+      it("if the refresh token is valid and the user still exists", async () => {
         (jwtServiceMock.verifyAsync as jest.Mock).mockResolvedValue({ userId: "user-1" });
         (userServiceMock.findOne as jest.Mock).mockResolvedValue(user);
         (jwtServiceMock.sign as jest.Mock)
           .mockReturnValueOnce("new-access-token")
           .mockReturnValueOnce("new-refresh-token");
-      });
 
-      test("verifies with the refresh secret, not the access secret", async () => {
         await service.refreshTokens("some-refresh-token");
+
         expect(jwtServiceMock.verifyAsync).toHaveBeenCalledWith("some-refresh-token", {
           secret: "refresh-secret",
         });
       });
+    });
 
-      test("rotates both tokens", async () => {
+    describe("should rotate both tokens", () => {
+      it("if the refresh token is valid and the user still exists", async () => {
+        (jwtServiceMock.verifyAsync as jest.Mock).mockResolvedValue({ userId: "user-1" });
+        (userServiceMock.findOne as jest.Mock).mockResolvedValue(user);
+        (jwtServiceMock.sign as jest.Mock)
+          .mockReturnValueOnce("new-access-token")
+          .mockReturnValueOnce("new-refresh-token");
+
         const result = await service.refreshTokens("some-refresh-token");
+
         expect(result).toEqual({
           accessToken: "new-access-token",
           refreshToken: "new-refresh-token",
@@ -176,19 +207,21 @@ describe("AuthService", () => {
       });
     });
 
-    test("throws UnauthorizedException when the token is invalid or expired", async () => {
-      (jwtServiceMock.verifyAsync as jest.Mock).mockRejectedValue(new Error("jwt expired"));
+    describe("should throw UnauthorizedException", () => {
+      it("if the token is invalid or expired", async () => {
+        (jwtServiceMock.verifyAsync as jest.Mock).mockRejectedValue(new Error("jwt expired"));
 
-      await expect(service.refreshTokens("bad-token")).rejects.toThrow(UnauthorizedException);
-    });
+        await expect(service.refreshTokens("bad-token")).rejects.toThrow(UnauthorizedException);
+      });
 
-    test("throws UnauthorizedException when the token is valid but the user was deleted", async () => {
-      (jwtServiceMock.verifyAsync as jest.Mock).mockResolvedValue({ userId: "deleted-user" });
-      (userServiceMock.findOne as jest.Mock).mockResolvedValue(null);
+      it("if the token is valid but the user was deleted", async () => {
+        (jwtServiceMock.verifyAsync as jest.Mock).mockResolvedValue({ userId: "deleted-user" });
+        (userServiceMock.findOne as jest.Mock).mockResolvedValue(null);
 
-      await expect(service.refreshTokens("still-valid-token")).rejects.toThrow(
-        UnauthorizedException,
-      );
+        await expect(service.refreshTokens("still-valid-token")).rejects.toThrow(
+          UnauthorizedException,
+        );
+      });
     });
   });
 });

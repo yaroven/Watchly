@@ -1,13 +1,11 @@
-import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { Filter, Sorting } from "../common/pagination/pagination.types";
 import { buildOrderBy, buildWhere } from "../common/pagination/prisma-query.util";
+import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PrismaService } from "../prisma/prisma.service";
-import BucketType from "../s3/enums/bucket-type.enum";
 import { MultipartUploadPart } from "../s3/multipart.constants";
-import { S3Service } from "../s3/s3.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
-import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
 import { CreateEpisodeDto } from "./dto/request/create-episode.dto";
 import { UpdateEpisodeDto } from "./dto/request/update-episode.dto";
 import { EpisodeResponseDto } from "./dto/response/episode-response.dto";
@@ -19,8 +17,7 @@ export class EpisodeService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly videoTranscoderService: VideoTranscoderService,
-    private readonly s3Service: S3Service,
+    private readonly mediaAssetService: MediaAssetService,
   ) {}
 
   async create(data: CreateEpisodeDto): Promise<EpisodeResponseDto> {
@@ -102,7 +99,7 @@ export class EpisodeService {
 
     const deleted = await this.prisma.episode.delete({ where: { id } });
 
-    await this.videoTranscoderService.cleanupVideoAsset(
+    await this.mediaAssetService.cleanupVideoAsset(
       id,
       VideoType.EPISODE,
       `videos/${titleId}/${seasonId}/${id}/`,
@@ -116,28 +113,25 @@ export class EpisodeService {
 
     if (!episode) throw new BadRequestException(`Episode with id ${id} not found`);
 
-    await this.videoTranscoderService.scheduleTranscodeVideo({
-      id,
-      type: VideoType.EPISODE,
-    });
+    await this.mediaAssetService.scheduleTranscode(id, VideoType.EPISODE);
   }
 
   async startUpload(id: string, fileSize: number) {
     const episode = await this.findOne(id);
     if (!episode) throw new BadRequestException(`Episode with id ${id} not found`);
 
-    return this.s3Service.startMultipartUpload(id, BucketType.RAW, fileSize);
+    return this.mediaAssetService.startUpload(id, fileSize);
   }
 
   async completeUpload(id: string, uploadId: string, parts: MultipartUploadPart[]): Promise<void> {
     const episode = await this.findOne(id);
     if (!episode) throw new BadRequestException(`Episode with id ${id} not found`);
 
-    await this.s3Service.completeMultipartUpload(id, BucketType.RAW, uploadId, parts);
+    await this.mediaAssetService.completeUpload(id, uploadId, parts);
   }
 
   async abortUpload(id: string, uploadId: string): Promise<void> {
-    await this.s3Service.abortMultipartUpload(id, BucketType.RAW, uploadId);
+    await this.mediaAssetService.abortUpload(id, uploadId);
   }
 
   async getStreamUrl(id: string): Promise<{ url: string }> {
@@ -146,11 +140,13 @@ export class EpisodeService {
     if (!episode) throw new BadRequestException(`Episode with id ${id} not found`);
 
     const { seasonId, titleId } = getEpisodeTitleAndSeasonId(episode);
-
-    const url = await this.s3Service.getReadPresignedUrl(
+    const { url } = await this.mediaAssetService.getReadUrl(
       `videos/${titleId}/${seasonId}/${episode.id}/master.m3u8`,
-      BucketType.PROCESSED,
     );
+
+    if (!url) {
+      throw new NotFoundException(`No media for episode ${id}`);
+    }
 
     return { url };
   }

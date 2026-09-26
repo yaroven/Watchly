@@ -1,12 +1,11 @@
 import { Module } from "@nestjs/common";
+import { MediaAssetModule } from "../media-asset/media-asset.module";
 import { PrismaModule } from "../prisma/prisma.module";
-import { S3Module } from "../s3/s3.module";
-import { VideoTranscoderModule } from "../video-transcoder/video-transcoder.module";
 import { EpisodeController } from "./episode.controller";
 import { EpisodeService } from "./episode.service";
 
 @Module({
-  imports: [PrismaModule, S3Module, VideoTranscoderModule],
+  imports: [PrismaModule, MediaAssetModule],
   providers: [EpisodeService],
   controllers: [EpisodeController],
   exports: [EpisodeService],

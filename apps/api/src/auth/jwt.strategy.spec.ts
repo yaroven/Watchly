@@ -49,19 +49,23 @@ describe("JwtStrategy", () => {
   });
 
   describe("validate", () => {
-    test("returns the user re-fetched by the payload's userId", async () => {
-      (userServiceMock.findOne as jest.Mock).mockResolvedValue(user);
+    describe("should return the user re-fetched by the payload's userId", () => {
+      it("if the user still exists", async () => {
+        (userServiceMock.findOne as jest.Mock).mockResolvedValue(user);
 
-      const result = await strategy.validate(payload);
+        const result = await strategy.validate(payload);
 
-      expect(userServiceMock.findOne).toHaveBeenCalledWith("user-1");
-      expect(result).toEqual(user);
+        expect(userServiceMock.findOne).toHaveBeenCalledWith("user-1");
+        expect(result).toEqual(user);
+      });
     });
 
-    test("throws UnauthorizedException when the token's user no longer exists", async () => {
-      (userServiceMock.findOne as jest.Mock).mockResolvedValue(null);
+    describe("should throw UnauthorizedException", () => {
+      it("if the token's user no longer exists", async () => {
+        (userServiceMock.findOne as jest.Mock).mockResolvedValue(null);
 
-      await expect(strategy.validate(payload)).rejects.toThrow(UnauthorizedException);
+        await expect(strategy.validate(payload)).rejects.toThrow(UnauthorizedException);
+      });
     });
   });
 });
