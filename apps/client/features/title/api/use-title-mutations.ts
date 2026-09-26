@@ -1,5 +1,5 @@
 import createMutationHook from "@/shared/api/createMutationHook";
-import { updateEntityPoster, uploadSignedFile, withUploadedPosterUrl } from "@/shared/api/upload-media";
+import { updateEntityPoster, uploadMultipartFile, withUploadedPosterUrl } from "@/shared/api/upload-media";
 import { UseMutationOptions } from "@tanstack/react-query";
 import { CreateTitleDto, Title, TitleFormValues, TitleType, UpdateTitleDto } from "../schemas/title";
 import titleKeys from "./title.keys";
@@ -11,11 +11,21 @@ type UpdateTitleWithUploadPayload = TitleFormValues;
 type CreateTitleWithUploadOptions = Omit<UseMutationOptions<Title, Error, CreateTitleWithUploadPayload>, "mutationFn"> & {
   onUploadProgress?: (progress: number) => void;
 };
+type UpdateTitleMutationArgs = { id: string; payload: UpdateTitleWithUploadPayload; currentPosterUrl: string };
 
-const getTitleUpdatePayload = ({ name, description, type }: UpdateTitleWithUploadPayload): UpdateTitleDto => ({
+const getTitleUpdatePayload = (
+  { name, description, type, ageRating, country, releaseDate, language, trailerUrl }: UpdateTitleWithUploadPayload,
+  posterUrl: string,
+): UpdateTitleDto => ({
   name,
   description,
   type,
+  ageRating,
+  country,
+  releaseDate,
+  language,
+  trailerUrl,
+  posterUrl,
 });
 
 export const useCreateTitle = (options?: Omit<UseMutationOptions<Title, Error, CreateTitlePayload>, "mutationFn">) => {
@@ -38,16 +48,29 @@ export const useCreateTitleWithUpload = (options?: CreateTitleWithUploadOptions)
           files: posterFile,
           getPosterUploadUrl: titleService.getPosterUploadUrl,
           uploadToUrl: titleService.uploadToS3,
+          buildPayload: (title, posterUrl): UpdateTitleDto => ({
+            name: title.name,
+            description: title.description,
+            type: title.type,
+            ageRating: title.ageRating,
+            country: title.country,
+            releaseDate: title.releaseDate,
+            language: title.language,
+            trailerUrl: title.trailerUrl,
+            posterUrl,
+          }),
           update: titleService.update,
           onProgress: options?.onUploadProgress,
         });
 
         if (payload.type === TitleType.MOVIE) {
           const titleId = createdTitle.id;
-          await uploadSignedFile({
+          await uploadMultipartFile({
             files: videoFile,
-            getUploadUrl: () => titleService.getUploadUrl(titleId),
-            uploadToUrl: titleService.uploadToS3,
+            startUpload: (fileSize) => titleService.startUpload(titleId, fileSize),
+            completeUpload: (uploadId, parts) => titleService.completeUpload(titleId, uploadId, parts),
+            abortUpload: (uploadId) => titleService.abortUpload(titleId, uploadId),
+            uploadPartToUrl: titleService.uploadPartToS3,
             onProgress: options?.onUploadProgress,
           });
         }
@@ -70,14 +93,12 @@ export const useCreateTitleWithUpload = (options?: CreateTitleWithUploadOptions)
   return useCreateTitleWithUpload(options);
 };
 
-export const useUpdateTitle = (
-  options?: Omit<UseMutationOptions<Title, Error, { id: string; payload: UpdateTitleWithUploadPayload }>, "mutationFn">,
-) => {
+export const useUpdateTitle = (options?: Omit<UseMutationOptions<Title, Error, UpdateTitleMutationArgs>, "mutationFn">) => {
   const useUpdateTitle = createMutationHook({
-    mutationFn: async ({ id, payload }: { id: string; payload: UpdateTitleWithUploadPayload }) => {
+    mutationFn: async ({ id, payload, currentPosterUrl }: UpdateTitleMutationArgs) => {
       const { posterFile } = payload;
       const nextPayload = await withUploadedPosterUrl<UpdateTitleDto>({
-        payload: getTitleUpdatePayload(payload),
+        payload: getTitleUpdatePayload(payload, currentPosterUrl),
         files: posterFile,
         getPosterUploadUrl: () => titleService.getPosterUploadUrl(id),
         uploadToUrl: titleService.uploadToS3,
@@ -85,7 +106,7 @@ export const useUpdateTitle = (
 
       return titleService.update(id, nextPayload);
     },
-    getInvalidateKeys: ({ id }: { id: string }) => [titleKeys.all(), titleKeys.detail(id)],
+    getInvalidateKeys: ({ id }: UpdateTitleMutationArgs) => [titleKeys.all(), titleKeys.detail(id)],
   });
   return useUpdateTitle(options);
 };

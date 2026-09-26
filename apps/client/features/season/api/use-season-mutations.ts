@@ -6,7 +6,7 @@ import seasonKeys from "./season.keys";
 import SeasonService from "./season.service";
 
 type CreateSeasonWithPosterPayload = SeasonFormValues & Pick<CreateSeasonDto, "titleId">;
-type UpdateSeasonWithPosterPayload = SeasonFormValues;
+type UpdateSeasonWithPosterPayload = SeasonFormValues & Pick<CreateSeasonDto, "titleId">;
 
 export const useCreateSeason = (options?: Omit<UseMutationOptions<Season, Error, CreateSeasonWithPosterPayload>, "mutationFn">) => {
   const useCreateSeason = createMutationHook({
@@ -17,6 +17,13 @@ export const useCreateSeason = (options?: Omit<UseMutationOptions<Season, Error,
         files: posterFile,
         getPosterUploadUrl: SeasonService.getPosterUploadUrl,
         uploadToUrl: SeasonService.uploadToS3,
+        buildPayload: (season, posterUrl): UpdateSeasonDto => ({
+          number: season.number,
+          name: season.name,
+          description: season.description,
+          titleId: season.titleId,
+          posterUrl,
+        }),
         update: SeasonService.update,
       });
     },

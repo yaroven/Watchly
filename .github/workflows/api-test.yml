@@ -50,6 +50,6 @@ jobs:
 
       - name: Run Unit Tests
         if: steps.changes.outputs.api == 'true'
-        run: pnpm --filter api test:unit
+        run: pnpm test:api
         env:
           NODE_ENV: test

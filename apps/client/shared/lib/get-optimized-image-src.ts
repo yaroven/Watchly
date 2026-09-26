@@ -1,4 +1,4 @@
-import defaultPoster from "@/public/cat.webp";
+import defaultPoster from "@/public/poster-placeholder.webp";
 
 const s3ImageBucket = process.env.NEXT_PUBLIC_S3_IMAGE_BUCKET || "content";
 
@@ -18,7 +18,7 @@ export function getOptimizedImageSrc(src?: string) {
     return defaultPoster;
   }
 
-  if (src === "/cat.webp") {
+  if (src === "/poster-placeholder.webp") {
     return defaultPoster;
   }
 

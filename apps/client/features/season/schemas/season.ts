@@ -39,8 +39,9 @@ export interface CreateSeasonDto {
 }
 
 export interface UpdateSeasonDto {
-  number?: number;
-  name?: string;
-  description?: string;
+  number: number;
+  name: string;
+  description: string;
+  titleId: string;
   posterUrl?: string;
 }
