@@ -5,6 +5,7 @@ import { APP } from "@/shared/lib/routes";
 import TitleCard from "@features/title/components/TitleCard";
 import { ArrowForward as ArrowForwardIcon } from "@mui/icons-material";
 import { Box } from "@mui/material";
+import Skeleton from "@mui/material/Skeleton";
 import Typography from "@mui/material/Typography";
 import { useRouter } from "next/navigation";
 
@@ -15,9 +16,31 @@ interface CatalogProps {
   viewAllLabel?: string;
   bleed?: boolean;
   bleedSize?: number;
+  isLoading?: boolean;
+  /** How many skeleton cards to show while `isLoading` — ignored otherwise. */
+  skeletonCount?: number;
 }
 
-export default function Catalog({ items, title, onViewAll, viewAllLabel = "View All", bleed = false, bleedSize = 24 }: CatalogProps) {
+// Mirrors TitleCard's poster box (width/aspect-ratio/radius) so the row doesn't jump when real cards swap in.
+function TitleCardSkeleton() {
+  return (
+    <Skeleton
+      variant="rounded"
+      sx={{ width: "clamp(150px, 13vw, 260px)", aspectRatio: "177 / 246", borderRadius: "8px", bgcolor: "#232323" }}
+    />
+  );
+}
+
+export default function Catalog({
+  items,
+  title,
+  onViewAll,
+  viewAllLabel = "View All",
+  bleed = false,
+  bleedSize = 24,
+  isLoading = false,
+  skeletonCount = 6,
+}: CatalogProps) {
   const router = useRouter();
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -81,9 +104,9 @@ export default function Catalog({ items, title, onViewAll, viewAllLabel = "View 
           "&::-webkit-scrollbar-thumb:hover": { background: "#4a4a4a" },
         }}
       >
-        {items.map((item) => (
-          <TitleCard key={item.id} onClick={() => router.push(APP.TITLE(item.id))} {...item}></TitleCard>
-        ))}
+        {isLoading
+          ? Array.from({ length: skeletonCount }, (_, index) => <TitleCardSkeleton key={index} />)
+          : items.map((item) => <TitleCard key={item.id} onClick={() => router.push(APP.TITLE(item.id))} {...item}></TitleCard>)}
       </Box>
     </Box>
   );

@@ -1,4 +1,4 @@
-import { Title, TitleType } from "@/features/title/schemas/title";
+import { AgeRating, Title, TitleType } from "@/features/title/schemas/title";
 import TranscodingStatus from "@/types/transcoding-status";
 
 /**
@@ -191,7 +191,11 @@ function mockTitle(id: string, name: string, description: string, posterId: numb
     description,
     type: TitleType.SERIES,
     posterUrl: `https://picsum.photos/id/${posterId}/400/600`,
-    hlsUrl: undefined,
+    ageRating: AgeRating.AGE_16,
+    country: "US",
+    releaseDate: "2026-01-01",
+    language: "en",
+    trailerUrl: "https://example.com/trailer.mp4",
     seasons: [],
     transcodingStatus: TranscodingStatus.COMPLETED,
   };

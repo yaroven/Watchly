@@ -59,4 +59,4 @@ export interface CreateEpisodeDto {
   videoFile: FileList;
 }
 
-export type UpdateEpisodeDto = Partial<Omit<CreateEpisodeDto, "videoFile">>;
+export type UpdateEpisodeDto = Omit<CreateEpisodeDto, "videoFile" | "seasonId">;

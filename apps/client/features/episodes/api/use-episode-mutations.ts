@@ -1,5 +1,5 @@
 import createMutationHook from "@/shared/api/createMutationHook";
-import { uploadSignedFile } from "@/shared/api/upload-media";
+import { uploadMultipartFile } from "@/shared/api/upload-media";
 import { UseMutationOptions } from "@tanstack/react-query";
 import { CreateEpisodeDto, Episode, UpdateEpisodeDto } from "../schemas/episode";
 import { episodeKeys } from "./episode.keys";
@@ -41,10 +41,12 @@ export const useCreateEpisodeWithUpload = (options?: CreateEpisodeWithUploadOpti
   const useCreateEpisodeWithUpload = createMutationHook({
     mutationFn: async ({ videoFile, ...payload }: CreateEpisodeWithUploadPayload) => {
       const episode = await EpisodeService.create(payload);
-      await uploadSignedFile({
+      await uploadMultipartFile({
         files: videoFile,
-        getUploadUrl: () => EpisodeService.getUploadUrl(episode.id),
-        uploadToUrl: EpisodeService.uploadToS3,
+        startUpload: (fileSize) => EpisodeService.startUpload(episode.id, fileSize),
+        completeUpload: (uploadId, parts) => EpisodeService.completeUpload(episode.id, uploadId, parts),
+        abortUpload: (uploadId) => EpisodeService.abortUpload(episode.id, uploadId),
+        uploadPartToUrl: EpisodeService.uploadPartToS3,
         onProgress: options?.onUploadProgress,
       });
 

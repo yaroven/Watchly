@@ -22,7 +22,7 @@ interface TitleProps extends Title {
   to: string;
 }
 
-export default function Title({ id, createdAt, name, posterUrl = "/cat.webp", transcodingStatus, type, to }: TitleProps) {
+export default function Title({ id, createdAt, name, posterUrl, transcodingStatus, type, to }: TitleProps) {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const { mutate: deleteTitle, isPending: isDeleting } = useDeleteTitle({ onSuccess: () => setIsDeleteOpen(false) });
 
