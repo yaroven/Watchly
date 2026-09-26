@@ -1,5 +1,6 @@
 "use client";
 
+import useGenres from "@/features/genre/api/use-genres";
 import useTitles from "@/features/title/api/use-titles";
 import { Title, TitleType } from "@/features/title/schemas/title";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
@@ -7,6 +8,7 @@ import { APP } from "@/shared/lib/routes";
 import ExpandMore from "@mui/icons-material/ExpandMore";
 import SearchOffIcon from "@mui/icons-material/SearchOff";
 import Box from "@mui/material/Box";
+import Input from "@mui/material/Input";
 import MenuItem from "@mui/material/MenuItem";
 import MuiSelect from "@mui/material/Select";
 import Skeleton from "@mui/material/Skeleton";
@@ -47,19 +49,10 @@ const menuProps = {
   },
 };
 
-// Only Movie/Series is backed by a real field (`Title.type`) — Director, Artist,
-// Network, Quality, Country, Order, Genre have no equivalent on the Title schema
-// yet (see PLACEHOLDER_DATA_BACKEND_TODO.md), so those render disabled.
-const DISABLED_FILTERS = [
-  { label: "Director" },
-  { label: "Age rating" },
-  { label: "Artist" },
-  { label: "Country" },
-  { label: "Network" },
-  { label: "Order" },
-  { label: "Quality" },
-  { label: "Genre" },
-];
+// Movie/Series, Director, Network, and Genre are wired below. Age rating,
+// Artist, Country, Order, and Quality have no equivalent filter yet
+// (see PLACEHOLDER_DATA_BACKEND_TODO.md), so those still render disabled.
+const DISABLED_FILTERS = [{ label: "Age rating" }, { label: "Artist" }, { label: "Country" }, { label: "Order" }, { label: "Quality" }];
 
 function DisabledFilter({ label }: { label: string }) {
   return (
@@ -77,23 +70,47 @@ export default function SearchResults() {
   const searchParams = useSearchParams();
   const query = searchParams.get("q") ?? "";
   const typeFilter = (searchParams.get("type") as TitleType | null) ?? "";
+  const directorFilter = searchParams.get("director") ?? "";
+  const networkFilter = searchParams.get("network") ?? "";
+  const genreIdFilter = searchParams.get("genreId") ?? "";
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  // Local, uncommitted text — only pushed to the URL (and so refetched) on Enter/blur,
+  // same as the header search bar, instead of firing a request per keystroke.
+  const [directorInput, setDirectorInput] = useState(directorFilter);
+  const [networkInput, setNetworkInput] = useState(networkFilter);
+
+  const { data: genresData } = useGenres();
+  const genres = genresData?.items ?? [];
 
   const { data, isPending, isFetching } = useTitles({
     searchString: query,
     page: 1,
     limit: FETCH_LIMIT,
     type: typeFilter || undefined,
+    director: directorFilter || undefined,
+    network: networkFilter || undefined,
+    genreId: genreIdFilter || undefined,
   });
 
   const items = data?.items ?? [];
   const visibleItems = items.slice(0, visibleCount);
   const loading = isPending || isFetching;
 
-  const setType = (nextType: TitleType | "") => {
+  const updateFilters = (next: Partial<{ type: TitleType | ""; director: string; network: string; genreId: string }>) => {
     setVisibleCount(PAGE_SIZE);
-    router.push(APP.SEARCH({ q: query || undefined, type: nextType || undefined }), { scroll: false });
+    router.push(
+      APP.SEARCH({
+        q: query || undefined,
+        type: (next.type ?? typeFilter) || undefined,
+        director: (next.director ?? directorFilter) || undefined,
+        network: (next.network ?? networkFilter) || undefined,
+        genreId: (next.genreId ?? genreIdFilter) || undefined,
+      }),
+      { scroll: false },
+    );
   };
+
+  const setType = (nextType: TitleType | "") => updateFilters({ type: nextType });
 
   const heading = query
     ? `The search results for "${query}"`
@@ -143,6 +160,57 @@ export default function SearchResults() {
                 </Box>
               ))}
             </Box>
+          </Box>
+
+          <Box sx={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <Typography sx={{ width: "90px", flexShrink: 0, fontWeight: 600, color: "#ffffff" }}>Genre</Typography>
+            <MuiSelect
+              fullWidth
+              displayEmpty
+              value={genreIdFilter}
+              onChange={(event) => updateFilters({ genreId: event.target.value })}
+              MenuProps={menuProps}
+              sx={selectSx}
+            >
+              <MenuItem value="">All</MenuItem>
+              {genres.map((genre) => (
+                <MenuItem key={genre.id} value={genre.id}>
+                  {genre.name}
+                </MenuItem>
+              ))}
+            </MuiSelect>
+          </Box>
+
+          <Box sx={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <Typography sx={{ width: "90px", flexShrink: 0, fontWeight: 600, color: "#ffffff" }}>Director</Typography>
+            <Input
+              fullWidth
+              disableUnderline
+              placeholder="All"
+              value={directorInput}
+              onChange={(event) => setDirectorInput(event.target.value)}
+              onBlur={() => updateFilters({ director: directorInput })}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") updateFilters({ director: directorInput });
+              }}
+              sx={selectSx}
+            />
+          </Box>
+
+          <Box sx={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <Typography sx={{ width: "90px", flexShrink: 0, fontWeight: 600, color: "#ffffff" }}>Network</Typography>
+            <Input
+              fullWidth
+              disableUnderline
+              placeholder="All"
+              value={networkInput}
+              onChange={(event) => setNetworkInput(event.target.value)}
+              onBlur={() => updateFilters({ network: networkInput })}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") updateFilters({ network: networkInput });
+              }}
+              sx={selectSx}
+            />
           </Box>
 
           {DISABLED_FILTERS.map(({ label }) => (

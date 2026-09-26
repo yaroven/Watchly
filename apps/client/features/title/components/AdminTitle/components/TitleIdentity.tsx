@@ -16,7 +16,7 @@ interface TitleIdentityProps {
   type: TitleType;
 }
 
-export default function TitleIdentity({ name, posterUrl = "/cat.webp", to, type }: TitleIdentityProps) {
+export default function TitleIdentity({ name, posterUrl, to, type }: TitleIdentityProps) {
   const typeLabel = type === TitleType.MOVIE ? "Movie" : "Series";
   const posterSrc = getOptimizedImageSrc(posterUrl);
 
