@@ -3,12 +3,10 @@ import { Episode, Prisma, Season } from "@prisma/client";
 import { Filter, Sorting } from "../common/pagination/pagination.types";
 import { buildOrderBy, buildWhere } from "../common/pagination/prisma-query.util";
 import { settleAllOrLog } from "../common/settle-all-or-throw.util";
+import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
-import BucketType from "../s3/enums/bucket-type.enum";
-import { S3Service } from "../s3/s3.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
-import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
 import { CreateSeasonDto } from "./dto/request/create-season.dto";
 import { UpdateSeasonDto } from "./dto/request/update-season.dto";
 import { SeasonResponseDto } from "./dto/response/season-response.dto";
@@ -19,9 +17,8 @@ export class SeasonService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly s3Service: S3Service,
     private readonly posterService: PosterService,
-    private readonly videoTranscoderService: VideoTranscoderService,
+    private readonly mediaAssetService: MediaAssetService,
   ) {}
 
   async create(data: CreateSeasonDto): Promise<SeasonResponseDto> {
@@ -98,7 +95,7 @@ export class SeasonService {
   async cleanupAssets(season: Season & { episodes: Episode[] }): Promise<void> {
     await settleAllOrLog(
       season.episodes,
-      (episode) => this.videoTranscoderService.cleanupVideoAsset(episode.id, VideoType.EPISODE),
+      (episode) => this.mediaAssetService.cleanupVideoAsset(episode.id, VideoType.EPISODE),
       (episode) => episode.id,
       this.logger,
       { itemLabel: "episode", parentLabel: "season", parentId: season.id },
@@ -110,10 +107,7 @@ export class SeasonService {
         {
           id: "processed-folder",
           run: () =>
-            this.s3Service.deleteFolder(
-              `videos/${season.titleId}/${season.id}/`,
-              BucketType.PROCESSED,
-            ),
+            this.mediaAssetService.deleteProcessedFolder(`videos/${season.titleId}/${season.id}/`),
         },
       ],
       (task) => task.run(),

@@ -21,9 +21,6 @@ import {
 } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import { AdminOnly } from "../auth/decorators/roles.decorator";
-import { CastCreditService } from "../cast-credit/cast-credit.service";
-import { SetTitleCastDto } from "../cast-credit/dto/request/set-title-cast.dto";
-import { CastCreditResponseDto } from "../cast-credit/dto/response/cast-credit-response.dto";
 import { CompleteMultipartUploadDto } from "../common/dto/request/complete-multipart-upload.dto";
 import { StartMultipartUploadDto } from "../common/dto/request/start-multipart-upload.dto";
 import { MultipartUploadResponseDto } from "../common/dto/response/multipart-upload-response.dto";
@@ -32,20 +29,19 @@ import { UrlResponseDto } from "../common/dto/url-response.dto";
 import { FilteringParams } from "../common/pagination/filtering-params.decorator";
 import { Filter, Sorting } from "../common/pagination/pagination.types";
 import { SortingParams } from "../common/pagination/sorting-params.decorator";
+import { PaginatedResponseOf } from "../common/utils/paginated-response-of.util";
 import { CreateTitleDto } from "./dto/request/create-title.dto";
 import { GetAllTitleDto } from "./dto/request/get-all-title.dto";
+import { SetTitleCastDto } from "./dto/request/set-title-cast.dto";
 import { UpdateTitleDto } from "./dto/request/update-title.dto";
-import { TitleListResponseDto } from "./dto/response/title-list.response.dto";
+import { CastCreditResponseDto } from "./dto/response/cast-credit-response.dto";
 import { TitleResponseDto } from "./dto/response/title-response.dto";
 import { TitleService } from "./title.service";
 
 @ApiTags("titles")
 @Controller("title")
 export class TitleController {
-  constructor(
-    private readonly titleService: TitleService,
-    private readonly castCreditService: CastCreditService,
-  ) {}
+  constructor(private readonly titleService: TitleService) {}
 
   @ApiOperation({ summary: "Create a title (movie or series)" })
   @ApiCreatedResponse({ type: TitleResponseDto })
@@ -70,7 +66,7 @@ export class TitleController {
       "Filterable: name, type, transcodingStatus, ageRating, country, language. " +
       "`sort`: `property:direction`. Sortable: name, createdAt, releaseDate.",
   })
-  @ApiOkResponse({ type: TitleListResponseDto })
+  @ApiOkResponse({ type: PaginatedResponseOf(TitleResponseDto) })
   @Get()
   async findAll(
     @Query() query: GetAllTitleDto,
@@ -169,7 +165,7 @@ export class TitleController {
   @ApiOkResponse({ type: [CastCreditResponseDto] })
   @Get(":id/cast")
   getCast(@Param("id", ParseUUIDPipe) id: string) {
-    return this.castCreditService.getCast(id);
+    return this.titleService.getCast(id);
   }
 
   @ApiOperation({ summary: "Replace a title's cast" })
@@ -178,6 +174,6 @@ export class TitleController {
   @AdminOnly()
   @Put(":id/cast")
   setCast(@Param("id", ParseUUIDPipe) id: string, @Body() dto: SetTitleCastDto) {
-    return this.castCreditService.setCast(id, dto.credits);
+    return this.titleService.setCast(id, dto.credits);
   }
 }

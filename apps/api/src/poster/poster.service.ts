@@ -17,14 +17,8 @@ export class PosterService {
     kind: PosterEntityKind,
     id: string,
     posterUrl: string,
-    defaultPosterUrl?: string,
   ): Promise<void> {
-    await assertManagedPosterUrl(
-      this.s3Service,
-      this.getPosterKey(kind, id),
-      posterUrl,
-      defaultPosterUrl,
-    );
+    await assertManagedPosterUrl(this.s3Service, this.getPosterKey(kind, id), posterUrl);
   }
 
   async createUploadUrl(

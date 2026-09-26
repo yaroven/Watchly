@@ -8,7 +8,7 @@ describe("settleAllOrThrow", () => {
     logger = { error: jest.fn() } as unknown as jest.Mocked<Logger>;
   });
 
-  test("should resolve without throwing when every item succeeds", async () => {
+  it("should resolve without throwing when every item succeeds", async () => {
     const items = ["a", "b", "c"];
     const action = settleAllOrThrow(
       items,
@@ -22,7 +22,7 @@ describe("settleAllOrThrow", () => {
     expect(logger.error).not.toHaveBeenCalled();
   });
 
-  test("should log each failure and throw once when some items fail", async () => {
+  it("should log each failure and throw once when some items fail", async () => {
     const items = ["a", "b", "c"];
     const action = settleAllOrThrow(
       items,
@@ -39,7 +39,7 @@ describe("settleAllOrThrow", () => {
     expect(logger.error).toHaveBeenCalledWith(expect.stringContaining("item b"), expect.any(Error));
   });
 
-  test("should never run more items concurrently than the configured limit", async () => {
+  it("should never run more items concurrently than the configured limit", async () => {
     const items = Array.from({ length: 10 }, (_, i) => i);
     let active = 0;
     let maxActive = 0;
@@ -69,7 +69,7 @@ describe("settleAllOrLog", () => {
     logger = { error: jest.fn() } as unknown as jest.Mocked<Logger>;
   });
 
-  test("should resolve without throwing even when every item fails", async () => {
+  it("should resolve without throwing even when every item fails", async () => {
     const items = ["a", "b"];
     const action = settleAllOrLog(
       items,
@@ -85,7 +85,7 @@ describe("settleAllOrLog", () => {
     expect(logger.error).toHaveBeenCalledTimes(2);
   });
 
-  test("should only log failed items, not successful ones", async () => {
+  it("should only log failed items, not successful ones", async () => {
     const items = ["a", "b", "c"];
     await settleAllOrLog(
       items,

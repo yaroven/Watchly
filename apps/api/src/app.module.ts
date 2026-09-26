@@ -22,6 +22,7 @@ import redisConfig, {
 import s3Config from "./config/s3.config";
 import { EpisodeModule } from "./episode/episode.module";
 import { GenreModule } from "./genre/genre.module";
+import { MediaAssetModule } from "./media-asset/media-asset.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { S3EventModule } from "./s3-event/s3-event.module";
 import { S3Module } from "./s3/s3.module";
@@ -82,6 +83,7 @@ import { VideoTranscoderModule } from "./video-transcoder/video-transcoder.modul
     UserModule,
     ArtistModule,
     GenreModule,
+    MediaAssetModule,
   ],
   controllers: [AppController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

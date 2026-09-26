@@ -24,9 +24,7 @@ export class ArtistService {
     filters: Filter[] = [],
   ): Promise<{ items: ArtistResponseDto[]; totalCount: number }> {
     const where = buildWhere(filters) as Prisma.ArtistWhereInput;
-    const orderBy = (buildOrderBy(sort) ?? {
-      createdAt: "desc",
-    }) as Prisma.ArtistOrderByWithRelationInput;
+    const orderBy = buildOrderBy(sort) as Prisma.ArtistOrderByWithRelationInput;
 
     const { items, totalCount } = await paginate<Artist>(this.prisma.artist, {
       where,

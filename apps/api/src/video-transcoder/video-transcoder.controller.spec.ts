@@ -32,50 +32,41 @@ describe("VideoTranscoderController", () => {
   });
 
   describe("getProgress", () => {
-    describe("when type is episode", () => {
-      describe("when progress is found", () => {
+    describe("should return the progress", () => {
+      it("if type is episode and progress is found", async () => {
         const progressData = { id: "progress-1", episodeId: "vid-1", progressPercentage: 50 };
-
-        beforeEach(() => {
-          (videoTranscoderServiceMock.getProgress as jest.Mock).mockResolvedValue(progressData);
-        });
-
-        test("should return progress for episode", async () => {
-          const result = await controller.getProgress("vid-1", VideoType.EPISODE);
-          expect(videoTranscoderServiceMock.getProgress).toHaveBeenCalledWith(
-            "vid-1",
-            VideoType.EPISODE,
-          );
-          expect(result).toEqual(progressData);
-        });
-      });
-
-      describe("when progress is not found", () => {
-        beforeEach(() => {
-          (videoTranscoderServiceMock.getProgress as jest.Mock).mockResolvedValue(null);
-        });
-
-        test("should throw NotFoundException", async () => {
-          const action = controller.getProgress("vid-1", VideoType.EPISODE);
-          await expect(action).rejects.toThrow(NotFoundException);
-        });
-      });
-    });
-
-    describe("when type is movie", () => {
-      const progressData = { id: "progress-2", titleId: "vid-1", progressPercentage: 80 };
-
-      beforeEach(() => {
         (videoTranscoderServiceMock.getProgress as jest.Mock).mockResolvedValue(progressData);
+
+        const result = await controller.getProgress("vid-1", VideoType.EPISODE);
+
+        expect(videoTranscoderServiceMock.getProgress).toHaveBeenCalledWith(
+          "vid-1",
+          VideoType.EPISODE,
+        );
+        expect(result).toEqual(progressData);
       });
 
-      test("should return progress for movie", async () => {
+      it("if type is movie", async () => {
+        const progressData = { id: "progress-2", titleId: "vid-1", progressPercentage: 80 };
+        (videoTranscoderServiceMock.getProgress as jest.Mock).mockResolvedValue(progressData);
+
         const result = await controller.getProgress("vid-1", VideoType.MOVIE);
+
         expect(videoTranscoderServiceMock.getProgress).toHaveBeenCalledWith(
           "vid-1",
           VideoType.MOVIE,
         );
         expect(result).toEqual(progressData);
+      });
+    });
+
+    describe("should throw NotFoundException", () => {
+      it("if type is episode and progress is not found", async () => {
+        (videoTranscoderServiceMock.getProgress as jest.Mock).mockResolvedValue(null);
+
+        const action = controller.getProgress("vid-1", VideoType.EPISODE);
+
+        await expect(action).rejects.toThrow(NotFoundException);
       });
     });
   });

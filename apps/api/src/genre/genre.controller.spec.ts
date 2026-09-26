@@ -33,88 +33,85 @@ describe("GenreController", () => {
   });
 
   describe("create", () => {
-    const createData = { name: "Action" };
-    const createdGenre = { id: "genre-1", ...createData };
+    describe("should return the created genre", () => {
+      it("if valid data is provided", async () => {
+        const createData = { name: "Action" };
+        const createdGenre = { id: "genre-1", ...createData };
+        (genreServiceMock.create as jest.Mock).mockResolvedValue(createdGenre);
 
-    beforeEach(() => {
-      (genreServiceMock.create as jest.Mock).mockResolvedValue(createdGenre);
-    });
+        const result = await controller.create(createData);
 
-    test("should return created genre", async () => {
-      const result = await controller.create(createData);
-      expect(genreServiceMock.create).toHaveBeenCalledWith(createData);
-      expect(result).toEqual(createdGenre);
+        expect(genreServiceMock.create).toHaveBeenCalledWith(createData);
+        expect(result).toEqual(createdGenre);
+      });
     });
   });
 
   describe("findAll", () => {
-    const query = { page: 1, limit: 10 };
-    const genresResponse = { items: [{ id: "genre-1" }], totalCount: 1 };
+    describe("should return the list of genres", () => {
+      it("if called with a query", async () => {
+        const query = { page: 1, limit: 10 };
+        const genresResponse = { items: [{ id: "genre-1" }], totalCount: 1 };
+        (genreServiceMock.findAll as jest.Mock).mockResolvedValue(genresResponse);
 
-    beforeEach(() => {
-      (genreServiceMock.findAll as jest.Mock).mockResolvedValue(genresResponse);
-    });
+        const result = await controller.findAll(query);
 
-    test("should return list of genres", async () => {
-      const result = await controller.findAll(query);
-      expect(genreServiceMock.findAll).toHaveBeenCalledWith(query, undefined, undefined);
-      expect(result).toEqual(genresResponse);
+        expect(genreServiceMock.findAll).toHaveBeenCalledWith(query, undefined, undefined);
+        expect(result).toEqual(genresResponse);
+      });
     });
   });
 
   describe("findOne", () => {
-    describe("when genre exists", () => {
-      const genre = { id: "genre-1" };
-
-      beforeEach(() => {
+    describe("should return the genre", () => {
+      it("if the genre exists", async () => {
+        const genre = { id: "genre-1" };
         (genreServiceMock.findOne as jest.Mock).mockResolvedValue(genre);
-      });
 
-      test("should return the genre", async () => {
         const result = await controller.findOne("genre-1");
+
         expect(genreServiceMock.findOne).toHaveBeenCalledWith("genre-1");
         expect(result).toEqual(genre);
       });
     });
 
-    describe("when genre does not exist", () => {
-      beforeEach(() => {
+    describe("should throw NotFoundException", () => {
+      it("if the genre does not exist", async () => {
         (genreServiceMock.findOne as jest.Mock).mockResolvedValue(null);
-      });
 
-      test("should throw NotFoundException", async () => {
         const action = controller.findOne("non-existent");
+
         await expect(action).rejects.toThrow(NotFoundException);
       });
     });
   });
 
   describe("update", () => {
-    const updateData = { name: "Adventure" };
-    const updatedGenre = { id: "genre-1", name: "Adventure" };
+    describe("should return the updated genre", () => {
+      it("if valid data is provided", async () => {
+        const updateData = { name: "Adventure" };
+        const updatedGenre = { id: "genre-1", name: "Adventure" };
+        (genreServiceMock.update as jest.Mock).mockResolvedValue(updatedGenre);
 
-    beforeEach(() => {
-      (genreServiceMock.update as jest.Mock).mockResolvedValue(updatedGenre);
-    });
+        const result = await controller.update("genre-1", updateData);
 
-    test("should return updated genre", async () => {
-      const result = await controller.update("genre-1", updateData);
-      expect(genreServiceMock.update).toHaveBeenCalledWith("genre-1", updateData);
-      expect(result).toEqual(updatedGenre);
+        expect(genreServiceMock.update).toHaveBeenCalledWith("genre-1", updateData);
+        expect(result).toEqual(updatedGenre);
+      });
     });
   });
 
   describe("delete", () => {
-    const deletedGenre = { id: "genre-1" };
+    describe("should return the deleted genre", () => {
+      it("if called with an existing id", async () => {
+        const deletedGenre = { id: "genre-1" };
+        (genreServiceMock.delete as jest.Mock).mockResolvedValue(deletedGenre);
 
-    beforeEach(() => {
-      (genreServiceMock.delete as jest.Mock).mockResolvedValue(deletedGenre);
-    });
+        const result = await controller.delete("genre-1");
 
-    test("should return deleted genre", async () => {
-      const result = await controller.delete("genre-1");
-      expect(genreServiceMock.delete).toHaveBeenCalledWith("genre-1");
-      expect(result).toEqual(deletedGenre);
+        expect(genreServiceMock.delete).toHaveBeenCalledWith("genre-1");
+        expect(result).toEqual(deletedGenre);
+      });
     });
   });
 });

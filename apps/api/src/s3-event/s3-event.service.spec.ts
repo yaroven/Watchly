@@ -94,21 +94,21 @@ describe("S3EventService", () => {
         .mockResolvedValueOnce({});
     });
 
-    test("should create SQS queue", async () => {
+    it("should create SQS queue", async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (service as any).setupInfrastructure();
 
       expect(mockSend).toHaveBeenCalledWith(expect.any(CreateQueueCommand));
     });
 
-    test("should fetch queue ARN via GetQueueAttributes", async () => {
+    it("should fetch queue ARN via GetQueueAttributes", async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (service as any).setupInfrastructure();
 
       expect(mockSend).toHaveBeenCalledWith(expect.any(GetQueueAttributesCommand));
     });
 
-    test("should set queue policy allowing S3 to send messages", async () => {
+    it("should set queue policy allowing S3 to send messages", async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (service as any).setupInfrastructure();
 
@@ -122,7 +122,7 @@ describe("S3EventService", () => {
       expect(policy.Statement[0].Principal.Service).toBe("s3.amazonaws.com");
     });
 
-    test("should subscribe S3 bucket to queue", async () => {
+    it("should subscribe S3 bucket to queue", async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (service as any).setupInfrastructure();
 
@@ -136,7 +136,7 @@ describe("S3EventService", () => {
       );
     });
 
-    test("should reuse the existing queue and reconcile its attributes when CreateQueue reports it already exists", async () => {
+    it("should reuse the existing queue and reconcile its attributes when CreateQueue reports it already exists", async () => {
       mockSend.mockReset();
       mockSend
         .mockResolvedValueOnce({ QueueUrl: mockDlqUrl }) // create dlq
@@ -158,7 +158,7 @@ describe("S3EventService", () => {
   });
 
   describe("resolveTask", () => {
-    test("should return EPISODE task when episode exists", async () => {
+    it("should return EPISODE task when episode exists", async () => {
       (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue({
         id: "11111111-1111-4111-8111-111111111111",
       });
@@ -173,7 +173,7 @@ describe("S3EventService", () => {
       expect(prismaMock.title.findUnique).not.toHaveBeenCalled();
     });
 
-    test("should return MOVIE task when episode not found but title exists", async () => {
+    it("should return MOVIE task when episode not found but title exists", async () => {
       (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
       (prismaMock.title.findUnique as jest.Mock).mockResolvedValue({
         id: "22222222-2222-4222-8222-222222222222",
@@ -185,7 +185,7 @@ describe("S3EventService", () => {
       expect(result).toEqual({ id: "22222222-2222-4222-8222-222222222222", type: VideoType.MOVIE });
     });
 
-    test("should return null when neither episode nor title exists", async () => {
+    it("should return null when neither episode nor title exists", async () => {
       (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
       (prismaMock.title.findUnique as jest.Mock).mockResolvedValue(null);
 
@@ -197,7 +197,7 @@ describe("S3EventService", () => {
   });
 
   describe("processMessage", () => {
-    test("should process valid episode message and schedule transcode", async () => {
+    it("should process valid episode message and schedule transcode", async () => {
       const message = {
         MessageId: "msg-1",
         ReceiptHandle: "receipt-123",
@@ -226,7 +226,7 @@ describe("S3EventService", () => {
       expect(mockSend.mock.calls[0][0]).toBeInstanceOf(DeleteMessageCommand);
     });
 
-    test("should process valid title (movie) message and schedule transcode", async () => {
+    it("should process valid title (movie) message and schedule transcode", async () => {
       const message = {
         MessageId: "msg-1",
         ReceiptHandle: "receipt-456",
@@ -250,7 +250,7 @@ describe("S3EventService", () => {
       });
     });
 
-    test("should delete message with no Records instead of leaving it in the queue", async () => {
+    it("should delete message with no Records instead of leaving it in the queue", async () => {
       const message = {
         MessageId: "msg-1",
         ReceiptHandle: "receipt-789",
@@ -264,7 +264,7 @@ describe("S3EventService", () => {
       expect(mockSend.mock.calls[0][0]).toBeInstanceOf(DeleteMessageCommand);
     });
 
-    test("should skip scheduling when task resolution returns null", async () => {
+    it("should skip scheduling when task resolution returns null", async () => {
       const message = {
         MessageId: "msg-1",
         ReceiptHandle: "receipt-abc",
@@ -282,7 +282,7 @@ describe("S3EventService", () => {
       expect(videoTranscoderServiceMock.scheduleTranscodeVideo).not.toHaveBeenCalled();
     });
 
-    test("should delete message only after successful processing", async () => {
+    it("should delete message only after successful processing", async () => {
       const message = {
         MessageId: "msg-1",
         ReceiptHandle: "receipt-xyz",
@@ -305,7 +305,7 @@ describe("S3EventService", () => {
       expect(deleteCall).toBeDefined();
     });
 
-    test("should delete unparseable (poison-pill) messages instead of retrying forever", async () => {
+    it("should delete unparseable (poison-pill) messages instead of retrying forever", async () => {
       const message = {
         MessageId: "msg-1",
         ReceiptHandle: "receipt-error",
@@ -318,7 +318,7 @@ describe("S3EventService", () => {
       expect(mockSend.mock.calls[0][0]).toBeInstanceOf(DeleteMessageCommand);
     });
 
-    test("should not delete message when processing a valid message throws", async () => {
+    it("should not delete message when processing a valid message throws", async () => {
       const message = {
         MessageId: "msg-1",
         ReceiptHandle: "receipt-retry",
@@ -335,7 +335,7 @@ describe("S3EventService", () => {
       expect(mockSend).not.toHaveBeenCalled();
     });
 
-    test("should decode percent-encoded characters in S3 key before matching", async () => {
+    it("should decode percent-encoded characters in S3 key before matching", async () => {
       const message = {
         MessageId: "msg-1",
         ReceiptHandle: "receipt-b",
@@ -358,7 +358,7 @@ describe("S3EventService", () => {
       });
     });
 
-    test("should skip non-UUID S3 keys without querying the database", async () => {
+    it("should skip non-UUID S3 keys without querying the database", async () => {
       const message = {
         MessageId: "msg-1",
         ReceiptHandle: "receipt-c",
