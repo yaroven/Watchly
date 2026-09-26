@@ -63,7 +63,8 @@ export class TitleController {
     summary: "List titles with filter, sort, and pagination",
     description:
       "`filter` (repeatable): `property:rule:value`, rule one of eq/neq/gt/gte/lt/lte/like/in/isnull. " +
-      "Filterable: name, type, transcodingStatus, ageRating, country, language. " +
+      "Filterable: name, type, transcodingStatus, ageRating, country, language, director, network, genres " +
+      "(genres: rule eq/in, value is a genre id, or comma-separated ids for `in`). " +
       "`sort`: `property:direction`. Sortable: name, createdAt, releaseDate.",
   })
   @ApiOkResponse({ type: PaginatedResponseOf(TitleResponseDto) })
@@ -71,7 +72,17 @@ export class TitleController {
   async findAll(
     @Query() query: GetAllTitleDto,
     @SortingParams(["name", "createdAt", "releaseDate"]) sort?: Sorting,
-    @FilteringParams(["name", "type", "transcodingStatus", "ageRating", "country", "language"])
+    @FilteringParams([
+      "name",
+      "type",
+      "transcodingStatus",
+      "ageRating",
+      "country",
+      "language",
+      "director",
+      "network",
+      "genres",
+    ])
     filters?: Filter[],
   ) {
     return this.titleService.findAll(query, sort, filters);

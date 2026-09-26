@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { Genre, Prisma, Title, TitleType } from "@prisma/client";
+import { FilterRule } from "../common/pagination/filter-rule.enum";
 import { paginate } from "../common/pagination/paginate.util";
 import { Filter, Sorting } from "../common/pagination/pagination.types";
 import { buildOrderBy, buildWhere } from "../common/pagination/prisma-query.util";
@@ -53,7 +54,16 @@ export class TitleService {
     sort?: Sorting,
     filters: Filter[] = [],
   ): Promise<{ items: TitleResponseDto[]; totalCount: number }> {
-    const where = buildWhere(filters) as Prisma.TitleWhereInput;
+    const genreFilters = filters.filter((filter) => filter.property === "genres");
+    const scalarFilters = filters.filter((filter) => filter.property !== "genres");
+
+    const where = buildWhere(scalarFilters) as Prisma.TitleWhereInput;
+    if (genreFilters.length) {
+      const genreIds = genreFilters.flatMap((filter) =>
+        filter.rule === FilterRule.IN ? filter.value.split(",") : [filter.value],
+      );
+      where.genres = { some: { id: { in: genreIds } } };
+    }
     const orderBy = (buildOrderBy(sort) ?? {
       createdAt: "desc",
     }) as Prisma.TitleOrderByWithRelationInput;
