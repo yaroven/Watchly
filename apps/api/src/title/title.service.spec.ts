@@ -213,6 +213,95 @@ describe("TitleService", () => {
         );
       });
     });
+
+    describe("should filter by director", () => {
+      it("if filtering by director", async () => {
+        (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([]);
+        (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(0);
+
+        await service.findAll({ page: 1, limit: 10 }, undefined, [
+          { property: "director", rule: FilterRule.EQ, value: "Jane Doe" },
+        ]);
+
+        expect(prismaServiceMock.title.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ director: "Jane Doe" }),
+          }),
+        );
+      });
+    });
+
+    describe("should filter by network", () => {
+      it("if filtering by network", async () => {
+        (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([]);
+        (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(0);
+
+        await service.findAll({ page: 1, limit: 10 }, undefined, [
+          { property: "network", rule: FilterRule.EQ, value: "Netflix" },
+        ]);
+
+        expect(prismaServiceMock.title.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ network: "Netflix" }),
+          }),
+        );
+      });
+    });
+
+    describe("should filter by genre", () => {
+      it("if given a single genre id", async () => {
+        (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([]);
+        (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(0);
+
+        await service.findAll({ page: 1, limit: 10 }, undefined, [
+          { property: "genres", rule: FilterRule.EQ, value: "genre-1" },
+        ]);
+
+        expect(prismaServiceMock.title.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              genres: { some: { id: { in: ["genre-1"] } } },
+            }),
+          }),
+        );
+      });
+
+      it("if given a comma-separated list of genre ids with the IN rule", async () => {
+        (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([]);
+        (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(0);
+
+        await service.findAll({ page: 1, limit: 10 }, undefined, [
+          { property: "genres", rule: FilterRule.IN, value: "genre-1,genre-2" },
+        ]);
+
+        expect(prismaServiceMock.title.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              genres: { some: { id: { in: ["genre-1", "genre-2"] } } },
+            }),
+          }),
+        );
+      });
+
+      it("if combined with a scalar filter", async () => {
+        (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([]);
+        (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(0);
+
+        await service.findAll({ page: 1, limit: 10 }, undefined, [
+          { property: "genres", rule: FilterRule.EQ, value: "genre-1" },
+          { property: "type", rule: FilterRule.EQ, value: TitleType.MOVIE },
+        ]);
+
+        expect(prismaServiceMock.title.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              type: TitleType.MOVIE,
+              genres: { some: { id: { in: ["genre-1"] } } },
+            }),
+          }),
+        );
+      });
+    });
   });
 
   describe("findOne", () => {
