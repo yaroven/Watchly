@@ -46,87 +46,105 @@ describe("AuthController", () => {
   describe("login", () => {
     const body = { email: "user@example.com", password: "correct-password" };
 
-    beforeEach(() => {
-      (authServiceMock.login as jest.Mock).mockResolvedValue({
-        accessToken: "access-token",
-        refreshToken: "refresh-token",
-        userId: "user-1",
-        role: "USER",
+    describe("should set the refresh token as an httpOnly cookie scoped to the refresh route", () => {
+      it("when login succeeds", async () => {
+        (authServiceMock.login as jest.Mock).mockResolvedValue({
+          accessToken: "access-token",
+          refreshToken: "refresh-token",
+          userId: "user-1",
+          role: "USER",
+        });
+
+        await controller.login(body, res);
+
+        expect(res.cookie).toHaveBeenCalledWith(
+          "refreshToken",
+          "refresh-token",
+          expect.objectContaining({
+            httpOnly: true,
+            sameSite: "strict",
+            path: "/",
+            maxAge: expect.any(Number),
+          }),
+        );
       });
     });
 
-    test("sets the refresh token as an httpOnly cookie scoped to the refresh route", async () => {
-      await controller.login(body, res);
+    describe("should return the access token, userId, and role — never the refresh token", () => {
+      it("when login succeeds", async () => {
+        (authServiceMock.login as jest.Mock).mockResolvedValue({
+          accessToken: "access-token",
+          refreshToken: "refresh-token",
+          userId: "user-1",
+          role: "USER",
+        });
 
-      expect(res.cookie).toHaveBeenCalledWith(
-        "refreshToken",
-        "refresh-token",
-        expect.objectContaining({
-          httpOnly: true,
-          sameSite: "strict",
-          path: "/",
-          maxAge: expect.any(Number),
-        }),
-      );
-    });
+        const result = await controller.login(body, res);
 
-    test("returns the access token, userId, and role — never the refresh token", async () => {
-      const result = await controller.login(body, res);
-      expect(result).toEqual({ accessToken: "access-token", userId: "user-1", role: "USER" });
+        expect(result).toEqual({ accessToken: "access-token", userId: "user-1", role: "USER" });
+      });
     });
   });
 
   describe("register", () => {
     const body = { email: "new@example.com", password: "new-password" };
 
-    beforeEach(() => {
-      (authServiceMock.register as jest.Mock).mockResolvedValue({
-        accessToken: "access-token",
-        refreshToken: "refresh-token",
-        userId: "user-1",
-        role: "USER",
+    describe("should sign the new user straight in — set the refresh cookie and return the access token", () => {
+      it("when registration succeeds", async () => {
+        (authServiceMock.register as jest.Mock).mockResolvedValue({
+          accessToken: "access-token",
+          refreshToken: "refresh-token",
+          userId: "user-1",
+          role: "USER",
+        });
+
+        const result = await controller.register(body, res);
+
+        expect(authServiceMock.register).toHaveBeenCalledWith(body);
+        expect(res.cookie).toHaveBeenCalledWith(
+          "refreshToken",
+          "refresh-token",
+          expect.objectContaining({ httpOnly: true, path: "/" }),
+        );
+        expect(result).toEqual({ accessToken: "access-token", userId: "user-1", role: "USER" });
       });
-    });
-
-    test("signs the new user straight in — sets the refresh cookie and returns the access token", async () => {
-      const result = await controller.register(body, res);
-
-      expect(authServiceMock.register).toHaveBeenCalledWith(body);
-      expect(res.cookie).toHaveBeenCalledWith(
-        "refreshToken",
-        "refresh-token",
-        expect.objectContaining({ httpOnly: true, path: "/" }),
-      );
-      expect(result).toEqual({ accessToken: "access-token", userId: "user-1", role: "USER" });
     });
   });
 
   describe("refresh", () => {
-    test("throws UnauthorizedException when the refresh cookie is missing", async () => {
-      const req = { cookies: {} } as unknown as Request;
+    describe("should throw UnauthorizedException", () => {
+      it("if the refresh cookie is missing", async () => {
+        const req = { cookies: {} } as unknown as Request;
 
-      await expect(controller.refresh(req, res)).rejects.toThrow(UnauthorizedException);
-      expect(authServiceMock.refreshTokens).not.toHaveBeenCalled();
+        await expect(controller.refresh(req, res)).rejects.toThrow(UnauthorizedException);
+        expect(authServiceMock.refreshTokens).not.toHaveBeenCalled();
+      });
     });
 
-    test("rotates the cookie and returns the new access token when the refresh cookie is present", async () => {
-      const req = { cookies: { refreshToken: "old-refresh-token" } } as unknown as Request;
-      (authServiceMock.refreshTokens as jest.Mock).mockResolvedValue({
-        accessToken: "new-access-token",
-        refreshToken: "new-refresh-token",
-        userId: "user-1",
-        role: "USER",
+    describe("should rotate the cookie and return the new access token", () => {
+      it("if the refresh cookie is present", async () => {
+        const req = { cookies: { refreshToken: "old-refresh-token" } } as unknown as Request;
+        (authServiceMock.refreshTokens as jest.Mock).mockResolvedValue({
+          accessToken: "new-access-token",
+          refreshToken: "new-refresh-token",
+          userId: "user-1",
+          role: "USER",
+        });
+
+        const result = await controller.refresh(req, res);
+
+        expect(authServiceMock.refreshTokens).toHaveBeenCalledWith("old-refresh-token");
+        expect(res.cookie).toHaveBeenCalledWith(
+          "refreshToken",
+          "new-refresh-token",
+          expect.objectContaining({ httpOnly: true, path: "/" }),
+        );
+        expect(result).toEqual({
+          accessToken: "new-access-token",
+          userId: "user-1",
+          role: "USER",
+        });
       });
-
-      const result = await controller.refresh(req, res);
-
-      expect(authServiceMock.refreshTokens).toHaveBeenCalledWith("old-refresh-token");
-      expect(res.cookie).toHaveBeenCalledWith(
-        "refreshToken",
-        "new-refresh-token",
-        expect.objectContaining({ httpOnly: true, path: "/" }),
-      );
-      expect(result).toEqual({ accessToken: "new-access-token", userId: "user-1", role: "USER" });
     });
   });
 });

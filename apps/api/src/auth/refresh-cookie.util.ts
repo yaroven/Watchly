@@ -1,5 +1,5 @@
 import type { Response } from "express";
-import { parseDurationMs } from "../common/duration.util";
+import { parseDurationMs } from "../common/utils/duration.util";
 
 export const REFRESH_COOKIE_NAME = "refreshToken";
 // Must be "/", not a narrow API sub-path: the client app's edge proxy (a different

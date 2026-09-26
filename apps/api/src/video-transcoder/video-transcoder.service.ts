@@ -4,10 +4,9 @@ import { TranscodingStatus } from "@prisma/client";
 import { Queue } from "bullmq";
 import ffmpeg from "fluent-ffmpeg";
 import * as fs from "fs-extra";
+import pMap from "p-map";
 import * as path from "path";
 import { Readable } from "stream";
-
-import { mapWithConcurrencyLimit } from "../common/concurrency.util";
 import { getEpisodeTitleAndSeasonId } from "../episode/episode-path.util";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
@@ -189,20 +188,24 @@ export class VideoTranscoderService {
     this.logger.log(`Uploading processed files to Object DB...`);
     const files = (await fs.readdir(outputDir, { recursive: true })) as string[];
 
-    await mapWithConcurrencyLimit(files, 8, async (file) => {
-      const localFilePath = path.join(outputDir, file);
-      if ((await fs.stat(localFilePath)).isDirectory()) return;
+    await pMap(
+      files,
+      async (file) => {
+        const localFilePath = path.join(outputDir, file);
+        if ((await fs.stat(localFilePath)).isDirectory()) return;
 
-      const s3Key = `videos/${key}/${file}`;
-      const contentType = file.endsWith(".m3u8") ? "application/x-mpegURL" : "video/MP2T";
+        const s3Key = `videos/${key}/${file}`;
+        const contentType = file.endsWith(".m3u8") ? "application/x-mpegURL" : "video/MP2T";
 
-      await this.s3Service.uploadStream(
-        BucketType.PROCESSED,
-        s3Key,
-        fs.createReadStream(localFilePath),
-        contentType,
-      );
-    });
+        await this.s3Service.uploadStream(
+          BucketType.PROCESSED,
+          s3Key,
+          fs.createReadStream(localFilePath),
+          contentType,
+        );
+      },
+      { concurrency: 8 },
+    );
 
     if (!(await this.entityExists(id, type)))
       throw new TranscodeAbortedError(`Entity ${id} was deleted before processed upload finished`);

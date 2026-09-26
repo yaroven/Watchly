@@ -43,154 +43,169 @@ describe("VideoTranscoderProcessor", () => {
   });
 
   describe("process", () => {
-    test("should set PROCESSING status and progress to 0 on start", async () => {
-      (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
-      videoTranscoderServiceMock.transcodeVideo.mockResolvedValue(undefined);
+    describe("should set PROCESSING status and progress to 0", () => {
+      it("when starting", async () => {
+        (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
+        videoTranscoderServiceMock.transcodeVideo.mockResolvedValue(undefined);
 
-      const job = mockJob({ id: "ep-1", type: VideoType.EPISODE });
+        const job = mockJob({ id: "ep-1", type: VideoType.EPISODE });
 
-      await processor.process(job);
+        await processor.process(job);
 
-      expect(videoTranscoderServiceMock.updateStatus).toHaveBeenCalledWith(
-        "ep-1",
-        VideoType.EPISODE,
-        TranscodingStatus.PROCESSING,
-      );
-      expect(videoTranscoderServiceMock.updateProgress).toHaveBeenCalledWith(
-        "ep-1",
-        VideoType.EPISODE,
-        0,
-      );
+        expect(videoTranscoderServiceMock.updateStatus).toHaveBeenCalledWith(
+          "ep-1",
+          VideoType.EPISODE,
+          TranscodingStatus.PROCESSING,
+        );
+        expect(videoTranscoderServiceMock.updateProgress).toHaveBeenCalledWith(
+          "ep-1",
+          VideoType.EPISODE,
+          0,
+        );
+      });
     });
 
-    test("should create temp directory before transcoding", async () => {
-      (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
-      videoTranscoderServiceMock.transcodeVideo.mockResolvedValue(undefined);
+    describe("should create the temp directory before transcoding", () => {
+      it("always", async () => {
+        (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
+        videoTranscoderServiceMock.transcodeVideo.mockResolvedValue(undefined);
 
-      const job = mockJob({ id: "ep-1", type: VideoType.EPISODE });
+        const job = mockJob({ id: "ep-1", type: VideoType.EPISODE });
 
-      await processor.process(job);
+        await processor.process(job);
 
-      expect(fs.ensureDir).toHaveBeenCalled();
+        expect(fs.ensureDir).toHaveBeenCalled();
+      });
     });
 
-    test("should call transcodeVideo with correct paths and type", async () => {
-      (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
-      videoTranscoderServiceMock.transcodeVideo.mockResolvedValue(undefined);
+    describe("should call transcodeVideo with the correct paths and type", () => {
+      it("always", async () => {
+        (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
+        videoTranscoderServiceMock.transcodeVideo.mockResolvedValue(undefined);
 
-      const job = mockJob({ id: "title-1", type: VideoType.MOVIE });
+        const job = mockJob({ id: "title-1", type: VideoType.MOVIE });
 
-      await processor.process(job);
+        await processor.process(job);
 
-      expect(videoTranscoderServiceMock.transcodeVideo).toHaveBeenCalledWith(
-        "title-1",
-        expect.stringContaining("title-1"),
-        expect.stringContaining("output"),
-        VideoType.MOVIE,
-      );
+        expect(videoTranscoderServiceMock.transcodeVideo).toHaveBeenCalledWith(
+          "title-1",
+          expect.stringContaining("title-1"),
+          expect.stringContaining("output"),
+          VideoType.MOVIE,
+        );
+      });
     });
 
-    test("should set COMPLETED status and progress to 100 on success", async () => {
-      (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
-      videoTranscoderServiceMock.transcodeVideo.mockResolvedValue(undefined);
+    describe("should set COMPLETED status and progress to 100", () => {
+      it("on success", async () => {
+        (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
+        videoTranscoderServiceMock.transcodeVideo.mockResolvedValue(undefined);
 
-      const job = mockJob({ id: "ep-1", type: VideoType.EPISODE });
+        const job = mockJob({ id: "ep-1", type: VideoType.EPISODE });
 
-      await processor.process(job);
+        await processor.process(job);
 
-      expect(videoTranscoderServiceMock.updateStatus).toHaveBeenCalledWith(
-        "ep-1",
-        VideoType.EPISODE,
-        TranscodingStatus.COMPLETED,
-      );
-      expect(videoTranscoderServiceMock.updateProgress).toHaveBeenCalledWith(
-        "ep-1",
-        VideoType.EPISODE,
-        100,
-      );
+        expect(videoTranscoderServiceMock.updateStatus).toHaveBeenCalledWith(
+          "ep-1",
+          VideoType.EPISODE,
+          TranscodingStatus.COMPLETED,
+        );
+        expect(videoTranscoderServiceMock.updateProgress).toHaveBeenCalledWith(
+          "ep-1",
+          VideoType.EPISODE,
+          100,
+        );
+      });
     });
 
-    test("should return { result: 'success' } on successful completion", async () => {
-      (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
-      videoTranscoderServiceMock.transcodeVideo.mockResolvedValue(undefined);
+    describe("should return { result: 'success' }", () => {
+      it("on successful completion", async () => {
+        (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
+        videoTranscoderServiceMock.transcodeVideo.mockResolvedValue(undefined);
 
-      const job = mockJob({ id: "ep-1", type: VideoType.EPISODE });
+        const job = mockJob({ id: "ep-1", type: VideoType.EPISODE });
 
-      const result = await processor.process(job);
+        const result = await processor.process(job);
 
-      expect(result).toEqual({ result: "success" });
+        expect(result).toEqual({ result: "success" });
+      });
     });
 
-    test("should return { result: 'aborted' } when TranscodeAbortedError is thrown", async () => {
-      (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
-      videoTranscoderServiceMock.transcodeVideo.mockRejectedValue(
-        new TranscodeAbortedError("Job was cancelled"),
-      );
+    describe("should return { result: 'aborted' } without marking the job FAILED", () => {
+      it("if TranscodeAbortedError is thrown", async () => {
+        (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
+        videoTranscoderServiceMock.transcodeVideo.mockRejectedValue(
+          new TranscodeAbortedError("Job was cancelled"),
+        );
 
-      const job = mockJob({ id: "ep-1", type: VideoType.EPISODE });
+        const job = mockJob({ id: "ep-1", type: VideoType.EPISODE });
 
-      const result = await processor.process(job);
+        const result = await processor.process(job);
 
-      expect(result).toEqual({ result: "aborted" });
-      // Should NOT set FAILED status on abort
-      expect(videoTranscoderServiceMock.updateStatus).not.toHaveBeenCalledWith(
-        "ep-1",
-        VideoType.EPISODE,
-        TranscodingStatus.FAILED,
-      );
+        expect(result).toEqual({ result: "aborted" });
+        expect(videoTranscoderServiceMock.updateStatus).not.toHaveBeenCalledWith(
+          "ep-1",
+          VideoType.EPISODE,
+          TranscodingStatus.FAILED,
+        );
+      });
     });
 
-    test("should set FAILED status on non-abort errors", async () => {
-      (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
-      videoTranscoderServiceMock.transcodeVideo.mockRejectedValue(new Error("ffmpeg error"));
+    describe("should set FAILED status and rethrow", () => {
+      it("on a non-abort error", async () => {
+        (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
+        videoTranscoderServiceMock.transcodeVideo.mockRejectedValue(new Error("ffmpeg error"));
 
-      const job = mockJob({ id: "ep-1", type: VideoType.EPISODE });
+        const job = mockJob({ id: "ep-1", type: VideoType.EPISODE });
 
-      await expect(processor.process(job)).rejects.toThrow("ffmpeg error");
+        await expect(processor.process(job)).rejects.toThrow("ffmpeg error");
 
-      expect(videoTranscoderServiceMock.updateStatus).toHaveBeenCalledWith(
-        "ep-1",
-        VideoType.EPISODE,
-        TranscodingStatus.FAILED,
-      );
+        expect(videoTranscoderServiceMock.updateStatus).toHaveBeenCalledWith(
+          "ep-1",
+          VideoType.EPISODE,
+          TranscodingStatus.FAILED,
+        );
+      });
     });
 
-    test("should cleanup temp directory in finally block on success", async () => {
-      (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
-      videoTranscoderServiceMock.transcodeVideo.mockResolvedValue(undefined);
-      (fs.remove as jest.Mock).mockResolvedValue(undefined);
+    describe("should cleanup the temp directory in the finally block", () => {
+      it("on success", async () => {
+        (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
+        videoTranscoderServiceMock.transcodeVideo.mockResolvedValue(undefined);
+        (fs.remove as jest.Mock).mockResolvedValue(undefined);
 
-      const job = mockJob({ id: "ep-1", type: VideoType.EPISODE });
+        const job = mockJob({ id: "ep-1", type: VideoType.EPISODE });
 
-      await processor.process(job);
+        await processor.process(job);
 
-      expect(fs.remove).toHaveBeenCalledWith(expect.stringContaining("transcode-job-123"));
-    });
+        expect(fs.remove).toHaveBeenCalledWith(expect.stringContaining("transcode-job-123"));
+      });
 
-    test("should cleanup temp directory in finally block on failure", async () => {
-      (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
-      videoTranscoderServiceMock.transcodeVideo.mockRejectedValue(new Error("error"));
-      (fs.remove as jest.Mock).mockResolvedValue(undefined);
+      it("on failure", async () => {
+        (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
+        videoTranscoderServiceMock.transcodeVideo.mockRejectedValue(new Error("error"));
+        (fs.remove as jest.Mock).mockResolvedValue(undefined);
 
-      const job = mockJob({ id: "ep-1", type: VideoType.EPISODE });
+        const job = mockJob({ id: "ep-1", type: VideoType.EPISODE });
 
-      await expect(processor.process(job)).rejects.toThrow();
+        await expect(processor.process(job)).rejects.toThrow();
 
-      expect(fs.remove).toHaveBeenCalled();
-    });
+        expect(fs.remove).toHaveBeenCalled();
+      });
 
-    test("should cleanup temp directory in finally block on abort", async () => {
-      (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
-      videoTranscoderServiceMock.transcodeVideo.mockRejectedValue(
-        new TranscodeAbortedError("cancelled"),
-      );
-      (fs.remove as jest.Mock).mockResolvedValue(undefined);
+      it("on abort", async () => {
+        (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
+        videoTranscoderServiceMock.transcodeVideo.mockRejectedValue(
+          new TranscodeAbortedError("cancelled"),
+        );
+        (fs.remove as jest.Mock).mockResolvedValue(undefined);
 
-      const job = mockJob({ id: "ep-1", type: VideoType.EPISODE });
+        const job = mockJob({ id: "ep-1", type: VideoType.EPISODE });
 
-      await processor.process(job);
+        await processor.process(job);
 
-      expect(fs.remove).toHaveBeenCalled();
+        expect(fs.remove).toHaveBeenCalled();
+      });
     });
   });
 });

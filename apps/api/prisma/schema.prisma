@@ -11,6 +11,13 @@ enum Role {
   USER
 }
 
+enum AgeRating {
+  AGE_0
+  AGE_12
+  AGE_16
+  AGE_18
+}
+
 enum TitleType {
   MOVIE
   SERIES
@@ -38,20 +45,62 @@ model Title {
   name              String
   description       String
   type              TitleType
-  posterUrl         String
-  hlsUrl            String?
+  posterUrl         String?
+  ageRating         AgeRating
+  country           String
+  releaseDate       DateTime
+  language          String
+  trailerUrl        String
+  runtime           Int
+  network           String
+  director          String
+  closedCaption     Boolean
   transcodingStatus TranscodingStatus @default(PENDING)
 
   videoTranscodingProgress VideoTranscodingProgress?
 
-  seasons Season[]
-
-  @@index([type, transcodingStatus])
+  seasons     Season[]
+  castCredits CastCredit[]
+  genres      Genre[]
   // Also see migration 20260717000000_title_search_indexes: it creates the
   // pg_trgm extension and a GIN trigram index on `name` for ILIKE search.
   // Neither is representable here (no postgresqlExtensions preview feature
   // enabled) — `prisma db push` / introspection against a fresh DB will not
   // recreate them. Run that migration explicitly on any new environment.
+
+  @@index([type, transcodingStatus])
+}
+
+model Genre {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  name      String   @unique
+
+  titles Title[]
+}
+
+model Artist {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  name      String
+  photoUrl  String?
+
+  castCredits CastCredit[]
+}
+
+model CastCredit {
+  id        String  @id @default(uuid())
+  titleId   String
+  title     Title   @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  artistId  String
+  artist    Artist  @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  character String?
+  order     Int     @default(0)
+
+  @@unique([titleId, artistId])
+  @@index([artistId])
 }
 
 model VideoTranscodingProgress {

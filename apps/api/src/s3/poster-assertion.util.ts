@@ -6,10 +6,7 @@ export async function assertManagedPosterUrl(
   s3Service: S3Service,
   posterKey: string,
   posterUrl: string,
-  defaultPosterUrl?: string,
 ): Promise<void> {
-  if (defaultPosterUrl !== undefined && posterUrl === defaultPosterUrl) return;
-
   const managedUrl = await s3Service.getReadPresignedUrl(posterKey, BucketType.PROCESSED);
 
   let submittedPath: string;
