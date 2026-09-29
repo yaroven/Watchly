@@ -9,6 +9,12 @@
 # Anything that does not apply cleanly fails the run and pushes nothing, so
 # the release line is only ever moved by a pick that applied on its own.
 #
+# Two destinations are possible. By default the pick moves the branch you
+# named. With "new_patch_branch" it goes onto a fresh branch one patch number
+# further along instead — release/2026.1 -> release/2026.1.1 — leaving the
+# branch you named untouched, which is what you want when the running release
+# has to stay exactly where it is while the fix is verified.
+#
 # A protected release branch will reject this push unless the identity behind
 # the token is allowed to bypass the protection; set BACKPORT_TOKEN to a PAT
 # that is, if that is how the branch is guarded.
@@ -23,9 +29,13 @@ on:
         type: string
         required: true
       target:
-        description: "Release branch to backport into (release/2026.1)"
+        description: "Release branch to take the fix (release/2026.1)"
         type: string
         required: true
+      new_patch_branch:
+        description: "Cut the next patch branch instead of moving the one above (release/2026.1 -> release/2026.1.1). Leave off to commit onto the branch itself."
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -49,9 +59,11 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.BACKPORT_TOKEN || secrets.GITHUB_TOKEN }}
 
-      - name: Validate inputs
+      - name: Work out where the pick is going
+        id: dest
         env:
           TARGET: ${{ inputs.target }}
+          NEW_PATCH: ${{ inputs.new_patch_branch }}
         run: |
           set -euo pipefail
           case "$TARGET" in
@@ -60,6 +72,29 @@ jobs:
           esac
           git ls-remote --exit-code --heads origin "$TARGET" >/dev/null \
             || { echo "Branch '$TARGET' does not exist on origin" >&2; exit 1; }
+
+          if [ "$NEW_PATCH" != "true" ]; then
+            echo "branch=$TARGET" >> "$GITHUB_OUTPUT"
+            echo "created=false" >> "$GITHUB_OUTPUT"
+            echo "Landing on $TARGET itself."
+            exit 0
+          fi
+
+          # The line is the first two segments, so both release/2026.1 and
+          # release/2026.1.4 belong to 2026.1 and are numbered together.
+          line=$(echo "${TARGET#release/}" | cut -d. -f1,2)
+
+          # Take the highest patch that already exists rather than assuming
+          # the named branch is the newest — .1 and .2 may both be out there.
+          highest=$(git ls-remote --heads origin "refs/heads/release/${line}.*" \
+            | sed "s#.*refs/heads/release/${line}\.##" \
+            | grep -E '^[0-9]+$' \
+            | sort -n | tail -1 || true)
+          next=$(( ${highest:-0} + 1 ))
+
+          echo "branch=release/${line}.${next}" >> "$GITHUB_OUTPUT"
+          echo "created=true" >> "$GITHUB_OUTPUT"
+          echo "Cutting release/${line}.${next} from $TARGET."
 
       - name: Read the source PR
         id: pr
@@ -103,23 +138,34 @@ jobs:
 
       - name: Push it to the release branch
         env:
-          TARGET: ${{ inputs.target }}
+          BRANCH: ${{ steps.dest.outputs.branch }}
+          CREATED: ${{ steps.dest.outputs.created }}
         run: |
           set -euo pipefail
-          git push origin "HEAD:refs/heads/$TARGET"
+          # Plain, never forced: a patch branch that turned up in the meantime
+          # rejects this push instead of being overwritten by it.
+          git push origin "HEAD:refs/heads/$BRANCH"
 
       - name: Report what landed
         env:
           TARGET: ${{ inputs.target }}
+          BRANCH: ${{ steps.dest.outputs.branch }}
+          CREATED: ${{ steps.dest.outputs.created }}
           PR: ${{ inputs.pr }}
         run: |
           {
-            echo "Backported #$PR onto \`$TARGET\` as \`${{ steps.pick.outputs.picked }}\`."
+            if [ "$CREATED" = "true" ]; then
+              echo "Cut \`$BRANCH\` from \`$TARGET\` with #$PR on it (\`${{ steps.pick.outputs.picked }}\`)."
+              echo ""
+              echo "\`$TARGET\` was not moved."
+            else
+              echo "Backported #$PR onto \`$BRANCH\` as \`${{ steps.pick.outputs.picked }}\`."
+            fi
             echo ""
-            echo "This is not a release on its own — tag the line to publish it:"
+            echo "This is not a release on its own — tag the branch to publish it:"
             echo '```'
-            echo "git fetch origin && git tag v<line>.<next-patch> origin/$TARGET"
-            echo "git push origin v<line>.<next-patch>"
+            echo "git fetch origin && git tag v${BRANCH#release/} origin/$BRANCH"
+            echo "git push origin v${BRANCH#release/}"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
