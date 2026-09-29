@@ -35,18 +35,25 @@ export class GenreService {
       createdAt: "desc",
     }) as Prisma.GenreOrderByWithRelationInput;
 
-    const { items, totalCount } = await paginate<Genre>(this.prisma.genre, {
-      where,
-      orderBy,
-      page,
-      limit,
-    });
+    const { items, totalCount } = await paginate<Genre & { _count: { titles: number } }>(
+      this.prisma.genre,
+      {
+        where,
+        orderBy,
+        page,
+        limit,
+        extra: { include: { _count: { select: { titles: true } } } },
+      },
+    );
 
     return { items: items.map((genre) => new GenreResponseDto(genre)), totalCount };
   }
 
   async findOne(id: string): Promise<GenreResponseDto | null> {
-    const genre = await this.prisma.genre.findUnique({ where: { id } });
+    const genre = await this.prisma.genre.findUnique({
+      where: { id },
+      include: { _count: { select: { titles: true } } },
+    });
     return genre ? new GenreResponseDto(genre) : null;
   }
 
@@ -71,6 +78,11 @@ export class GenreService {
     const genre = await this.findOne(id);
     if (!genre) {
       throw new BadRequestException(`Genre with id ${id} not found`);
+    }
+    if (genre.titleCount) {
+      throw new BadRequestException(
+        `Genre "${genre.name}" is still assigned to ${genre.titleCount} title(s) — remove it from every title first`,
+      );
     }
 
     const deleted = await this.prisma.genre.delete({ where: { id } });

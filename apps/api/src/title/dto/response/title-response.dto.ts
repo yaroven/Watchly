@@ -1,6 +1,14 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { AgeRating, Genre, Title, TitleType, TranscodingStatus } from "@prisma/client";
+import {
+  AgeRating,
+  ExternalRatings,
+  Genre,
+  Title,
+  TitleType,
+  TranscodingStatus,
+} from "@prisma/client";
 import { GenreResponseDto } from "../../../genre/dto/response/genre-response.dto";
+import { ExternalRatingResponseDto } from "./external-rating-response.dto";
 
 export class TitleResponseDto {
   @ApiProperty({ format: "uuid" })
@@ -57,7 +65,10 @@ export class TitleResponseDto {
   @ApiProperty({ enum: TranscodingStatus })
   transcodingStatus: TranscodingStatus;
 
-  constructor(title: Title & { genres: Genre[] }) {
+  @ApiProperty({ type: [ExternalRatingResponseDto] })
+  externalRatings: ExternalRatingResponseDto[];
+
+  constructor(title: Title & { genres: Genre[]; externalRatings?: ExternalRatings[] }) {
     this.id = title.id;
     this.createdAt = title.createdAt;
     this.updatedAt = title.updatedAt;
@@ -76,5 +87,8 @@ export class TitleResponseDto {
     this.closedCaption = title.closedCaption;
     this.genres = title.genres.map((genre) => new GenreResponseDto(genre));
     this.transcodingStatus = title.transcodingStatus;
+    this.externalRatings = (title.externalRatings ?? []).map(
+      (rating) => new ExternalRatingResponseDto(rating),
+    );
   }
 }

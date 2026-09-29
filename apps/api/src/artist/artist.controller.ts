@@ -27,6 +27,7 @@ import { ArtistService } from "./artist.service";
 import { CreateArtistDto } from "./dto/request/create-artist.dto";
 import { GetAllArtistDto } from "./dto/request/get-all-artist.dto";
 import { UpdateArtistDto } from "./dto/request/update-artist.dto";
+import { ArtistFilmographyItemDto } from "./dto/response/artist-filmography-item.dto";
 import { ArtistResponseDto } from "./dto/response/artist-response.dto";
 
 @ApiTags("artists")
@@ -68,6 +69,22 @@ export class ArtistController {
     if (!artist) throw new NotFoundException(`Artist with id ${id} not found`);
 
     return artist;
+  }
+
+  @ApiOperation({ summary: "Get the titles an artist is credited on" })
+  @ApiParam({ name: "id", format: "uuid" })
+  @ApiOkResponse({ type: [ArtistFilmographyItemDto] })
+  @Get(":id/filmography")
+  getFilmography(@Param("id", ParseUUIDPipe) id: string) {
+    return this.artistService.getFilmography(id);
+  }
+
+  @ApiOperation({ summary: "Get a presigned upload URL for an artist's photo" })
+  @ApiParam({ name: "id", format: "uuid" })
+  @AdminOnly()
+  @Get(":id/photo-upload-url")
+  createPhotoUploadUrl(@Param("id", ParseUUIDPipe) id: string) {
+    return this.artistService.createPhotoUploadUrl(id);
   }
 
   @ApiOperation({ summary: "Update an artist" })

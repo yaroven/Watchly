@@ -2,7 +2,7 @@ import { StartMultipartUpload } from "@/shared/api/upload-media";
 import { parseApiDate } from "@/shared/lib/parse-api-date";
 import api from "@shared/api/axios";
 import axios from "axios";
-import { CreateTitleDto, GetAllTitlesDto, Title, UpdateTitleDto } from "../schemas/title";
+import { CastCredit, CastCreditInput, CreateTitleDto, ExternalRating, GetAllTitlesDto, Title, UpdateTitleDto } from "../schemas/title";
 
 const prefix = "title";
 
@@ -19,6 +19,11 @@ const mapTitle = (title: ApiTitle): Title => ({
 
 type TitleCreatePayload = CreateTitleDto;
 type TitleUpdatePayload = UpdateTitleDto;
+
+export interface SyncAllRatingsResult {
+  total: number;
+  synced: number;
+}
 
 const TitleService = {
   createTitle: async (titleData: TitleCreatePayload): Promise<Title> => {
@@ -122,6 +127,26 @@ const TitleService = {
 
   delete: async (id: string): Promise<void> => {
     await api.delete(`/${prefix}/${id}`);
+  },
+
+  syncRatings: async (id: string): Promise<ExternalRating[]> => {
+    const { data } = await api.post<ExternalRating[]>(`/external-ratings/titles/${id}/sync`);
+    return data;
+  },
+
+  syncAllRatings: async (): Promise<SyncAllRatingsResult> => {
+    const { data } = await api.post<SyncAllRatingsResult>(`/external-ratings/sync`);
+    return data;
+  },
+
+  getCast: async (id: string): Promise<CastCredit[]> => {
+    const { data } = await api.get<CastCredit[]>(`/${prefix}/${id}/cast`);
+    return data;
+  },
+
+  setCast: async (id: string, credits: CastCreditInput[]): Promise<CastCredit[]> => {
+    const { data } = await api.put<CastCredit[]>(`/${prefix}/${id}/cast`, { credits });
+    return data;
   },
 };
 

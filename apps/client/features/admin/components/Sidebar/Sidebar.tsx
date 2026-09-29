@@ -2,6 +2,9 @@
 
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DashboardIcon from "@mui/icons-material/Dashboard";
+import GroupsIcon from "@mui/icons-material/Groups";
+import PeopleIcon from "@mui/icons-material/People";
+import SellIcon from "@mui/icons-material/Sell";
 import VideoLibraryIcon from "@mui/icons-material/VideoLibrary";
 import { Box, Drawer, List, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
@@ -22,6 +25,9 @@ const BORDER_GRADIENT = `linear-gradient(180deg, #6e6e6e 0%, rgba(178, 178, 178,
 const menuItems = [
   { text: "Dashboard", href: ADMIN.DASHBOARD, icon: <DashboardIcon /> },
   { text: "Titles", href: ADMIN.TITLES, icon: <VideoLibraryIcon /> },
+  { text: "Users", href: ADMIN.USERS, icon: <PeopleIcon /> },
+  { text: "Actors", href: ADMIN.ARTISTS, icon: <GroupsIcon /> },
+  { text: "Genres", href: ADMIN.GENRES, icon: <SellIcon /> },
 ];
 
 export default function Sidebar() {

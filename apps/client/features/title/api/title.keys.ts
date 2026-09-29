@@ -7,6 +7,7 @@ const titleKeys = {
   details: () => [...titleKeys.all(), "detail"] as const,
   detail: (id: string) => [...titleKeys.details(), id] as const,
   stream: (id: string) => [...titleKeys.detail(id), "stream-url"] as const,
+  cast: (id: string) => [...titleKeys.detail(id), "cast"] as const,
 };
 
 export default titleKeys;

@@ -57,6 +57,11 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit() {
+    if (!this.config.eventsEnabled) {
+      this.logger.log("S3 events disabled — transcodes are scheduled on upload completion instead");
+      return;
+    }
+
     await this.setupInfrastructure();
     this.pollLoopFinished = this.pollLoop().catch((err) =>
       this.logger.error("Critical polling error", err),

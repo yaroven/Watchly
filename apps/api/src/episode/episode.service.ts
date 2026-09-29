@@ -127,7 +127,7 @@ export class EpisodeService {
     const episode = await this.findOne(id);
     if (!episode) throw new BadRequestException(`Episode with id ${id} not found`);
 
-    await this.mediaAssetService.completeUpload(id, uploadId, parts);
+    await this.mediaAssetService.completeUpload(id, uploadId, parts, VideoType.EPISODE);
   }
 
   async abortUpload(id: string, uploadId: string): Promise<void> {
