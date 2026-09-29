@@ -11,17 +11,20 @@ interface UseTitleSubmissionWorkflowProps {
 
 export function useTitleSubmissionWorkflow({ initialData }: UseTitleSubmissionWorkflowProps) {
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadParts, setUploadParts] = useState<{ completed: number; total: number } | null>(null);
   const [actionError, setActionError] = useState<Error | null>(null);
-  const [createdTitleId, setCreatedTitleId] = useState<string | null>(null);
+  const [createdTitle, setCreatedTitle] = useState<Title | null>(null);
 
   const { mutateAsync: createTitle, isPending: isCreating } = useCreateTitleWithUpload({
     onUploadProgress: setUploadProgress,
+    onUploadPartProgress: (completed, total) => setUploadParts({ completed, total }),
   });
   const { mutateAsync: updateTitle, isPending: isUpdating } = useUpdateTitle();
 
   const submit = async (data: TitleFormValues) => {
     setActionError(null);
     setUploadProgress(0);
+    setUploadParts(null);
 
     try {
       if (initialData) {
@@ -30,25 +33,36 @@ export function useTitleSubmissionWorkflow({ initialData }: UseTitleSubmissionWo
         return { createdId: initialData.id };
       }
 
-      const createdTitle = await createTitle(data);
+      const title = await createTitle(data);
 
-      setCreatedTitleId(createdTitle.id);
+      setCreatedTitle(title);
       setUploadProgress(100);
-      return { createdId: createdTitle.id };
+      return { createdId: title.id };
     } catch (error: unknown) {
       const normalizedError = error instanceof Error ? error : new ApiError("Failed to save title");
       setUploadProgress(0);
+      setUploadParts(null);
       setActionError(normalizedError);
       throw normalizedError;
     }
   };
 
+  const resetWorkflow = () => {
+    setCreatedTitle(null);
+    setUploadProgress(0);
+    setUploadParts(null);
+    setActionError(null);
+  };
+
   return {
     submit,
+    resetWorkflow,
     uploadProgress,
+    uploadParts,
     isUploading: uploadProgress > 0 && uploadProgress < 100,
     isPending: isCreating || isUpdating,
     actionError,
-    createdTitleId,
+    createdTitle,
+    createdTitleId: createdTitle?.id ?? null,
   };
 }

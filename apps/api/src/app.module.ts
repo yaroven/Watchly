@@ -3,6 +3,7 @@ import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
 import { JwtModule, JwtModuleOptions } from "@nestjs/jwt";
+import { ScheduleModule } from "@nestjs/schedule";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { LoggerModule } from "nestjs-pino";
 import { AppController } from "./app.controller";
@@ -14,6 +15,7 @@ import loggerConfig, {
   LoggerConfig,
   LoggerConfigName,
 } from "./config/logger.config";
+import omdbConfig from "./config/omdb.config";
 import redisConfig, {
   RedisConfig,
   RedisConfigName,
@@ -21,6 +23,7 @@ import redisConfig, {
 } from "./config/redis.config";
 import s3Config from "./config/s3.config";
 import { EpisodeModule } from "./episode/episode.module";
+import { ExternalRatingsModule } from "./external-ratings/external-ratings.module";
 import { GenreModule } from "./genre/genre.module";
 import { MediaAssetModule } from "./media-asset/media-asset.module";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -70,9 +73,10 @@ import { VideoTranscoderModule } from "./video-transcoder/video-transcoder.modul
     }),
     S3Module,
     ConfigModule.forRoot({
-      load: [s3Config, redisConfig, loggerConfig, jwtConfig],
+      load: [s3Config, redisConfig, loggerConfig, jwtConfig, omdbConfig],
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(),
     VideoTranscoderModule,
     TitleModule,
     PrismaModule,
@@ -84,6 +88,7 @@ import { VideoTranscoderModule } from "./video-transcoder/video-transcoder.modul
     ArtistModule,
     GenreModule,
     MediaAssetModule,
+    ExternalRatingsModule,
   ],
   controllers: [AppController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

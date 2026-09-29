@@ -16,6 +16,7 @@ type UploadMultipartFileParams = {
   abortUpload: (uploadId: string) => Promise<void>;
   uploadPartToUrl: UploadPartToUrl;
   onProgress?: UploadProgressHandler;
+  onPartProgress?: (completedParts: number, totalParts: number) => void;
 };
 
 type UploadPosterFileParams = {
@@ -85,11 +86,13 @@ export const uploadMultipartFile = async ({
   abortUpload,
   uploadPartToUrl,
   onProgress = noopProgress,
+  onPartProgress,
 }: UploadMultipartFileParams): Promise<boolean> => {
   const file = getFirstFile(files);
   if (!file) return false;
 
   const { uploadId, partSize, parts } = await startUpload(file.size);
+  onPartProgress?.(0, parts.length);
   const loadedByPart = new Array(parts.length).fill(0);
   const reportProgress = () => {
     const loaded = loadedByPart.reduce((sum: number, n: number) => sum + n, 0);
@@ -107,6 +110,7 @@ export const uploadMultipartFile = async ({
         reportProgress();
       });
       completedParts.push({ partNumber, eTag });
+      onPartProgress?.(completedParts.length, parts.length);
     }
   } catch (error) {
     await abortUpload(uploadId).catch(() => undefined);

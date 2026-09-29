@@ -73,7 +73,7 @@ describe("MediaAssetService", () => {
       it("always", async () => {
         const parts = [{ partNumber: 1, eTag: "etag-1" }];
 
-        await service.completeUpload("asset-1", "upload-1", parts);
+        await service.completeUpload("asset-1", "upload-1", parts, VideoType.MOVIE);
 
         expect(s3ServiceMock.completeMultipartUpload).toHaveBeenCalledWith(
           "asset-1",
@@ -81,6 +81,17 @@ describe("MediaAssetService", () => {
           "upload-1",
           parts,
         );
+      });
+    });
+
+    describe("should schedule the transcode", () => {
+      it("always", async () => {
+        await service.completeUpload("asset-1", "upload-1", [], VideoType.EPISODE);
+
+        expect(videoTranscoderServiceMock.scheduleTranscodeVideo).toHaveBeenCalledWith({
+          id: "asset-1",
+          type: VideoType.EPISODE,
+        });
       });
     });
   });

@@ -338,6 +338,7 @@ describe("EpisodeService", () => {
           "episode-1",
           "upload-1",
           parts,
+          VideoType.EPISODE,
         );
       });
     });

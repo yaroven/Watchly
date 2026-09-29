@@ -30,19 +30,29 @@ interface InfoRow {
 const CAST_AVATAR_SIZE = 96;
 
 export default function TitleInformation({ title }: TitleInformationProps) {
-  const { cast, meta } = getTitleOverviewFixture(title.id);
+  const { cast } = getTitleOverviewFixture(title.id);
   const isSeries = title.type === TitleType.SERIES;
+  const releaseDate = new Date(title.releaseDate).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 
   const leftRows: InfoRow[] = [
-    { label: "Country", value: meta.country, icon: FlagIcon },
-    { label: "Release Date", value: meta.releaseDate, icon: EventIcon },
-    { label: "Language", value: meta.language, icon: TranslateIcon, hasChevron: true },
-    ...(isSeries ? [{ label: "Network", value: meta.network, icon: PublicIcon }] : []),
+    { label: "Country", value: title.country, icon: FlagIcon },
+    { label: "Release Date", value: releaseDate, icon: EventIcon },
+    { label: "Language", value: title.language, icon: TranslateIcon, hasChevron: true },
+    ...(isSeries ? [{ label: "Network", value: title.network, icon: PublicIcon }] : []),
   ];
   const rightRows: InfoRow[] = [
-    { label: "Director", value: meta.director, icon: MovieCreationIcon },
-    { label: "Runtime", value: meta.runtime, icon: AccessTimeIcon },
-    { label: "Closed Caption", value: meta.closedCaption, icon: ClosedCaptionIcon, hasChevron: true },
+    { label: "Director", value: title.director, icon: MovieCreationIcon },
+    { label: "Runtime", value: `${title.runtime}m`, icon: AccessTimeIcon },
+    {
+      label: "Closed Caption",
+      value: title.closedCaption ? "Available" : "Not Available",
+      icon: ClosedCaptionIcon,
+      hasChevron: true,
+    },
   ];
 
   return (

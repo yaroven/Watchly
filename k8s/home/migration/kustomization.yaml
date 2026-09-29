@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# The shared migration Job with this cluster's namespace and image tag baked
+# in, so applying it needs no flags:
+#
+#   kubectl apply -k k8s/home/migration
+#   kubectl wait --for=condition=complete job/watchly-migrate -n watchly-home --timeout=10m
+namespace: watchly-home
+
+resources:
+  - ../../migration
+
+images:
+  - name: razanka/watchly-migrator
+    newTag: home-1

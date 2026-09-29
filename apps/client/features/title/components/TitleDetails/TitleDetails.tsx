@@ -4,19 +4,29 @@ import EpisodeManager from "@/features/episodes/components/EpisodeManager";
 import VideoPreviewModal from "@/features/player/components/VideoPreviewModal";
 import SeasonManager from "@/features/season/components/SeasonManager";
 import { Season } from "@/features/season/schemas/season";
+import { useSyncTitleRatings } from "@/features/title/api/use-title-mutations";
+import TitleCastManager from "@/features/title/components/TitleCastManager";
 import TitleForm from "@/features/title/components/TitleForm";
 import { Title, TitleType } from "@/features/title/schemas/title";
 import TranscodingStatus from "@/types/transcoding-status";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import ReplayIcon from "@mui/icons-material/Replay";
+import SyncIcon from "@mui/icons-material/Sync";
+import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
+import { keyframes } from "@mui/material/styles";
 import Typography from "@mui/material/Typography";
 import Button from "@shared/ui/Button";
 import GradientCard from "@shared/ui/GradientCard";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import DeleteModal from "./components/DeleteModal";
 import { useTitleDetails } from "./model/useTitleDetails";
+
+const spin = keyframes`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+`;
 
 interface TitleDetailsProps {
   title: Title;
@@ -49,6 +59,13 @@ export default function TitleDetails({ title, initialSeasons }: TitleDetailsProp
     initialSeasons,
   });
 
+  const [ratingsSyncMessage, setRatingsSyncMessage] = useState<string | null>(null);
+  const { mutate: syncRatings, isPending: isSyncingRatings } = useSyncTitleRatings({
+    onSuccess: (ratings) =>
+      setRatingsSyncMessage(ratings.length ? `Synced ${ratings.length} rating(s).` : "No ratings found for this title yet."),
+    onError: (error) => setRatingsSyncMessage(error.message || "Failed to sync ratings."),
+  });
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "28px", padding: { xs: "24px 16px 40px", md: "40px 36px 56px" } }}>
       <Box
@@ -75,11 +92,22 @@ export default function TitleDetails({ title, initialSeasons }: TitleDetailsProp
           currentTranscodingStatus={currentTranscodingStatus}
           isDeleting={isDeleting}
           isTranscoding={isTranscoding}
+          isSyncingRatings={isSyncingRatings}
           onDelete={openDeleteModal}
           onPreview={openPreviewModal}
           onRestartTranscoding={() => restartTranscoding(title.id)}
+          onSyncRatings={() => {
+            setRatingsSyncMessage(null);
+            syncRatings(title.id);
+          }}
         />
       </Box>
+
+      {ratingsSyncMessage && (
+        <Alert severity="info" onClose={() => setRatingsSyncMessage(null)}>
+          {ratingsSyncMessage}
+        </Alert>
+      )}
 
       <Box
         sx={{
@@ -92,6 +120,10 @@ export default function TitleDetails({ title, initialSeasons }: TitleDetailsProp
         <Box sx={{ display: "flex", flexDirection: "column", gap: "24px" }}>
           <SectionCard title="Details" description="Edit the primary metadata for this title.">
             <TitleForm initialData={currentTitle} />
+          </SectionCard>
+
+          <SectionCard title="Cast" description="Assign actors and their characters, in display order.">
+            <TitleCastManager titleId={title.id} />
           </SectionCard>
         </Box>
 
@@ -130,17 +162,21 @@ function TitleDetailsActions({
   currentTranscodingStatus,
   isDeleting,
   isTranscoding,
+  isSyncingRatings,
   onDelete,
   onPreview,
   onRestartTranscoding,
+  onSyncRatings,
 }: {
   title: Title;
   currentTranscodingStatus: TranscodingStatus;
   isDeleting: boolean;
   isTranscoding: boolean;
+  isSyncingRatings: boolean;
   onDelete: () => void;
   onPreview: () => void;
   onRestartTranscoding: () => void;
+  onSyncRatings: () => void;
 }) {
   const hasSecondaryAction =
     (title.type === TitleType.MOVIE && currentTranscodingStatus === TranscodingStatus.FAILED) ||
@@ -159,6 +195,15 @@ function TitleDetailsActions({
           Preview
         </Button>
       )}
+
+      <Button
+        variant="outlined"
+        onClick={onSyncRatings}
+        disabled={isSyncingRatings}
+        startIcon={<SyncIcon sx={{ fontSize: 16, animation: isSyncingRatings ? `${spin} 1s linear infinite` : "none" }} />}
+      >
+        {isSyncingRatings ? "Syncing Ratings..." : "Sync Ratings"}
+      </Button>
 
       {hasSecondaryAction && <Divider orientation="vertical" flexItem sx={{ borderColor: "#333333", my: "4px" }} />}
 

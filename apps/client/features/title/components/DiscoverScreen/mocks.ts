@@ -1,44 +1,8 @@
-import { APP } from "@/shared/lib/routes";
-import type { SpotlightTitle } from "@features/title/components/SpotlightGrid";
-import type { SliderTitle } from "@shared/ui/HeroSlider";
-
 /**
- * TEMPORARY: design-file fixtures for the parts of the discover screen that
- * have no endpoint yet (hero carousel, news rail, spotlight grid). Drop this
- * file once those endpoints land; nothing else imports it.
+ * TEMPORARY: design-file fixture for the discover screen's news rail — there's
+ * no news/announcements backend at all. Drop this file once that lands;
+ * nothing else imports it.
  */
-
-export const heroSlides: SliderTitle[] = [
-  {
-    id: "mock-1",
-    title: "Game of Thrones",
-    description: "It's the story of the intricate and bloody battles of several noble families in the fictional land of Westeros.",
-    score: "9.2",
-    backdropUrl: "/banner.png",
-    watchLink: APP.DISCOVER,
-    trailerLink: APP.DISCOVER,
-    genres: ["Action", "Adventure", "Drama"],
-  },
-  {
-    id: "mock-2",
-    title: "House of the Dragon",
-    description: "An internal succession war within House Targaryen at the height of its power, 172 years before the birth of Daenerys.",
-    score: "8.4",
-    backdropUrl: "https://picsum.photos/id/1015/1600/500",
-    watchLink: APP.DISCOVER,
-    genres: ["Fantasy", "Drama"],
-  },
-  {
-    id: "mock-3",
-    title: "Peaky Blinders",
-    description: "A gangster family epic set in 1900s England, centring on a gang who sew razor blades in the peaks of their caps.",
-    score: "8.8",
-    backdropUrl: "https://picsum.photos/id/1039/1600/500",
-    watchLink: APP.DISCOVER,
-    trailerLink: APP.DISCOVER,
-    genres: ["Crime", "Drama"],
-  },
-];
 
 export const news = [
   {
@@ -84,29 +48,3 @@ export const news = [
     createdAt: new Date("2026-06-28"),
   },
 ];
-
-export const spotlight: Record<"feature" | "secondary" | "tall", SpotlightTitle> = {
-  feature: {
-    id: "shogun",
-    name: "Shogun",
-    tagline: "Uncovering Secrets, Shifting Powers",
-    description:
-      "When a mysterious European ship sinks near a nearby fishing village, Lord Yoshi Toranaga uncovers secrets that could tip the balance of power and devastate his enemies. He must act quickly to protect his realm from the looming threat.",
-    imageUrl: "/spotlight/banner_shogun.png",
-    watchLink: APP.DISCOVER,
-  },
-  secondary: {
-    id: "sympathizer",
-    name: "The Sympathizer",
-    genres: ["Historical", "Drama", "Thriller"],
-    imageUrl: "/spotlight/banner_the_sympathizer.png",
-    watchLink: APP.DISCOVER,
-  },
-  tall: {
-    id: "small-light",
-    name: "A Small Light",
-    tagline: "Risk Everything",
-    imageUrl: "/spotlight/banner_a_small_light.png",
-    watchLink: APP.DISCOVER,
-  },
-};

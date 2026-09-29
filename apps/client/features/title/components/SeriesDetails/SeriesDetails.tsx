@@ -3,7 +3,6 @@ import type { Season } from "@features/season/schemas/season";
 import TitleInformation from "@features/title/components/TitleInformation";
 import TitleMoreLikeThis from "@features/title/components/TitleMoreLikeThis";
 import TitleOverview from "@features/title/components/TitleOverview";
-import { moreLikeThis } from "@features/title/components/TitleOverview/mocks";
 import TitleReviews from "@features/title/components/TitleReviews";
 import TitleTabs from "@features/title/components/TitleTabs";
 import type { Title } from "@features/title/schemas/title";
@@ -44,7 +43,7 @@ export default function SeriesDetails({ title, seasons, episodes, currentSeasonI
       </Box>
 
       <Box id="more-like-this">
-        <TitleMoreLikeThis items={moreLikeThis} />
+        <TitleMoreLikeThis title={title} />
       </Box>
 
       <Box id="reviews">

@@ -1,0 +1,136 @@
+# Carries a merged PR from main into a release branch.
+#
+# The release model is: main never carries release tags. Every minor line
+# gets a release/<line> branch, and v<line>.<patch> tags live only there. A
+# fix is therefore written once against main and brought over here, rather
+# than written twice.
+#
+# The cherry-pick lands straight on the release branch — no intermediate PR.
+# Anything that does not apply cleanly fails the run and pushes nothing, so
+# the release line is only ever moved by a pick that applied on its own.
+#
+# A protected release branch will reject this push unless the identity behind
+# the token is allowed to bypass the protection; set BACKPORT_TOKEN to a PAT
+# that is, if that is how the branch is guarded.
+name: Backport
+run-name: "Backport #${{ inputs.pr }} into ${{ inputs.target }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "Number of the merged PR on main to bring over"
+        type: string
+        required: true
+      target:
+        description: "Release branch to backport into (release/2026.1)"
+        type: string
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  # Two picks racing onto the same release branch would have one of them
+  # rejected as non-fast-forward, halfway through.
+  group: backport-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  backport:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the full history
+        uses: actions/checkout@v4
+        with:
+          # cherry-pick needs both the commit being picked and the target
+          # branch, neither of which a shallow clone has.
+          fetch-depth: 0
+          token: ${{ secrets.BACKPORT_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Validate inputs
+        env:
+          TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+          case "$TARGET" in
+            release/*) ;;
+            *) echo "Target must be a release/* branch, got '$TARGET'" >&2; exit 1 ;;
+          esac
+          git ls-remote --exit-code --heads origin "$TARGET" >/dev/null \
+            || { echo "Branch '$TARGET' does not exist on origin" >&2; exit 1; }
+
+      - name: Read the source PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ inputs.pr }}
+        run: |
+          set -euo pipefail
+          read -r merged sha title <<<"$(gh api "repos/${{ github.repository }}/pulls/$PR" \
+            --jq '[.merged, .merge_commit_sha, .title] | @tsv')"
+          if [ "$merged" != "true" ]; then
+            echo "PR #$PR is not merged — there is nothing to backport yet." >&2
+            exit 1
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "title=$title" >> "$GITHUB_OUTPUT"
+
+      - name: Cherry-pick onto the release branch
+        id: pick
+        env:
+          TARGET: ${{ inputs.target }}
+          SHA: ${{ steps.pr.outputs.sha }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git switch --detach "origin/$TARGET"
+
+          # A merge-commit SHA needs -m 1 to say which side is the mainline; a
+          # squash or rebase merge leaves an ordinary commit that must not
+          # have it. Count the parents and pick accordingly.
+          fields=$(git rev-list --parents -n 1 "$SHA" | wc -w)
+          if [ "$fields" -ge 3 ]; then
+            git cherry-pick -m 1 "$SHA"
+          else
+            git cherry-pick "$SHA"
+          fi
+
+          echo "picked=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Push it to the release branch
+        env:
+          TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+          git push origin "HEAD:refs/heads/$TARGET"
+
+      - name: Report what landed
+        env:
+          TARGET: ${{ inputs.target }}
+          PR: ${{ inputs.pr }}
+        run: |
+          {
+            echo "Backported #$PR onto \`$TARGET\` as \`${{ steps.pick.outputs.picked }}\`."
+            echo ""
+            echo "This is not a release on its own — tag the line to publish it:"
+            echo '```'
+            echo "git fetch origin && git tag v<line>.<next-patch> origin/$TARGET"
+            echo "git push origin v<line>.<next-patch>"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Explain a conflict instead of guessing
+        if: failure() && steps.pick.outcome == 'failure'
+        env:
+          TARGET: ${{ inputs.target }}
+          SHA: ${{ steps.pr.outputs.sha }}
+        run: |
+          echo "The cherry-pick did not apply cleanly, so nothing was pushed." >&2
+          echo "Finish it by hand:" >&2
+          echo "  git fetch origin && git switch --detach origin/${TARGET}" >&2
+          echo "  git cherry-pick ${SHA}   # resolve, then --continue" >&2
+          echo "  git push origin HEAD:refs/heads/${TARGET}" >&2
