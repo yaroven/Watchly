@@ -1,6 +1,6 @@
 "use client";
 
-import { type Title } from "@/features/title/schemas/title";
+import { ExternalRatingSource, type Title } from "@/features/title/schemas/title";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import { Favorite as FavoriteIcon, Star as StarIcon } from "@mui/icons-material";
 import Box from "@mui/material/Box";
@@ -12,13 +12,12 @@ import { useState } from "react";
 interface TitleProps extends Omit<Title, "seasons"> {
   onClick: () => void;
   isFavorite?: boolean;
-  rating?: number;
-  genres?: string[];
 }
 
-export default function TitleCard({ name, posterUrl, type, rating, genres, onClick, isFavorite = false }: TitleProps) {
+export default function TitleCard({ name, posterUrl, type, genres, externalRatings, onClick, isFavorite = false }: TitleProps) {
   const posterSrc = getOptimizedImageSrc(posterUrl);
-  const subtitle = genres?.length ? genres.join(", ") : type === "MOVIE" ? "Movie" : "Series";
+  const subtitle = genres.length ? genres.map((genre) => genre.name).join(", ") : type === "MOVIE" ? "Movie" : "Series";
+  const rating = externalRatings.find((r) => r.source === ExternalRatingSource.IMDB)?.rating;
 
   const [favorite, setFavorite] = useState(isFavorite);
 

@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Genre } from "@prisma/client";
 
 export class GenreResponseDto {
@@ -14,10 +14,14 @@ export class GenreResponseDto {
   @ApiProperty()
   name: string;
 
-  constructor(genre: Genre) {
+  @ApiPropertyOptional({ description: "Only present when the query counted it" })
+  titleCount?: number;
+
+  constructor(genre: Genre & { _count?: { titles: number } }) {
     this.id = genre.id;
     this.createdAt = genre.createdAt;
     this.updatedAt = genre.updatedAt;
     this.name = genre.name;
+    this.titleCount = genre._count?.titles;
   }
 }

@@ -3,6 +3,17 @@ WORKDIR /app
 RUN npm install -g pnpm@10.30.0
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Dev target for the transcoder worker: same live-source/pnpm-install workflow
+# as the api service's `base` target, plus ffmpeg (which the worker actually
+# needs to transcode). `worker-runner` below is a *production* image (baked
+# deploy of dist/ + prod-only node_modules, no pnpm/nest-cli) and can't run
+# `nest start --watch` — this stage exists so docker-compose's dev command has
+# somewhere with both pnpm and ffmpeg to run against.
+# ─────────────────────────────────────────────────────────────────────────────
+FROM base AS worker-base
+RUN apk add --no-cache ffmpeg
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Dependencies. Manifests only, so this layer survives every change that does
 # not touch a dependency.
 # ─────────────────────────────────────────────────────────────────────────────

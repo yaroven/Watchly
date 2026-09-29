@@ -32,9 +32,30 @@ async function refreshAccessToken(): Promise<string> {
   return data.accessToken;
 }
 
-// Shared across all interceptor invocations so concurrent 401s don't each fire their own
-// /auth/refresh — they await the same in-flight request and reuse its result.
+// Shared across all callers so concurrent 401s (or a 401 racing the app-boot session
+// restore below) don't each fire their own /auth/refresh — they await the same
+// in-flight request and reuse its result.
 let refreshPromise: Promise<string> | null = null;
+
+function getOrRefreshAccessToken(): Promise<string> {
+  refreshPromise ??= refreshAccessToken().finally(() => {
+    refreshPromise = null;
+  });
+  return refreshPromise;
+}
+
+/**
+ * Restores the session from the httpOnly refresh cookie on app boot. The auth store starts
+ * empty on every hard navigation, so without this, role-gated views never see a role and
+ * never render — see AuthorizeView.
+ */
+export async function restoreSession(): Promise<void> {
+  try {
+    await getOrRefreshAccessToken();
+  } catch {
+    // No valid refresh cookie (logged out / expired) — leave the store empty.
+  }
+}
 
 api.interceptors.response.use(
   (response) => response,
@@ -52,11 +73,7 @@ api.interceptors.response.use(
     originalRequest._retry = true;
 
     try {
-      refreshPromise ??= refreshAccessToken().finally(() => {
-        refreshPromise = null;
-      });
-
-      const accessToken = await refreshPromise;
+      const accessToken = await getOrRefreshAccessToken();
       originalRequest.headers.Authorization = `Bearer ${accessToken}`;
       return api(originalRequest);
     } catch (refreshError) {

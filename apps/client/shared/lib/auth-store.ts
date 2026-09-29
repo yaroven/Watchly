@@ -1,14 +1,24 @@
 import Role from "@/types/role";
 import { createStore, useStore } from "zustand";
 
+/**
+ * "idle"/"loading" cover the brief window on app boot where the httpOnly refresh cookie is
+ * being exchanged for a session (see restoreSession in shared/api/axios.ts) — role-gated
+ * views must wait for "resolved" before deciding anything, since the store starts empty on
+ * every hard navigation regardless of whether the user is actually logged in.
+ */
+export type AuthStatus = "idle" | "loading" | "resolved";
+
 export interface AuthStoreState {
   token: string | null;
   role: Role | null;
   userId: string | null;
+  status: AuthStatus;
   setSession: (session: { token: string; role: Role; userId: string }) => void;
   setToken: (token: string | null) => void;
   setRole: (role: Role | null) => void;
   setUserId: (userId: string | null) => void;
+  setStatus: (status: AuthStatus) => void;
   clear: () => void;
 }
 
@@ -18,12 +28,15 @@ export const createAuthStore = () =>
     token: null,
     role: null,
     userId: null,
+    status: "idle",
 
     // Actions
     setSession: ({ token, role, userId }) => set({ token, role, userId }),
     setToken: (token) => set({ token }),
     setRole: (role) => set({ role }),
     setUserId: (userId) => set({ userId }),
+    setStatus: (status) => set({ status }),
+    // Session status (bootstrapped or not) survives logout — only the identity resets.
     clear: () => set({ token: null, role: null, userId: null }),
   }));
 

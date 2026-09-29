@@ -2,7 +2,7 @@
 
 import useGenres from "@/features/genre/api/use-genres";
 import useTitles from "@/features/title/api/use-titles";
-import { Title, TitleType } from "@/features/title/schemas/title";
+import { ExternalRatingSource, Title, TitleType } from "@/features/title/schemas/title";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import { APP } from "@/shared/lib/routes";
 import ExpandMore from "@mui/icons-material/ExpandMore";
@@ -20,7 +20,6 @@ import CustomIcon from "@shared/ui/CustomIcon";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { getTitleOverviewFixture } from "../TitleOverview/mocks";
 
 const FETCH_LIMIT = 60;
 const PAGE_SIZE = 9;
@@ -286,7 +285,7 @@ function ResultRows({ items, onOpen }: { items: Title[]; onOpen: (id: string) =>
 
 function ResultItem({ title, onClick }: { title: Title; onClick: () => void }) {
   const year = title.createdAt && !Number.isNaN(new Date(title.createdAt).getTime()) ? new Date(title.createdAt).getFullYear() : undefined;
-  const { scores } = getTitleOverviewFixture(title.id);
+  const imdbRating = title.externalRatings.find((r) => r.source === ExternalRatingSource.IMDB)?.rating;
 
   return (
     <Box
@@ -324,10 +323,12 @@ function ResultItem({ title, onClick }: { title: Title; onClick: () => void }) {
           {title.name}
         </Typography>
         {year && <Typography sx={{ mt: "4px", fontSize: "14px", color: "text.secondary" }}>{year}</Typography>}
-        <Box sx={{ display: "flex", alignItems: "center", gap: "6px", mt: "10px" }}>
-          <CustomIcon icon={IMDB} sx={{ fontSize: "22px" }} />
-          <Typography sx={{ fontSize: "14px", fontWeight: 700, color: "#ffffff" }}>{scores.imdb}</Typography>
-        </Box>
+        {imdbRating !== undefined && (
+          <Box sx={{ display: "flex", alignItems: "center", gap: "6px", mt: "10px" }}>
+            <CustomIcon icon={IMDB} sx={{ fontSize: "22px" }} />
+            <Typography sx={{ fontSize: "14px", fontWeight: 700, color: "#ffffff" }}>{imdbRating.toFixed(1)}</Typography>
+          </Box>
+        )}
       </Box>
     </Box>
   );

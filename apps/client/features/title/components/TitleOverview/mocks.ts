@@ -1,30 +1,14 @@
-import { AgeRating, Title, TitleType } from "@/features/title/schemas/title";
-import TranscodingStatus from "@/types/transcoding-status";
-
 /**
  * TEMPORARY: design-file fixtures for the parts of the title-detail (Film)
- * page that have no endpoint yet (cast, scores, info-table metadata, reviews,
- * "more like this"). Same convention as DiscoverScreen/mocks.ts. Drop this
- * file once those endpoints land — nothing outside TitleOverview/TitleInformation/
- * TitleReviews imports it.
+ * page that have no endpoint yet (cast, Watchly's own score, reviews, stream
+ * stats). Same convention as DiscoverScreen/mocks.ts. Drop this file once
+ * those endpoints land — nothing outside TitleOverview/TitleInformation/
+ * TitleReviews/MovieStream/SeriesStream/StreamFilmInfo/StreamPhotos imports it.
  */
 
 export interface TitleScores {
-  imdb: number;
-  rottenTomatoes: number;
-  metacritic: number;
+  /** Watchly's own score — no endpoint yet. */
   tmovie: number;
-}
-
-export interface TitleMeta {
-  ageRating: string;
-  runtime: string;
-  country: string;
-  releaseDate: string;
-  language: string;
-  network?: string;
-  director: string;
-  closedCaption: string;
 }
 
 export interface CastMember {
@@ -54,27 +38,14 @@ export interface StreamStats {
 }
 
 export interface TitleOverviewFixture {
-  genres: string[];
   scores: TitleScores;
-  meta: TitleMeta;
   cast: CastMember[];
   reviews: ReviewComment[];
   stream: StreamStats;
 }
 
 const DEFAULT_FIXTURE: TitleOverviewFixture = {
-  genres: ["Action", "Adventure", "Drama"],
-  scores: { imdb: 8.4, rottenTomatoes: 92, metacritic: 68, tmovie: 8.7 },
-  meta: {
-    ageRating: "TV-MA",
-    runtime: "50m",
-    country: "United States",
-    releaseDate: "August 21, 2022",
-    language: "English",
-    network: "HBO",
-    director: "Ryan Condal",
-    closedCaption: "English",
-  },
+  scores: { tmovie: 8.7 },
   cast: [
     { name: "Olivia Cooke", avatarUrl: "https://picsum.photos/id/64/120/120" },
     { name: "Matt Smith", avatarUrl: "https://picsum.photos/id/65/120/120" },
@@ -179,80 +150,6 @@ export function getTitleOverviewFixture(titleId: string): TitleOverviewFixture {
   if (!override) return DEFAULT_FIXTURE;
   return { ...DEFAULT_FIXTURE, ...override };
 }
-
-const now = new Date("2026-01-01T00:00:00Z");
-
-function mockTitle(id: string, name: string, description: string, posterId: number): Title {
-  return {
-    id,
-    createdAt: now,
-    updatedAt: now,
-    name,
-    description,
-    type: TitleType.SERIES,
-    posterUrl: `https://picsum.photos/id/${posterId}/400/600`,
-    ageRating: AgeRating.AGE_16,
-    country: "US",
-    releaseDate: "2026-01-01",
-    language: "en",
-    trailerUrl: "https://example.com/trailer.mp4",
-    seasons: [],
-    transcodingStatus: TranscodingStatus.COMPLETED,
-  };
-}
-
-export const moreLikeThis: (Title & { rating: number; genres: string[] })[] = [
-  {
-    ...mockTitle(
-      "mock-lotr-rings-of-power",
-      "The Lord of the Rings ...",
-      "An epic drama set thousands of years before the events of J.R.R. Tolkien's The Hobbit and The Lord of the Rings, following a cast of familiar and new characters as they confront the long-feared re-emergence of evil.",
-      1005,
-    ),
-    rating: 7.0,
-    genres: ["Action", "Drama", "Adventure"],
-  },
-  {
-    ...mockTitle(
-      "mock-those-about-to-die",
-      "Those About to Die",
-      "This series explores another side of Rome, the dirty business of entertaining the masses by giving them what the mob craves more, blood and spectacle.",
-      1011,
-    ),
-    rating: 6.6,
-    genres: ["Action", "Drama", "Adventure"],
-  },
-  {
-    ...mockTitle(
-      "mock-barbarians",
-      "Barbarians",
-      "The conflicting loyalty of a Roman officer, torn between the powerful empire that nurtured him and his tribal people, led to an epic historical conflict.",
-      1025,
-    ),
-    rating: 7.2,
-    genres: ["Action", "Drama", "Adventure"],
-  },
-  {
-    ...mockTitle(
-      "mock-rome",
-      "Rome",
-      "A simple account of the lives of both famous and ordinary Romans that takes place during the final days of the Roman Republic and...",
-      1035,
-    ),
-    rating: 8.7,
-    genres: ["Action", "Drama", "Historical"],
-  },
-  {
-    ...mockTitle(
-      "mock-white-queen",
-      "The White Queen",
-      "This series depicts three different women, all in the 15th century, who are eager to seize the throne in England.",
-      1041,
-    ),
-    rating: 7.7,
-    genres: ["Action", "Adventure", "Romantic"],
-  },
-];
 
 const EPISODE_THUMBNAILS: Record<string, string> = {};
 

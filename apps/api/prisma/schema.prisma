@@ -30,6 +30,12 @@ enum TranscodingStatus {
   FAILED
 }
 
+enum ExternalRatingSource {
+  IMDB
+  METACRITIC
+  ROTTEN_TOMATOES
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -56,6 +62,8 @@ model Title {
   director          String
   closedCaption     Boolean
   transcodingStatus TranscodingStatus @default(PENDING)
+  externalRatings   ExternalRatings[]
+  externalIds       TitleExternalId[]
 
   videoTranscodingProgress VideoTranscodingProgress?
 
@@ -69,6 +77,34 @@ model Title {
   // recreate them. Run that migration explicitly on any new environment.
 
   @@index([type, transcodingStatus])
+}
+
+model ExternalRatings {
+  id         String               @id @default(uuid())
+  titleId    String
+  title      Title                @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  source     ExternalRatingSource
+  rating     Float
+  // Only IMDB exposes a vote count through OMDb; Rotten Tomatoes and
+  // Metacritic ratings are stored with this left null.
+  votesCount Int?
+  updatedAt  DateTime             @updatedAt
+
+  @@unique([titleId, source])
+}
+
+// Generic per-aggregator external id lookup, kept off Title so each new rating
+// source (Metacritic, Rotten Tomatoes, ...) adds a row here instead of another
+// nullable *_id column on Title.
+model TitleExternalId {
+  id         String               @id @default(uuid())
+  titleId    String
+  title      Title                @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  source     ExternalRatingSource
+  externalId String
+
+  @@unique([titleId, source])
+  @@unique([source, externalId])
 }
 
 model Genre {

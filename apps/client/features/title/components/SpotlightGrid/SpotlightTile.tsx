@@ -6,7 +6,7 @@ import { Play } from "@shared/assets/icons";
 import Button from "@shared/ui/Button";
 import CustomIcon from "@shared/ui/CustomIcon";
 import GenreList from "@shared/ui/GenreList";
-import Image from "next/image";
+import Image, { type StaticImageData } from "next/image";
 
 export interface SpotlightTitle {
   id: string;
@@ -14,7 +14,7 @@ export interface SpotlightTitle {
   tagline?: string;
   description?: string;
   genres?: string[];
-  imageUrl: string;
+  imageUrl: string | StaticImageData;
   watchLink: string;
 }
 

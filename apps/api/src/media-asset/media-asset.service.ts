@@ -19,8 +19,21 @@ export class MediaAssetService {
     return this.s3Service.startMultipartUpload(id, BucketType.RAW, fileSize);
   }
 
-  async completeUpload(id: string, uploadId: string, parts: MultipartUploadPart[]): Promise<void> {
+  /**
+   * Schedules the transcode itself rather than waiting for the S3 event to come
+   * back through SQS. The queue job id is derived from (type, id), so when the
+   * event path is also live it dedupes into this same job instead of running a
+   * second one — which is what lets a deployment without S3 notifications
+   * (MinIO, say) still transcode.
+   */
+  async completeUpload(
+    id: string,
+    uploadId: string,
+    parts: MultipartUploadPart[],
+    type: VideoType,
+  ): Promise<void> {
     await this.s3Service.completeMultipartUpload(id, BucketType.RAW, uploadId, parts);
+    await this.scheduleTranscode(id, type);
   }
 
   async abortUpload(id: string, uploadId: string): Promise<void> {

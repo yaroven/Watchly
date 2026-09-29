@@ -1,0 +1,71 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: watchly-home
+
+resources:
+  - namespace.yaml
+  - ../base
+  - postgres.yaml
+  - redis.yaml
+  - minio.yaml
+  - ingress.yaml
+
+# Built separately per environment — NEXT_PUBLIC_BACKEND_API_URL and friends
+# are compiled into the browser bundle, so the prod image cannot serve a LAN
+# hostname. Build one with the home URLs and put its tag here.
+images:
+  - name: razanka/watchly-client
+    newTag: home-1
+  # The tags base pins are the ones built for DigitalOcean. This cluster runs
+  # its own build — it has to, since the S3_EVENTS_ENABLED switch the overlay
+  # relies on postdates them.
+  - name: razanka/watchly-api
+    newTag: home-1
+  - name: razanka/watchly-transcoder-worker
+    newTag: home-1
+
+configMapGenerator:
+  - name: watchly-config
+    behavior: merge
+    literals:
+      # In-cluster Redis, plaintext on the default port — the managed-Redis
+      # values in base are wrong here in both respects.
+      - REDIS_PORT=6379
+      - REDIS_TLS=false
+
+      # MinIO: the api reaches it by service name, the browser through the
+      # ingress. s3.service.ts signs with the internal endpoint and rewrites
+      # only the host afterwards, which stays valid because MinIO does not
+      # check the Host header the way SigV4 against AWS does.
+      - S3_ENDPOINT_INTERNAL=http://minio:9000
+      - S3_ENDPOINT_PUBLIC=http://s3.watchly.192-168-31-100.sslip.io
+      - S3_REGION=us-east-1
+      - S3_RAW_BUCKET_NAME=raw
+      - S3_PROCESSED_BUCKET_NAME=content
+
+      # MinIO rejects an SQS queue ARN on PutBucketNotificationConfiguration,
+      # so the event poller stands down and completeUpload schedules the
+      # transcode directly. Nothing else replaces SQS — there is no queue
+      # service in this overlay.
+      - S3_EVENTS_ENABLED=false
+
+      - CORS_ALLOWED_ORIGINS=http://watchly.192-168-31-100.sslip.io
+
+  - name: watchly-client-config
+    behavior: merge
+    literals:
+      # Read at runtime by app/api/image-proxy/route.ts: it fetches posters
+      # over the internal origin and rewrites them to the public one.
+      - S3_IMAGE_PUBLIC_ORIGIN=http://s3.watchly.192-168-31-100.sslip.io
+      - S3_IMAGE_INTERNAL_ORIGIN=http://minio:9000
+
+secretGenerator:
+  # Same reason as the prod overlay: kustomize will not read a file above its
+  # own root, so each overlay carries its own copy.
+  - name: watchly-secrets
+    behavior: replace
+    envs:
+      - .env.secrets
+    options:
+      disableNameSuffixHash: true

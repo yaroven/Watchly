@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { Genre, Prisma, Title, TitleType } from "@prisma/client";
+import { ExternalRatings, Genre, Prisma, Title, TitleType } from "@prisma/client";
 import { FilterRule } from "../common/pagination/filter-rule.enum";
 import { paginate } from "../common/pagination/paginate.util";
 import { Filter, Sorting } from "../common/pagination/pagination.types";
@@ -36,9 +36,10 @@ export class TitleService {
       const title = await this.prisma.title.create({
         data: {
           ...rest,
+          releaseDate: new Date(rest.releaseDate),
           genres: genreIds?.length ? { connect: genreIds.map((id) => ({ id })) } : undefined,
         },
-        include: { genres: true },
+        include: { genres: true, externalRatings: true },
       });
       return new TitleResponseDto(title);
     } catch (error) {
@@ -68,19 +69,24 @@ export class TitleService {
       createdAt: "desc",
     }) as Prisma.TitleOrderByWithRelationInput;
 
-    const { items, totalCount } = await paginate<Title & { genres: Genre[] }>(this.prisma.title, {
+    const { items, totalCount } = await paginate<
+      Title & { genres: Genre[]; externalRatings: ExternalRatings[] }
+    >(this.prisma.title, {
       where,
       orderBy,
       page,
       limit,
-      extra: { include: { genres: true } },
+      extra: { include: { genres: true, externalRatings: true } },
     });
 
     return { items: items.map((title) => new TitleResponseDto(title)), totalCount };
   }
 
   async findOne(id: string): Promise<TitleResponseDto | null> {
-    const title = await this.prisma.title.findUnique({ where: { id }, include: { genres: true } });
+    const title = await this.prisma.title.findUnique({
+      where: { id },
+      include: { genres: true, externalRatings: true },
+    });
     return title ? new TitleResponseDto(title) : null;
   }
 
@@ -100,12 +106,15 @@ export class TitleService {
         where: { id },
         data: {
           ...rest,
+          // A partial update may omit it; `new Date(undefined)` is an Invalid
+          // Date, which Prisma rejects.
+          ...(rest.releaseDate !== undefined ? { releaseDate: new Date(rest.releaseDate) } : {}),
           genres:
             genreIds !== undefined
               ? { set: genreIds.map((genreId) => ({ id: genreId })) }
               : undefined,
         },
-        include: { genres: true },
+        include: { genres: true, externalRatings: true },
       });
       return new TitleResponseDto(updated);
     } catch (error) {
@@ -133,7 +142,7 @@ export class TitleService {
     if (!movie) {
       throw new BadRequestException(`Movie with id ${id} not found`);
     }
-    await this.mediaAssetService.completeUpload(id, uploadId, parts);
+    await this.mediaAssetService.completeUpload(id, uploadId, parts, VideoType.MOVIE);
   }
 
   async abortMovieUpload(id: string, uploadId: string): Promise<void> {

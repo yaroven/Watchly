@@ -33,6 +33,7 @@ const s3ConfigMock: S3Config = {
   secretAccessKey: "test-secret",
   rawBucketName: "watchly-raw",
   processedBucketName: "watchly-processed",
+  eventsEnabled: true,
   queueName: "watchly-s3-events",
 };
 
