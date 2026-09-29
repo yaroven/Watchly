@@ -1,5 +1,10 @@
 # Builds and pushes the four runtime images to Docker Hub.
 #
+# Release model: main carries no release tags. Each minor line gets a
+# release/<line> branch cut from main, and every v<line>.<patch> tag lives on
+# that branch — so main builds are for the dev cluster and tags are what prod
+# runs. Fixes are written against main and carried over by backport.yml.
+#
 # The api, worker and migrator images are environment-independent, so one
 # build serves every cluster. The client is not: NEXT_PUBLIC_* values are
 # compiled into the browser bundle, so its image is built per environment and
