@@ -14,6 +14,7 @@ import {
   PutBucketCorsCommand,
   PutObjectCommand,
   S3Client,
+  S3ServiceException,
   UploadPartCommand,
 } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
@@ -105,22 +106,36 @@ export class S3Service implements OnModuleInit {
    * flow silently gets `undefined` ETags and fails at the complete step.
    */
   private async configureBucketCors(bucketName: string) {
-    await this.s3Client.send(
-      new PutBucketCorsCommand({
-        Bucket: bucketName,
-        CORSConfiguration: {
-          CORSRules: [
-            {
-              AllowedMethods: ["PUT", "GET", "HEAD"],
-              AllowedOrigins: ["*"],
-              AllowedHeaders: ["*"],
-              ExposeHeaders: ["ETag"],
-              MaxAgeSeconds: 3600,
-            },
-          ],
-        },
-      }),
-    );
+    try {
+      await this.s3Client.send(
+        new PutBucketCorsCommand({
+          Bucket: bucketName,
+          CORSConfiguration: {
+            CORSRules: [
+              {
+                AllowedMethods: ["PUT", "GET", "HEAD"],
+                AllowedOrigins: ["*"],
+                AllowedHeaders: ["*"],
+                ExposeHeaders: ["ETag"],
+                MaxAgeSeconds: 3600,
+              },
+            ],
+          },
+        }),
+      );
+    } catch (error) {
+      // MinIO answers 501 here: it has no per-bucket CORS API and instead
+      // allows every origin by default, which is the policy this would have
+      // set anyway. Boot would otherwise die on a call that has nothing to
+      // do with serving the app. Any other failure is still fatal.
+      if (error instanceof S3ServiceException && error.name === "NotImplemented") {
+        this.logger.warn(
+          `Bucket "${bucketName}": the storage backend has no CORS API, leaving its own policy in place.`,
+        );
+        return;
+      }
+      throw error;
+    }
   }
   private async createBucket(bucketName: string) {
     try {

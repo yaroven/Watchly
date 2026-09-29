@@ -1,0 +1,25 @@
+# base pins do-block-storage on the two observability volumes, which is a
+# DigitalOcean class and does not exist here. k3s ships local-path as the
+# default, and these are single-node volumes anyway.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-data
+spec:
+  storageClassName: local-path
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: loki
+spec:
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 10Gi
