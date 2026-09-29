@@ -1,0 +1,180 @@
+# Builds and pushes the four runtime images to Docker Hub.
+#
+# The api, worker and migrator images are environment-independent, so one
+# build serves every cluster. The client is not: NEXT_PUBLIC_* values are
+# compiled into the browser bundle, so its image is built per environment and
+# its tag carries that environment's name.
+#
+# Runners are amd64, which is also what the clusters run — that is the whole
+# reason this exists, since a laptop on Apple silicon can only produce amd64
+# images through emulation.
+name: Release Images
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+      - "release/**"
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      client_env:
+        description: "Which environment's URLs to bake into the client image"
+        type: choice
+        options: [home, dev, prod]
+        default: home
+      version:
+        description: "Image tag to publish (defaults to the branch's own scheme)"
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # A tag build is a release artifact — never cancel one halfway.
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      moving_tag: ${{ steps.resolve.outputs.moving_tag }}
+      client_env: ${{ steps.resolve.outputs.client_env }}
+    steps:
+      - name: Resolve version and target environment
+        id: resolve
+        run: |
+          set -euo pipefail
+          ref='${{ github.ref }}'
+          sha="$(echo '${{ github.sha }}' | cut -c1-7)"
+          input_version='${{ inputs.version }}'
+          input_env='${{ inputs.client_env }}'
+
+          # moving_tag is the alias that follows the newest build on this line
+          # (2026.1 -> the latest 2026.1.x). version is immutable and is what
+          # a manifest should pin.
+          case "$ref" in
+            refs/tags/v*)
+              version="${ref#refs/tags/v}"
+              moving_tag="${version%.*}"
+              client_env=prod
+              ;;
+            refs/heads/release/*)
+              line="${ref#refs/heads/release/}"
+              version="${line}-${sha}"
+              moving_tag="$line"
+              client_env=prod
+              ;;
+            refs/heads/main)
+              version="main-${sha}"
+              moving_tag="main"
+              client_env=dev
+              ;;
+            refs/heads/dev)
+              version="dev-${sha}"
+              moving_tag="dev"
+              client_env=dev
+              ;;
+            *)
+              version="${sha}"
+              moving_tag=""
+              client_env=home
+              ;;
+          esac
+
+          [ -n "$input_version" ] && version="$input_version" && moving_tag=""
+          [ -n "$input_env" ] && client_env="$input_env"
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "moving_tag=$moving_tag" >> "$GITHUB_OUTPUT"
+          echo "client_env=$client_env" >> "$GITHUB_OUTPUT"
+          echo "Publishing $version (alias '${moving_tag:-none}'), client built for $client_env"
+
+  services:
+    needs: meta
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: watchly-api
+            target: runner
+          - image: watchly-transcoder-worker
+            target: worker-runner
+          - image: watchly-migrator
+            target: migrator
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.image }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          target: ${{ matrix.target }}
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}:${{ needs.meta.outputs.version }}
+            ${{ needs.meta.outputs.moving_tag && format('{0}/{1}:{2}', secrets.DOCKERHUB_USERNAME, matrix.image, needs.meta.outputs.moving_tag) || '' }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  client:
+    needs: meta
+    runs-on: ubuntu-latest
+    # The URLs live as variables on a GitHub Environment of the same name, so
+    # adding a cluster means adding an environment, not editing this file.
+    environment: ${{ needs.meta.outputs.client_env }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fail early if the environment has no URLs
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -z "${{ vars.NEXT_PUBLIC_BACKEND_API_URL }}" ] && missing="$missing NEXT_PUBLIC_BACKEND_API_URL"
+          [ -z "${{ vars.NEXT_PUBLIC_APP_URL }}" ] && missing="$missing NEXT_PUBLIC_APP_URL"
+          if [ -n "$missing" ]; then
+            echo "Environment '${{ needs.meta.outputs.client_env }}' is missing:$missing" >&2
+            echo "Set them as Variables on that environment — baking empty values produces a client that calls the wrong host." >&2
+            exit 1
+          fi
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push client for ${{ needs.meta.outputs.client_env }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/client/Dockerfile
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            NEXT_PUBLIC_BACKEND_API_URL=${{ vars.NEXT_PUBLIC_BACKEND_API_URL }}
+            NEXT_PUBLIC_APP_URL=${{ vars.NEXT_PUBLIC_APP_URL }}
+            NEXT_PUBLIC_REMOTE_IMAGE_HOSTNAME=${{ vars.NEXT_PUBLIC_REMOTE_IMAGE_HOSTNAME }}
+            NEXT_PUBLIC_S3_IMAGE_PROTOCOL=${{ vars.NEXT_PUBLIC_S3_IMAGE_PROTOCOL }}
+            NEXT_PUBLIC_S3_IMAGE_HOSTNAME=${{ vars.NEXT_PUBLIC_S3_IMAGE_HOSTNAME }}
+            NEXT_PUBLIC_S3_IMAGE_PORT=${{ vars.NEXT_PUBLIC_S3_IMAGE_PORT }}
+            NEXT_PUBLIC_S3_IMAGE_BUCKET=${{ vars.NEXT_PUBLIC_S3_IMAGE_BUCKET }}
+          # The environment is part of the tag: one version can have a client
+          # per cluster, and pulling the wrong one is then impossible.
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/watchly-client:${{ needs.meta.outputs.client_env }}-${{ needs.meta.outputs.version }}
+            ${{ needs.meta.outputs.moving_tag && format('{0}/watchly-client:{1}-{2}', secrets.DOCKERHUB_USERNAME, needs.meta.outputs.client_env, needs.meta.outputs.moving_tag) || '' }}
+          cache-from: type=gha,scope=client-${{ needs.meta.outputs.client_env }}
+          cache-to: type=gha,mode=max,scope=client-${{ needs.meta.outputs.client_env }}
