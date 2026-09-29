@@ -47,6 +47,7 @@ services:
 
   api:
     container_name: "api"
+    tty: true
     mem_limit: 768m
     build:
       context: ../../
@@ -95,8 +96,9 @@ services:
     build:
       context: ../../
       dockerfile: apps/api/Dockerfile
-      target: worker-runner
-    command: sh -c "cd apps/api && npm run worker:dev"
+      target: worker-base
+    command: sh -c "CI=true pnpm install --frozen-lockfile && pnpm --filter api exec prisma generate && cd apps/api && npm run worker:dev"
+    tty: true
     mem_limit: 2g
     cpus: 2
     environment:

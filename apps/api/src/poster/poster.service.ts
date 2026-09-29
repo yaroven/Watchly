@@ -3,7 +3,7 @@ import BucketType from "../s3/enums/bucket-type.enum";
 import { assertManagedPosterUrl } from "../s3/poster-assertion.util";
 import { S3Service } from "../s3/s3.service";
 
-export type PosterEntityKind = "titles" | "seasons";
+export type PosterEntityKind = "titles" | "seasons" | "artists";
 
 @Injectable()
 export class PosterService {

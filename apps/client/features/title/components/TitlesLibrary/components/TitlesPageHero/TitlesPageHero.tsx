@@ -1,15 +1,24 @@
 "use client";
 
 import AddIcon from "@mui/icons-material/Add";
+import SyncIcon from "@mui/icons-material/Sync";
 import Box from "@mui/material/Box";
+import { keyframes } from "@mui/material/styles";
 import Typography from "@mui/material/Typography";
 import Button from "@shared/ui/Button";
 
+const spin = keyframes`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+`;
+
 interface TitlesPageHeroProps {
   onCreate: () => void;
+  onSyncAllRatings: () => void;
+  isSyncingAllRatings: boolean;
 }
 
-export default function TitlesPageHero({ onCreate }: TitlesPageHeroProps) {
+export default function TitlesPageHero({ onCreate, onSyncAllRatings, isSyncingAllRatings }: TitlesPageHeroProps) {
   return (
     <Box
       sx={{
@@ -32,9 +41,20 @@ export default function TitlesPageHero({ onCreate }: TitlesPageHeroProps) {
         </Typography>
       </Box>
 
-      <Button variant="contained" onClick={onCreate} startIcon={<AddIcon sx={{ fontSize: 22 }} />}>
-        Add New
-      </Button>
+      <Box sx={{ display: "flex", gap: "12px" }}>
+        <Button
+          variant="outlined"
+          onClick={onSyncAllRatings}
+          disabled={isSyncingAllRatings}
+          startIcon={<SyncIcon sx={{ fontSize: 20, animation: isSyncingAllRatings ? `${spin} 1s linear infinite` : "none" }} />}
+        >
+          {isSyncingAllRatings ? "Syncing Ratings..." : "Sync All Ratings"}
+        </Button>
+
+        <Button variant="contained" onClick={onCreate} startIcon={<AddIcon sx={{ fontSize: 22 }} />}>
+          Add New
+        </Button>
+      </Box>
     </Box>
   );
 }

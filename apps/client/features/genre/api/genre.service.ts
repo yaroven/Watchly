@@ -1,6 +1,6 @@
 import { parseApiDate } from "@/shared/lib/parse-api-date";
 import api from "@shared/api/axios";
-import { Genre, GetAllGenresDto } from "../schemas/genre";
+import { CreateGenreDto, Genre, GetAllGenresDto, UpdateGenreDto } from "../schemas/genre";
 
 const prefix = "genre";
 
@@ -27,6 +27,20 @@ const GenreService = {
       ...data,
       items: data.items.map(mapGenre),
     };
+  },
+
+  create: async (data: CreateGenreDto): Promise<Genre> => {
+    const { data: genre } = await api.post<ApiGenre>(`/${prefix}`, data);
+    return mapGenre(genre);
+  },
+
+  update: async (id: string, data: UpdateGenreDto): Promise<Genre> => {
+    const { data: genre } = await api.patch<ApiGenre>(`/${prefix}/${id}`, data);
+    return mapGenre(genre);
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await api.delete(`/${prefix}/${id}`);
   },
 };
 

@@ -20,6 +20,12 @@ export interface S3Config {
    * endpoint makes every queue call fail.
    */
   sqsEndpoint?: string;
+  /**
+   * S3 bucket notifications into SQS are an AWS/LocalStack feature; MinIO and
+   * friends reject the ARN. Turn this off there — uploads still transcode,
+   * because completeUpload schedules the job directly.
+   */
+  eventsEnabled: boolean;
 }
 
 /**
@@ -58,4 +64,5 @@ export default registerAs(S3ConfigName, () => ({
   ),
   queueName: requireInProduction(process.env.SQS_QUEUE_NAME, "SQS_QUEUE_NAME", "s3-event-queue"),
   sqsEndpoint: process.env.SQS_ENDPOINT || undefined,
+  eventsEnabled: process.env.S3_EVENTS_ENABLED !== "false",
 }));

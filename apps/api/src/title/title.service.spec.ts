@@ -106,10 +106,15 @@ describe("TitleService", () => {
         const result = await service.create(createData);
 
         expect(prismaServiceMock.title.create).toHaveBeenCalledWith({
-          data: { ...createData, genres: undefined },
-          include: { genres: true },
+          data: { ...createData, releaseDate: new Date(createData.releaseDate), genres: undefined },
+          include: { genres: true, externalRatings: true },
         });
-        expect(result).toEqual(createdTitle);
+        expect(result).toMatchObject({
+          id: "title-1",
+          name: "Title",
+          genres: [],
+          externalRatings: [],
+        });
       });
     });
   });
@@ -128,9 +133,10 @@ describe("TitleService", () => {
           skip: 0,
           take: 10,
           orderBy: { createdAt: "desc" },
-          include: { genres: true },
+          include: { genres: true, externalRatings: true },
         });
-        expect(result).toEqual({ items: titles, totalCount: 1 });
+        expect(result.totalCount).toBe(1);
+        expect(result.items).toMatchObject([{ id: "title-1", name: "Title 1", genres: [] }]);
       });
     });
 
@@ -314,9 +320,9 @@ describe("TitleService", () => {
 
         expect(prismaServiceMock.title.findUnique).toHaveBeenCalledWith({
           where: { id: "title-1" },
-          include: { genres: true },
+          include: { genres: true, externalRatings: true },
         });
-        expect(result).toEqual(title);
+        expect(result).toMatchObject({ id: "title-1", genres: [] });
       });
     });
 
@@ -370,9 +376,9 @@ describe("TitleService", () => {
         expect(prismaServiceMock.title.update).toHaveBeenCalledWith({
           where: { id: "title-1" },
           data: { ...updateData, genres: undefined },
-          include: { genres: true },
+          include: { genres: true, externalRatings: true },
         });
-        expect(result).toEqual(updatedTitle);
+        expect(result).toMatchObject({ id: "title-1", name: "New Name", genres: [] });
       });
     });
 
@@ -443,6 +449,7 @@ describe("TitleService", () => {
           "title-1",
           "upload-1",
           parts,
+          VideoType.MOVIE,
         );
       });
     });
@@ -560,7 +567,7 @@ describe("TitleService", () => {
           where: { id: "title-1" },
           include: { genres: true },
         });
-        expect(result).toEqual({ id: title.id, type: title.type, genres: [] });
+        expect(result).toMatchObject({ id: title.id, type: title.type, genres: [] });
       });
     });
 

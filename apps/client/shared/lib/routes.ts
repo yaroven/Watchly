@@ -37,4 +37,9 @@ export const ADMIN = {
   TITLES: createAdminPath("titles"),
   TITLES_NEW: createAdminPath("titles/new"),
   TITLES_EDIT: (id: string) => createAdminPath(`titles/${id}`),
+  USERS: createAdminPath("users"),
+  USERS_DETAIL: (id: string) => createAdminPath(`users/${id}`),
+  ARTISTS: createAdminPath("artists"),
+  ARTISTS_DETAIL: (id: string) => createAdminPath(`artists/${id}`),
+  GENRES: createAdminPath("genres"),
 };

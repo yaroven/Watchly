@@ -13,6 +13,42 @@ export enum AgeRating {
   AGE_18 = "AGE_18",
 }
 
+export enum ExternalRatingSource {
+  IMDB = "IMDB",
+  ROTTEN_TOMATOES = "ROTTEN_TOMATOES",
+  METACRITIC = "METACRITIC",
+}
+
+export interface ExternalRating {
+  source: ExternalRatingSource;
+  rating: number;
+  votesCount: number | null;
+}
+
+export interface TitleGenre {
+  id: string;
+  name: string;
+}
+
+export interface CastCreditArtist {
+  id: string;
+  name: string;
+  photoUrl?: string | null;
+}
+
+export interface CastCredit {
+  id: string;
+  character?: string | null;
+  order: number;
+  artist: CastCreditArtist;
+}
+
+export interface CastCreditInput {
+  artistId: string;
+  character?: string;
+  order?: number;
+}
+
 export interface Title {
   id: string;
   createdAt: Date;
@@ -27,8 +63,14 @@ export interface Title {
   releaseDate: string;
   language: string;
   trailerUrl: string;
+  runtime: number;
+  network: string;
+  director: string;
+  closedCaption: boolean;
   seasons: string[];
   transcodingStatus: TranscodingStatus;
+  externalRatings: ExternalRating[];
+  genres: TitleGenre[];
 }
 
 export interface GetAllTitlesDto {
@@ -53,6 +95,11 @@ export const BaseTitleSchema = z.object({
   releaseDate: z.iso.date({ error: "Release date is required" }),
   language: z.string().min(1, "Language is required").max(100),
   trailerUrl: z.url({ error: "Trailer URL must be a valid URL" }),
+  runtime: z.number("Runtime is required").int("Runtime must be a whole number").min(0, "Runtime must be 0 or greater"),
+  network: z.string().min(1, "Network is required").max(100),
+  director: z.string().min(1, "Director is required").max(255),
+  closedCaption: z.boolean(),
+  genreIds: z.array(z.string()),
 });
 
 export const CreateTitleSchema = BaseTitleSchema.extend({
@@ -114,6 +161,11 @@ export interface CreateTitleDto {
   releaseDate: string;
   language: string;
   trailerUrl: string;
+  runtime: number;
+  network: string;
+  director: string;
+  closedCaption: boolean;
+  genreIds?: string[];
 }
 
 export interface UpdateTitleDto {
@@ -125,5 +177,10 @@ export interface UpdateTitleDto {
   releaseDate: string;
   language: string;
   trailerUrl: string;
+  runtime: number;
+  network: string;
+  director: string;
+  closedCaption: boolean;
   posterUrl: string;
+  genreIds?: string[];
 }

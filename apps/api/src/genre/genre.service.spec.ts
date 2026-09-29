@@ -80,6 +80,8 @@ describe("GenreService", () => {
           skip: 0,
           take: 10,
           orderBy: { createdAt: "desc" },
+          // Powers the "N titles" count and the delete guard on the Genres screen.
+          include: { _count: { select: { titles: true } } },
         });
         expect(result).toEqual({ items: genres, totalCount: 1 });
       });
@@ -111,7 +113,10 @@ describe("GenreService", () => {
 
         const result = await service.findOne("genre-1");
 
-        expect(prismaMock.genre.findUnique).toHaveBeenCalledWith({ where: { id: "genre-1" } });
+        expect(prismaMock.genre.findUnique).toHaveBeenCalledWith({
+          where: { id: "genre-1" },
+          include: { _count: { select: { titles: true } } },
+        });
         expect(result).toEqual(genre);
       });
     });
