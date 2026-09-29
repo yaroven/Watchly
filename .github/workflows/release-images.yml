@@ -2,8 +2,13 @@
 #
 # Release model: main carries no release tags. Each minor line gets a
 # release/<line> branch cut from main, and every v<line>.<patch> tag lives on
-# that branch — so main builds are for the dev cluster and tags are what prod
-# runs. Fixes are written against main and carried over by backport.yml.
+# that branch. Fixes are written against main and carried over by
+# backport.yml.
+#
+# Only release branches and their tags build. main and dev deliberately do
+# not: nothing deploys from them yet, and an image nobody pulls is just a
+# red run waiting to happen. Add them back here the day a cluster tracks
+# them. Anything else can still be built on demand through the manual run.
 #
 # The api, worker and migrator images are environment-independent, so one
 # build serves every cluster. The client is not: NEXT_PUBLIC_* values are
@@ -18,8 +23,6 @@ name: Release Images
 on:
   push:
     branches:
-      - dev
-      - main
       - "release/**"
     tags:
       - "v*"
@@ -71,16 +74,9 @@ jobs:
               moving_tag="$line"
               client_env=prod
               ;;
-            refs/heads/main)
-              version="main-${sha}"
-              moving_tag="main"
-              client_env=dev
-              ;;
-            refs/heads/dev)
-              version="dev-${sha}"
-              moving_tag="dev"
-              client_env=dev
-              ;;
+            # Only reachable through a manual run, since no other ref builds
+            # automatically. No alias: a one-off build should not move a tag
+            # that a cluster might be following.
             *)
               version="${sha}"
               moving_tag=""
