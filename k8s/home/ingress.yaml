@@ -1,0 +1,50 @@
+# Three hostnames on the Traefik controller k3s ships with. No cert-manager
+# and no TLS block: this never leaves the LAN, and Let's Encrypt cannot issue
+# for a private address anyway.
+#
+# The hosts use sslip.io, which resolves any <ip>.sslip.io to that IP without
+# touching a hosts file on every device. Replace REPLACE_ME with the server's
+# LAN address, dashes instead of dots — 192.168.0.10 becomes 192-168-0-10.
+# If the router blocks DNS rebinding (Pi-hole, OpenWRT and friends do by
+# default), swap these for names you add to its local DNS instead.
+#
+# s3 needs its own host because presigned URLs are signed over it: the browser
+# fetches the HLS playlist and its segments straight from MinIO, not through
+# the api.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: watchly
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: watchly.192-168-31-100.sslip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: client
+                port:
+                  number: 4000
+    - host: api.watchly.192-168-31-100.sslip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 3000
+    - host: s3.watchly.192-168-31-100.sslip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: minio
+                port:
+                  number: 9000

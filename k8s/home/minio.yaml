@@ -1,0 +1,121 @@
+# S3 without AWS. MinIO speaks the same API and the same path-style URLs the
+# client's image proxy matches on, so only the endpoints change.
+#
+# What it cannot do is the bucket-notification-into-SQS wiring: it rejects an
+# AWS queue ARN. That is why the overlay sets S3_EVENTS_ENABLED=false — the
+# api then schedules the transcode itself when an upload completes, and no
+# queue service is needed at all.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    # Raw uploads plus every HLS rendition of them. Videos are the whole point
+    # of the app, so this is the claim to grow first.
+    storage: 100Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: minio
+  ports:
+    - name: s3
+      port: 9000
+      targetPort: 9000
+    - name: console
+      port: 9001
+      targetPort: 9001
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: minio
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: minio
+    spec:
+      containers:
+        - name: minio
+          image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+          args: ["server", "/data", "--console-address", ":9001"]
+          env:
+            # The api authenticates with these same two values through
+            # S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY.
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: watchly-secrets
+                  key: S3_ACCESS_KEY_ID
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: watchly-secrets
+                  key: S3_SECRET_ACCESS_KEY
+          ports:
+            - containerPort: 9000
+            - containerPort: 9001
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: 9000
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 2Gi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: minio-data
+---
+# Buckets are created by LocalStack's init script in dev and by Terraform in
+# prod; neither exists here, so a Job does it. Re-running is harmless —
+# `mb --ignore-existing` is a no-op on the second pass.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-buckets
+spec:
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mc
+          image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+          command:
+            - sh
+            - -c
+            - |
+              until mc alias set home http://minio:9000 "$S3_ACCESS_KEY_ID" "$S3_SECRET_ACCESS_KEY"; do
+                echo "waiting for minio..." && sleep 3
+              done
+              mc mb --ignore-existing home/raw
+              mc mb --ignore-existing home/content
+              # The browser fetches HLS segments straight from these URLs, and
+              # a presigned GET per segment would expire mid-playback.
+              mc anonymous set download home/content
+          envFrom:
+            - secretRef:
+                name: watchly-secrets
