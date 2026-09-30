@@ -71,6 +71,8 @@ export interface Title {
   transcodingStatus: TranscodingStatus;
   externalRatings: ExternalRating[];
   genres: TitleGenre[];
+  /** Watchly's own score, aggregated from viewer ratings — `average` is null until someone rates it. */
+  rating: { average: number | null; count: number };
 }
 
 export interface GetAllTitlesDto {
