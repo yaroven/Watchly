@@ -64,7 +64,14 @@ describe("UserService", () => {
         expect(hashPassword).toHaveBeenCalledWith("plaintext-pw");
         expect(prismaMock.user.create).toHaveBeenCalledWith({
           data: { email: createData.email, password: "salt:hash", role: Role.USER },
-          select: { id: true, email: true, role: true, createdAt: true },
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            createdAt: true,
+            displayName: true,
+            avatarUrl: true,
+          },
         });
         expect(result).toEqual(safeUser);
       });
@@ -178,7 +185,14 @@ describe("UserService", () => {
 
         expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
           where: { id: "user-1" },
-          select: { id: true, email: true, role: true, createdAt: true },
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            createdAt: true,
+            displayName: true,
+            avatarUrl: true,
+          },
         });
         expect(result).toEqual(safeUser);
       });
@@ -272,7 +286,14 @@ describe("UserService", () => {
         expect(prismaMock.user.update).toHaveBeenCalledWith({
           where: { id: "user-1" },
           data: { email: "new@example.com", password: undefined },
-          select: { id: true, email: true, role: true, createdAt: true },
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            createdAt: true,
+            displayName: true,
+            avatarUrl: true,
+          },
         });
       });
     });
@@ -313,7 +334,14 @@ describe("UserService", () => {
 
         expect(prismaMock.user.delete).toHaveBeenCalledWith({
           where: { id: "user-1" },
-          select: { id: true, email: true, role: true, createdAt: true },
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            createdAt: true,
+            displayName: true,
+            avatarUrl: true,
+          },
         });
         expect(result).toEqual(safeUser);
       });

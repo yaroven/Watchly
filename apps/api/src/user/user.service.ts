@@ -16,6 +16,8 @@ const USER_SAFE_SELECT = {
   email: true,
   role: true,
   createdAt: true,
+  displayName: true,
+  avatarUrl: true,
 } satisfies Prisma.UserSelect;
 
 @Injectable()
@@ -49,16 +51,13 @@ export class UserService {
       createdAt: "desc",
     }) as Prisma.UserOrderByWithRelationInput;
 
-    const { items, totalCount } = await paginate<Pick<User, "id" | "email" | "role" | "createdAt">>(
-      this.prisma.user,
-      {
-        where,
-        orderBy,
-        page,
-        limit,
-        extra: { select: USER_SAFE_SELECT },
-      },
-    );
+    const { items, totalCount } = await paginate<Omit<User, "password">>(this.prisma.user, {
+      where,
+      orderBy,
+      page,
+      limit,
+      extra: { select: USER_SAFE_SELECT },
+    });
 
     return { items: items.map((user) => new UserResponseDto(user)), totalCount };
   }

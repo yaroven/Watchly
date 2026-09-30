@@ -10,6 +10,7 @@ import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { MultipartUploadPart } from "../s3/multipart.constants";
 import { SeasonService } from "../season/season.service";
+import { TitleRatingService } from "../title-rating/title-rating.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { CreateTitleDto } from "./dto/request/create-title.dto";
 import { GetAllTitleDto } from "./dto/request/get-all-title.dto";
@@ -27,6 +28,7 @@ export class TitleService {
     private readonly posterService: PosterService,
     private readonly seasonService: SeasonService,
     private readonly mediaAssetService: MediaAssetService,
+    private readonly titleRatingService: TitleRatingService,
   ) {}
 
   async create(data: CreateTitleDto): Promise<TitleResponseDto> {
@@ -79,7 +81,12 @@ export class TitleService {
       extra: { include: { genres: true, externalRatings: true } },
     });
 
-    return { items: items.map((title) => new TitleResponseDto(title)), totalCount };
+    const ratings = await this.titleRatingService.summarizeMany(items.map((title) => title.id));
+
+    return {
+      items: items.map((title) => new TitleResponseDto(title, ratings.get(title.id))),
+      totalCount,
+    };
   }
 
   async findOne(id: string): Promise<TitleResponseDto | null> {
@@ -87,7 +94,10 @@ export class TitleService {
       where: { id },
       include: { genres: true, externalRatings: true },
     });
-    return title ? new TitleResponseDto(title) : null;
+    if (!title) return null;
+
+    const { average, count } = await this.titleRatingService.summarize(id);
+    return new TitleResponseDto(title, { average, count });
   }
 
   async update(id: string, data: UpdateTitleDto): Promise<TitleResponseDto> {
