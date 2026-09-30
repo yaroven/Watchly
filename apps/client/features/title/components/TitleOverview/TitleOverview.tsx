@@ -1,5 +1,6 @@
 "use client";
 
+import { useTitleRating } from "@/features/title-rating";
 import { AgeRating, ExternalRatingSource, type Title, TitleType } from "@/features/title/schemas/title";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import Box from "@mui/material/Box";
@@ -24,7 +25,7 @@ const AGE_RATING_LABELS: Record<AgeRating, string> = {
   [AgeRating.AGE_18]: "18+",
 };
 
-// `tmovie` is Watchly's own score, not an external source — it has no endpoint yet.
+// `tmovie` is Watchly's own score — aggregated from viewer ratings, not an external source.
 const SCORE_ROWS: { key: "imdb" | "rottenTomatoes" | "metacritic" | "tmovie"; icon: typeof IMDB; source: ExternalRatingSource | null }[] = [
   { key: "imdb", icon: IMDB, source: ExternalRatingSource.IMDB },
   { key: "rottenTomatoes", icon: RottenTomatoes, source: ExternalRatingSource.ROTTEN_TOMATOES },
@@ -34,6 +35,9 @@ const SCORE_ROWS: { key: "imdb" | "rottenTomatoes" | "metacritic" | "tmovie"; ic
 
 export default function TitleOverview({ title }: TitleOverviewProps) {
   const router = useRouter();
+  // The page is server-rendered, so `title.rating` goes stale the moment the viewer rates — fall back to it only until the live summary arrives.
+  const { data: liveRating } = useTitleRating(title.id);
+  const ratingSummary = liveRating ?? title.rating;
   const ratingBySource = new Map(title.externalRatings.map((rating) => [rating.source, rating.rating]));
   const isSeries = title.type === TitleType.SERIES;
   const posterSrc = getOptimizedImageSrc(title.posterUrl);
@@ -119,7 +123,7 @@ export default function TitleOverview({ title }: TitleOverviewProps) {
             <Box sx={{ display: "flex", flexDirection: "column", gap: "14px", flexShrink: 0 }}>
               {SCORE_ROWS.map(({ key, icon, source }) => {
                 const isPercent = source === ExternalRatingSource.ROTTEN_TOMATOES || source === ExternalRatingSource.METACRITIC;
-                const value = source ? ratingBySource.get(source) : 8.1;
+                const value = source ? ratingBySource.get(source) : (ratingSummary?.average ?? undefined);
 
                 return (
                   <Box key={key} sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "8px" }}>

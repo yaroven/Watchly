@@ -68,7 +68,16 @@ export class TitleResponseDto {
   @ApiProperty({ type: [ExternalRatingResponseDto] })
   externalRatings: ExternalRatingResponseDto[];
 
-  constructor(title: Title & { genres: Genre[]; externalRatings?: ExternalRatings[] }) {
+  @ApiProperty({
+    description:
+      "Watchly's own score — the mean of what viewers rated it, alongside the external ones",
+  })
+  rating: { average: number | null; count: number };
+
+  constructor(
+    title: Title & { genres: Genre[]; externalRatings?: ExternalRatings[] },
+    rating: { average: number | null; count: number } = { average: null, count: 0 },
+  ) {
     this.id = title.id;
     this.createdAt = title.createdAt;
     this.updatedAt = title.updatedAt;
@@ -87,6 +96,7 @@ export class TitleResponseDto {
     this.closedCaption = title.closedCaption;
     this.genres = title.genres.map((genre) => new GenreResponseDto(genre));
     this.transcodingStatus = title.transcodingStatus;
+    this.rating = rating;
     this.externalRatings = (title.externalRatings ?? []).map(
       (rating) => new ExternalRatingResponseDto(rating),
     );
