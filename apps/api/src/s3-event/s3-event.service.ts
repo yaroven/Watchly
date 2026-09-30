@@ -1,14 +1,9 @@
-import { PutBucketNotificationConfigurationCommand, S3Client } from "@aws-sdk/client-s3";
 import {
-  CreateQueueCommand,
   DeleteMessageCommand,
-  GetQueueAttributesCommand,
   GetQueueUrlCommand,
   Message,
-  QueueNameExists,
   ReceiveMessageCommand,
   SQSClient,
-  SetQueueAttributesCommand,
 } from "@aws-sdk/client-sqs";
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -21,7 +16,6 @@ import { VideoTranscoderService } from "../video-transcoder/video-transcoder.ser
 export class S3EventService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(S3EventService.name);
   private sqsClient: SQSClient;
-  private s3Client: S3Client;
   private config: S3Config;
   private queueUrl: string;
   private isShuttingDown = false;
@@ -39,20 +33,13 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
       secretAccessKey: this.config.secretAccessKey,
     };
 
-    // The two clients used to share one endpoint, which only ever worked
-    // under LocalStack. Omitting it lets the SDK derive the right regional
-    // host per service.
+    // No endpoint override against real AWS: SQS lives at
+    // sqs.<region>.amazonaws.com. LocalStack serves it from the same port as
+    // S3, which is what sqsEndpoint is for.
     this.sqsClient = new SQSClient({
       region: this.config.region,
       credentials,
       ...(this.config.sqsEndpoint ? { endpoint: this.config.sqsEndpoint } : {}),
-    });
-
-    this.s3Client = new S3Client({
-      region: this.config.region,
-      endpoint: this.config.internalEndpoint,
-      credentials,
-      forcePathStyle: true,
     });
   }
 
@@ -62,7 +49,7 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    await this.setupInfrastructure();
+    this.queueUrl = await this.resolveQueueUrl();
     this.pollLoopFinished = this.pollLoop().catch((err) =>
       this.logger.error("Critical polling error", err),
     );
@@ -76,87 +63,23 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * SQS CreateQueue is only idempotent when the requested attributes match an
-   * existing queue's exactly (e.g. the DLQ's ARN can change across restarts
-   * of a persisted LocalStack volume) — a mismatch throws QueueNameExists
-   * instead of returning the existing queue. Fall back to looking the queue
-   * up by name and reconciling its attributes so setup is idempotent across
-   * restarts.
+   * The queue is provisioned with the rest of the infrastructure — by the
+   * LocalStack init script locally, by whatever manages the cloud account in
+   * dev and prod. Looking it up rather than creating it keeps this service's
+   * credentials down to receiving and deleting messages.
    */
-  private async getOrCreateQueue(
-    name: string,
-    attributes?: Record<string, string>,
-  ): Promise<string> {
+  private async resolveQueueUrl(): Promise<string> {
     try {
       const { QueueUrl } = await this.sqsClient.send(
-        new CreateQueueCommand({ QueueName: name, Attributes: attributes }),
+        new GetQueueUrlCommand({ QueueName: this.config.queueName }),
       );
       return QueueUrl!;
     } catch (error) {
-      if (!(error instanceof QueueNameExists)) throw error;
-
-      const { QueueUrl } = await this.sqsClient.send(new GetQueueUrlCommand({ QueueName: name }));
-      if (attributes) {
-        await this.sqsClient.send(
-          new SetQueueAttributesCommand({ QueueUrl: QueueUrl!, Attributes: attributes }),
-        );
-      }
-      return QueueUrl!;
+      throw new Error(
+        `Queue "${this.config.queueName}" does not exist. It is part of the environment, not something this service creates — provision it, or set S3_EVENTS_ENABLED=false to run without the event path.`,
+        { cause: error },
+      );
     }
-  }
-
-  private async setupInfrastructure() {
-    const dlqUrl = await this.getOrCreateQueue(`${this.config.queueName}-dlq`);
-    const { Attributes: dlqAttributes } = await this.sqsClient.send(
-      new GetQueueAttributesCommand({
-        QueueUrl: dlqUrl,
-        AttributeNames: ["QueueArn"],
-      }),
-    );
-    const dlqArn = dlqAttributes?.QueueArn;
-
-    this.queueUrl = await this.getOrCreateQueue(this.config.queueName, {
-      RedrivePolicy: JSON.stringify({
-        deadLetterTargetArn: dlqArn,
-        maxReceiveCount: 5,
-      }),
-    });
-
-    const { Attributes } = await this.sqsClient.send(
-      new GetQueueAttributesCommand({
-        QueueUrl: this.queueUrl,
-        AttributeNames: ["QueueArn"],
-      }),
-    );
-    const queueArn = Attributes?.QueueArn;
-
-    await this.sqsClient.send(
-      new SetQueueAttributesCommand({
-        QueueUrl: this.queueUrl,
-        Attributes: {
-          Policy: JSON.stringify({
-            Version: "2012-10-17",
-            Statement: [
-              {
-                Effect: "Allow",
-                Principal: { Service: "s3.amazonaws.com" },
-                Action: "sqs:SendMessage",
-                Resource: queueArn,
-              },
-            ],
-          }),
-        },
-      }),
-    );
-
-    await this.s3Client.send(
-      new PutBucketNotificationConfigurationCommand({
-        Bucket: this.config.rawBucketName,
-        NotificationConfiguration: {
-          QueueConfigurations: [{ QueueArn: queueArn!, Events: ["s3:ObjectCreated:*"] }],
-        },
-      }),
-    );
   }
 
   private async pollLoop() {

@@ -168,9 +168,16 @@ services:
       - EXTRA_CORS_ALLOWED_METHODS=*
       - EXTRA_CORS_EXPOSE_HEADERS=*
       - DEBUG=1
+      # Buckets, queue and the notification between them. The api no longer
+      # creates them; the script lives under k8s/home because kustomize
+      # cannot read files above its root and compose can.
+      - S3_RAW_BUCKET_NAME=raw
+      - S3_PROCESSED_BUCKET_NAME=content
+      - SQS_QUEUE_NAME=s3-event-queue
     volumes:
       - "localstack_data:/persisted-data"
       - "/var/run/docker.sock:/var/run/docker.sock"
+      - "../../k8s/home/localstack-init:/etc/localstack/init/ready.d:ro"
 
   grafana:
     image: "grafana/grafana-enterprise"
