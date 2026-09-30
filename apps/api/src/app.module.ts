@@ -9,6 +9,7 @@ import { LoggerModule } from "nestjs-pino";
 import { AppController } from "./app.controller";
 import { ArtistModule } from "./artist/artist.module";
 import { AuthModule } from "./auth/auth.module";
+import { CommentModule } from "./comment/comment.module";
 import jwtConfig, { JwtConfig, JwtConfigName } from "./config/jwt.config";
 import loggerConfig, {
   buildLoggerParams,
@@ -30,6 +31,7 @@ import { PrismaModule } from "./prisma/prisma.module";
 import { S3EventModule } from "./s3-event/s3-event.module";
 import { S3Module } from "./s3/s3.module";
 import { SeasonModule } from "./season/season.module";
+import { TitleRatingModule } from "./title-rating/title-rating.module";
 import { TitleModule } from "./title/title.module";
 import { UserModule } from "./user/user.module";
 import { VideoTranscoderModule } from "./video-transcoder/video-transcoder.module";
@@ -89,6 +91,8 @@ import { VideoTranscoderModule } from "./video-transcoder/video-transcoder.modul
     GenreModule,
     MediaAssetModule,
     ExternalRatingsModule,
+    TitleRatingModule,
+    CommentModule,
   ],
   controllers: [AppController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

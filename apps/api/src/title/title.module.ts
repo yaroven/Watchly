@@ -3,11 +3,12 @@ import { MediaAssetModule } from "../media-asset/media-asset.module";
 import { PosterModule } from "../poster/poster.module";
 import { PrismaModule } from "../prisma/prisma.module";
 import { SeasonModule } from "../season/season.module";
+import { TitleRatingModule } from "../title-rating/title-rating.module";
 import { TitleController } from "./title.controller";
 import { TitleService } from "./title.service";
 
 @Module({
-  imports: [PrismaModule, PosterModule, SeasonModule, MediaAssetModule],
+  imports: [TitleRatingModule, PrismaModule, PosterModule, SeasonModule, MediaAssetModule],
   providers: [TitleService],
   controllers: [TitleController],
   exports: [TitleService],

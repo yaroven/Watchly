@@ -17,18 +17,19 @@ export default function SeasonTabItem({ number, isActive, onClick }: SeasonTabIt
         border: "none",
         font: "inherit",
         cursor: "pointer",
+        whiteSpace: "nowrap",
         borderRadius: "12px 12px 0 0",
         height: "44px",
-        paddingInline: "24px",
-        fontSize: "16px",
+        paddingInline: "20px",
+        fontSize: "15px",
         fontWeight: 700,
-        color: isActive ? "#191919" : "#999999",
-        backgroundColor: isActive ? "#ffffff" : "transparent",
+        color: isActive ? "primary.contrastText" : "text.secondary",
+        backgroundColor: isActive ? "primary.main" : "transparent",
         transition: "background-color .15s ease-out, color .15s ease-out",
-        ":hover": { color: isActive ? "#191919" : "#ffffff" },
+        ":hover": { color: isActive ? "primary.contrastText" : "text.primary" },
       }}
     >
-      season {number}
+      Season {number}
     </Box>
   );
 }

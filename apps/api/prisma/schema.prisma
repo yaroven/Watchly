@@ -42,6 +42,17 @@ model User {
   password  String
   role      Role     @default(USER)
   createdAt DateTime @default(now())
+
+  // Shown next to anything the user writes. Nullable because every account
+  // that already exists predates them; the api falls back to the email local
+  // part until the user sets one.
+  displayName String?
+  avatarUrl   String?
+
+  ratings   TitleRating[]
+  comments  TitleComment[]
+  reactions CommentReaction[]
+  reports   CommentReport[]
 }
 
 model Title {
@@ -70,13 +81,80 @@ model Title {
   seasons     Season[]
   castCredits CastCredit[]
   genres      Genre[]
-  // Also see migration 20260717000000_title_search_indexes: it creates the
-  // pg_trgm extension and a GIN trigram index on `name` for ILIKE search.
-  // Neither is representable here (no postgresqlExtensions preview feature
-  // enabled) — `prisma db push` / introspection against a fresh DB will not
-  // recreate them. Run that migration explicitly on any new environment.
+  ratings     TitleRating[]
+  comments    TitleComment[]
 
   @@index([type, transcodingStatus])
+}
+
+/// A viewer's score for a title, independent of whether they wrote anything.
+/// Kept apart from TitleComment on purpose: a score is one opinion per person
+/// that changes over time, a comment is many entries that do not.
+model TitleRating {
+  id        String   @id @default(uuid())
+  titleId   String
+  title     Title    @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([titleId, userId])
+}
+
+/// One level of threading: a comment either belongs to a title (parentId null)
+/// or replies to one that does. The service rejects a reply to a reply — the
+/// column allows deeper trees so the rule can be relaxed without a migration.
+model TitleComment {
+  id         String   @id @default(uuid())
+  titleId    String
+  title      Title    @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  text       String
+  hasSpoiler Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  parentId String?
+  parent   TitleComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  TitleComment[] @relation("CommentReplies")
+
+  reactions CommentReaction[]
+  reports   CommentReport[]
+
+  @@index([titleId, parentId, createdAt])
+}
+
+model CommentReaction {
+  id        String       @id @default(uuid())
+  commentId String
+  comment   TitleComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      ReactionType
+  createdAt DateTime     @default(now())
+
+  // One vote per person; switching sides updates this row rather than adding one.
+  @@unique([commentId, userId])
+  @@index([commentId, type])
+}
+
+enum ReactionType {
+  LIKE
+  DISLIKE
+}
+
+model CommentReport {
+  id        String       @id @default(uuid())
+  commentId String
+  comment   TitleComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reason    String?
+  createdAt DateTime     @default(now())
+
+  @@unique([commentId, userId])
 }
 
 model ExternalRatings {
@@ -93,9 +171,6 @@ model ExternalRatings {
   @@unique([titleId, source])
 }
 
-// Generic per-aggregator external id lookup, kept off Title so each new rating
-// source (Metacritic, Rotten Tomatoes, ...) adds a row here instead of another
-// nullable *_id column on Title.
 model TitleExternalId {
   id         String               @id @default(uuid())
   titleId    String

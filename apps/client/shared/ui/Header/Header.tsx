@@ -3,10 +3,10 @@
 import { APP } from "@/shared/lib/routes";
 import { Box, Tab } from "@mui/material";
 import Tabs from "@mui/material/Tabs";
+import Avatar from "@shared/ui/Avatar";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import Avatar from "./components/Avatar";
 import Notification from "./components/Notification";
 import SearchBar from "./components/SearchBar";
 
