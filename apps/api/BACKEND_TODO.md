@@ -9,7 +9,7 @@ Discover ranking → Artists → Blog/Article. The first five phases close almos
 in the client TODO for existing pages; the last two are brand-new Figma pages with no
 client feature yet either.
 
-## Phase 0 — Auth (blocks everything else)
+## Phase 0 — Auth (blocks everything else) — **shipped** (#50, #51)
 
 `User` model already exists (`email`, `password`, `role`), but there is no backend auth
 module at all — no `AuthModule`, no JWT. Login/Register forms on the client only validate
@@ -21,7 +21,10 @@ locally (`LoginForm.tsx`, `RegisterForm.tsx` — see PLACEHOLDER comments).
 
 Unblocks: reviews, watchlist, like/dislike, admin auth, Header notifications/avatar.
 
-## Phase 1 — Title: missing fields & endpoints
+## Phase 1 — Title: missing fields & endpoints — **shipped** (#52, #53)
+
+Landed as planned, plus `MediaAsset` extracted from `Title` and `hlsUrl` dropped;
+`CastCredit` folded into the Title module rather than kept as its own.
 
 `Title` currently has: `name, description, type, posterUrl, hlsUrl, transcodingStatus`.
 Add:
@@ -69,7 +72,14 @@ Endpoints:
 - `GET /titles?genre=` — genre filter (extend `GetAllTitleDto`)
 - IMDB-ranked sort — `sortBy=imdbScore` or a dedicated trending query param
 
-## Phase 2 — Score / Rating
+## Phase 2 — Score / Rating — **shipped** (#58, with phase 3)
+
+Landed as a separate `ExternalRating` row per source (IMDb / Rotten Tomatoes /
+Metacritic, backfilled from OMDb) rather than columns on `Title`, because the three
+sources refresh on their own cadence and a missing source has to be distinguishable
+from a zero. The Watchly score is not stored at all: it is the average of
+`TitleRating`, computed per request, since a title has few enough raters that a cached
+average would only be one more thing to drift.
 
 ```prisma
 model TitleScore {
@@ -85,7 +95,21 @@ model TitleScore {
 Or just plain fields on `Title` — simpler, recommended unless these need independent
 update cadences.
 
-## Phase 3 — Reviews / Comments (Title)
+## Phase 3 — Reviews / Comments (Title) — **shipped** (#58)
+
+Split in two rather than built as the `Review` below. A `Review` carrying both a score
+and text makes "I rated it, I have nothing to say" unexpressible, and leaves replies
+with a mostly-null score column. What shipped:
+
+- `TitleRating` — one row per (title, viewer), upserted. `GET/PUT/DELETE /title/:id/rating`.
+- `TitleComment` — text only, one level of threading (the column allows deeper, the
+  service refuses it). `GET/POST /title/:id/comments`, `GET /comments/:id/replies`.
+- `CommentReaction` / `CommentReport` — as the `Review*` models below, renamed.
+  `POST /comments/:id/reactions`, `POST /comments/:id/report`, `DELETE /comments/:id`.
+- `@OptionalAuth()` — the public reads still fill in the caller's own vote when a token
+  is present, instead of turning anonymous access into a 401.
+
+The shape below is kept for the record; the models it describes were not built.
 
 ```prisma
 model Review {
