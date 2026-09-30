@@ -8,6 +8,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
 import { SeasonService } from "../season/season.service";
+import { TitleRatingService } from "../title-rating/title-rating.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { TitleService } from "./title.service";
 
@@ -60,6 +61,15 @@ describe("TitleService", () => {
             scheduleTranscode: jest.fn(),
             getReadUrl: jest.fn(),
             cleanupVideoAsset: jest.fn(),
+          },
+        },
+        {
+          provide: TitleRatingService,
+          useValue: {
+            // Ratings are their own module; TitleService only asks it to fill
+            // the Watchly score on a response.
+            summarize: jest.fn().mockResolvedValue({ average: null, count: 0, myScore: null }),
+            summarizeMany: jest.fn().mockResolvedValue(new Map()),
           },
         },
         {
