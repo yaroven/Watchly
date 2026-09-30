@@ -10,6 +10,7 @@ import {
   Post,
   Put,
   Query,
+  Req,
 } from "@nestjs/common";
 import {
   ApiCreatedResponse,
@@ -20,6 +21,8 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
+import type { Request } from "express";
+import { OptionalAuth } from "../auth/decorators/optional-auth.decorator";
 import { AdminOnly } from "../auth/decorators/roles.decorator";
 import { CompleteMultipartUploadDto } from "../common/dto/request/complete-multipart-upload.dto";
 import { StartMultipartUploadDto } from "../common/dto/request/start-multipart-upload.dto";
@@ -68,6 +71,7 @@ export class TitleController {
       "`sort`: `property:direction`. Sortable: name, createdAt, releaseDate.",
   })
   @ApiOkResponse({ type: PaginatedResponseOf(TitleResponseDto) })
+  @OptionalAuth()
   @Get()
   async findAll(
     @Query() query: GetAllTitleDto,
@@ -84,17 +88,19 @@ export class TitleController {
       "genres",
     ])
     filters?: Filter[],
+    @Req() request?: Request,
   ) {
-    return this.titleService.findAll(query, sort, filters);
+    return this.titleService.findAll(query, sort, filters, request?.userId);
   }
 
   @ApiOperation({ summary: "Get a title by id" })
   @ApiParam({ name: "id", format: "uuid" })
   @ApiOkResponse({ type: TitleResponseDto })
   @ApiNotFoundResponse({ description: "Title not found" })
+  @OptionalAuth()
   @Get(":id")
-  async findOne(@Param("id", ParseUUIDPipe) id: string) {
-    const title = await this.titleService.findOne(id);
+  async findOne(@Param("id", ParseUUIDPipe) id: string, @Req() { userId }: Request) {
+    const title = await this.titleService.findOne(id, userId);
 
     if (!title) throw new NotFoundException(`Title with id ${id} not found`);
 

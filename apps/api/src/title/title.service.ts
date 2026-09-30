@@ -10,6 +10,7 @@ import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { MultipartUploadPart } from "../s3/multipart.constants";
 import { SeasonService } from "../season/season.service";
+import { TitleEngagementService } from "../title-engagement/title-engagement.service";
 import { TitleRatingService } from "../title-rating/title-rating.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { CreateTitleDto } from "./dto/request/create-title.dto";
@@ -29,6 +30,7 @@ export class TitleService {
     private readonly seasonService: SeasonService,
     private readonly mediaAssetService: MediaAssetService,
     private readonly titleRatingService: TitleRatingService,
+    private readonly titleEngagementService: TitleEngagementService,
   ) {}
 
   async create(data: CreateTitleDto): Promise<TitleResponseDto> {
@@ -56,6 +58,7 @@ export class TitleService {
     { page = 1, limit = 10 }: GetAllTitleDto,
     sort?: Sorting,
     filters: Filter[] = [],
+    viewerId?: string,
   ): Promise<{ items: TitleResponseDto[]; totalCount: number }> {
     const genreFilters = filters.filter((filter) => filter.property === "genres");
     const scalarFilters = filters.filter((filter) => filter.property !== "genres");
@@ -81,23 +84,67 @@ export class TitleService {
       extra: { include: { genres: true, externalRatings: true } },
     });
 
-    const ratings = await this.titleRatingService.summarizeMany(items.map((title) => title.id));
+    const ids = items.map((title) => title.id);
+    const [ratings, engagement] = await Promise.all([
+      this.titleRatingService.summarizeMany(ids),
+      this.titleEngagementService.summarizeMany(ids, viewerId),
+    ]);
 
     return {
-      items: items.map((title) => new TitleResponseDto(title, ratings.get(title.id))),
+      items: items.map(
+        (title) => new TitleResponseDto(title, ratings.get(title.id), engagement.get(title.id)),
+      ),
       totalCount,
     };
   }
 
-  async findOne(id: string): Promise<TitleResponseDto | null> {
+  /// The watchlist is a list of titles in the viewer's own order, so it reads the
+  /// ids from the engagement module and rehydrates them here rather than making
+  /// that module know how a title is serialised.
+  async findWatchlist(
+    viewerId: string,
+    { page = 1, limit = 10 }: GetAllTitleDto,
+  ): Promise<{ items: TitleResponseDto[]; totalCount: number }> {
+    const { titleIds, totalCount } = await this.titleEngagementService.findWatchlistTitleIds(
+      viewerId,
+      { page, limit },
+    );
+    if (titleIds.length === 0) return { items: [], totalCount };
+
+    const [titles, ratings, engagement] = await Promise.all([
+      this.prisma.title.findMany({
+        where: { id: { in: titleIds } },
+        include: { genres: true, externalRatings: true },
+      }),
+      this.titleRatingService.summarizeMany(titleIds),
+      this.titleEngagementService.summarizeMany(titleIds, viewerId),
+    ]);
+
+    const byId = new Map(titles.map((title) => [title.id, title]));
+
+    return {
+      items: titleIds
+        .map((id) => byId.get(id))
+        .filter((title): title is (typeof titles)[number] => Boolean(title))
+        .map(
+          (title) => new TitleResponseDto(title, ratings.get(title.id), engagement.get(title.id)),
+        ),
+      totalCount,
+    };
+  }
+
+  async findOne(id: string, viewerId?: string): Promise<TitleResponseDto | null> {
     const title = await this.prisma.title.findUnique({
       where: { id },
       include: { genres: true, externalRatings: true },
     });
     if (!title) return null;
 
-    const { average, count } = await this.titleRatingService.summarize(id);
-    return new TitleResponseDto(title, { average, count });
+    const [{ average, count }, engagement] = await Promise.all([
+      this.titleRatingService.summarize(id),
+      this.titleEngagementService.summarize(id, viewerId),
+    ]);
+    return new TitleResponseDto(title, { average, count }, engagement);
   }
 
   async update(id: string, data: UpdateTitleDto): Promise<TitleResponseDto> {
