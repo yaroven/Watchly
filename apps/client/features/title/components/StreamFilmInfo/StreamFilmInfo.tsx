@@ -1,5 +1,6 @@
 "use client";
 
+import { EMPTY_ENGAGEMENT, ReactionType, useReactToTitle, useSetTitleWatchlist, useTitleEngagement } from "@/features/title-engagement";
 import type { Title } from "@/features/title/schemas/title";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import AddIcon from "@mui/icons-material/Add";
@@ -10,10 +11,10 @@ import ThumbUpIcon from "@mui/icons-material/ThumbUp";
 import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
 import Typography from "@mui/material/Typography";
+import { useAuthStore } from "@shared/lib/auth-store";
 import { formatCount } from "@shared/lib/format-count";
 import Image from "next/image";
 import { useState } from "react";
-import { getTitleOverviewFixture } from "../TitleOverview/mocks";
 
 interface StreamFilmInfoProps {
   title: Title;
@@ -22,33 +23,33 @@ interface StreamFilmInfoProps {
 }
 
 export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFilmInfoProps) {
-  const { stream } = getTitleOverviewFixture(title.id);
-  // PLACEHOLDER: like/dislike/watchlist below are local-only state — nothing is persisted.
-  // Needs like/dislike + watchlist endpoints on the backend and initial values from them.
-  const [reaction, setReaction] = useState<"like" | "dislike" | null>(null);
-  const [likes, setLikes] = useState(stream.likes);
-  const [inWatchlist, setInWatchlist] = useState(false);
+  const isSignedIn = useAuthStore((state) => Boolean(state.userId));
   const [expanded, setExpanded] = useState(false);
+  const [shared, setShared] = useState(false);
+
+  // The page is server-rendered, so the block on `title` is the starting point
+  // and the live query takes over once the session is known.
+  const { data: liveEngagement } = useTitleEngagement(title.id);
+  const engagement = liveEngagement ?? title.engagement ?? EMPTY_ENGAGEMENT;
+
+  const react = useReactToTitle(title.id);
+  const setWatchlist = useSetTitleWatchlist(title.id);
 
   // The design shows a dislike toggle with no visible counter — only the
   // like count and the active/inactive colour change.
-  const handleLike = () => {
-    if (reaction === "like") {
-      setLikes((value) => value - 1);
-      setReaction(null);
-      return;
-    }
-    setLikes((value) => value + 1);
-    setReaction("like");
+  const handleReact = (type: ReactionType) => {
+    if (!isSignedIn) return;
+    react.mutate(type);
   };
 
-  const handleDislike = () => {
-    if (reaction === "dislike") {
-      setReaction(null);
-      return;
+  const handleShare = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setShared(true);
+      window.setTimeout(() => setShared(false), 2000);
+    } catch {
+      // Clipboard access can be denied; the button simply does nothing then.
     }
-    if (reaction === "like") setLikes((value) => value - 1);
-    setReaction("dislike");
   };
 
   const storyline = title.description || "Description will appear here once added.";
@@ -74,35 +75,42 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
           <Box
             component="button"
             type="button"
-            onClick={handleLike}
-            sx={{ ...actionButtonSx, color: reaction === "like" ? "primary.main" : "#ffffff" }}
+            aria-label={engagement.myReaction === ReactionType.LIKE ? "Remove like" : "Like"}
+            aria-pressed={engagement.myReaction === ReactionType.LIKE}
+            disabled={!isSignedIn || react.isPending}
+            onClick={() => handleReact(ReactionType.LIKE)}
+            sx={{ ...actionButtonSx, color: engagement.myReaction === ReactionType.LIKE ? "primary.main" : "#ffffff" }}
           >
             <ThumbUpIcon sx={{ fontSize: "18px" }} />
             <Typography component="span" sx={{ fontSize: "13px" }}>
-              {formatCount(likes)}
+              {formatCount(engagement.likes)}
             </Typography>
           </Box>
           <Box
             component="button"
             type="button"
-            onClick={handleDislike}
-            sx={{ ...actionButtonSx, color: reaction === "dislike" ? "primary.main" : "#ffffff" }}
+            aria-label={engagement.myReaction === ReactionType.DISLIKE ? "Remove dislike" : "Dislike"}
+            aria-pressed={engagement.myReaction === ReactionType.DISLIKE}
+            disabled={!isSignedIn || react.isPending}
+            onClick={() => handleReact(ReactionType.DISLIKE)}
+            sx={{ ...actionButtonSx, color: engagement.myReaction === ReactionType.DISLIKE ? "primary.main" : "#ffffff" }}
           >
             <ThumbDownIcon sx={{ fontSize: "18px" }} />
           </Box>
-          <Box component="button" type="button" sx={actionButtonSx}>
+          <Box component="button" type="button" aria-label="Copy link to this title" onClick={handleShare} sx={actionButtonSx}>
             <IosShareIcon sx={{ fontSize: "18px" }} />
             <Typography component="span" sx={{ fontSize: "13px" }}>
-              {formatCount(stream.shares)}
+              {shared ? "Copied" : "Share"}
             </Typography>
           </Box>
-          <Box sx={{ display: "flex", alignItems: "center", gap: "6px", color: "primary.main" }}>
-            <StarIcon sx={{ fontSize: "18px" }} />
-            {/* PLACEHOLDER: 9 is a hardcoded fallback when no score prop is passed */}
-            <Typography component="span" sx={{ fontSize: "13px", fontWeight: 600 }}>
-              {(rating ?? 9).toFixed(1)}
-            </Typography>
-          </Box>
+          {(rating ?? title.rating?.average) !== null && (rating ?? title.rating?.average) !== undefined && (
+            <Box sx={{ display: "flex", alignItems: "center", gap: "6px", color: "primary.main" }}>
+              <StarIcon sx={{ fontSize: "18px" }} />
+              <Typography component="span" sx={{ fontSize: "13px", fontWeight: 600 }}>
+                {(rating ?? title.rating!.average!).toFixed(1)}
+              </Typography>
+            </Box>
+          )}
         </Box>
       </Box>
 
@@ -128,13 +136,16 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
         <Box
           component="button"
           type="button"
-          onClick={() => setInWatchlist((value) => !value)}
+          aria-pressed={engagement.inWatchlist}
+          disabled={!isSignedIn || setWatchlist.isPending}
+          onClick={() => setWatchlist.mutate(!engagement.inWatchlist)}
           sx={{
             display: "flex",
             alignItems: "center",
             gap: "10px",
             border: "none",
-            cursor: "pointer",
+            cursor: isSignedIn ? "pointer" : "default",
+            opacity: isSignedIn ? 1 : 0.6,
             borderRadius: "12px",
             backgroundColor: "primary.main",
             px: "18px",
@@ -157,10 +168,10 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
           </Box>
           <Box sx={{ textAlign: "left" }}>
             <Typography sx={{ fontSize: "14px", fontWeight: 700, color: "#191919", lineHeight: 1.2 }}>
-              {inWatchlist ? "In Watchlist" : "Add to Watchlist"}
+              {engagement.inWatchlist ? "In Watchlist" : "Add to Watchlist"}
             </Typography>
             <Typography sx={{ fontSize: "11px", color: "#191919", opacity: 0.75, lineHeight: 1.2 }}>
-              Add by {formatCount(stream.watchlistCount)} Users
+              Added by {formatCount(engagement.watchlistCount)} {engagement.watchlistCount === 1 ? "User" : "Users"}
             </Typography>
           </Box>
         </Box>
