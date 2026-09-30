@@ -121,23 +121,33 @@ export class CommentService {
   ): Promise<{ likes: number; dislikes: number; myReaction: ReactionType | null }> {
     await this.assertCommentExists(commentId);
 
-    const existing = await this.prisma.commentReaction.findUnique({
-      where: { commentId_userId: { commentId, userId } },
+    // Deleting first answers "is this a withdrawal?" with the delete itself,
+    // so there is no read whose result a second request could invalidate: two
+    // clicks racing would otherwise both see no row and both insert, and one
+    // would die on the unique index. The upsert closes the same race on the
+    // other branch — Postgres resolves it as ON CONFLICT rather than a failed
+    // insert.
+    const { count: withdrawn } = await this.prisma.commentReaction.deleteMany({
+      where: { commentId, userId, type },
     });
 
-    if (existing?.type === type) {
-      await this.prisma.commentReaction.delete({ where: { id: existing.id } });
-    } else if (existing) {
-      await this.prisma.commentReaction.update({ where: { id: existing.id }, data: { type } });
-    } else {
-      await this.prisma.commentReaction.create({ data: { commentId, userId, type } });
+    if (withdrawn > 0) {
+      const counts = await this.countFor(commentId);
+      return { ...counts, myReaction: null };
     }
 
-    const counts = (await this.countReactions([commentId])).get(commentId) ?? {
-      likes: 0,
-      dislikes: 0,
-    };
-    return { ...counts, myReaction: existing?.type === type ? null : type };
+    await this.prisma.commentReaction.upsert({
+      where: { commentId_userId: { commentId, userId } },
+      create: { commentId, userId, type },
+      update: { type },
+    });
+
+    const counts = await this.countFor(commentId);
+    return { ...counts, myReaction: type };
+  }
+
+  private async countFor(commentId: string): Promise<ReactionCounts> {
+    return (await this.countReactions([commentId])).get(commentId) ?? { likes: 0, dislikes: 0 };
   }
 
   /** Re-reporting replaces the reason rather than failing: the unique index exists to stop pile-ons, not to punish a second thought. */

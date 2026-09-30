@@ -40,12 +40,10 @@ describe("CommentService", () => {
               delete: jest.fn(),
             },
             commentReaction: {
-              findUnique: jest.fn(),
               findMany: jest.fn(),
               groupBy: jest.fn(),
-              create: jest.fn(),
-              update: jest.fn(),
-              delete: jest.fn(),
+              deleteMany: jest.fn(),
+              upsert: jest.fn(),
             },
             commentReport: { upsert: jest.fn() },
             titleRating: { findMany: jest.fn() },
@@ -188,57 +186,47 @@ describe("CommentService", () => {
   describe("react", () => {
     beforeEach(() => {
       (prismaMock.titleComment.findUnique as jest.Mock).mockResolvedValue({ id: commentId });
+      (prismaMock.commentReaction.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
     });
 
     describe("should withdraw the vote", () => {
-      it("if the same reaction is sent twice", async () => {
-        (prismaMock.commentReaction.findUnique as jest.Mock).mockResolvedValue({
-          id: "reaction-1",
-          type: ReactionType.LIKE,
-        });
+      it("if the same reaction is sent twice, without writing a row", async () => {
+        (prismaMock.commentReaction.deleteMany as jest.Mock).mockResolvedValue({ count: 1 });
 
         const result = await service.react(commentId, userId, ReactionType.LIKE);
 
-        expect(prismaMock.commentReaction.delete).toHaveBeenCalledWith({
-          where: { id: "reaction-1" },
+        expect(prismaMock.commentReaction.deleteMany).toHaveBeenCalledWith({
+          where: { commentId, userId, type: ReactionType.LIKE },
         });
+        expect(prismaMock.commentReaction.upsert).not.toHaveBeenCalled();
         expect(result.myReaction).toBeNull();
       });
     });
 
-    describe("should switch sides in place", () => {
-      it("if the other reaction is sent, rather than leaving two rows", async () => {
-        (prismaMock.commentReaction.findUnique as jest.Mock).mockResolvedValue({
-          id: "reaction-1",
-          type: ReactionType.LIKE,
-        });
-
+    describe("should record the vote", () => {
+      it("if the viewer had not reacted, or had voted the other way", async () => {
         const result = await service.react(commentId, userId, ReactionType.DISLIKE);
 
-        expect(prismaMock.commentReaction.update).toHaveBeenCalledWith({
-          where: { id: "reaction-1" },
-          data: { type: ReactionType.DISLIKE },
+        expect(prismaMock.commentReaction.upsert).toHaveBeenCalledWith({
+          where: { commentId_userId: { commentId, userId } },
+          create: { commentId, userId, type: ReactionType.DISLIKE },
+          update: { type: ReactionType.DISLIKE },
         });
-        expect(prismaMock.commentReaction.create).not.toHaveBeenCalled();
         expect(result.myReaction).toBe(ReactionType.DISLIKE);
       });
     });
 
-    describe("should record the first vote", () => {
-      it("if the viewer had not reacted before", async () => {
-        (prismaMock.commentReaction.findUnique as jest.Mock).mockResolvedValue(null);
-
+    describe("should not read the row before writing", () => {
+      it("so two clicks racing cannot both decide the row is missing", async () => {
         await service.react(commentId, userId, ReactionType.LIKE);
 
-        expect(prismaMock.commentReaction.create).toHaveBeenCalledWith({
-          data: { commentId, userId, type: ReactionType.LIKE },
-        });
+        // Only the existence check on the comment itself.
+        expect(prismaMock.titleComment.findUnique).toHaveBeenCalledTimes(1);
       });
     });
 
     describe("should split the counts by type", () => {
       it("so likes and dislikes are reported separately", async () => {
-        (prismaMock.commentReaction.findUnique as jest.Mock).mockResolvedValue(null);
         (prismaMock.commentReaction.groupBy as jest.Mock).mockResolvedValue([
           { commentId, type: ReactionType.LIKE, _count: { _all: 3 } },
           { commentId, type: ReactionType.DISLIKE, _count: { _all: 1 } },
