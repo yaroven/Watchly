@@ -1,9 +1,6 @@
 import {
   AbortMultipartUploadCommand,
-  BucketAlreadyExists,
-  BucketAlreadyOwnedByYou,
   CompleteMultipartUploadCommand,
-  CreateBucketCommand,
   CreateMultipartUploadCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
@@ -11,7 +8,6 @@ import {
   HeadBucketCommand,
   ListObjectsV2Command,
   NotFound,
-  PutBucketCorsCommand,
   PutObjectCommand,
   S3Client,
   UploadPartCommand,
@@ -62,83 +58,36 @@ export class S3Service implements OnModuleInit {
   }
 
   async onModuleInit() {
-    await this.initializeBucketWithRetry(this.rawBucketName);
-    await this.initializeBucketWithRetry(this.processedBucketName);
-  }
-
-  private async initializeBucketWithRetry(bucketName: string, retries = 3) {
-    for (let i = 0; i < retries; i++) {
-      try {
-        await this.initializeBucket(bucketName);
-        return;
-      } catch (error) {
-        if (i === retries - 1) throw error;
-        this.logger.warn(`Failed to initialize bucket "${bucketName}". Retrying in 2 seconds...`);
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-      }
-    }
-  }
-
-  private async initializeBucket(bucketName: string) {
-    try {
-      await this.s3Client.send(new HeadBucketCommand({ Bucket: bucketName }));
-      this.logger.log(`Bucket "${bucketName}" verified.`);
-    } catch (error: any) {
-      if (error instanceof NotFound) {
-        this.logger.log(`Bucket "${bucketName}" not found. Creating it now...`);
-        await this.createBucket(bucketName);
-      } else {
-        this.logger.error(`Unexpected Error: ${error}`);
-        throw new InternalServerErrorException(
-          "An unexpected error occurred during S3 initialization",
-        );
-      }
-    }
-
-    await this.configureBucketCors(bucketName);
+    await Promise.all([
+      this.verifyBucket(this.rawBucketName),
+      this.verifyBucket(this.processedBucketName),
+    ]);
   }
 
   /**
-   * The browser needs to read the `ETag` response header of each multipart-part PUT (it's
-   * how a part is identified when completing the upload) — browsers only expose response
-   * headers a CORS policy explicitly lists in `ExposeHeaders`, so without this the upload
-   * flow silently gets `undefined` ETags and fails at the complete step.
+   * Buckets belong to the environment, not to this service: the LocalStack
+   * init script creates them locally, the cloud account owns them elsewhere.
+   * Checking at boot turns a missing one into a clear failure here instead of
+   * a confusing 404 on the first upload — and keeps this service's
+   * credentials down to reading and writing objects.
    */
-  private async configureBucketCors(bucketName: string) {
-    await this.s3Client.send(
-      new PutBucketCorsCommand({
-        Bucket: bucketName,
-        CORSConfiguration: {
-          CORSRules: [
-            {
-              AllowedMethods: ["PUT", "GET", "HEAD"],
-              AllowedOrigins: ["*"],
-              AllowedHeaders: ["*"],
-              ExposeHeaders: ["ETag"],
-              MaxAgeSeconds: 3600,
-            },
-          ],
-        },
-      }),
-    );
-  }
-  private async createBucket(bucketName: string) {
-    try {
-      await this.s3Client.send(new CreateBucketCommand({ Bucket: bucketName }));
-      this.logger.log(`Bucket "${bucketName}" created successfully.`);
-    } catch (createError) {
-      if (
-        createError instanceof BucketAlreadyOwnedByYou ||
-        createError instanceof BucketAlreadyExists
-      ) {
-        this.logger.log(`Bucket "${bucketName}" was created by another process.`);
+  private async verifyBucket(bucketName: string, retries = 3) {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        await this.s3Client.send(new HeadBucketCommand({ Bucket: bucketName }));
+        this.logger.log(`Bucket "${bucketName}" verified.`);
         return;
+      } catch (error) {
+        if (error instanceof NotFound) {
+          throw new InternalServerErrorException(
+            `Bucket "${bucketName}" does not exist. It is provisioned with the environment, not by this service.`,
+          );
+        }
+        // Storage may simply not be up yet on a cold start.
+        if (attempt === retries) throw error;
+        this.logger.warn(`Could not reach bucket "${bucketName}". Retrying in 2 seconds...`);
+        await new Promise((resolve) => setTimeout(resolve, 2000));
       }
-
-      this.logger.error(
-        `Failed to create bucket: ${createError instanceof Error ? createError.message : createError}`,
-      );
-      throw new InternalServerErrorException(`Failed to create bucket: ${bucketName}`);
     }
   }
 
