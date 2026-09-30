@@ -1,0 +1,85 @@
+# Rolls a build out to the home cluster.
+#
+# Runs on a self-hosted runner because the cluster is on a home LAN behind
+# NAT — a GitHub-hosted runner cannot reach its API server.
+#
+# ┌─ SECURITY ─────────────────────────────────────────────────────────────┐
+# │ This repository is PUBLIC and this runner sits inside a home network.  │
+# │ Never add `pull_request`, `pull_request_target` or `issue_comment` to  │
+# │ the triggers below: any of them would let a stranger's fork run code   │
+# │ on that machine. Manual dispatch cannot be triggered from a fork,      │
+# │ which is the whole reason it is the only trigger here.                 │
+# └────────────────────────────────────────────────────────────────────────┘
+#
+# The runner authenticates with a ServiceAccount scoped to the watchly-home
+# namespace (k8s/home/ci-rbac.yaml), not the cluster admin kubeconfig.
+name: Deploy Home
+run-name: "Deploy ${{ inputs.sha }} to home${{ inputs.migrate && ' (with migrations)' || '' }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Image tag to deploy — the sha Release Images printed"
+        type: string
+        required: true
+      migrate:
+        description: "Run database migrations before rolling out the app"
+        type: boolean
+        default: false
+
+# One deploy at a time; a second would fight the first over the same
+# Deployments.
+concurrency:
+  group: deploy-home
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, watchly-home]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Point the overlay at ${{ inputs.sha }}
+        run: ./scripts/set-home-images.sh "${{ inputs.sha }}"
+
+      - name: Check the images exist before touching the cluster
+        run: |
+          set -euo pipefail
+          for image in \
+            "razanka/watchly-api:${{ inputs.sha }}" \
+            "razanka/watchly-transcoder-worker:${{ inputs.sha }}" \
+            "razanka/watchly-client:home-${{ inputs.sha }}"; do
+            docker manifest inspect "$image" >/dev/null \
+              || { echo "$image is not in the registry — did Release Images finish?" >&2; exit 1; }
+          done
+
+      - name: Migrate
+        if: ${{ inputs.migrate }}
+        run: |
+          set -euo pipefail
+          # A Job's pod template is immutable, so the previous one has to go.
+          kubectl -n watchly-home delete job watchly-migrate --ignore-not-found
+          kubectl apply -k k8s/home/migration
+          kubectl wait --for=condition=complete job/watchly-migrate -n watchly-home --timeout=10m
+
+      - name: Apply
+        run: kubectl apply -k k8s/home
+
+      - name: Wait for the rollout
+        run: |
+          set -euo pipefail
+          kubectl -n watchly-home rollout status deploy/api --timeout=5m
+          kubectl -n watchly-home rollout status deploy/client --timeout=5m
+          kubectl -n watchly-home rollout status deploy/transcoder-worker --timeout=5m
+
+      - name: Report
+        if: always()
+        run: |
+          {
+            echo "### watchly-home"
+            echo '```'
+            kubectl -n watchly-home get pods
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
