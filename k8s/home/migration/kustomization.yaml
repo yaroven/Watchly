@@ -13,4 +13,4 @@ resources:
 
 images:
   - name: razanka/watchly-migrator
-    newTag: 550c6ba
+    newTag: 3eb8c46
