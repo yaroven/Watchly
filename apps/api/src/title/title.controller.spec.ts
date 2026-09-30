@@ -94,7 +94,7 @@ describe("TitleController", () => {
 
         const result = await controller.findAll(query, sort, filters);
 
-        expect(titleServiceMock.findAll).toHaveBeenCalledWith(query, sort, filters);
+        expect(titleServiceMock.findAll).toHaveBeenCalledWith(query, sort, filters, undefined);
         expect(result).toEqual(titlesResponse);
       });
     });
@@ -106,9 +106,9 @@ describe("TitleController", () => {
         const title = { id: "title-1" };
         (titleServiceMock.findOne as jest.Mock).mockResolvedValue(title);
 
-        const result = await controller.findOne("title-1");
+        const result = await controller.findOne("title-1", {} as never);
 
-        expect(titleServiceMock.findOne).toHaveBeenCalledWith("title-1");
+        expect(titleServiceMock.findOne).toHaveBeenCalledWith("title-1", undefined);
         expect(result).toEqual(title);
       });
     });
@@ -117,7 +117,7 @@ describe("TitleController", () => {
       it("if the title does not exist", async () => {
         (titleServiceMock.findOne as jest.Mock).mockResolvedValue(null);
 
-        const action = controller.findOne("non-existent");
+        const action = controller.findOne("non-existent", {} as never);
 
         await expect(action).rejects.toThrow(NotFoundException);
       });

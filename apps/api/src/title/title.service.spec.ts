@@ -8,6 +8,8 @@ import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
 import { SeasonService } from "../season/season.service";
+import { TitleEngagementDto } from "../title-engagement/dto/response/title-engagement.dto";
+import { TitleEngagementService } from "../title-engagement/title-engagement.service";
 import { TitleRatingService } from "../title-rating/title-rating.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { TitleService } from "./title.service";
@@ -70,6 +72,16 @@ describe("TitleService", () => {
             // the Watchly score on a response.
             summarize: jest.fn().mockResolvedValue({ average: null, count: 0, myScore: null }),
             summarizeMany: jest.fn().mockResolvedValue(new Map()),
+          },
+        },
+        {
+          provide: TitleEngagementService,
+          useValue: {
+            // Likewise its own module; TitleService only asks it to fill the
+            // like/watchlist block on a response.
+            summarize: jest.fn().mockResolvedValue(new TitleEngagementDto({})),
+            summarizeMany: jest.fn().mockResolvedValue(new Map()),
+            findWatchlistTitleIds: jest.fn().mockResolvedValue({ titleIds: [], totalCount: 0 }),
           },
         },
         {
