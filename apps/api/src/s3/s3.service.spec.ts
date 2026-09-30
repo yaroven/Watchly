@@ -1,6 +1,4 @@
 import {
-  BucketAlreadyExists,
-  BucketAlreadyOwnedByYou,
   CreateBucketCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
@@ -12,7 +10,6 @@ import {
 } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { InternalServerErrorException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Test } from "@nestjs/testing";
 import { Readable } from "stream";
@@ -229,134 +226,44 @@ describe("S3Service", () => {
   });
 
   describe("onModuleInit", () => {
-    const createHeadBucketMock = (error: Error | null) => {
-      mockSend.mockImplementation((command) => {
-        if (command instanceof HeadBucketCommand) {
-          if (error) throw error;
+    describe("should verify both buckets", () => {
+      it("if they exist", async () => {
+        mockSend.mockResolvedValue({});
+
+        await service.onModuleInit();
+
+        const heads = mockSend.mock.calls.filter(([c]) => c instanceof HeadBucketCommand);
+        expect(heads).toHaveLength(2);
+      });
+    });
+
+    describe("should throw naming the bucket", () => {
+      it("if one is missing, since provisioning belongs to the environment", async () => {
+        mockSend.mockImplementation((command) => {
+          if (command instanceof HeadBucketCommand) {
+            throw new NotFound({ message: "not found", $metadata: {} });
+          }
           return Promise.resolve({});
-        }
-        if (command instanceof CreateBucketCommand) {
+        });
+
+        await expect(service.onModuleInit()).rejects.toThrow("watchly-raw");
+      });
+    });
+
+    describe("should not create anything", () => {
+      it("even when a bucket is missing", async () => {
+        mockSend.mockImplementation((command) => {
+          if (command instanceof HeadBucketCommand) {
+            throw new NotFound({ message: "not found", $metadata: {} });
+          }
           return Promise.resolve({});
-        }
-        return Promise.resolve({});
+        });
+
+        await expect(service.onModuleInit()).rejects.toThrow();
+
+        const creates = mockSend.mock.calls.filter(([c]) => c instanceof CreateBucketCommand);
+        expect(creates).toHaveLength(0);
       });
-    };
-
-    it("should verify existing bucket without creating", async () => {
-      createHeadBucketMock(null);
-
-      await service.onModuleInit();
-
-      // Both buckets verified + CORS configured on each
-      expect(mockSend).toHaveBeenCalledTimes(4);
-    });
-
-    it("should create bucket when NotFound is thrown", async () => {
-      mockSend.mockImplementation((command) => {
-        if (command instanceof HeadBucketCommand) {
-          throw new NotFound({ message: "not found", $metadata: {} });
-        }
-        if (command instanceof CreateBucketCommand) {
-          return Promise.resolve({});
-        }
-        return Promise.resolve({});
-      });
-
-      await service.onModuleInit();
-
-      // 2 head-bucket failures + 2 create-bucket calls + 2 CORS configs = 6
-      expect(mockSend).toHaveBeenCalledTimes(6);
-    });
-
-    it("should rethrow non-NotFound errors from initializeBucket", async () => {
-      mockSend.mockImplementation((command) => {
-        if (command instanceof HeadBucketCommand) {
-          throw new Error("unexpected error");
-        }
-        return Promise.resolve({});
-      });
-
-      await expect(service.onModuleInit()).rejects.toThrow(
-        "An unexpected error occurred during S3 initialization",
-      );
-    });
-
-    it("should retry initializeBucket up to 3 times when a non-NotFound error keeps occurring, then succeed", async () => {
-      jest.useFakeTimers();
-      let attempts = 0;
-      mockSend.mockImplementation((command) => {
-        if (command instanceof HeadBucketCommand) {
-          attempts++;
-          if (attempts % 3 !== 0) throw new Error("transient failure");
-          return Promise.resolve({});
-        }
-        return Promise.resolve({});
-      });
-
-      const initPromise = service.onModuleInit();
-      await jest.runAllTimersAsync();
-      await initPromise;
-
-      // 2 buckets × 3 attempts each (2 failures + 1 success per bucket)
-      expect(attempts).toBe(6);
-      jest.useRealTimers();
-    });
-
-    it("should throw after exhausting all retries when errors persist", async () => {
-      jest.useFakeTimers();
-      mockSend.mockImplementation((command) => {
-        if (command instanceof HeadBucketCommand) {
-          throw new Error("permanent failure");
-        }
-        return Promise.resolve({});
-      });
-
-      const initPromise = service.onModuleInit();
-      const assertion = expect(initPromise).rejects.toThrow(InternalServerErrorException);
-      await jest.runAllTimersAsync();
-      await assertion;
-
-      jest.useRealTimers();
-    });
-  });
-
-  describe("createBucket", () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let createBucketMethod: (bucketName: string) => Promise<void>;
-
-    beforeEach(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      createBucketMethod = (service as any).createBucket.bind(service);
-    });
-
-    it("should create bucket successfully", async () => {
-      mockSend.mockResolvedValueOnce({});
-
-      await createBucketMethod("new-bucket");
-
-      expect(mockSend).toHaveBeenCalledWith(expect.any(CreateBucketCommand));
-    });
-
-    it("should handle BucketAlreadyExists gracefully", async () => {
-      mockSend.mockRejectedValueOnce(
-        new BucketAlreadyExists({ message: "already exists", $metadata: {} }),
-      );
-
-      await expect(createBucketMethod("existing-bucket")).resolves.not.toThrow();
-    });
-
-    it("should handle BucketAlreadyOwnedByYou gracefully", async () => {
-      mockSend.mockRejectedValueOnce(
-        new BucketAlreadyOwnedByYou({ message: "already owned", $metadata: {} }),
-      );
-
-      await expect(createBucketMethod("owned-bucket")).resolves.not.toThrow();
-    });
-
-    it("should throw InternalServerErrorException for other errors", async () => {
-      mockSend.mockRejectedValueOnce(new Error("permission denied"));
-
-      await expect(createBucketMethod("bad-bucket")).rejects.toThrow(InternalServerErrorException);
     });
   });
 });
