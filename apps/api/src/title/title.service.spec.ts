@@ -17,6 +17,7 @@ import { TitleService } from "./title.service";
 describe("TitleService", () => {
   let service: TitleService;
   let prismaServiceMock: jest.Mocked<PrismaService>;
+  let engagementServiceMock: jest.Mocked<TitleEngagementService>;
   let s3ServiceMock: jest.Mocked<S3Service>;
   let mediaAssetServiceMock: jest.Mocked<MediaAssetService>;
   let seasonServiceMock: jest.Mocked<SeasonService>;
@@ -96,6 +97,9 @@ describe("TitleService", () => {
 
     service = module.get<TitleService>(TitleService);
     prismaServiceMock = module.get(PrismaService) as jest.Mocked<PrismaService>;
+    engagementServiceMock = module.get(
+      TitleEngagementService,
+    ) as jest.Mocked<TitleEngagementService>;
     s3ServiceMock = module.get(S3Service) as jest.Mocked<S3Service>;
     mediaAssetServiceMock = module.get(MediaAssetService) as jest.Mocked<MediaAssetService>;
     seasonServiceMock = module.get(SeasonService) as jest.Mocked<SeasonService>;
@@ -329,6 +333,68 @@ describe("TitleService", () => {
           }),
         );
       });
+    });
+  });
+
+  describe("findWatchlist", () => {
+    const viewerId = "viewer-1";
+
+    it("should return the titles in the order the watchlist gave them, not the database's", async () => {
+      // `findMany({ id: { in: [...] } })` answers in arbitrary order, so the id
+      // list is the only thing carrying "newest addition first".
+      (engagementServiceMock.findWatchlistTitleIds as jest.Mock).mockResolvedValue({
+        titleIds: ["title-b", "title-a"],
+        totalCount: 2,
+      });
+      (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([
+        { id: "title-a", genres: [] },
+        { id: "title-b", genres: [] },
+      ]);
+
+      const result = await service.findWatchlist(viewerId, {});
+
+      expect(result.items.map((item) => item.id)).toEqual(["title-b", "title-a"]);
+      expect(result.totalCount).toBe(2);
+    });
+
+    it("should ask for the viewer's own engagement, or every row renders as unsaved", async () => {
+      (engagementServiceMock.findWatchlistTitleIds as jest.Mock).mockResolvedValue({
+        titleIds: ["title-a"],
+        totalCount: 1,
+      });
+      (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([
+        { id: "title-a", genres: [] },
+      ]);
+
+      await service.findWatchlist(viewerId, {});
+
+      expect(engagementServiceMock.summarizeMany).toHaveBeenCalledWith(["title-a"], viewerId);
+    });
+
+    it("should drop a title that no longer exists without inventing a row", async () => {
+      (engagementServiceMock.findWatchlistTitleIds as jest.Mock).mockResolvedValue({
+        titleIds: ["title-a", "gone"],
+        totalCount: 2,
+      });
+      (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([
+        { id: "title-a", genres: [] },
+      ]);
+
+      const result = await service.findWatchlist(viewerId, {});
+
+      expect(result.items.map((item) => item.id)).toEqual(["title-a"]);
+    });
+
+    it("should not query titles at all for an empty watchlist", async () => {
+      (engagementServiceMock.findWatchlistTitleIds as jest.Mock).mockResolvedValue({
+        titleIds: [],
+        totalCount: 0,
+      });
+
+      const result = await service.findWatchlist(viewerId, {});
+
+      expect(result).toEqual({ items: [], totalCount: 0 });
+      expect(prismaServiceMock.title.findMany).not.toHaveBeenCalled();
     });
   });
 

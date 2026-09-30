@@ -3,6 +3,7 @@
 import { useWatchlist } from "@/features/title-engagement";
 import { APP } from "@/shared/lib/routes";
 import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutlineOutlined";
 import Box from "@mui/material/Box";
 import Skeleton from "@mui/material/Skeleton";
 import Typography from "@mui/material/Typography";
@@ -15,6 +16,8 @@ import { useState } from "react";
 import TitleCard from "../TitleCard";
 
 const PAGE_SIZE = 12;
+
+const iconSx = { fontSize: "40px", color: "text.secondary" } as const;
 
 const gridSx = {
   display: "grid",
@@ -29,7 +32,7 @@ export default function WatchlistScreen() {
   const authStatus = useAuthStore((state) => state.status);
   const [page, setPage] = useState(1);
 
-  const { data, isPending } = useWatchlist({ page, limit: PAGE_SIZE });
+  const { data, isPending, isError, error, refetch, isFetching } = useWatchlist({ page, limit: PAGE_SIZE });
   const items = data?.items ?? [];
   const totalCount = data?.totalCount ?? 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
@@ -55,7 +58,7 @@ export default function WatchlistScreen() {
         )}
       </Box>
 
-      {isPending && (
+      {isPending && !isError && (
         <Box sx={gridSx}>
           {Array.from({ length: 6 }, (_, index) => (
             <Skeleton
@@ -67,7 +70,17 @@ export default function WatchlistScreen() {
         </Box>
       )}
 
-      {!isPending && items.length === 0 && (
+      {/* A failed load must never read as an empty watchlist — someone whose forty
+          saved titles did not arrive would be told they never saved anything. */}
+      {isError && (
+        <EmptyState message={`Could not load your watchlist: ${error.message}`} icon={<ErrorOutlineIcon sx={iconSx} />}>
+          <Button variant="outlined" disabled={isFetching} onClick={() => void refetch()}>
+            Try again
+          </Button>
+        </EmptyState>
+      )}
+
+      {!isPending && !isError && items.length === 0 && (
         <EmptyState message="Nothing saved yet. The bookmark on any poster puts it here.">
           <Button variant="outlined" onClick={() => router.push(APP.DISCOVER)}>
             Browse titles
@@ -88,7 +101,7 @@ export default function WatchlistScreen() {
   );
 }
 
-function EmptyState({ message, children }: { message: string; children: React.ReactNode }) {
+function EmptyState({ message, children, icon }: { message: string; children: React.ReactNode; icon?: React.ReactNode }) {
   return (
     <Box
       sx={{
@@ -102,7 +115,7 @@ function EmptyState({ message, children }: { message: string; children: React.Re
         borderColor: "divider",
       }}
     >
-      <BookmarkBorderIcon sx={{ fontSize: "40px", color: "text.secondary" }} />
+      {icon ?? <BookmarkBorderIcon sx={iconSx} />}
       <Typography sx={{ color: "text.secondary" }}>{message}</Typography>
       {children}
     </Box>

@@ -5,13 +5,12 @@ import { ReactionType, TitleEngagement } from "../schemas/title-engagement";
 import titleEngagementKeys from "./title-engagement.keys";
 import titleEngagementService from "./title-engagement.service";
 
-/** Every title read carries the engagement block, so lists and the detail page go stale together with it. */
-const invalidateFor = (titleId: string) => [
-  titleEngagementKeys.detail(titleId),
-  titleEngagementKeys.watchlists(),
-  titleKeys.detail(titleId),
-  titleKeys.lists(),
-];
+/**
+ * Every title read carries the engagement block, so the title caches go stale with
+ * it — toggling from one poster has to update the same title in the other rails it
+ * appears in. The prefixes cover every viewer-scoped variant of those keys.
+ */
+const invalidateFor = (titleId: string) => [titleEngagementKeys.all(), titleKeys.detail(titleId), titleKeys.lists()];
 
 export const useReactToTitle = (
   titleId: string,

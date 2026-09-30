@@ -1,4 +1,4 @@
-import { ReactionType } from "@/features/comment";
+import ReactionType from "@/types/reaction-type";
 
 export { ReactionType };
 
@@ -10,11 +10,3 @@ export interface TitleEngagement {
   myReaction: ReactionType | null;
   inWatchlist: boolean;
 }
-
-export const EMPTY_ENGAGEMENT: TitleEngagement = {
-  likes: 0,
-  dislikes: 0,
-  watchlistCount: 0,
-  myReaction: null,
-  inWatchlist: false,
-};

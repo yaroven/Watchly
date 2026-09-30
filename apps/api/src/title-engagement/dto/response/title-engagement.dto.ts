@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { ApiProperty } from "@nestjs/swagger";
 import { ReactionType } from "@prisma/client";
 
 export interface TitleEngagementCounts {
@@ -17,8 +17,9 @@ export class TitleEngagementDto {
   @ApiProperty({ description: "How many people have this title on their watchlist" })
   watchlistCount: number;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     enum: ReactionType,
+    nullable: true,
     description: "The current viewer's own vote, null if they have not voted or are anonymous",
   })
   myReaction: ReactionType | null;

@@ -159,7 +159,25 @@ Endpoints:
 Unblocks `TitleReviews.tsx` + `CommentCard.tsx` (both have explicit PLACEHOLDER comments
 pointing here).
 
-## Phase 4 — Engagement (like/dislike/watchlist on Title)
+## Phase 4 — Engagement (like/dislike/watchlist on Title) — **shipped** (#60)
+
+The models landed as described. The endpoints did not:
+
+| Planned                            | Shipped                           |
+| ---------------------------------- | --------------------------------- |
+| `POST/DELETE /titles/:id/reaction` | `POST/DELETE /title/:id/reaction` |
+| `GET /users/me/watchlist`          | `GET /watchlist`                  |
+| `GET /titles/:id/stats`            | —                                 |
+
+`GET /titles/:id/stats` was dropped rather than renamed: the counts and the
+viewer's own state ride on the title response itself beside the rating block,
+so the detail page, every list and the watchlist page get them from the read
+they already make. Title reads became `@OptionalAuth()` to carry it.
+`GET /title/:id/engagement` exists for the one case that has no title read
+to piggyback on.
+
+`shares` has no counterpart — nothing tracks sharing, and the client's share
+button copies the link rather than reporting a number.
 
 ```prisma
 model TitleReaction {
@@ -187,7 +205,8 @@ Endpoints:
 - `POST /titles/:id/watchlist`, `DELETE /titles/:id/watchlist`, `GET /users/me/watchlist`
 - `GET /titles/:id/stats` — aggregate likes/dislikes/shares/watchlistCount
 
-Unblocks `StreamFilmInfo.tsx` and the "My Watchlist" row on Discover.
+Unblocked `StreamFilmInfo.tsx`, the "My Watchlist" row on Discover, the poster
+bookmark on `TitleCard`, and the `/watchlist` page (which did not exist).
 
 ## Phase 5 — Title photos
 

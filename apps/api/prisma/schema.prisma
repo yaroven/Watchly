@@ -92,8 +92,7 @@ model Title {
 }
 
 /// A thumbs up or down on the title itself, distinct from TitleRating: the
-/// score says how good it is, this says whether the viewer enjoyed it, and the
-/// player bar shows only the latter.
+/// score says how good it is, this says whether the viewer enjoyed it.
 model TitleReaction {
   id        String       @id @default(uuid())
   titleId   String
