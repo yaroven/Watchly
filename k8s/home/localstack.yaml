@@ -1,0 +1,120 @@
+# S3 and SQS from one process, the same way dev runs them.
+#
+# The point of this over MinIO is the part MinIO cannot do: bucket
+# notifications into a queue. With it the api bootstraps itself exactly as it
+# does in dev and prod — S3Service creates the buckets, S3EventService
+# creates the queue and wires the notification — so this overlay needs no
+# bucket Job and no S3_EVENTS_ENABLED override.
+#
+# It is an AWS emulator rather than a storage system, which is the risk worth
+# watching: a media library is not what it was built to hold. `-persist` is a
+# community image that adds the on-disk persistence LocalStack keeps for its
+# paid tier; without it every restart would empty the library.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: localstack-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: localstack
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: localstack
+  ports:
+    - name: edge
+      port: 4566
+      targetPort: 4566
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: localstack
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: localstack
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: localstack
+    spec:
+      containers:
+        - name: localstack
+          image: gresau/localstack-persist:4
+          env:
+            - name: PERSISTENCE
+              value: "1"
+            # Only the two services the app talks to. The rest would start
+            # for nothing, and some of them want a container runtime this
+            # pod deliberately has no access to.
+            - name: SERVICES
+              value: s3,sqs
+            # LocalStack accepts any credentials by default; pinning them to
+            # the ones the api signs with keeps the two from drifting.
+            - name: PARITY_AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: watchly-secrets
+                  key: S3_ACCESS_KEY_ID
+            - name: PARITY_AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: watchly-secrets
+                  key: S3_SECRET_ACCESS_KEY
+            - name: EXTRA_CORS_ALLOWED_ORIGINS
+              value: "*"
+            - name: EXTRA_CORS_ALLOWED_HEADERS
+              value: "*"
+            - name: EXTRA_CORS_ALLOWED_METHODS
+              value: "*"
+            # The browser reads the ETag of each uploaded part to complete a
+            # multipart upload; without this it sees undefined and the upload
+            # fails at the last step.
+            - name: EXTRA_CORS_EXPOSE_HEADERS
+              value: "ETag"
+          # The init script reads the same names the api does, so the two
+          # cannot drift.
+          envFrom:
+            - configMapRef:
+                name: watchly-config
+          ports:
+            - containerPort: 4566
+          volumeMounts:
+            - name: data
+              mountPath: /persisted-data
+            # LocalStack runs everything here once the edge port is up.
+            - name: init
+              mountPath: /etc/localstack/init/ready.d
+          readinessProbe:
+            httpGet:
+              path: /_localstack/health
+              port: 4566
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 12
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              memory: 2Gi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: localstack-data
+        - name: init
+          configMap:
+            name: localstack-init
+            defaultMode: 0755
