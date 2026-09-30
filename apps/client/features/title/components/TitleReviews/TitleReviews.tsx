@@ -1,5 +1,7 @@
 "use client";
 
+import { type CommentSortMode, useComments, useCreateComment } from "@/features/comment";
+import { useRemoveTitleRating, useSetTitleRating, useTitleRating } from "@/features/title-rating";
 import type { Title } from "@/features/title/schemas/title";
 import ExpandMore from "@mui/icons-material/ExpandMore";
 import ForumIcon from "@mui/icons-material/Forum";
@@ -8,73 +10,109 @@ import Box from "@mui/material/Box";
 import Slider from "@mui/material/Slider";
 import Switch from "@mui/material/Switch";
 import Typography from "@mui/material/Typography";
+import { useAuthStore } from "@shared/lib/auth-store";
 import { formatCount } from "@shared/lib/format-count";
 import Button from "@shared/ui/Button";
-import { useMemo, useState } from "react";
-import { getTitleOverviewFixture, type ReviewComment } from "../TitleOverview/mocks";
+import { useState } from "react";
 import CommentCard from "./components/CommentCard";
 
 interface TitleReviewsProps {
   title: Title;
 }
 
-type SortMode = "newest" | "oldest" | "hottest";
-
-const SORT_OPTIONS: { key: SortMode; label: string }[] = [
+const SORT_OPTIONS: { key: CommentSortMode; label: string }[] = [
   { key: "newest", label: "Newest" },
   { key: "oldest", label: "Oldest" },
   { key: "hottest", label: "Hottest" },
 ];
 
-const PAGE_SIZE = 3;
-
-function sortComments(comments: ReviewComment[], mode: SortMode) {
-  const sorted = [...comments];
-  if (mode === "newest") return sorted.sort((a, b) => b.postedAt.getTime() - a.postedAt.getTime());
-  if (mode === "oldest") return sorted.sort((a, b) => a.postedAt.getTime() - b.postedAt.getTime());
-  return sorted.sort((a, b) => b.likes - a.likes);
-}
+const PAGE_SIZE = 5;
 
 export default function TitleReviews({ title }: TitleReviewsProps) {
-  const { reviews } = getTitleOverviewFixture(title.id);
+  const userId = useAuthStore((state) => state.userId);
+  const authStatus = useAuthStore((state) => state.status);
+  const isSignedIn = Boolean(userId);
+  // Both reads are personalised (own score, own reactions), so they wait for the session restore.
+  const sessionReady = authStatus === "resolved";
 
-  const [comments, setComments] = useState(reviews);
-  const [sortMode, setSortMode] = useState<SortMode>("newest");
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-
-  const [score, setScore] = useState(0);
+  const [sortMode, setSortMode] = useState<CommentSortMode>("newest");
   const [text, setText] = useState("");
   const [hasSpoiler, setHasSpoiler] = useState(false);
+  const [score, setScore] = useState(0);
 
-  const sortedComments = useMemo(() => sortComments(comments, sortMode), [comments, sortMode]);
-  const visibleComments = sortedComments.slice(0, visibleCount);
-  const totalReactions = useMemo(() => comments.reduce((sum, comment) => sum + comment.likes, 0), [comments]);
+  const { data: rating } = useTitleRating(title.id);
+  const setRating = useSetTitleRating(title.id);
+  const removeRating = useRemoveTitleRating(title.id);
 
-  // PLACEHOLDER: submits to local state only, never persisted. Needs a POST /titles/:id/reviews
-  // endpoint and a real signed-in user for author/avatarUrl instead of the hardcoded "You".
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isPending } = useComments(title.id, sortMode, PAGE_SIZE, sessionReady);
+  const comments = data?.pages.flatMap((page) => page.items) ?? [];
+  const totalCount = data?.pages[0]?.totalCount ?? 0;
+
+  const createComment = useCreateComment(title.id, {
+    onSuccess: () => {
+      setText("");
+      setHasSpoiler(false);
+    },
+  });
+
+  // Adjusting state during render rather than in an effect: the slider follows the saved score
+  // whenever the server's value changes, but stays put while the viewer is dragging it.
+  const [syncedScore, setSyncedScore] = useState<number | null>(null);
+  if (rating !== undefined && syncedScore !== rating.myScore) {
+    setSyncedScore(rating.myScore);
+    setScore(rating.myScore ?? 0);
+  }
+
   const handleSubmit = () => {
     if (!text.trim()) return;
-
-    const comment: ReviewComment = {
-      id: `local-${Date.now()}`,
-      author: "You",
-      avatarUrl: "https://picsum.photos/id/1074/120/120",
-      score,
-      text: hasSpoiler ? `[Contains spoilers] ${text.trim()}` : text.trim(),
-      postedAt: new Date(),
-      likes: 0,
-      dislikes: 0,
-    };
-
-    setComments((current) => [comment, ...current]);
-    setText("");
-    setScore(0);
-    setHasSpoiler(false);
+    createComment.mutate({ text: text.trim(), hasSpoiler });
   };
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "32px" }}>
-      <Typography variant="h3">Reviews</Typography>
+      <Box sx={{ display: "flex", alignItems: "baseline", gap: "16px", flexWrap: "wrap" }}>
+        <Typography variant="h3">Reviews</Typography>
+        <Typography sx={{ fontSize: "15px", color: "text.secondary" }}>
+          {rating?.average === null || rating === undefined
+            ? "Not rated yet"
+            : `${rating.average}/10 from ${formatCount(rating.count)} ${rating.count === 1 ? "viewer" : "viewers"}`}
+        </Typography>
+      </Box>
+
+      {isSignedIn && (
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: "16px",
+            flexWrap: "wrap",
+            borderRadius: "16px",
+            border: "1px solid",
+            borderColor: "divider",
+            p: "20px",
+          }}
+        >
+          <Typography sx={{ fontSize: "16px", fontWeight: 600, whiteSpace: "nowrap" }}>Your Score</Typography>
+          <Slider
+            value={score}
+            onChange={(_, value) => setScore(value as number)}
+            min={0}
+            max={10}
+            step={1}
+            size="small"
+            sx={{ color: "primary.main", flex: 1, minWidth: "180px" }}
+          />
+          <Typography sx={{ fontSize: "14px", color: "#ffffff", width: "24px" }}>{score}</Typography>
+          <Button variant="contained" disabled={score < 1 || setRating.isPending} onClick={() => setRating.mutate(score)}>
+            {rating?.myScore === null ? "Rate" : "Update"}
+          </Button>
+          {rating?.myScore !== null && rating !== undefined && (
+            <Button variant="outlined" disabled={removeRating.isPending} onClick={() => removeRating.mutate()}>
+              Clear
+            </Button>
+          )}
+        </Box>
+      )}
 
       <Box
         sx={{
@@ -88,18 +126,21 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
         }}
       >
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
-          <Typography sx={{ fontSize: "16px", fontWeight: 600 }}>Post a comment for this series:</Typography>
+          <Typography sx={{ fontSize: "16px", fontWeight: 600 }}>
+            {isSignedIn ? "Post a comment for this title:" : "Sign in to leave a comment."}
+          </Typography>
           <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <Typography sx={{ fontSize: "14px", color: "text.secondary" }}>Contains spoilers</Typography>
-            <Switch checked={hasSpoiler} onChange={(e) => setHasSpoiler(e.target.checked)} size="small" />
+            <Switch checked={hasSpoiler} onChange={(e) => setHasSpoiler(e.target.checked)} size="small" disabled={!isSignedIn} />
           </Box>
         </Box>
 
         <Box
           component="textarea"
           value={text}
+          disabled={!isSignedIn}
           onChange={(e) => setText((e.target as HTMLTextAreaElement).value)}
-          placeholder="Review Text ..."
+          placeholder="Comment Text ..."
           sx={{
             width: "100%",
             minHeight: "140px",
@@ -120,26 +161,12 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
           <Button
             variant="contained"
             onClick={handleSubmit}
-            disabled={!text.trim()}
+            disabled={!isSignedIn || !text.trim() || createComment.isPending}
             sx={{ display: "flex", alignItems: "center", gap: "8px" }}
           >
-            Submit Review
+            Post Comment
             <ForumIcon sx={{ fontSize: "18px" }} />
           </Button>
-
-          <Box sx={{ display: "flex", alignItems: "center", gap: "12px", minWidth: "220px" }}>
-            <Typography sx={{ fontSize: "13px", color: "text.secondary", whiteSpace: "nowrap" }}>Your Score</Typography>
-            <Slider
-              value={score}
-              onChange={(_, value) => setScore(value as number)}
-              min={0}
-              max={10}
-              step={1}
-              size="small"
-              sx={{ color: "primary.main" }}
-            />
-            <Typography sx={{ fontSize: "13px", color: "#ffffff", width: "16px" }}>{score}</Typography>
-          </Box>
         </Box>
       </Box>
 
@@ -179,20 +206,25 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
             {label}
           </Box>
         ))}
-        <Typography sx={{ fontSize: "14px", color: "text.secondary", ml: "auto" }}>({formatCount(totalReactions)})</Typography>
+        <Typography sx={{ fontSize: "14px", color: "text.secondary", ml: "auto" }}>({formatCount(totalCount)})</Typography>
       </Box>
 
       <Box sx={{ display: "flex", flexDirection: "column", gap: "32px" }}>
-        {visibleComments.map((comment) => (
-          <CommentCard key={comment.id} comment={comment} />
+        {isPending && <Typography sx={{ fontSize: "14px", color: "text.secondary" }}>Loading comments ...</Typography>}
+        {!isPending && comments.length === 0 && (
+          <Typography sx={{ fontSize: "14px", color: "text.secondary" }}>No comments yet — be the first.</Typography>
+        )}
+        {comments.map((comment) => (
+          <CommentCard key={comment.id} comment={comment} titleId={title.id} />
         ))}
       </Box>
 
-      {visibleCount < sortedComments.length && (
+      {hasNextPage && (
         <Box sx={{ display: "flex", justifyContent: "center" }}>
           <Button
             variant="outlined"
-            onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
+            disabled={isFetchingNextPage}
+            onClick={() => fetchNextPage()}
             sx={{ display: "flex", alignItems: "center", gap: "6px" }}
           >
             Show more
