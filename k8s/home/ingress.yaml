@@ -45,6 +45,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: minio
+                name: localstack
                 port:
-                  number: 9000
+                  number: 4566

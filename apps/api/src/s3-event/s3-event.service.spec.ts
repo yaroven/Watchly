@@ -1,12 +1,4 @@
-import { PutBucketNotificationConfigurationCommand } from "@aws-sdk/client-s3";
-import {
-  CreateQueueCommand,
-  DeleteMessageCommand,
-  GetQueueAttributesCommand,
-  GetQueueUrlCommand,
-  QueueNameExists,
-  SetQueueAttributesCommand,
-} from "@aws-sdk/client-sqs";
+import { DeleteMessageCommand } from "@aws-sdk/client-sqs";
 import { ConfigService } from "@nestjs/config";
 import { Test, TestingModule } from "@nestjs/testing";
 import { PrismaService } from "../prisma/prisma.service";
@@ -69,12 +61,9 @@ describe("S3EventService", () => {
       VideoTranscoderService,
     ) as jest.Mocked<VideoTranscoderService>;
 
-    // Override the real SQS/S3 clients with a stub that shares one mockSend
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (service as any).sqsClient = { send: mockSend };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (service as any).s3Client = { send: mockSend };
-    // Inject fake queueUrl so pollLoop/setupInfrastructure can use it
+    // Inject fake queueUrl so pollLoop can use it
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (service as any).queueUrl = mockQueueUrl;
   });
@@ -83,77 +72,27 @@ describe("S3EventService", () => {
     jest.clearAllMocks();
   });
 
-  describe("setupInfrastructure", () => {
-    beforeEach(() => {
-      mockSend
-        .mockResolvedValueOnce({ QueueUrl: mockDlqUrl })
-        .mockResolvedValueOnce({ Attributes: { QueueArn: mockDlqArn } })
-        .mockResolvedValueOnce({ QueueUrl: mockQueueUrl })
-        .mockResolvedValueOnce({ Attributes: { QueueArn: mockQueueArn } })
-        .mockResolvedValueOnce({})
-        .mockResolvedValueOnce({});
+  describe("resolveQueueUrl", () => {
+    describe("should return the existing queue's url", () => {
+      it("if the queue was provisioned with the environment", async () => {
+        mockSend.mockResolvedValueOnce({ QueueUrl: mockQueueUrl });
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const result = await (service as any).resolveQueueUrl();
+
+        expect(result).toBe(mockQueueUrl);
+      });
     });
 
-    it("should create SQS queue", async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (service as any).setupInfrastructure();
+    describe("should throw a message naming the queue", () => {
+      it("if it does not exist, since this service no longer creates it", async () => {
+        mockSend.mockRejectedValueOnce(new Error("AWS.SimpleQueueService.NonExistentQueue"));
 
-      expect(mockSend).toHaveBeenCalledWith(expect.any(CreateQueueCommand));
-    });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const action = (service as any).resolveQueueUrl();
 
-    it("should fetch queue ARN via GetQueueAttributes", async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (service as any).setupInfrastructure();
-
-      expect(mockSend).toHaveBeenCalledWith(expect.any(GetQueueAttributesCommand));
-    });
-
-    it("should set queue policy allowing S3 to send messages", async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (service as any).setupInfrastructure();
-
-      const policyCall = mockSend.mock.calls.find(
-        (call) => call[0] instanceof SetQueueAttributesCommand,
-      );
-      expect(policyCall).toBeDefined();
-      const attrs = policyCall[0].input.Attributes;
-      const policy = JSON.parse(attrs.Policy);
-      expect(policy.Statement[0].Effect).toBe("Allow");
-      expect(policy.Statement[0].Principal.Service).toBe("s3.amazonaws.com");
-    });
-
-    it("should subscribe S3 bucket to queue", async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (service as any).setupInfrastructure();
-
-      const notifCall = mockSend.mock.calls.find(
-        (call) => call[0] instanceof PutBucketNotificationConfigurationCommand,
-      );
-      expect(notifCall).toBeDefined();
-      expect(notifCall[0].input.Bucket).toBe("watchly-raw");
-      expect(notifCall[0].input.NotificationConfiguration.QueueConfigurations[0].QueueArn).toBe(
-        mockQueueArn,
-      );
-    });
-
-    it("should reuse the existing queue and reconcile its attributes when CreateQueue reports it already exists", async () => {
-      mockSend.mockReset();
-      mockSend
-        .mockResolvedValueOnce({ QueueUrl: mockDlqUrl }) // create dlq
-        .mockResolvedValueOnce({ Attributes: { QueueArn: mockDlqArn } }) // dlq arn
-        .mockRejectedValueOnce(new QueueNameExists({ message: "already exists", $metadata: {} })) // create main queue fails
-        .mockResolvedValueOnce({ QueueUrl: mockQueueUrl }) // GetQueueUrl fallback
-        .mockResolvedValueOnce({}) // SetQueueAttributes (RedrivePolicy)
-        .mockResolvedValueOnce({ Attributes: { QueueArn: mockQueueArn } }) // main queue arn
-        .mockResolvedValueOnce({}) // SetQueueAttributes (Policy)
-        .mockResolvedValueOnce({}); // PutBucketNotificationConfiguration
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (service as any).setupInfrastructure();
-
-      expect(mockSend).toHaveBeenCalledWith(expect.any(GetQueueUrlCommand));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      expect((service as any).queueUrl).toBe(mockQueueUrl);
+        await expect(action).rejects.toThrow(mockConfig.queueName);
+      });
     });
   });
 
