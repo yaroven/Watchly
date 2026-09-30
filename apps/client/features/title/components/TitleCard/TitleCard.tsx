@@ -1,25 +1,33 @@
 "use client";
 
+import { EMPTY_ENGAGEMENT, useSetTitleWatchlist } from "@/features/title-engagement";
 import { ExternalRatingSource, type Title } from "@/features/title/schemas/title";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import { Favorite as FavoriteIcon, Star as StarIcon } from "@mui/icons-material";
 import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
+import { useAuthStore } from "@shared/lib/auth-store";
 import Image from "next/image";
-import { useState } from "react";
 
 interface TitleProps extends Omit<Title, "seasons"> {
   onClick: () => void;
-  isFavorite?: boolean;
 }
 
-export default function TitleCard({ name, posterUrl, type, genres, externalRatings, onClick, isFavorite = false }: TitleProps) {
+export default function TitleCard({ id, name, posterUrl, type, genres, externalRatings, engagement, onClick }: TitleProps) {
   const posterSrc = getOptimizedImageSrc(posterUrl);
   const subtitle = genres.length ? genres.map((genre) => genre.name).join(", ") : type === "MOVIE" ? "Movie" : "Series";
   const rating = externalRatings.find((r) => r.source === ExternalRatingSource.IMDB)?.rating;
 
-  const [favorite, setFavorite] = useState(isFavorite);
+  const isSignedIn = useAuthStore((state) => Boolean(state.userId));
+  const setWatchlist = useSetTitleWatchlist(id);
+  const inWatchlist = (engagement ?? EMPTY_ENGAGEMENT).inWatchlist;
+
+  const toggleWatchlist = (event: { stopPropagation: () => void }) => {
+    event.stopPropagation();
+    if (!isSignedIn || setWatchlist.isPending) return;
+    setWatchlist.mutate(!inWatchlist);
+  };
 
   return (
     <Card
@@ -83,8 +91,6 @@ export default function TitleCard({ name, posterUrl, type, genres, externalRatin
 
         <Box
           component="span"
-          role="button"
-          aria-label="Add to watchlist"
           sx={{
             position: "absolute",
             top: 0,
@@ -98,10 +104,19 @@ export default function TitleCard({ name, posterUrl, type, genres, externalRatin
             justifyContent: "center",
           }}
         >
+          {/* A span rather than a button: the whole card is already one, and a
+              button inside a button is invalid. */}
           <Box
             component="span"
             role="button"
-            aria-label="Add to watchlist"
+            tabIndex={isSignedIn ? 0 : -1}
+            aria-label={inWatchlist ? "Remove from watchlist" : "Add to watchlist"}
+            aria-pressed={inWatchlist}
+            aria-disabled={!isSignedIn}
+            onClick={toggleWatchlist}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") toggleWatchlist(event);
+            }}
             sx={{
               position: "absolute",
               top: 0,
@@ -112,18 +127,13 @@ export default function TitleCard({ name, posterUrl, type, genres, externalRatin
               // cut out of the poster rather than a chip floating on top of it.
               borderRadius: "8px",
               bgcolor: "#ffffff1a",
+              cursor: isSignedIn ? "pointer" : "default",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <FavoriteIcon
-              sx={{ fontSize: "12px", color: favorite ? "primary.main" : "#ffffff" }}
-              onClick={(e) => {
-                e.stopPropagation();
-                setFavorite((value) => !value);
-              }}
-            />
+            <FavoriteIcon sx={{ fontSize: "12px", color: inWatchlist ? "primary.main" : "#ffffff" }} />
           </Box>
         </Box>
 
