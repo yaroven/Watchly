@@ -80,13 +80,13 @@ model Title {
 
   videoTranscodingProgress VideoTranscodingProgress?
 
-  seasons     Season[]
-  castCredits CastCredit[]
-  genres      Genre[]
-  ratings     TitleRating[]
-  comments    TitleComment[]
-  reactions   TitleReaction[]
-  watchlisted WatchlistItem[]
+  seasons          Season[]
+  castCredits      CastCredit[]
+  genres           Genre[]
+  ratings          TitleRating[]
+  comments         TitleComment[]
+  reactions        TitleReaction[]
+  watchlistEntries WatchlistItem[]
 
   @@index([type, transcodingStatus])
 }
