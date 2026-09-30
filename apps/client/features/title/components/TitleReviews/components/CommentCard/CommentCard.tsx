@@ -17,15 +17,15 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { useAuthStore } from "@shared/lib/auth-store";
 import { formatCount } from "@shared/lib/format-count";
+import { tokens } from "@shared/mui/theme";
+import Avatar from "@shared/ui/Avatar";
 import Button from "@shared/ui/Button";
-import Avatar from "@shared/ui/Header/components/Avatar";
 import { useState } from "react";
 
 interface CommentCardProps {
   comment: Comment;
   titleId: string;
   depth?: number;
-  repliedToAuthor?: string;
 }
 
 const FALLBACK_AVATAR = "https://picsum.photos/id/1074/120/120";
@@ -40,7 +40,7 @@ function formatRelativeTime(postedAt: Date) {
   return `${days} day${days === 1 ? "" : "s"} ago`;
 }
 
-export default function CommentCard({ comment, titleId, depth = 0, repliedToAuthor }: CommentCardProps) {
+export default function CommentCard({ comment, titleId, depth = 0 }: CommentCardProps) {
   const userId = useAuthStore((state) => state.userId);
   const role = useAuthStore((state) => state.role);
   const status = useAuthStore((state) => state.status);
@@ -73,14 +73,20 @@ export default function CommentCard({ comment, titleId, depth = 0, repliedToAuth
     react.mutate({ commentId: comment.id, type });
   };
 
+  const isReply = depth > 0;
+
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: "12px", ml: depth > 0 ? "72px" : 0 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: "12px" }}>
       <Box
         sx={{
           position: "relative",
           display: "flex",
           gap: "16px",
-          ...(depth > 0 && { border: "1px solid", borderColor: "divider", borderRadius: "16px", p: "16px" }),
+          borderRadius: CARD_RADIUS,
+          border: "1px solid",
+          borderColor: "divider",
+          backgroundColor: isReply ? "transparent" : tokens.surface.default,
+          p: isReply ? "16px" : "20px",
         }}
       >
         {!spoilerRevealed && (
@@ -94,7 +100,7 @@ export default function CommentCard({ comment, titleId, depth = 0, repliedToAuth
               alignItems: "center",
               justifyContent: "center",
               gap: "12px",
-              borderRadius: "16px",
+              borderRadius: CARD_RADIUS,
               backgroundColor: "rgba(10,10,10,.92)",
               backdropFilter: "blur(6px)",
             }}
@@ -107,18 +113,25 @@ export default function CommentCard({ comment, titleId, depth = 0, repliedToAuth
           </Box>
         )}
 
-        <Avatar src={comment.author.avatarUrl ?? FALLBACK_AVATAR} alt={comment.author.name} />
+        <Avatar src={comment.author.avatarUrl ?? FALLBACK_AVATAR} alt={comment.author.name} size={isReply ? 36 : 48} />
         <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px", minWidth: 0 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-            <Typography sx={{ fontSize: "16px", fontWeight: 600 }}>{comment.author.name}</Typography>
-            {repliedToAuthor && (
-              <Typography component="span" sx={{ fontSize: "13px", color: "primary.main" }}>
-                Replied to: @{repliedToAuthor.replace(/\s+/g, "")}
-              </Typography>
+            <Typography sx={{ fontSize: isReply ? "15px" : "16px", fontWeight: 600 }}>{comment.author.name}</Typography>
+            {comment.author.score !== null && (
+              <Box sx={{ px: "10px", py: "2px", borderRadius: "999px", border: "1px solid", borderColor: "primary.main" }}>
+                <Typography sx={{ fontSize: "12px", fontWeight: 600, color: "primary.main", whiteSpace: "nowrap" }}>
+                  {comment.author.score}/10
+                </Typography>
+              </Box>
             )}
+            <Typography sx={{ fontSize: "13px", color: "text.secondary", whiteSpace: "nowrap", ml: "auto" }}>
+              {formatRelativeTime(comment.createdAt)}
+            </Typography>
           </Box>
 
-          <Typography sx={{ fontSize: "15px", color: "#e5e5e5" }}>{comment.text}</Typography>
+          <Typography sx={{ fontSize: "15px", color: tokens.text.field, lineHeight: 1.6, overflowWrap: "anywhere" }}>
+            {comment.text}
+          </Typography>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: "20px", flexWrap: "wrap" }}>
             <Box
@@ -216,7 +229,7 @@ export default function CommentCard({ comment, titleId, depth = 0, repliedToAuth
                   border: "1px solid",
                   borderColor: "divider",
                   backgroundColor: "transparent",
-                  color: "#e5e5e5",
+                  color: tokens.text.field,
                   padding: "10px",
                   font: "inherit",
                   fontSize: "14px",
@@ -233,35 +246,32 @@ export default function CommentCard({ comment, titleId, depth = 0, repliedToAuth
             </Box>
           )}
         </Box>
-
-        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px", flexShrink: 0 }}>
-          <Typography sx={{ fontSize: "13px", color: "text.secondary", whiteSpace: "nowrap" }}>
-            {formatRelativeTime(comment.createdAt)}
-          </Typography>
-          {comment.author.score !== null && (
-            <Box
-              sx={{
-                px: "12px",
-                py: "4px",
-                borderRadius: "999px",
-                border: "1px solid",
-                borderColor: "primary.main",
-              }}
-            >
-              <Typography sx={{ fontSize: "13px", fontWeight: 600, color: "primary.main", whiteSpace: "nowrap" }}>
-                Score: {comment.author.score}/10
-              </Typography>
-            </Box>
-          )}
-        </Box>
       </Box>
 
-      {replies.map((reply) => (
-        <CommentCard key={reply.id} comment={reply} titleId={titleId} depth={depth + 1} repliedToAuthor={comment.author.name} />
-      ))}
+      {replies.length > 0 && (
+        // A rail rather than a plain margin, so a long reply thread still reads as
+        // hanging off its parent once the parent has scrolled out of view.
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
+            ml: "24px",
+            pl: "24px",
+            borderLeft: "1px solid",
+            borderColor: "divider",
+          }}
+        >
+          {replies.map((reply) => (
+            <CommentCard key={reply.id} comment={reply} titleId={titleId} depth={depth + 1} />
+          ))}
+        </Box>
+      )}
     </Box>
   );
 }
+
+const CARD_RADIUS = "16px";
 
 const reactionButtonSx = {
   display: "flex",
