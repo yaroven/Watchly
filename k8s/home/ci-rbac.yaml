@@ -1,0 +1,85 @@
+# Credentials for the deploy runner.
+#
+# The runner sits on the node and could simply use the k3s admin kubeconfig,
+# which is what makes this worth doing: it runs jobs defined in a public
+# repository, so its blast radius should stop at this namespace rather than
+# reach the whole cluster.
+#
+# It can change everything the overlay contains and nothing else — no nodes,
+# no other namespaces, no RBAC of its own.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: deployer
+---
+# Kubernetes stopped minting long-lived tokens automatically in 1.24; this
+# asks for one explicitly, since a runner outside the cluster cannot use a
+# projected volume token.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: deployer-token
+  annotations:
+    kubernetes.io/service-account.name: deployer
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: deployer
+rules:
+  - apiGroups: [""]
+    resources: [configmaps, secrets, services, persistentvolumeclaims]
+    verbs: [get, list, watch, create, update, patch, delete]
+  # Read-only: `rollout status` watches pods, and logs are the first thing
+  # you want when a deploy goes wrong.
+  - apiGroups: [""]
+    resources: [pods, pods/log, events]
+    verbs: [get, list, watch]
+  - apiGroups: ["apps"]
+    resources: [deployments, statefulsets, replicasets]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: ["batch"]
+    resources: [jobs]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: ["networking.k8s.io"]
+    resources: [ingresses]
+    verbs: [get, list, watch, create, update, patch, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: deployer
+subjects:
+  - kind: ServiceAccount
+    name: deployer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: deployer
+---
+# `kubectl apply -k k8s/home` includes namespace.yaml, so the apply patches
+# the namespace itself — a namespaced Role cannot grant that. Scoped to this
+# one name, so it is not a licence to touch any other namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: watchly-home-namespace
+rules:
+  - apiGroups: [""]
+    resources: [namespaces]
+    resourceNames: [watchly-home]
+    verbs: [get, patch, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: watchly-home-namespace
+subjects:
+  - kind: ServiceAccount
+    name: deployer
+    namespace: watchly-home
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: watchly-home-namespace
