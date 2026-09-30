@@ -101,7 +101,6 @@ model TitleRating {
   updatedAt DateTime @updatedAt
 
   @@unique([titleId, userId])
-  @@index([titleId])
 }
 
 /// One level of threading: a comment either belongs to a title (parentId null)

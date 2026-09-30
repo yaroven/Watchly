@@ -38,6 +38,7 @@ describe("CommentService", () => {
               count: jest.fn(),
               create: jest.fn(),
               delete: jest.fn(),
+              groupBy: jest.fn(),
             },
             commentReaction: {
               findMany: jest.fn(),
@@ -61,14 +62,17 @@ describe("CommentService", () => {
     (prismaMock.commentReaction.groupBy as jest.Mock).mockResolvedValue([]);
     (prismaMock.commentReaction.findMany as jest.Mock).mockResolvedValue([]);
     (prismaMock.titleRating.findMany as jest.Mock).mockResolvedValue([]);
+    (prismaMock.titleComment.groupBy as jest.Mock).mockResolvedValue([]);
+    (prismaMock.$queryRaw as unknown as jest.Mock).mockResolvedValue([]);
   });
 
   afterEach(() => jest.clearAllMocks());
 
   describe("findForTitle", () => {
-    // findForTitle queries findMany three times, in this order: the page's
-    // root ids, those roots with their authors, then their replies.
-    const mockPage = (roots = [rootComment], replies: unknown[] = []) => {
+    const mockPage = (roots = [rootComment], replies: { id: string }[] = []) => {
+      (prismaMock.$queryRaw as unknown as jest.Mock).mockResolvedValue(
+        replies.map((reply) => ({ id: reply.id })),
+      );
       (prismaMock.titleComment.findMany as jest.Mock)
         .mockReset()
         .mockResolvedValueOnce(roots.map((root) => ({ id: root.id })))
@@ -82,12 +86,16 @@ describe("CommentService", () => {
       it("if the page has any", async () => {
         const reply = { ...rootComment, id: "reply-1", parentId: commentId, text: "Agreed" };
         mockPage([rootComment], [reply]);
+        (prismaMock.titleComment.groupBy as jest.Mock).mockResolvedValue([
+          { parentId: commentId, _count: { _all: 7 } },
+        ]);
 
         const { items } = await service.findForTitle(titleId, { page: 1, limit: 10 });
 
         expect(items).toHaveLength(1);
         expect(items[0].replies).toHaveLength(1);
         expect(items[0].replies[0].text).toBe("Agreed");
+        expect(items[0].replyCount).toBe(7);
       });
     });
 
@@ -118,11 +126,22 @@ describe("CommentService", () => {
       });
     });
 
+    describe("should cap the replies it ships", () => {
+      it("so one busy thread cannot bloat the page", async () => {
+        mockPage();
+
+        await service.findForTitle(titleId, { page: 1, limit: 10 });
+
+        const [query] = (prismaMock.$queryRaw as unknown as jest.Mock).mock.calls.at(-1)!;
+        expect(query.join("")).toContain("ROW_NUMBER()");
+      });
+    });
+
     describe("should rank by likes alone", () => {
       it("if sorting by hottest, since a dislike pile-on is not popularity", async () => {
-        // Raw SQL supplies the ids here, so findMany is only asked for the
-        // rows and their replies.
-        (prismaMock.$queryRaw as unknown as jest.Mock).mockResolvedValue([{ id: commentId }]);
+        (prismaMock.$queryRaw as unknown as jest.Mock)
+          .mockResolvedValueOnce([{ id: commentId }])
+          .mockResolvedValue([]);
         (prismaMock.titleComment.findMany as jest.Mock)
           .mockReset()
           .mockResolvedValueOnce([rootComment])
@@ -220,7 +239,6 @@ describe("CommentService", () => {
       it("so two clicks racing cannot both decide the row is missing", async () => {
         await service.react(commentId, userId, ReactionType.LIKE);
 
-        // Only the existence check on the comment itself.
         expect(prismaMock.titleComment.findUnique).toHaveBeenCalledTimes(1);
       });
     });

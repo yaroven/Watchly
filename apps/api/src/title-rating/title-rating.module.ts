@@ -7,7 +7,6 @@ import { TitleRatingService } from "./title-rating.service";
   imports: [PrismaModule],
   controllers: [TitleRatingController],
   providers: [TitleRatingService],
-  // TitleService reads it to put the Watchly score on a title response.
   exports: [TitleRatingService],
 })
 export class TitleRatingModule {}

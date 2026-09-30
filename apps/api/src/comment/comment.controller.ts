@@ -54,6 +54,23 @@ export class CommentController {
     return this.commentService.findForTitle(id, query, userId);
   }
 
+  @ApiOperation({
+    summary: "List a comment's replies",
+    description:
+      "The comment list ships the first few replies inline; this returns the rest, paginated.",
+  })
+  @ApiParam({ name: "id", format: "uuid" })
+  @ApiOkResponse({ type: PaginatedResponseOf(CommentResponseDto) })
+  @OptionalAuth()
+  @Get("comments/:id/replies")
+  findReplies(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Query() query: GetCommentsDto,
+    @Req() { userId }: Request,
+  ) {
+    return this.commentService.findReplies(id, query, userId);
+  }
+
   @ApiOperation({ summary: "Comment on a title, or reply to a comment" })
   @ApiParam({ name: "id", format: "uuid" })
   @ApiCreatedResponse({ type: CommentResponseDto })

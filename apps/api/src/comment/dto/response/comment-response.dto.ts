@@ -1,11 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { ReactionType, TitleComment, User } from "@prisma/client";
 
-/**
- * The author as a reader sees them. `displayName` is nullable on User for
- * accounts that predate it, so the email local part stands in — never the
- * address itself, which is not the commenter's to publish.
- */
 export class CommentAuthorDto {
   @ApiProperty({ format: "uuid" })
   id: string;
@@ -66,9 +61,12 @@ export class CommentResponseDto {
   myReaction: ReactionType | null;
 
   @ApiProperty({
-    description: "Replies to this comment. Always empty on a reply — threads are one level deep.",
+    description: `Up to ${3} replies. Fetch the rest from /comments/:id/replies.`,
   })
   replies: CommentResponseDto[];
+
+  @ApiProperty({ description: "How many replies exist in total, not how many are in `replies`" })
+  replyCount: number;
 
   constructor(
     comment: CommentWithAuthor,
@@ -76,6 +74,7 @@ export class CommentResponseDto {
     myReaction: ReactionType | null,
     authorScore: number | null,
     replies: CommentResponseDto[] = [],
+    replyCount = 0,
   ) {
     this.id = comment.id;
     this.author = new CommentAuthorDto(comment.user, authorScore);
@@ -86,5 +85,6 @@ export class CommentResponseDto {
     this.dislikes = counts.dislikes;
     this.myReaction = myReaction;
     this.replies = replies;
+    this.replyCount = replyCount;
   }
 }
