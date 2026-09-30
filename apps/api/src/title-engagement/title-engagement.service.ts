@@ -1,41 +1,68 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { ReactionType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { TitleEngagementCounts, TitleEngagementDto } from "./dto/response/title-engagement.dto";
 
 const EMPTY_COUNTS: TitleEngagementCounts = { likes: 0, dislikes: 0, watchlistCount: 0 };
 
+/// Prisma reads `undefined` in a `where` as "no filter", so an unset viewer would
+/// turn a delete of one person's row into a delete of everyone's.
+function assertViewer(userId: string | undefined): asserts userId is string {
+  if (!userId) throw new UnauthorizedException();
+}
+
 @Injectable()
 export class TitleEngagementService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async react(titleId: string, userId: string, type: ReactionType): Promise<TitleEngagementDto> {
+  async react(
+    titleId: string,
+    userId: string | undefined,
+    type: ReactionType,
+  ): Promise<TitleEngagementDto> {
+    assertViewer(userId);
     await this.assertTitleExists(titleId);
 
-    // Delete-then-upsert rather than read-then-write: two clicks racing each
-    // other would both read "no vote" and both insert, and the second would hit
-    // the unique index as a 500 rather than a withdrawal.
-    const { count: withdrawn } = await this.prisma.titleReaction.deleteMany({
-      where: { titleId, userId, type },
-    });
+    // The delete answers "had they already cast this exact vote?" without a
+    // separate read — its row count is the whole state machine. Both statements
+    // run in one transaction so a failing write cannot leave the viewer's
+    // previous vote deleted with nothing put back.
+    //
+    // Two *concurrent* clicks on the same vote still resolve last-writer-wins:
+    // one deletes, the other finds nothing to delete and re-inserts. That is a
+    // double-click, which the client prevents by disabling the control while
+    // the request is in flight; the guarantee here is only that no state is lost.
+    await this.prisma.$transaction(async (tx) => {
+      const { count: withdrawn } = await tx.titleReaction.deleteMany({
+        where: { titleId, userId, type },
+      });
+      if (withdrawn > 0) return;
 
-    if (withdrawn === 0) {
-      await this.prisma.titleReaction.upsert({
+      await tx.titleReaction.upsert({
         where: { titleId_userId: { titleId, userId } },
         create: { titleId, userId, type },
         update: { type },
       });
-    }
+    });
 
     return this.summarize(titleId, userId);
   }
 
-  async removeReaction(titleId: string, userId: string): Promise<TitleEngagementDto> {
+  async removeReaction(titleId: string, userId: string | undefined): Promise<TitleEngagementDto> {
+    assertViewer(userId);
+    await this.assertTitleExists(titleId);
+
     await this.prisma.titleReaction.deleteMany({ where: { titleId, userId } });
     return this.summarize(titleId, userId);
   }
 
-  async addToWatchlist(titleId: string, userId: string): Promise<TitleEngagementDto> {
+  async addToWatchlist(titleId: string, userId: string | undefined): Promise<TitleEngagementDto> {
+    assertViewer(userId);
     await this.assertTitleExists(titleId);
 
     await this.prisma.watchlistItem.upsert({
@@ -47,14 +74,27 @@ export class TitleEngagementService {
     return this.summarize(titleId, userId);
   }
 
-  async removeFromWatchlist(titleId: string, userId: string): Promise<TitleEngagementDto> {
+  async removeFromWatchlist(
+    titleId: string,
+    userId: string | undefined,
+  ): Promise<TitleEngagementDto> {
+    assertViewer(userId);
+    await this.assertTitleExists(titleId);
+
     await this.prisma.watchlistItem.deleteMany({ where: { userId, titleId } });
     return this.summarize(titleId, userId);
   }
 
   async summarize(titleId: string, viewerId?: string): Promise<TitleEngagementDto> {
     const summaries = await this.summarizeMany([titleId], viewerId);
-    return summaries.get(titleId) ?? new TitleEngagementDto({});
+
+    const summary = summaries.get(titleId);
+    // summarizeMany answers for every id it is handed, so a miss means it stopped
+    // doing that. Better a 500 than a write that succeeded reporting itself as zeroes.
+    if (!summary) {
+      throw new InternalServerErrorException(`No engagement summary built for title ${titleId}`);
+    }
+    return summary;
   }
 
   async summarizeMany(

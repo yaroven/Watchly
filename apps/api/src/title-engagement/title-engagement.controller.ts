@@ -50,7 +50,7 @@ export class TitleEngagementController {
     @Body() { type }: ReactToTitleDto,
     @Req() { userId }: Request,
   ) {
-    return this.engagement.react(id, userId!, type);
+    return this.engagement.react(id, userId, type);
   }
 
   @ApiOperation({ summary: "Withdraw your vote on a title" })
@@ -59,7 +59,7 @@ export class TitleEngagementController {
   @Auth()
   @Delete("reaction")
   removeReaction(@Param("id", ParseUUIDPipe) id: string, @Req() { userId }: Request) {
-    return this.engagement.removeReaction(id, userId!);
+    return this.engagement.removeReaction(id, userId);
   }
 
   @ApiOperation({ summary: "Put a title on your watchlist" })
@@ -69,7 +69,7 @@ export class TitleEngagementController {
   @HttpCode(HttpStatus.OK)
   @Post("watchlist")
   addToWatchlist(@Param("id", ParseUUIDPipe) id: string, @Req() { userId }: Request) {
-    return this.engagement.addToWatchlist(id, userId!);
+    return this.engagement.addToWatchlist(id, userId);
   }
 
   @ApiOperation({ summary: "Take a title off your watchlist" })
@@ -78,6 +78,6 @@ export class TitleEngagementController {
   @Auth()
   @Delete("watchlist")
   removeFromWatchlist(@Param("id", ParseUUIDPipe) id: string, @Req() { userId }: Request) {
-    return this.engagement.removeFromWatchlist(id, userId!);
+    return this.engagement.removeFromWatchlist(id, userId);
   }
 }

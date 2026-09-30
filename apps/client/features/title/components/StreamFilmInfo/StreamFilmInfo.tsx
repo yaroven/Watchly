@@ -1,6 +1,6 @@
 "use client";
 
-import { EMPTY_ENGAGEMENT, ReactionType, useReactToTitle, useSetTitleWatchlist, useTitleEngagement } from "@/features/title-engagement";
+import { ReactionType, useReactToTitle, useSetTitleWatchlist, useTitleEngagement } from "@/features/title-engagement";
 import type { Title } from "@/features/title/schemas/title";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import AddIcon from "@mui/icons-material/Add";
@@ -8,13 +8,14 @@ import IosShareIcon from "@mui/icons-material/IosShare";
 import StarIcon from "@mui/icons-material/Star";
 import ThumbDownIcon from "@mui/icons-material/ThumbDown";
 import ThumbUpIcon from "@mui/icons-material/ThumbUp";
+import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
 import Typography from "@mui/material/Typography";
-import { useAuthStore } from "@shared/lib/auth-store";
 import { formatCount } from "@shared/lib/format-count";
+import { useViewer } from "@shared/lib/use-viewer";
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface StreamFilmInfoProps {
   title: Title;
@@ -23,17 +24,23 @@ interface StreamFilmInfoProps {
 }
 
 export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFilmInfoProps) {
-  const isSignedIn = useAuthStore((state) => Boolean(state.userId));
+  const { isSignedIn } = useViewer();
   const [expanded, setExpanded] = useState(false);
-  const [shared, setShared] = useState(false);
+  const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
+  const shareTimer = useRef<number | undefined>(undefined);
 
-  // The page is server-rendered, so the block on `title` is the starting point
-  // and the live query takes over once the session is known.
-  const { data: liveEngagement } = useTitleEngagement(title.id);
-  const engagement = liveEngagement ?? title.engagement ?? EMPTY_ENGAGEMENT;
+  useEffect(() => () => window.clearTimeout(shareTimer.current), []);
+
+  // The page is server-rendered with no session — `shared/api/axios.ts` reads its
+  // bearer from the auth store, which is empty there, and the refresh cookie is not
+  // forwarded. So `title.engagement` seeds the public counts only; the viewer's own
+  // vote and watchlist state are always null until the client query lands.
+  const { data: liveEngagement, isError: engagementFailed } = useTitleEngagement(title.id);
+  const engagement = liveEngagement ?? title.engagement;
 
   const react = useReactToTitle(title.id);
   const setWatchlist = useSetTitleWatchlist(title.id);
+  const writeError = react.error ?? setWatchlist.error;
 
   // The design shows a dislike toggle with no visible counter — only the
   // like count and the active/inactive colour change.
@@ -42,15 +49,31 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
     react.mutate(type);
   };
 
+  const flashShareState = (next: "copied" | "failed") => {
+    setShareState(next);
+    window.clearTimeout(shareTimer.current);
+    shareTimer.current = window.setTimeout(() => setShareState("idle"), 2000);
+  };
+
   const handleShare = async () => {
+    // `navigator.clipboard` is undefined outside a secure context, so this is a
+    // plain failure on any http deployment rather than something exceptional.
+    if (!navigator.clipboard) {
+      flashShareState("failed");
+      return;
+    }
+
     try {
       await navigator.clipboard.writeText(window.location.href);
-      setShared(true);
-      window.setTimeout(() => setShared(false), 2000);
-    } catch {
-      // Clipboard access can be denied; the button simply does nothing then.
+    } catch (error) {
+      console.error("Failed to copy the title link", error);
+      flashShareState("failed");
+      return;
     }
+    flashShareState("copied");
   };
+
+  const shareLabel = shareState === "copied" ? "Copied" : shareState === "failed" ? "Copy failed" : "Share";
 
   const storyline = title.description || "Description will appear here once added.";
   const isLong = storyline.length > 220;
@@ -99,8 +122,8 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
           </Box>
           <Box component="button" type="button" aria-label="Copy link to this title" onClick={handleShare} sx={actionButtonSx}>
             <IosShareIcon sx={{ fontSize: "18px" }} />
-            <Typography component="span" sx={{ fontSize: "13px" }}>
-              {shared ? "Copied" : "Share"}
+            <Typography component="span" sx={{ fontSize: "13px", color: shareState === "failed" ? "error.main" : "inherit" }}>
+              {shareLabel}
             </Typography>
           </Box>
           {(rating ?? title.rating?.average) !== null && (rating ?? title.rating?.average) !== undefined && (
@@ -176,6 +199,14 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
           </Box>
         </Box>
       </Box>
+
+      {(writeError || engagementFailed) && (
+        <Alert severity="error" variant="outlined" sx={{ alignItems: "center" }}>
+          {writeError
+            ? `Could not save that: ${writeError.message}`
+            : "Could not load the likes and watchlist state for this title — the counts below may be out of date."}
+        </Alert>
+      )}
 
       <Divider sx={{ borderColor: "divider" }} />
 

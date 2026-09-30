@@ -1,4 +1,4 @@
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, UnauthorizedException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { ReactionType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
@@ -19,6 +19,7 @@ describe("TitleEngagementService", () => {
         {
           provide: PrismaService,
           useValue: {
+            $transaction: jest.fn(),
             title: { findUnique: jest.fn() },
             titleReaction: {
               deleteMany: jest.fn(),
@@ -41,6 +42,9 @@ describe("TitleEngagementService", () => {
     service = module.get(TitleEngagementService);
     prismaMock = module.get(PrismaService) as jest.Mocked<PrismaService>;
 
+    (prismaMock.$transaction as jest.Mock).mockImplementation((fn: (tx: unknown) => unknown) =>
+      fn(prismaMock),
+    );
     (prismaMock.title.findUnique as jest.Mock).mockResolvedValue({ id: titleId });
     (prismaMock.titleReaction.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
     (prismaMock.titleReaction.groupBy as jest.Mock).mockResolvedValue([]);
@@ -75,12 +79,54 @@ describe("TitleEngagementService", () => {
       expect(result.myReaction).toBeNull();
     });
 
-    it("should not read the existing vote before writing, so concurrent clicks cannot both insert", async () => {
+    it("should switch sides in place when the viewer had cast the opposite vote", async () => {
+      // The delete is filtered by `type`, so an existing DISLIKE is not matched and
+      // the upsert flips it. Drop that filter and this becomes a silent withdrawal.
+      (prismaMock.titleReaction.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
+      (prismaMock.titleReaction.findMany as jest.Mock).mockResolvedValue([
+        { titleId, type: ReactionType.LIKE },
+      ]);
+
+      const result = await service.react(titleId, userId, ReactionType.LIKE);
+
+      expect(prismaMock.titleReaction.deleteMany).toHaveBeenCalledWith({
+        where: { titleId, userId, type: ReactionType.LIKE },
+      });
+      expect(prismaMock.titleReaction.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ update: { type: ReactionType.LIKE } }),
+      );
+      expect(result.myReaction).toBe(ReactionType.LIKE);
+    });
+
+    it("should decide on the delete's row count rather than a preceding read", async () => {
+      const calls: string[] = [];
+      (prismaMock.titleReaction.deleteMany as jest.Mock).mockImplementation(() => {
+        calls.push("deleteMany");
+        return Promise.resolve({ count: 0 });
+      });
+      (prismaMock.titleReaction.upsert as jest.Mock).mockImplementation(() => {
+        calls.push("upsert");
+        return Promise.resolve({});
+      });
+
       await service.react(titleId, userId, ReactionType.LIKE);
 
-      expect(prismaMock.titleReaction.findMany).not.toHaveBeenCalledWith(
-        expect.objectContaining({ where: expect.objectContaining({ userId, titleId }) }),
+      // No read of the viewer's row stands between the two writes — the only
+      // findMany is the summary built afterwards.
+      expect(calls).toEqual(["deleteMany", "upsert"]);
+    });
+
+    it("should run both writes in one transaction so a failed write cannot lose the vote", async () => {
+      await service.react(titleId, userId, ReactionType.LIKE);
+
+      expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it("should reject an unidentified viewer rather than writing without a userId filter", async () => {
+      await expect(service.react(titleId, undefined, ReactionType.LIKE)).rejects.toThrow(
+        UnauthorizedException,
       );
+      expect(prismaMock.titleReaction.deleteMany).not.toHaveBeenCalled();
     });
 
     it("should reject a title that does not exist", async () => {
@@ -107,6 +153,22 @@ describe("TitleEngagementService", () => {
 
     it("should not fail when removing a title that was never on the list", async () => {
       await expect(service.removeFromWatchlist(titleId, userId)).resolves.toBeDefined();
+    });
+
+    it("should reject a title that does not exist on the remove paths too", async () => {
+      (prismaMock.title.findUnique as jest.Mock).mockResolvedValue(null);
+
+      await expect(service.removeFromWatchlist(titleId, userId)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.removeReaction(titleId, userId)).rejects.toThrow(BadRequestException);
+    });
+
+    it("should reject an unidentified viewer rather than deleting every user's row", async () => {
+      await expect(service.removeFromWatchlist(titleId, undefined)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(prismaMock.watchlistItem.deleteMany).not.toHaveBeenCalled();
     });
 
     it("should return the viewer's own rows newest first", async () => {

@@ -1,5 +1,5 @@
 import type { Title } from "@/features/title/schemas/title";
-import { useAuthStore } from "@shared/lib/auth-store";
+import { useViewer } from "@shared/lib/use-viewer";
 import { useQuery, UseQueryOptions } from "@tanstack/react-query";
 import titleEngagementKeys from "./title-engagement.keys";
 import titleEngagementService from "./title-engagement.service";
@@ -12,10 +12,10 @@ const useWatchlist = (
 ) => {
   // The endpoint is the viewer's own list, so anonymous callers get a 401 —
   // wait for the session rather than firing one.
-  const isSignedIn = useAuthStore((state) => Boolean(state.userId) && state.status === "resolved");
+  const { viewerKey, isSignedIn } = useViewer();
 
   return useQuery({
-    queryKey: titleEngagementKeys.watchlist(params),
+    queryKey: titleEngagementKeys.watchlist(params, viewerKey),
     queryFn: () => titleEngagementService.getWatchlist(params),
     ...options,
     enabled: isSignedIn && (options?.enabled ?? true),

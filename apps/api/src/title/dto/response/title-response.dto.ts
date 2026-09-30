@@ -81,10 +81,13 @@ export class TitleResponseDto {
   })
   engagement: TitleEngagementDto;
 
+  // Neither aggregate is defaulted: a title that nobody has rated or liked and a
+  // title whose aggregates were never fetched would serialise identically, and
+  // the client caches whichever it is handed.
   constructor(
     title: Title & { genres: Genre[]; externalRatings?: ExternalRatings[] },
-    rating: { average: number | null; count: number } = { average: null, count: 0 },
-    engagement: TitleEngagementDto = new TitleEngagementDto({}),
+    rating: { average: number | null; count: number },
+    engagement: TitleEngagementDto,
   ) {
     this.id = title.id;
     this.createdAt = title.createdAt;

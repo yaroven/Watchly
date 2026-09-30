@@ -4,5 +4,5 @@ export { default as titleEngagementService } from "./api/title-engagement.servic
 export { default as useTitleEngagement } from "./api/use-title-engagement";
 export { useReactToTitle, useSetTitleWatchlist } from "./api/use-title-engagement-mutations";
 export { default as useWatchlist } from "./api/use-watchlist";
-export { EMPTY_ENGAGEMENT, ReactionType } from "./schemas/title-engagement";
+export { ReactionType } from "./schemas/title-engagement";
 export type { TitleEngagement } from "./schemas/title-engagement";

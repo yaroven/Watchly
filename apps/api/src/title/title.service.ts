@@ -10,6 +10,7 @@ import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { MultipartUploadPart } from "../s3/multipart.constants";
 import { SeasonService } from "../season/season.service";
+import { TitleEngagementDto } from "../title-engagement/dto/response/title-engagement.dto";
 import { TitleEngagementService } from "../title-engagement/title-engagement.service";
 import { TitleRatingService } from "../title-rating/title-rating.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
@@ -19,6 +20,8 @@ import { CastCreditInputDto } from "./dto/request/set-title-cast.dto";
 import { UpdateTitleDto } from "./dto/request/update-title.dto";
 import { CastCreditResponseDto } from "./dto/response/cast-credit-response.dto";
 import { TitleResponseDto } from "./dto/response/title-response.dto";
+
+const EMPTY_RATING = { average: null, count: 0 };
 
 @Injectable()
 export class TitleService {
@@ -45,7 +48,8 @@ export class TitleService {
         },
         include: { genres: true, externalRatings: true },
       });
-      return new TitleResponseDto(title);
+      // A title created a moment ago has no raters and no reactions yet.
+      return new TitleResponseDto(title, EMPTY_RATING, new TitleEngagementDto({}));
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
         throw new BadRequestException("One or more genreIds do not exist");
@@ -92,15 +96,20 @@ export class TitleService {
 
     return {
       items: items.map(
-        (title) => new TitleResponseDto(title, ratings.get(title.id), engagement.get(title.id)),
+        (title) =>
+          new TitleResponseDto(
+            title,
+            ratings.get(title.id) ?? EMPTY_RATING,
+            engagement.get(title.id) ?? new TitleEngagementDto({}),
+          ),
       ),
       totalCount,
     };
   }
 
-  /// The watchlist is a list of titles in the viewer's own order, so it reads the
-  /// ids from the engagement module and rehydrates them here rather than making
-  /// that module know how a title is serialised.
+  /// Newest addition first. The ordering lives in the id list and nowhere else:
+  /// `findMany({ id: { in: ids } })` returns rows in whatever order the database
+  /// finds convenient, so the rows are re-sorted back onto `titleIds` below.
   async findWatchlist(
     viewerId: string,
     { page = 1, limit = 10 }: GetAllTitleDto,
@@ -122,12 +131,27 @@ export class TitleService {
 
     const byId = new Map(titles.map((title) => [title.id, title]));
 
+    // Unreachable while the FK cascade holds: a deleted title takes its watchlist
+    // rows with it. If it ever fires the database is inconsistent, and a silently
+    // short page with an unchanged totalCount is the worst way to find that out.
+    if (titles.length !== titleIds.length) {
+      const missing = titleIds.filter((id) => !byId.has(id));
+      this.logger.error(
+        `Watchlist of user ${viewerId} references titles that no longer exist: ${missing.join(", ")}`,
+      );
+    }
+
     return {
       items: titleIds
         .map((id) => byId.get(id))
         .filter((title): title is (typeof titles)[number] => Boolean(title))
         .map(
-          (title) => new TitleResponseDto(title, ratings.get(title.id), engagement.get(title.id)),
+          (title) =>
+            new TitleResponseDto(
+              title,
+              ratings.get(title.id) ?? EMPTY_RATING,
+              engagement.get(title.id) ?? new TitleEngagementDto({}),
+            ),
         ),
       totalCount,
     };
@@ -173,7 +197,12 @@ export class TitleService {
         },
         include: { genres: true, externalRatings: true },
       });
-      return new TitleResponseDto(updated);
+
+      const [rating, engagement] = await Promise.all([
+        this.titleRatingService.summarize(id),
+        this.titleEngagementService.summarize(id),
+      ]);
+      return new TitleResponseDto(updated, rating, engagement);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
         throw new BadRequestException("One or more genreIds do not exist");
@@ -264,7 +293,8 @@ export class TitleService {
         ),
     ]);
 
-    return new TitleResponseDto(deleted);
+    // The row is gone and its ratings/reactions/watchlist entries cascaded with it.
+    return new TitleResponseDto(deleted, EMPTY_RATING, new TitleEngagementDto({}));
   }
 
   async getCast(id: string): Promise<CastCreditResponseDto[]> {

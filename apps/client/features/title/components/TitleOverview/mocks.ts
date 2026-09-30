@@ -1,8 +1,16 @@
 /**
- * TEMPORARY: design-file fixtures for the parts of the title-detail (Film)
- * page that have no endpoint yet (cast, stream photos). Same convention as
- * DiscoverScreen/mocks.ts. Drop this file once those endpoints land — nothing
- * outside TitleInformation/StreamPhotos imports it.
+ * TEMPORARY: design-file fixtures for the parts of the title, watch and episode
+ * surfaces that have no endpoint yet — cast, stream photos, and per-episode
+ * score/thumbnail. Same convention as DiscoverScreen/mocks.ts.
+ *
+ * Importers, all of which break if this file goes before its endpoints land:
+ * - TitleInformation (cast)
+ * - StreamPhotos (photos)
+ * - StreamEpisodesSidebar and, in another feature, episodes/EpisodeList
+ *   (getEpisodeScore / getEpisodeThumbnail)
+ *
+ * Retiring it takes three separate endpoints, not one — drop each fixture as its
+ * own lands rather than the file as a whole.
  */
 
 export interface CastMember {
