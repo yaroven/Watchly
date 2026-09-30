@@ -209,7 +209,7 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
         <Typography sx={{ fontSize: "14px", color: "text.secondary", ml: "auto" }}>({formatCount(totalCount)})</Typography>
       </Box>
 
-      <Box sx={{ display: "flex", flexDirection: "column", gap: "32px" }}>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: "16px" }}>
         {isPending && <Typography sx={{ fontSize: "14px", color: "text.secondary" }}>Loading comments ...</Typography>}
         {!isPending && comments.length === 0 && (
           <Typography sx={{ fontSize: "14px", color: "text.secondary" }}>No comments yet — be the first.</Typography>

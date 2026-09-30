@@ -5,7 +5,7 @@ import { Box, Input, InputAdornment, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { ADMIN } from "@shared/lib/routes";
 import { inputVariants, tokens } from "@shared/mui/theme";
-import Avatar from "@shared/ui/Header/components/Avatar";
+import Avatar from "@shared/ui/Avatar";
 import { usePathname, useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 
