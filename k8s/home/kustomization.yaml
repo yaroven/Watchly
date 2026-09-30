@@ -20,14 +20,14 @@ patches:
 # hostname. Build one with the home URLs and put its tag here.
 images:
   - name: razanka/watchly-client
-    newTag: home-550c6ba
+    newTag: home-3eb8c46
   # The tags base pins are the ones built for DigitalOcean. This cluster runs
   # its own build — it has to, since the S3_EVENTS_ENABLED switch the overlay
   # relies on postdates them.
   - name: razanka/watchly-api
-    newTag: 550c6ba
+    newTag: 3eb8c46
   - name: razanka/watchly-transcoder-worker
-    newTag: 550c6ba
+    newTag: 3eb8c46
 
 configMapGenerator:
   # The same provisioning script docker compose mounts (it reaches in here
