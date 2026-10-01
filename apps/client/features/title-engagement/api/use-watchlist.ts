@@ -12,13 +12,13 @@ const useWatchlist = (
 ) => {
   // The endpoint is the viewer's own list, so anonymous callers get a 401 —
   // wait for the session rather than firing one.
-  const { viewerKey, isSignedIn } = useViewer();
+  const viewer = useViewer();
 
   return useQuery({
-    queryKey: titleEngagementKeys.watchlist(params, viewerKey),
+    queryKey: titleEngagementKeys.watchlist(params, viewer.viewerKey),
     queryFn: () => titleEngagementService.getWatchlist(params),
     ...options,
-    enabled: isSignedIn && (options?.enabled ?? true),
+    enabled: viewer.status === "signed-in" && (options?.enabled ?? true),
   });
 };
 

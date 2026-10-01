@@ -170,19 +170,27 @@ export class TitleEngagementService {
     );
   }
 
+  /**
+   * Both the page and the count are filtered through `title`, so they agree with
+   * each other. Counting rows the page cannot render makes the pager advertise
+   * pages that come back short, and a count that only excluded the orphans on the
+   * current page would change as the viewer pages through.
+   */
   async findWatchlistTitleIds(
     userId: string,
     { page = 1, limit = 10 }: { page?: number; limit?: number },
   ): Promise<{ titleIds: string[]; totalCount: number }> {
+    const where = { userId, title: { is: {} } };
+
     const [items, totalCount] = await Promise.all([
       this.prisma.watchlistItem.findMany({
-        where: { userId },
+        where,
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
         select: { titleId: true },
       }),
-      this.prisma.watchlistItem.count({ where: { userId } }),
+      this.prisma.watchlistItem.count({ where }),
     ]);
 
     return { titleIds: items.map((item) => item.titleId), totalCount };

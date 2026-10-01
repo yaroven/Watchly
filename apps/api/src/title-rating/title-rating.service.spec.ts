@@ -132,5 +132,22 @@ describe("TitleRatingService", () => {
         expect(result.get(titleId)).toEqual({ average: 6.7, count: 3 });
       });
     });
+
+    describe("should answer for every id it was given", () => {
+      // groupBy only returns titles that have ratings. The caller treats a map
+      // miss as a broken invariant and throws, so an unrated title in a list
+      // would 500 the whole page if it were simply absent here.
+      it("including one nobody has rated", async () => {
+        const unratedId = "44444444-4444-4444-8444-444444444444";
+        (prismaMock.titleRating.groupBy as jest.Mock).mockResolvedValue([
+          { titleId, _avg: { score: 8 }, _count: { _all: 2 } },
+        ]);
+
+        const result = await service.summarizeMany([titleId, unratedId]);
+
+        expect(result.get(titleId)).toEqual({ average: 8, count: 2 });
+        expect(result.get(unratedId)).toEqual({ average: null, count: 0 });
+      });
+    });
   });
 });

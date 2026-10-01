@@ -7,7 +7,11 @@ import titleRatingKeys from "./title-rating.keys";
 import titleRatingService from "./title-rating.service";
 
 /** A viewer's score also shows next to every comment they left on the title, so those refetch too. */
-const invalidateFor = (titleId: string) => [titleRatingKeys.detail(titleId), titleKeys.detail(titleId), commentKeys.titleLists(titleId)];
+const invalidateFor = (titleId: string) => [
+  titleRatingKeys.detail(titleId),
+  titleKeys.detailPrefix(titleId),
+  commentKeys.titleLists(titleId),
+];
 
 export const useSetTitleRating = (titleId: string, options?: Omit<UseMutationOptions<TitleRatingSummary, Error, number>, "mutationFn">) => {
   const useSet = createMutationHook({

@@ -11,7 +11,6 @@ import { APP } from "@shared/lib/routes";
 import { useViewer } from "@shared/lib/use-viewer";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 
 /**
  * Only the fields the card draws, so adding a column to `Title` cannot silently
@@ -27,42 +26,43 @@ export default function TitleCard({ id, name, posterUrl, type, genres, externalR
   const rating = externalRatings.find((r) => r.source === ExternalRatingSource.IMDB)?.rating;
 
   const router = useRouter();
-  const { isSignedIn, sessionReady } = useViewer();
-  const [failed, setFailed] = useState(false);
-  const setWatchlist = useSetTitleWatchlist(id, {
-    onError: (error) => {
-      console.error(`Failed to update the watchlist for title ${id}`, error);
-      setFailed(true);
-    },
-    onSuccess: () => setFailed(false),
-  });
+  const viewer = useViewer();
+  const setWatchlist = useSetTitleWatchlist(id);
+  // A tinted 12px icon and a changed label are thin feedback — on touch there is
+  // no hover to reveal anything. The card has no room for a message, so this
+  // wants an app-level snackbar fed by the mutation cache; not built here.
+  // `isError` at least clears itself on the next attempt.
+  const failed = setWatchlist.isError;
 
-  // A null viewer means the payload was read without a session — server-side, or
-  // before the boot exchange finished. Unknown, not "not saved".
-  const inWatchlist = engagement.viewer?.inWatchlist ?? false;
+  // A null `viewer` on the payload means it was read without a session — server
+  // side, or during the boot exchange — so their own state is unknown, which is
+  // not the same as not saved. Rendering an empty bookmark for it would assert
+  // something false to anyone reading the page with assistive tech.
+  const saved = engagement.viewer?.inWatchlist ?? null;
+  const stateUnknown = viewer.status === "signed-in" && saved === null;
 
-  // Enabled for signed-out viewers too: a disabled button swallows the click
-  // without letting it reach the open-title overlay underneath, which would make
-  // the corner of every poster inert. Signing in is what they are missing, so
-  // that is where the click goes.
+  // Never `disabled`: a disabled button swallows the click instead of letting it
+  // through to the open-title overlay underneath, which would leave the corner
+  // of every poster inert. Each state the button cannot act on routes somewhere
+  // that can.
   const toggleWatchlist = (event: { stopPropagation: () => void; preventDefault: () => void }) => {
     event.stopPropagation();
     event.preventDefault();
-    if (setWatchlist.isPending) return;
-    if (!isSignedIn) {
+    if (setWatchlist.isPending || viewer.status === "pending" || stateUnknown) return;
+    if (viewer.status === "anonymous") {
       router.push(APP.LOGIN);
       return;
     }
-    setWatchlist.mutate(!inWatchlist);
+    setWatchlist.mutate(!saved);
   };
 
   const toggleLabel = failed
     ? "Could not update your watchlist — try again"
-    : !sessionReady
+    : viewer.status === "pending" || stateUnknown
       ? "Watchlist"
-      : !isSignedIn
+      : viewer.status === "anonymous"
         ? "Sign in to add to your watchlist"
-        : inWatchlist
+        : saved
           ? "Remove from watchlist"
           : "Add to watchlist";
 
@@ -167,9 +167,9 @@ export default function TitleCard({ id, name, posterUrl, type, genres, externalR
             component="button"
             type="button"
             aria-label={toggleLabel}
-            aria-pressed={isSignedIn ? inWatchlist : undefined}
-            title={failed ? "Could not update your watchlist — try again" : undefined}
-            disabled={!sessionReady || setWatchlist.isPending}
+            // Only claim a state we actually know — never while it is unknown.
+            aria-pressed={saved === null ? undefined : saved}
+            aria-busy={setWatchlist.isPending}
             onClick={toggleWatchlist}
             sx={{
               // Fills the notch: a smaller button would leave an inert strip of it
@@ -182,14 +182,14 @@ export default function TitleCard({ id, name, posterUrl, type, genres, externalR
               border: "none",
               padding: 0,
               bgcolor: "#ffffff1a",
-              cursor: sessionReady ? "pointer" : "default",
-              opacity: isSignedIn || !sessionReady ? 1 : 0.6,
+              cursor: viewer.status === "pending" || stateUnknown ? "default" : "pointer",
+              opacity: viewer.status === "anonymous" || stateUnknown ? 0.6 : 1,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            {inWatchlist ? (
+            {saved ? (
               <BookmarkIcon sx={{ fontSize: "12px", color: failed ? "error.main" : "primary.main" }} />
             ) : (
               <BookmarkBorderIcon sx={{ fontSize: "12px", color: failed ? "error.main" : "#ffffff" }} />

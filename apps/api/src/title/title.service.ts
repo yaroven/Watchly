@@ -16,7 +16,10 @@ import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { MultipartUploadPart } from "../s3/multipart.constants";
 import { SeasonService } from "../season/season.service";
-import { TitleEngagementDto } from "../title-engagement/dto/response/title-engagement.dto";
+import {
+  TitleEngagementDto,
+  ViewerTitleEngagementDto,
+} from "../title-engagement/dto/response/title-engagement.dto";
 import { TitleEngagementService } from "../title-engagement/title-engagement.service";
 import { TitleRatingService } from "../title-rating/title-rating.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
@@ -52,8 +55,13 @@ export class TitleService {
         },
         include: { genres: true, externalRatings: true },
       });
-      // A title created a moment ago has no raters and no reactions yet.
-      return new TitleResponseDto(title, { average: null, count: 0 }, TitleEngagementDto.empty());
+      // Nothing has been rated or reacted to yet, and the admin creating it
+      // provably has no vote on it — that is known, not unknown.
+      return new TitleResponseDto(
+        title,
+        { average: null, count: 0 },
+        TitleEngagementDto.empty(new ViewerTitleEngagementDto(null, false)),
+      );
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
         throw new BadRequestException("One or more genreIds do not exist");
@@ -128,9 +136,9 @@ export class TitleService {
 
     const byId = new Map(titles.map((title) => [title.id, title]));
 
-    // Unreachable while the FK cascade holds: a deleted title takes its watchlist
-    // rows with it. If it ever fires the database is inconsistent — drop the rows
-    // from the count as well, or the pager advertises pages that render short.
+    // The ids were already filtered through `title`, so a gap here means a row
+    // vanished between the two queries — rare, and not something to paper over
+    // with a short page and an unchanged count.
     const missing = titleIds.filter((id) => !byId.has(id));
     if (missing.length > 0) {
       this.logger.error(
@@ -162,10 +170,7 @@ export class TitleService {
   }
 
   async update(id: string, data: UpdateTitleDto, viewerId?: string): Promise<TitleResponseDto> {
-    const title = await this.findOne(id);
-    if (!title) {
-      throw new BadRequestException(`Title with id ${id} not found`);
-    }
+    await this.assertExists(id);
     if (data.posterUrl !== undefined) {
       await this.posterService.assertManagedPosterUrl("titles", id, data.posterUrl);
     }
@@ -202,10 +207,7 @@ export class TitleService {
   }
 
   async startMovieUpload(id: string, fileSize: number) {
-    const movie = await this.findOne(id);
-    if (!movie) {
-      throw new BadRequestException(`Movie with id ${id} not found`);
-    }
+    await this.assertExists(id);
     return this.mediaAssetService.startUpload(id, fileSize);
   }
 
@@ -214,10 +216,7 @@ export class TitleService {
     uploadId: string,
     parts: MultipartUploadPart[],
   ): Promise<void> {
-    const movie = await this.findOne(id);
-    if (!movie) {
-      throw new BadRequestException(`Movie with id ${id} not found`);
-    }
+    await this.assertExists(id);
     await this.mediaAssetService.completeUpload(id, uploadId, parts, VideoType.MOVIE);
   }
 
@@ -226,20 +225,13 @@ export class TitleService {
   }
 
   async createPosterUploadingUrl(id: string): Promise<{ uploadUrl: string; posterUrl: string }> {
-    const title = await this.findOne(id);
-    if (!title) {
-      throw new BadRequestException(`Title with id ${id} not found`);
-    }
+    await this.assertExists(id);
 
     return this.posterService.createUploadUrl("titles", id);
   }
 
   async transcode(id: string): Promise<void> {
-    const title = await this.findOne(id);
-
-    if (!title) {
-      throw new BadRequestException(`Movie with id ${id} not found`);
-    }
+    await this.assertExists(id);
 
     await this.mediaAssetService.scheduleTranscode(id, VideoType.MOVIE);
   }
@@ -261,7 +253,7 @@ export class TitleService {
     });
 
     if (!title) {
-      throw new BadRequestException(`Title with id ${id} not found`);
+      throw new NotFoundException(`Title with id ${id} not found`);
     }
 
     const deleted = await this.prisma.title.delete({ where: { id }, include: { genres: true } });
@@ -283,15 +275,17 @@ export class TitleService {
         ),
     ]);
 
-    // The row is gone and its ratings/reactions/watchlist entries cascaded with it.
-    return new TitleResponseDto(deleted, { average: null, count: 0 }, TitleEngagementDto.empty());
+    // The row is gone and its ratings/reactions/watchlist entries cascaded with it,
+    // so nobody has any state on it, the caller included.
+    return new TitleResponseDto(
+      deleted,
+      { average: null, count: 0 },
+      TitleEngagementDto.empty(new ViewerTitleEngagementDto(null, false)),
+    );
   }
 
   async getCast(id: string): Promise<CastCreditResponseDto[]> {
-    const title = await this.findOne(id);
-    if (!title) {
-      throw new BadRequestException(`Title with id ${id} not found`);
-    }
+    await this.assertExists(id);
 
     const credits = await this.prisma.castCredit.findMany({
       where: { titleId: id },
@@ -303,10 +297,7 @@ export class TitleService {
   }
 
   async setCast(id: string, credits: CastCreditInputDto[]): Promise<CastCreditResponseDto[]> {
-    const title = await this.findOne(id);
-    if (!title) {
-      throw new BadRequestException(`Title with id ${id} not found`);
-    }
+    await this.assertExists(id);
 
     try {
       await this.prisma.$transaction([
@@ -328,6 +319,15 @@ export class TitleService {
     }
 
     return this.getCast(id);
+  }
+
+  /**
+   * Existence only. `findOne` builds a whole response — two aggregate round trips
+   * since this phase — and every caller here threw it away.
+   */
+  private async assertExists(id: string): Promise<void> {
+    const title = await this.prisma.title.findUnique({ where: { id }, select: { id: true } });
+    if (!title) throw new NotFoundException(`Title with id ${id} not found`);
   }
 
   /**

@@ -6,12 +6,18 @@ import { UserResponseDto } from "../../user/dto/response/user-response.dto";
 /**
  * For reads that are public but richer when the caller is known.
  *
- * A rejected credential answers anonymously rather than 401. These routes serve
- * pages that need no session, and the client turns a 401 into refresh-then-
- * redirect-to-login — so 401-ing a public read ejects a viewer with a dead
- * refresh cookie off a page they were entitled to see. Keeping the access token
- * fresh is the client's job (it refreshes before sending an expired one); the
- * rejection is logged here so a sudden anonymous-read spike is diagnosable.
+ * Nothing here is ever a 401 — not a rejected credential, and not a failure
+ * inside the strategy. These routes serve pages that need no session, and the
+ * client turns a 401 into refresh-then-redirect-to-login, so 401-ing one would
+ * eject a viewer with a dead refresh cookie off a page they were entitled to
+ * see. The cost is that a strategy failure degrades every signed-in read to
+ * anonymous, which is why the two cases are logged apart and at different
+ * severities: one expired token is routine, an outage in the user lookup is not.
+ *
+ * This leaves nothing to tell a client its access token has gone stale, since the
+ * response is a normal 200. `apps/client/shared/api/axios.ts` refreshes an expired
+ * token before sending it for that reason; if that ever stops being true, signed-in
+ * viewers will silently read as anonymous here.
  */
 @Injectable()
 export class OptionalJwtAuthGuard extends AuthGuard("jwt") {
@@ -23,17 +29,27 @@ export class OptionalJwtAuthGuard extends AuthGuard("jwt") {
     info: unknown,
     context: ExecutionContext,
   ): TUser {
-    if (err || !user) {
-      const request = context.switchToHttp().getRequest<Request>();
+    const request = context.switchToHttp().getRequest<Request>();
+
+    if (err) {
+      // The strategy itself failed — e.g. the user lookup it runs on every
+      // request. Every signed-in caller is being served anonymous data right now.
+      this.logger.error(
+        `Authentication failed on optional route ${request.method} ${request.url}; serving it anonymously`,
+        err instanceof Error ? err.stack : describeInfo(err),
+      );
+      return undefined as TUser;
+    }
+
+    if (!user) {
       if (request.headers.authorization) {
         this.logger.warn(
-          `Rejected credential on an optional route, continuing anonymously: ${describe(err ?? info)}`,
+          `Rejected credential on ${request.method} ${request.url}, continuing anonymously: ${describeInfo(info)}`,
         );
       }
       return undefined as TUser;
     }
 
-    const request = context.switchToHttp().getRequest<Request>();
     const authenticated = user as unknown as UserResponseDto;
     request.userId = authenticated.id;
     request.role = authenticated.role;
@@ -42,10 +58,10 @@ export class OptionalJwtAuthGuard extends AuthGuard("jwt") {
   }
 }
 
-function describe(reason: unknown): string {
-  if (reason instanceof Error) return `${reason.name}: ${reason.message}`;
-  if (reason && typeof reason === "object" && "message" in reason) {
-    return String(reason.message);
+function describeInfo(info: unknown): string {
+  if (info instanceof Error) return `${info.name}: ${info.message}`;
+  if (info && typeof info === "object" && "message" in info) {
+    return String(info.message);
   }
   return "no reason given";
 }

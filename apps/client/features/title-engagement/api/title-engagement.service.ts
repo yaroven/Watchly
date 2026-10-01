@@ -1,3 +1,4 @@
+import { type ApiTitle, mapTitle } from "@/features/title/api/title.service";
 import type { Title } from "@/features/title/schemas/title";
 import api from "@shared/api/axios";
 import { ReactionType, TitleEngagement } from "../schemas/title-engagement";
@@ -29,8 +30,10 @@ const TitleEngagementService = {
   },
 
   getWatchlist: async (params: { page?: number; limit?: number } = {}): Promise<{ items: Title[]; totalCount: number }> => {
-    const { data } = await api.get<{ items: Title[]; totalCount: number }>("/watchlist", { params });
-    return data;
+    const { data } = await api.get<{ items: ApiTitle[]; totalCount: number }>("/watchlist", { params });
+    // Same normalisation as every other title read — without it these carry ISO
+    // strings typed as `Date`, and the first component to format one throws.
+    return { items: data.items.map(mapTitle), totalCount: data.totalCount };
   },
 };
 

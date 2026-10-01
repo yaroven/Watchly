@@ -19,17 +19,21 @@ function readPayload(token: string): Record<string, unknown> | null {
 }
 
 /**
- * Whether the access token is past (or within `skewSeconds` of) its own `exp`.
+ * Whether the access token should be refreshed before it is sent.
  *
- * Only for deciding when to refresh before sending it. An expired token on a
- * public route answers 200-anonymous rather than 401, so without this check the
- * viewer's own likes and watchlist silently read as empty with nothing to
- * trigger a refresh. A token we cannot parse is treated as not-expired and left
- * to the server to reject.
+ * "Unreadable" counts as expired. The caller cannot fall back on the server
+ * noticing: `@OptionalAuth()` routes answer 200-anonymous to a dead token rather
+ * than 401, so nothing downstream would ever trigger a refresh and the viewer's
+ * own likes and watchlist would read as unknown for as long as that token sits
+ * in the store. Refreshing a token that was in fact fine costs one round trip;
+ * the caller guards against a wrong clock turning that into every round trip.
  */
 export function isAccessTokenExpired(token: string, skewSeconds = 10): boolean {
   const exp = readPayload(token)?.exp;
-  if (typeof exp !== "number") return false;
+  if (typeof exp !== "number") {
+    console.warn("[auth] Access token carries no readable `exp`; treating it as expired");
+    return true;
+  }
   return Date.now() >= (exp - skewSeconds) * 1000;
 }
 
