@@ -261,6 +261,22 @@ describe("a server minting tokens that already read as expired", () => {
  * browser. Driven through a 401 on a normal request rather than an expired token,
  * so the request interceptor stays out of the way.
  */
+describe("server-side", () => {
+  // The module is imported by server components, where the store and the backoff
+  // are process-wide and shared across concurrent requests for different people.
+  it("should never attach a token or refresh when there is no window", async () => {
+    signIn(EXPIRED);
+    vi.unstubAllGlobals();
+    mock.onPost("/auth/refresh").reply(200, { accessToken: FRESH, userId: "u1", role: Role.USER });
+    mock.onGet("/title").reply(200, []);
+
+    await api.get("/title");
+
+    expect(mock.history.post).toHaveLength(0);
+    expect(mock.history.get[0].headers?.Authorization).toBeUndefined();
+  });
+});
+
 describe("the reactive 401 path", () => {
   it("should refresh once and retry the original request", async () => {
     signIn(FRESH);

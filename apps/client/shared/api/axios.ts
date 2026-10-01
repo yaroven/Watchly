@@ -7,6 +7,9 @@ import axios, { type InternalAxiosRequestConfig } from "axios";
 import { SessionUnusableError, toApiError } from "./api-error";
 
 const isServer = typeof window === "undefined";
+
+/** Evaluated per call, not at module load, so a test can stand a window up around it. */
+const isServerRuntime = () => typeof window === "undefined";
 const baseURL = isServer ? process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_BACKEND_API_URL : process.env.NEXT_PUBLIC_BACKEND_API_URL;
 
 const REFRESH_PATH = "/auth/refresh";
@@ -27,6 +30,12 @@ const api = axios.create({
 
 /**
  * Refreshing is paused until this timestamp; `0` means allowed.
+ *
+ * Module-level, therefore per-browser-tab on the client and per-process on the
+ * server — which is why the request interceptor refuses to use any of it when
+ * `isServer`, and why `restoreSession` is only ever called from a client
+ * component. Nothing here may become a place where one request's state is
+ * visible to another's.
  *
  * Set from two places: a refresh attempt that failed, and a refresh that
  * succeeded into a token already past its `exp`. Without it every request fires
@@ -72,6 +81,12 @@ function isSessionRejection(error: unknown): boolean {
 }
 
 api.interceptors.request.use(async (config: TrackedConfig) => {
+  // Server-side there is no session to refresh and no per-viewer state to hold:
+  // this module is imported by server components, where `authStore` and the
+  // backoff below are process-wide and shared across every concurrent request.
+  // Returning early keeps all of it unreachable there rather than merely unused.
+  if (isServerRuntime()) return config;
+
   const token = authStore.getState().token;
   if (!token) return config;
 
