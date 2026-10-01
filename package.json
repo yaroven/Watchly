@@ -19,7 +19,8 @@
     "lint:client": "pnpm --filter client precommit",
     "lint": "pnpm lint:api && pnpm lint:client",
     "test:api": "pnpm --filter api test",
-    "test": "pnpm test:api",
+    "test:client": "pnpm --filter client test",
+    "test": "pnpm test:api && pnpm test:client",
     "prepare": "husky || true"
   },
   "devDependencies": {

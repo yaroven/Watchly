@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { TitleRatingSummaryDto } from "./dto/response/title-rating-summary.dto";
 
@@ -84,6 +84,8 @@ export class TitleRatingService {
       where: { id: titleId },
       select: { id: true },
     });
-    if (!title) throw new BadRequestException(`Title with id ${titleId} not found`);
+    // 404 like every other route that takes a title id — the request is
+    // well-formed, the resource is gone.
+    if (!title) throw new NotFoundException(`Title with id ${titleId} not found`);
   }
 }

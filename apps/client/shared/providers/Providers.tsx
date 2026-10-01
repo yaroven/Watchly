@@ -13,13 +13,14 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       new QueryClient({
         // A failed write has no rendered state of its own to fall back on: the UI
         // shows server values, so a rejected click leaves the control identical to
-        // before it. This is the floor — every mutation at least reaches the
-        // console; call sites that can show the viewer something pass `onError`
-        // and keep full control.
+        // before it. Unconditional on purpose — a call site that handles one
+        // failure for its own narrow purpose should not silence the rest.
+        //
+        // Still only a console line. Nothing shows the viewer anything, which is
+        // the open half: it wants an app-level snackbar reading from this cache.
         mutationCache: new MutationCache({
           onError: (error, _variables, _context, mutation) => {
-            if (mutation.options.onError) return;
-            console.error("[Mutation failed]", error);
+            console.error("[Mutation failed]", mutation.options.mutationKey ?? "", error);
           },
         }),
         defaultOptions: {

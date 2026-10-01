@@ -41,10 +41,13 @@ export default function TitleCard({ id, name, posterUrl, type, genres, externalR
   const saved = engagement.viewer?.inWatchlist ?? null;
   const stateUnknown = viewer.status === "signed-in" && saved === null;
 
-  // Never `disabled`: a disabled button swallows the click instead of letting it
-  // through to the open-title overlay underneath, which would leave the corner
-  // of every poster inert. Each state the button cannot act on routes somewhere
-  // that can.
+  // Never `disabled`: a disabled button fires no click at all, and a bookmark
+  // that silently does nothing is indistinguishable from a broken one. An
+  // anonymous viewer is missing a session, so their click goes to the login page.
+  //
+  // The other two states still swallow it — the boot window, and viewer state we
+  // could not read. Both are transient and the label says which, but there is
+  // nothing to route them to yet.
   const toggleWatchlist = (event: { stopPropagation: () => void; preventDefault: () => void }) => {
     event.stopPropagation();
     event.preventDefault();

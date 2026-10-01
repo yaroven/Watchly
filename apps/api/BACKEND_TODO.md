@@ -161,23 +161,35 @@ pointing here).
 
 ## Phase 4 — Engagement (like/dislike/watchlist on Title) — **shipped** (#60)
 
-The models landed as described. The endpoints did not:
+Both models shipped with more than the sketch below carries: `title`/`user` relations
+with `onDelete: Cascade` on each, `createdAt`, and indexes. Neither addition is
+cosmetic — the cascade is why an orphaned watchlist row is a broken-database case
+rather than a routine one, and `@@index([userId, createdAt])` is what makes "newest
+addition first" cheap. `apps/api/prisma/schema.prisma` is the current shape.
 
-| Planned                            | Shipped                           |
-| ---------------------------------- | --------------------------------- |
-| `POST/DELETE /titles/:id/reaction` | `POST/DELETE /title/:id/reaction` |
-| `GET /users/me/watchlist`          | `GET /watchlist`                  |
-| `GET /titles/:id/stats`            | —                                 |
+The endpoints diverged from the plan:
 
-`GET /titles/:id/stats` was dropped rather than renamed: the counts and the
-viewer's own state ride on the title response itself beside the rating block,
-so the detail page, every list and the watchlist page get them from the read
-they already make. Title reads became `@OptionalAuth()` to carry it.
-`GET /title/:id/engagement` exists for the one case that has no title read
-to piggyback on.
+| Planned                             | Shipped                            |
+| ----------------------------------- | ---------------------------------- |
+| `POST/DELETE /titles/:id/reaction`  | `POST/DELETE /title/:id/reaction`  |
+| `POST/DELETE /titles/:id/watchlist` | `POST/DELETE /title/:id/watchlist` |
+| `GET /users/me/watchlist`           | `GET /watchlist`                   |
+| `GET /titles/:id/stats`             | `GET /title/:id/engagement`        |
 
-`shares` has no counterpart — nothing tracks sharing, and the client's share
-button copies the link rather than reporting a number.
+`stats` was not dropped so much as moved and renamed. The counts and the viewer's own
+state ride on the title response itself, beside the rating block, so the detail page,
+every list and the watchlist page get them from a read they already make — title reads
+became `@OptionalAuth()` to carry it. `GET /title/:id/engagement` serves the same
+payload for the one case with no title read to piggyback on.
+
+The one planned field with no counterpart is `shares`: nothing tracks sharing, and the
+client's share button copies the link rather than reporting a number.
+
+Unblocked `StreamFilmInfo.tsx`, the "My Watchlist" row on Discover, the poster bookmark
+on `TitleCard`, and the `/watchlist` page (which did not exist).
+
+<details>
+<summary>The original plan, kept for the record — not what shipped</summary>
 
 ```prisma
 model TitleReaction {
@@ -199,14 +211,11 @@ model WatchlistItem {
 }
 ```
 
-Endpoints:
-
 - `POST /titles/:id/reaction`, `DELETE /titles/:id/reaction`
 - `POST /titles/:id/watchlist`, `DELETE /titles/:id/watchlist`, `GET /users/me/watchlist`
 - `GET /titles/:id/stats` — aggregate likes/dislikes/shares/watchlistCount
 
-Unblocked `StreamFilmInfo.tsx`, the "My Watchlist" row on Discover, the poster
-bookmark on `TitleCard`, and the `/watchlist` page (which did not exist).
+</details>
 
 ## Phase 5 — Title photos
 

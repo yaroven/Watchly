@@ -62,6 +62,16 @@ describe("TitleEngagementService", () => {
   afterEach(() => jest.clearAllMocks());
 
   describe("react", () => {
+    it("should scope the withdrawal probe to this viewer and this vote", async () => {
+      // Without `userId` here one person un-liking withdraws every user's LIKE
+      // on the title; without `type` a side-switch becomes a withdrawal.
+      await service.react(titleId, userId, ReactionType.LIKE);
+
+      expect(txMock.titleReaction.deleteMany).toHaveBeenCalledWith({
+        where: { titleId, userId, type: ReactionType.LIKE },
+      });
+    });
+
     it("should cast the vote if the viewer had not voted", async () => {
       await service.react(titleId, userId, ReactionType.LIKE);
 
@@ -302,6 +312,12 @@ describe("TitleEngagementService", () => {
       });
       expect(result.get(otherTitleId)?.likes).toBe(4);
       expect(result.get(otherTitleId)?.watchlistCount).toBe(1);
+    });
+
+    it("should report a missing title as not found rather than answering with zeroes", async () => {
+      prismaMock.title.findUnique.mockResolvedValue(null);
+
+      await expect(service.summarize(titleId, null)).rejects.toThrow(NotFoundException);
     });
 
     it("should skip the database entirely for an empty list", async () => {

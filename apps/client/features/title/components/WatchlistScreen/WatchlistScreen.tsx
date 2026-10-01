@@ -7,8 +7,8 @@ import ErrorOutlineIcon from "@mui/icons-material/ErrorOutlineOutlined";
 import Box from "@mui/material/Box";
 import Skeleton from "@mui/material/Skeleton";
 import Typography from "@mui/material/Typography";
-import { useAuthStore } from "@shared/lib/auth-store";
 import { formatCount } from "@shared/lib/format-count";
+import { useViewer } from "@shared/lib/use-viewer";
 import Button from "@shared/ui/Button";
 import Pagination from "@shared/ui/Pagination";
 import { useRouter } from "next/navigation";
@@ -28,8 +28,7 @@ const gridSx = {
 
 export default function WatchlistScreen() {
   const router = useRouter();
-  const isSignedIn = useAuthStore((state) => Boolean(state.userId));
-  const authStatus = useAuthStore((state) => state.status);
+  const viewer = useViewer();
   const [page, setPage] = useState(1);
 
   const { data, isPending, isError, error, refetch, isFetching } = useWatchlist({ page, limit: PAGE_SIZE });
@@ -37,7 +36,7 @@ export default function WatchlistScreen() {
   const totalCount = data?.totalCount ?? 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
-  if (authStatus === "resolved" && !isSignedIn) {
+  if (viewer.status === "anonymous") {
     return (
       <EmptyState message="Sign in to keep a watchlist.">
         <Button variant="contained" onClick={() => router.push(APP.LOGIN)}>

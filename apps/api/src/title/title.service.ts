@@ -343,7 +343,13 @@ export class TitleService {
     const rating = ratings.get(title.id);
     const titleEngagement = engagement.get(title.id);
     if (!rating || !titleEngagement) {
-      throw new InternalServerErrorException(`No aggregates were built for title ${title.id}`);
+      // Logged, then thrown bare: Nest's default filter does not log HttpExceptions,
+      // and the invariant text and row id are not the client's business. This is
+      // mapped over every row of a list, so one bad title fails the whole page.
+      this.logger.error(
+        `No ${!rating ? "rating" : "engagement"} aggregate was built for title ${title.id}`,
+      );
+      throw new InternalServerErrorException();
     }
     return new TitleResponseDto(title, rating, titleEngagement);
   }

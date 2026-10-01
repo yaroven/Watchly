@@ -121,6 +121,19 @@ describe("TitleService", () => {
   });
 
   describe("create", () => {
+    // `viewer: null` means "we did not ask", which the client renders as unknown
+    // and disables on. A title created a moment ago has provably known state.
+    it("should state the viewer's engagement rather than reporting it unknown", async () => {
+      (prismaServiceMock.title.create as jest.Mock).mockResolvedValue({
+        id: "title-1",
+        genres: [],
+      });
+
+      const result = await service.create({ name: "Title", genreIds: [] } as never);
+
+      expect(result.engagement.viewer).toEqual({ myReaction: null, inWatchlist: false });
+    });
+
     describe("should return the created title with no poster", () => {
       it("if valid data is provided", async () => {
         const createData = {
@@ -344,6 +357,43 @@ describe("TitleService", () => {
           }),
         );
       });
+    });
+  });
+
+  describe("the viewer on read paths", () => {
+    // Replacing any of these with `null` makes every signed-in viewer read as
+    // anonymous — the failure the supertest spec catches one layer up.
+    it("should forward the viewer from findOne", async () => {
+      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
+        id: "title-1",
+        genres: [],
+      });
+
+      await service.findOne("title-1", "viewer-1");
+
+      expect(engagementServiceMock.summarize).toHaveBeenCalledWith("title-1", "viewer-1");
+    });
+
+    it("should forward the viewer from findAll", async () => {
+      (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([
+        { id: "title-1", genres: [] },
+      ]);
+      (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(1);
+
+      await service.findAll({ page: 1, limit: 10 }, undefined, [], "viewer-1");
+
+      expect(engagementServiceMock.summarizeMany).toHaveBeenCalledWith(["title-1"], "viewer-1");
+    });
+
+    it("should pass null rather than undefined when there is no viewer", async () => {
+      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
+        id: "title-1",
+        genres: [],
+      });
+
+      await service.findOne("title-1");
+
+      expect(engagementServiceMock.summarize).toHaveBeenCalledWith("title-1", null);
     });
   });
 
