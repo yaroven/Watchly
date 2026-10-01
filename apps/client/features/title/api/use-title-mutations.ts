@@ -141,7 +141,7 @@ export const useUpdateTitle = (options?: Omit<UseMutationOptions<Title, Error, U
 
       return titleService.update(id, nextPayload);
     },
-    getInvalidateKeys: ({ id }: UpdateTitleMutationArgs) => [titleKeys.all(), titleKeys.detail(id)],
+    getInvalidateKeys: ({ id }: UpdateTitleMutationArgs) => [titleKeys.all(), titleKeys.detailPrefix(id)],
   });
   return useUpdateTitle(options);
 };
@@ -150,7 +150,9 @@ export const useDeleteTitle = (options?: Omit<UseMutationOptions<void, Error, st
   const useDeleteTitle = createMutationHook({
     mutationFn: (id: string) => titleService.delete(id),
     getInvalidateKeys: () => [titleKeys.all()],
-    getRemoveKeys: (id: string) => [titleKeys.detail(id)],
+    // stream and cast hang off `all()` rather than `detail(id)`, so removing the
+    // detail prefix no longer reaches them — name them.
+    getRemoveKeys: (id: string) => [titleKeys.detailPrefix(id), titleKeys.stream(id), titleKeys.cast(id)],
   });
   return useDeleteTitle(options);
 };
@@ -158,7 +160,7 @@ export const useDeleteTitle = (options?: Omit<UseMutationOptions<void, Error, st
 export const useTranscodeTitle = (options?: Omit<UseMutationOptions<void, Error, string>, "mutationFn">) => {
   const useTranscodeTitle = createMutationHook({
     mutationFn: (id: string) => titleService.transcode(id),
-    getInvalidateKeys: (id: string) => [titleKeys.all(), titleKeys.detail(id), titleKeys.stream(id)],
+    getInvalidateKeys: (id: string) => [titleKeys.all(), titleKeys.detailPrefix(id), titleKeys.stream(id)],
   });
   return useTranscodeTitle(options);
 };
@@ -166,7 +168,7 @@ export const useTranscodeTitle = (options?: Omit<UseMutationOptions<void, Error,
 export const useSyncTitleRatings = (options?: Omit<UseMutationOptions<ExternalRating[], Error, string>, "mutationFn">) => {
   const useSyncTitleRatings = createMutationHook({
     mutationFn: (id: string) => titleService.syncRatings(id),
-    getInvalidateKeys: (id: string) => [titleKeys.detail(id)],
+    getInvalidateKeys: (id: string) => [titleKeys.detailPrefix(id)],
   });
   return useSyncTitleRatings(options);
 };

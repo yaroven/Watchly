@@ -8,6 +8,7 @@ import {
   TranscodingStatus,
 } from "@prisma/client";
 import { GenreResponseDto } from "../../../genre/dto/response/genre-response.dto";
+import { TitleEngagementDto } from "../../../title-engagement/dto/response/title-engagement.dto";
 import { ExternalRatingResponseDto } from "./external-rating-response.dto";
 
 export class TitleResponseDto {
@@ -74,9 +75,19 @@ export class TitleResponseDto {
   })
   rating: { average: number | null; count: number };
 
+  @ApiProperty({
+    type: TitleEngagementDto,
+    description: "Likes, dislikes and watchlist state — the viewer's own included when signed in",
+  })
+  engagement: TitleEngagementDto;
+
+  // Neither aggregate is defaulted: a title that nobody has rated or liked and a
+  // title whose aggregates were never fetched would serialise identically, and
+  // the client caches whichever it is handed.
   constructor(
     title: Title & { genres: Genre[]; externalRatings?: ExternalRatings[] },
-    rating: { average: number | null; count: number } = { average: null, count: 0 },
+    rating: { average: number | null; count: number },
+    engagement: TitleEngagementDto,
   ) {
     this.id = title.id;
     this.createdAt = title.createdAt;
@@ -97,6 +108,7 @@ export class TitleResponseDto {
     this.genres = title.genres.map((genre) => new GenreResponseDto(genre));
     this.transcodingStatus = title.transcodingStatus;
     this.rating = rating;
+    this.engagement = engagement;
     this.externalRatings = (title.externalRatings ?? []).map(
       (rating) => new ExternalRatingResponseDto(rating),
     );

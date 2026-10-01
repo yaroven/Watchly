@@ -1,7 +1,6 @@
-export enum ReactionType {
-  LIKE = "LIKE",
-  DISLIKE = "DISLIKE",
-}
+import ReactionType from "@/types/reaction-type";
+
+export { ReactionType };
 
 export const COMMENT_SORT_MODES = ["newest", "oldest", "hottest"] as const;
 export type CommentSortMode = (typeof COMMENT_SORT_MODES)[number];

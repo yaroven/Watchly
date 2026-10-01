@@ -1,15 +1,17 @@
 /**
- * TEMPORARY: design-file fixtures for the parts of the title-detail (Film)
- * page that have no endpoint yet (cast, stream stats). Same convention as
- * DiscoverScreen/mocks.ts. Drop this file once those endpoints land — nothing
- * outside TitleOverview/TitleInformation/MovieStream/SeriesStream/
- * StreamFilmInfo/StreamPhotos imports it.
+ * TEMPORARY: design-file fixtures for the parts of the title, watch and episode
+ * surfaces that have no endpoint yet — cast, stream photos, and per-episode
+ * score/thumbnail. Same convention as DiscoverScreen/mocks.ts.
+ *
+ * Importers, all of which break if this file goes before its endpoints land:
+ * - TitleInformation (cast)
+ * - StreamPhotos (photos)
+ * - StreamEpisodesSidebar and, in another feature, episodes/EpisodeList
+ *   (getEpisodeScore / getEpisodeThumbnail)
+ *
+ * Retiring it takes three separate endpoints, not one — drop each fixture as its
+ * own lands rather than the file as a whole.
  */
-
-export interface TitleScores {
-  /** Watchly's own score — no endpoint yet. */
-  tmovie: number;
-}
 
 export interface CastMember {
   name: string;
@@ -17,21 +19,15 @@ export interface CastMember {
 }
 
 export interface StreamStats {
-  likes: number;
-  dislikes: number;
-  shares: number;
-  watchlistCount: number;
   photos: string[];
 }
 
 export interface TitleOverviewFixture {
-  scores: TitleScores;
   cast: CastMember[];
   stream: StreamStats;
 }
 
 const DEFAULT_FIXTURE: TitleOverviewFixture = {
-  scores: { tmovie: 8.7 },
   cast: [
     { name: "Olivia Cooke", avatarUrl: "https://picsum.photos/id/64/120/120" },
     { name: "Matt Smith", avatarUrl: "https://picsum.photos/id/65/120/120" },
@@ -42,10 +38,6 @@ const DEFAULT_FIXTURE: TitleOverviewFixture = {
     { name: "Bill Paterson", avatarUrl: "https://picsum.photos/id/453/120/120" },
   ],
   stream: {
-    likes: 41200,
-    dislikes: 1300,
-    shares: 6200,
-    watchlistCount: 9400,
     photos: Array.from({ length: 10 }, (_, index) => `https://picsum.photos/id/${1050 + index}/400/400`),
   },
 };
