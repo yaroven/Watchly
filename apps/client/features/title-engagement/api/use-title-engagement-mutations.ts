@@ -10,7 +10,7 @@ import titleEngagementService from "./title-engagement.service";
  * it — toggling from one poster has to update the same title in the other rails it
  * appears in. Each entry is a prefix covering every viewer-scoped variant beneath
  * it, and each is as narrow as the key tree allows: `detailPrefix`/`detail` reach one
- * title, and `stream`/`cast` sit outside `details()` so a like does not invalidate
+ * title, and `stream`/`cast` sit outside `detailsPrefix()` so a like does not invalidate
  * a presigned playback URL.
  *
  * `watchlistsPrefix()` and `listsPrefix()` are genuinely broad — the toggled title sits

@@ -21,8 +21,15 @@ cookie. `/auth/refresh` returns the new access token **and** the viewer's `userI
 - The access token dies while a tab is open, so the client refreshes **before** sending
   an expired one. It cannot wait for a 401, because public routes are `@OptionalAuth()`
   and answer an expired token with 200-anonymous.
-- Identity comes from the refresh response body, not from parsing the token. Parsing was
-  tried and produced a half-session — a valid token with no `userId` — whenever the
-  payload didn't decode.
-- Only a 401 from `/auth/refresh` ends a session. Clearing on any failure signed viewers
-  out over transient network errors.
+- The refresh response body is authoritative about identity, with the token parsed as a
+  fallback when the body omits `userId` or carries a role this client does not know —
+  and only while both describe the same person, since taking the token wholesale would
+  silently swap the viewer. A refresh that yields neither ends the session rather than
+  storing a token with no identity, which reported a signed-in viewer as anonymous
+  everywhere.
+- Only two things end a session: a 401 from `/auth/refresh`, and a refresh that answered
+  with nothing usable. Clearing on any failure signed viewers out over transient network
+  errors.
+- Expiry is measured against the server's `Date` header, not the device clock. Without
+  that, a machine whose clock is wrong reads every token as expired and refreshes on
+  every request forever.

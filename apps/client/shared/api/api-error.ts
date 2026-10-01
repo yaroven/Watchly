@@ -12,6 +12,22 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * The refresh call answered, but carried nothing we can build a session from.
+ *
+ * Neither a refusal nor transient, and it must not be mistaken for either: as a
+ * 401 it would look like a password problem, and as a transient failure the
+ * viewer stays pinned with a dead token — signed in according to the store,
+ * anonymous according to every read, and never sent anywhere to fix it.
+ */
+export class SessionUnusableError extends ApiError {
+  constructor(detail: string) {
+    super("Your session could not be restored. Please sign in again.");
+    this.name = "SessionUnusableError";
+    this.details = detail;
+  }
+}
+
 export function toApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error;
 

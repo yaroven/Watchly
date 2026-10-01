@@ -8,7 +8,9 @@ ignore it.
 ## Layout
 
 One directory per domain under `src/`, each with `*.module.ts`, `*.controller.ts`,
-`*.service.ts`, `*.service.spec.ts`, and `dto/request` + `dto/response`:
+`*.service.ts` and `dto/request` + `dto/response`, and in most cases a
+`*.service.spec.ts` (`artist` and `external-ratings` predate that and have none;
+`external-ratings` has no `dto/request` either):
 
 `artist` `comment` `episode` `external-ratings` `genre` `season` `title`
 `title-engagement` `title-rating` `user`
@@ -37,8 +39,9 @@ shared DTOs, `env.util.ts`).
   `deleteMany({ where: { titleId, userId: undefined } })` deletes every user's row and
   answers 200. The decorator is what keeps `undefined` out of that position.
 - `@CurrentUserId()` on an `@OptionalAuth()` route compiles and 500s every anonymous
-  caller. The four controllers with a `*.controller.spec.ts` pin their own pairing
-  through supertest; anywhere else, check it by hand.
+  caller. Four specs pin the pairing through supertest — `title.controller.viewer`,
+  `title-engagement.controller`, `title-rating.controller`, `watchlist.controller`.
+  Every other route, check by hand.
 
 ### Responses that depend on who is asking
 
@@ -67,8 +70,7 @@ Jest, `rootDir: src`, `*.spec.ts` beside the unit under test. No coverage floor 
 enforced and specs are excluded from ESLint and from `tsconfig.build.json`.
 
 Routes that read the viewer need a **request-level** spec (supertest +
-`overrideGuard`), not a handler call — see `title.controller.viewer.spec.ts` and the
-three controller specs. A direct call never runs the param decorator, so it cannot tell
+`overrideGuard`), not a handler call — see the four named above. A direct call never runs the param decorator, so it cannot tell
 `@CurrentUserId()` from a hardcoded value.
 
 **Write the test so it can fail.** Before trusting a new test, break the behaviour it
@@ -79,6 +81,8 @@ names and confirm _that_ test goes red. The ones that have slipped through here:
   the transaction its own mock and assert the writes landed on it.
 - Hard-coding a `deleteMany` row count makes the `where` clause irrelevant — the test
   passes whatever you filter on. Model the row instead.
-- `toHaveBeenCalledWith(id, undefined)` pins the _absence_ of a viewer as the contract.
+- `toHaveBeenCalledWith(id, undefined)` is right for an anonymous caller on an
+  `@OptionalAuth()` route and wrong as the _only_ case — assert the signed-in one
+  beside it, or nothing notices the controller dropping the viewer on the floor.
 - Param decorators don't execute on a direct method call. Viewer propagation needs a
   request-level test (supertest + `overrideGuard`), not a handler call.

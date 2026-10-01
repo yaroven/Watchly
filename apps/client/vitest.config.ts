@@ -9,7 +9,10 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["{shared,features}/**/*.test.ts"],
+    // Both suffixes and both extensions: a file written to the convention
+    // `apps/api` documents (`*.spec.ts`) would otherwise be skipped silently,
+    // with the run still green.
+    include: ["{app,shared,features,types}/**/*.{test,spec}.{ts,tsx}"],
   },
   resolve: {
     alias: {

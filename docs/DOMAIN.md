@@ -30,9 +30,11 @@ expressible, and so replies don't carry a mostly-null score column.
 Watchly's own score is the **mean of `TitleRating`, computed per request** — it is not
 stored. A cached average would be one more thing to drift.
 
-All four uniques are enforced in the database (`@@unique([titleId, userId])` and
-friends), so double voting is unrepresentable rather than merely discouraged. Switching
-sides on a reaction updates the row; sending the vote you already cast withdraws it.
+The three one-per-viewer tables enforce it in the database (`@@unique([titleId, userId])`
+and friends), so double voting is unrepresentable rather than merely discouraged.
+`TitleComment` has no such constraint and cannot: many comments per viewer is the point.
+Switching sides on a reaction updates the row; sending the vote you already cast
+withdraws it.
 
 ## Comments
 
