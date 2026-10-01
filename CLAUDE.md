@@ -16,9 +16,10 @@ Package manager is **pnpm@10.30.0**. Never npm or yarn. Run from the repo root.
 pnpm dev:up                 # whole stack in docker; client on :4000, api on :3000
 pnpm dev:down
 pnpm lint                   # lint-staged in both apps (prettier + eslint --fix on staged files)
-pnpm test                   # == test:api. The client has no test suite at all.
+pnpm test                   # api (jest) + client (vitest)
 pnpm --filter api test      # jest; rootDir=src, *.spec.ts only
 pnpm --filter api test -- --testPathPattern=title-rating    # one suite
+pnpm --filter client test   # vitest; unit only, no DOM environment
 ```
 
 Swagger: `http://localhost:3000/docs`. Deploys go through `make help`.
@@ -55,7 +56,9 @@ Worth knowing before trusting a green build:
   explicitly off; `strictNullChecks` is on. `apps/client` is `strict: true`.
 - **CI jobs are wrapped in `dorny/paths-filter`.** A PR touching only `apps/api` still
   reports a green "Build Client" that built nothing.
-- **`apps/client` has no tests and no test runner** — 365 source files, zero specs.
+- **`apps/client` tests are unit-only.** vitest, no DOM environment, and coverage is
+  limited to the auth plumbing in `shared/`. Nothing renders a component, so component
+  behaviour is still only verified by hand.
 - `apps/api` specs are in the ESLint ignore list.
 - `test:e2e` and `test:integration` in `apps/api/package.json` point at a `test/`
   directory that does not exist. There is no e2e coverage; don't claim any.

@@ -23,14 +23,14 @@ say so when you do.
   tokens), `ui/`, `assets/`.
 
 Layer rules are ESLint-enforced: `shared/**` may not import `features/*` or `app/*`, and
-`features/**` may not import `app/*`. Cross-feature access goes through the other
-feature's `index.ts`, never into its internals.
+`features/**` may not import `app/*`. Nothing enforces the feature-to-feature direction,
+and roughly forty deep cross-feature imports exist today — prefer the other feature's
+`index.ts`, and expect to find neighbours that do not.
 
 ## Rules
 
 - Server state is TanStack Query; client-only state is zustand. Fetched data does not go
   in zustand.
-- Import a feature through its `index.ts`, not by deep path.
 - MUI: use theme tokens from `shared/mui/theme` (`tokens`, `inputVariants`) rather than
   raw hex. There is a sass dependency but it is not the styling path.
 - New remote image hosts go in `next.config.ts` **and** `.env.example`.

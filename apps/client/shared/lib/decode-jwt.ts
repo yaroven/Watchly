@@ -1,4 +1,5 @@
 import Role from "@/types/role";
+import { serverNow } from "./server-time";
 
 export interface AccessTokenClaims {
   userId: string;
@@ -34,7 +35,8 @@ export function isAccessTokenExpired(token: string, skewSeconds = 10): boolean {
     console.warn("[auth] Access token carries no readable `exp`; treating it as expired");
     return true;
   }
-  return Date.now() >= (exp - skewSeconds) * 1000;
+  // Against the server's clock, not this device's — see `server-time.ts`.
+  return serverNow() >= (exp - skewSeconds) * 1000;
 }
 
 /**

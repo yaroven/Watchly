@@ -13,9 +13,11 @@ import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
 import Typography from "@mui/material/Typography";
 import { formatCount } from "@shared/lib/format-count";
+import { APP } from "@shared/lib/routes";
 import { useViewer } from "@shared/lib/use-viewer";
 import Button from "@shared/ui/Button";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 interface StreamFilmInfoProps {
@@ -25,6 +27,7 @@ interface StreamFilmInfoProps {
 }
 
 export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFilmInfoProps) {
+  const router = useRouter();
   const viewer = useViewer();
   const [expanded, setExpanded] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
@@ -50,14 +53,18 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
   // Without trustworthy viewer state a toggle is a coin flip: the server toggles,
   // so clicking an un-lit thumb on behalf of someone who has already liked the
   // title would withdraw the like they meant to keep.
-  // Three viewer states, three answers — flattening them to "signed in or not"
-  // is how a control ends up disabled for someone who is in fact signed in.
   const viewerStateUnknown = viewer.status === "signed-in" && (viewerEngagement === null || engagementFailed);
   const togglesDisabled = viewer.status !== "signed-in" || viewerStateUnknown;
+
+  // Each of the three viewer states gets its own answer. Anonymous is not a
+  // failure — it is a viewer who needs an account, and the sibling TitleCard
+  // sends them to one rather than dimming a control at them.
+  const handleToggleWhileAnonymous = () => router.push(APP.LOGIN);
 
   // The design shows a dislike toggle with no visible counter — only the
   // like count and the active/inactive colour change.
   const handleReact = (type: ReactionType) => {
+    if (viewer.status === "anonymous") return handleToggleWhileAnonymous();
     if (togglesDisabled || react.isPending) return;
     react.mutate(type);
   };
@@ -112,8 +119,8 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
             component="button"
             type="button"
             aria-label={viewerEngagement?.myReaction === ReactionType.LIKE ? "Remove like" : "Like"}
-            aria-pressed={viewerEngagement?.myReaction === ReactionType.LIKE}
-            disabled={togglesDisabled || react.isPending}
+            aria-pressed={viewerEngagement ? viewerEngagement.myReaction === ReactionType.LIKE : undefined}
+            disabled={viewerStateUnknown || viewer.status === "pending" || react.isPending}
             onClick={() => handleReact(ReactionType.LIKE)}
             sx={{ ...actionButtonSx, color: viewerEngagement?.myReaction === ReactionType.LIKE ? "primary.main" : "#ffffff" }}
           >
@@ -126,8 +133,8 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
             component="button"
             type="button"
             aria-label={viewerEngagement?.myReaction === ReactionType.DISLIKE ? "Remove dislike" : "Dislike"}
-            aria-pressed={viewerEngagement?.myReaction === ReactionType.DISLIKE}
-            disabled={togglesDisabled || react.isPending}
+            aria-pressed={viewerEngagement ? viewerEngagement.myReaction === ReactionType.DISLIKE : undefined}
+            disabled={viewerStateUnknown || viewer.status === "pending" || react.isPending}
             onClick={() => handleReact(ReactionType.DISLIKE)}
             sx={{ ...actionButtonSx, color: viewerEngagement?.myReaction === ReactionType.DISLIKE ? "primary.main" : "#ffffff" }}
           >
@@ -172,9 +179,12 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
         <Box
           component="button"
           type="button"
-          aria-pressed={viewerEngagement?.inWatchlist ?? false}
-          disabled={togglesDisabled || setWatchlist.isPending}
-          onClick={() => viewerEngagement && setWatchlist.mutate(!viewerEngagement.inWatchlist)}
+          aria-pressed={viewerEngagement ? viewerEngagement.inWatchlist : undefined}
+          disabled={viewerStateUnknown || viewer.status === "pending" || setWatchlist.isPending}
+          onClick={() => {
+            if (viewer.status === "anonymous") return handleToggleWhileAnonymous();
+            if (viewerEngagement) setWatchlist.mutate(!viewerEngagement.inWatchlist);
+          }}
           sx={{
             display: "flex",
             alignItems: "center",
@@ -204,7 +214,7 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
           </Box>
           <Box sx={{ textAlign: "left" }}>
             <Typography sx={{ fontSize: "14px", fontWeight: 700, color: "#191919", lineHeight: 1.2 }}>
-              {viewerEngagement?.inWatchlist ? "In Watchlist" : "Add to Watchlist"}
+              {viewerEngagement ? (viewerEngagement.inWatchlist ? "In Watchlist" : "Add to Watchlist") : "Watchlist"}
             </Typography>
             <Typography sx={{ fontSize: "11px", color: "#191919", opacity: 0.75, lineHeight: 1.2 }}>
               Added by {formatCount(engagement.watchlistCount)} {engagement.watchlistCount === 1 ? "User" : "Users"}

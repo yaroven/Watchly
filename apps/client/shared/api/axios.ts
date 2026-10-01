@@ -2,8 +2,9 @@ import Role from "@/types/role";
 import { authStore } from "@shared/lib/auth-store";
 import { decodeAccessToken, isAccessTokenExpired } from "@shared/lib/decode-jwt";
 import { APP } from "@shared/lib/routes";
+import { recordServerTime } from "@shared/lib/server-time";
 import axios, { type InternalAxiosRequestConfig } from "axios";
-import { ApiError, toApiError } from "./api-error";
+import { SessionUnusableError, toApiError } from "./api-error";
 
 const isServer = typeof window === "undefined";
 const baseURL = isServer ? process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_BACKEND_API_URL : process.env.NEXT_PUBLIC_BACKEND_API_URL;
@@ -39,21 +40,30 @@ let proactiveRefreshBlockedUntil = 0;
 
 const BACKOFF_AFTER_FAILURE_MS = 30_000;
 const BACKOFF_AFTER_RATE_LIMIT_MS = 60_000;
-/** A clock this wrong will not fix itself in thirty seconds, but it may be fixed by hand. */
-const BACKOFF_AFTER_CLOCK_SKEW_MS = 10 * 60_000;
+/** Not a clock problem — the offset handles those — so something is genuinely wrong. */
+const BACKOFF_AFTER_ANOMALY_MS = 10 * 60_000;
 
 function blockProactiveRefresh(ms: number, reason: string) {
   proactiveRefreshBlockedUntil = Date.now() + ms;
   console.warn(`[auth] Pausing pre-emptive token refresh for ${Math.round(ms / 1000)}s: ${reason}`);
 }
 
+/** Guards both the pre-emptive path and the reactive retry. */
 function mayRefreshProactively(): boolean {
   return Date.now() >= proactiveRefreshBlockedUntil;
 }
 
-/** Only a refusal means the session ended; a timeout, a 5xx or a rate limit does not. */
+/**
+ * Whether this failure ends the session.
+ *
+ * Only two things do: the refresh cookie being refused, and a refresh that
+ * answered with nothing usable. A timeout, a 5xx or a rate limit does not —
+ * tearing the session down for those signs a viewer out over a dropped packet.
+ *
+ * Both callers pass a raw rejection; `toApiError` is idempotent on an ApiError.
+ */
 function isSessionRejection(error: unknown): boolean {
-  return toApiError(error).statusCode === 401;
+  return error instanceof SessionUnusableError || toApiError(error).statusCode === 401;
 }
 
 api.interceptors.request.use(async (config: TrackedConfig) => {
@@ -73,7 +83,7 @@ api.interceptors.request.use(async (config: TrackedConfig) => {
   } catch (error) {
     const apiError = toApiError(error);
 
-    if (apiError.statusCode === 401) {
+    if (isSessionRejection(error)) {
       console.error(`[auth] Session ended: ${REFRESH_PATH} refused the refresh cookie. Clearing the session.`);
       authStore.getState().clear();
       delete config.headers.Authorization;
@@ -96,13 +106,21 @@ api.interceptors.request.use(async (config: TrackedConfig) => {
 
 /** The viewer the refresh response describes, or null if it describes none we can use. */
 function readIdentity(body: { accessToken: string; userId?: string; role?: Role }) {
-  // The body is authoritative, but it is still unvalidated wire data: a role the
-  // client does not know would be stored and then match nothing, and the viewer
-  // would be bounced off role-gated pages as if unauthorised.
-  const roleIsKnown = typeof body.role === "string" && Object.values(Role).includes(body.role);
-  if (body.userId && roleIsKnown) return { userId: body.userId, role: body.role as Role };
+  const fromToken = decodeAccessToken(body.accessToken);
 
-  return decodeAccessToken(body.accessToken);
+  // The body is authoritative about *who*, but it is unvalidated wire data about
+  // *what role*: one the client does not know would be stored and then match
+  // nothing, bouncing the viewer off role-gated pages as if unauthorised.
+  if (!body.userId) return fromToken;
+
+  if (typeof body.role === "string" && Object.values(Role).includes(body.role)) {
+    return { userId: body.userId, role: body.role };
+  }
+
+  // Falling back to the token is only safe while both describe the same person.
+  // Taking the token's identity wholesale would silently swap the viewer — cache
+  // keys, likes, watchlist and every write would run as somebody else.
+  return fromToken?.userId === body.userId ? fromToken : null;
 }
 
 /** Calls /auth/refresh, applies the session it returns, and returns the new access token. */
@@ -117,16 +135,20 @@ async function refreshAccessToken(): Promise<string> {
     // refusal, so the existing session stays rather than being torn down — and
     // storing the token without an identity would report a signed-in viewer as
     // anonymous everywhere while keying their cache as such.
-    console.error("[auth] /auth/refresh returned no identity this client can use; keeping the current session");
-    throw new ApiError("Refreshed session carried no usable identity");
+    throw new SessionUnusableError("/auth/refresh returned no identity this client can use");
   }
 
   authStore.getState().setSession({ token: data.accessToken, ...identity });
 
   if (isAccessTokenExpired(data.accessToken)) {
+    // With the server-time offset applied this should be unreachable; if it is
+    // not, the server is minting tokens already past their `exp`, or they carry
+    // no readable one. Either way, stop pre-empting — the reason will not change
+    // within the window, and re-arming on every success is how the last version
+    // of this became a latch that could never clear.
     blockProactiveRefresh(
-      BACKOFF_AFTER_CLOCK_SKEW_MS,
-      "a token issued moments ago already reads as expired — this device's clock is wrong, or the token carries no readable `exp`",
+      BACKOFF_AFTER_ANOMALY_MS,
+      "a token issued moments ago already reads as expired, measured against the server's own clock",
     );
   } else {
     proactiveRefreshBlockedUntil = 0;
@@ -161,8 +183,12 @@ export async function restoreSession(): Promise<void> {
 }
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    recordServerTime(response.headers?.date as string | undefined);
+    return response;
+  },
   async (error) => {
+    recordServerTime(error?.response?.headers?.date as string | undefined);
     const originalRequest = error.config as TrackedConfig | undefined;
     const shouldRefresh = error.response?.status === 401 && originalRequest && !originalRequest._retry && !originalRequest._isRefreshCall;
 
@@ -173,6 +199,13 @@ api.interceptors.response.use(
     }
 
     originalRequest._retry = true;
+
+    if (!mayRefreshProactively()) {
+      // Backing off covers both paths: otherwise a request that failed to refresh
+      // pre-emptively immediately tries again on the 401 the stale token earns,
+      // doubling the attempts the backoff exists to stop.
+      return Promise.reject(toApiError(error));
+    }
 
     try {
       const accessToken = await getOrRefreshAccessToken();

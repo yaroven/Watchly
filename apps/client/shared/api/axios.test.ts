@@ -1,7 +1,10 @@
 import Role from "@/types/role";
 import { authStore } from "@shared/lib/auth-store";
+import { APP } from "@shared/lib/routes";
+import { __resetServerTimeForTests } from "@shared/lib/server-time";
 import MockAdapter from "axios-mock-adapter";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { SessionUnusableError } from "./api-error";
 import api, { __resetAuthBackoffForTests } from "./axios";
 
 function tokenWith(payload: Record<string, unknown>): string {
@@ -16,6 +19,8 @@ let mock: MockAdapter;
 beforeEach(() => {
   mock = new MockAdapter(api);
   __resetAuthBackoffForTests();
+  __resetServerTimeForTests();
+  vi.stubGlobal("window", { location: { href: "" } });
   authStore.getState().clear();
   authStore.getState().setStatus("resolved");
   vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -24,6 +29,8 @@ beforeEach(() => {
 
 afterEach(() => {
   mock.restore();
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -117,35 +124,126 @@ describe("identity from the refresh response", () => {
 
   // A role the client does not know would be stored and then match nothing, and the
   // viewer would be bounced off role-gated pages as if unauthorised.
-  it("should fall back to the token when the body carries a role it does not know", async () => {
+  it("should fall back to the token's role when the body carries one it does not know", async () => {
+    signIn(EXPIRED);
+    mock.onPost("/auth/refresh").reply(200, { accessToken: FRESH, userId: "u1", role: "superuser" });
+    mock.onGet("/title").reply(200, []);
+
+    await api.get("/title");
+
+    expect(authStore.getState().userId).toBe("u1");
+    expect(authStore.getState().role).toBe(Role.USER);
+  });
+
+  // Falling back wholesale would store a different person than the server named.
+  it("should refuse rather than swap the viewer when body and token disagree about who", async () => {
     signIn(EXPIRED);
     mock.onPost("/auth/refresh").reply(200, { accessToken: FRESH, userId: "u2", role: "superuser" });
     mock.onGet("/title").reply(200, []);
 
     await api.get("/title");
 
-    expect(authStore.getState().role).toBe(Role.USER);
-    expect(authStore.getState().userId).toBe("u1");
+    expect(authStore.getState().userId).not.toBe("u1");
+    expect(authStore.getState().token).toBeNull();
   });
 
-  // Storing a token with no identity reports a signed-in viewer as anonymous
-  // everywhere and keys their cache as such.
-  it("should keep the existing session when the response carries no usable identity", async () => {
+  // Neither a refusal nor transient. Storing the token without an identity would
+  // report a signed-in viewer as anonymous everywhere; treating it as transient
+  // pins them with a dead token and never sends them anywhere to fix it.
+  it("should end the session when the response carries no usable identity", async () => {
     signIn(EXPIRED);
     mock.onPost("/auth/refresh").reply(200, { accessToken: "opaque-token" });
     mock.onGet("/title").reply(200, []);
 
     await api.get("/title");
 
-    expect(authStore.getState().token).toBe(EXPIRED);
-    expect(authStore.getState().userId).toBe("u1");
+    expect(authStore.getState().token).toBeNull();
+  });
+
+  // The message reaches the viewer verbatim through the mutation alerts.
+  it("should not put the internal reason in front of the viewer", async () => {
+    const detail = new SessionUnusableError("/auth/refresh returned no identity this client can use");
+
+    expect(detail.message).toBe("Your session could not be restored. Please sign in again.");
+    expect(detail.details).toContain("no identity this client can use");
   });
 });
 
-describe("a clock this device cannot be trusted on", () => {
-  // Every minted token reading as expired would otherwise mean a refresh per
-  // request, forever, rotating the refresh cookie each time.
-  it("should stop refreshing pre-emptively, but only for a while", async () => {
+describe("the backoff window", () => {
+  // Every other case calls the reset seam first, which would hide a module that
+  // ships blocked from the start. This one takes the module as it loads.
+  it("should start out allowing pre-emptive refresh", async () => {
+    vi.resetModules();
+    const [{ default: freshApi }, { authStore: freshStore }] = await Promise.all([import("./axios"), import("@shared/lib/auth-store")]);
+    const freshMock = new MockAdapter(freshApi);
+    freshStore.getState().setSession({ token: EXPIRED, userId: "u1", role: Role.USER });
+    freshMock.onPost("/auth/refresh").reply(200, { accessToken: FRESH, userId: "u1", role: Role.USER });
+    freshMock.onGet("/title").reply(200, []);
+
+    await freshApi.get("/title");
+
+    expect(freshMock.history.post).toHaveLength(1);
+    freshMock.restore();
+  });
+
+  // "For a while" is the whole difference between this and the kill switch the
+  // previous version shipped, and nothing but time control can express it.
+  it("should resume pre-emptive refreshing once the cool-off has passed", async () => {
+    vi.useFakeTimers();
+    signIn(EXPIRED);
+    mock.onPost("/auth/refresh").reply(500);
+    mock.onGet("/title").reply(200, []);
+
+    await api.get("/title");
+    await api.get("/title");
+    expect(mock.history.post).toHaveLength(1);
+
+    vi.advanceTimersByTime(30_001);
+    await api.get("/title");
+
+    expect(mock.history.post).toHaveLength(2);
+  });
+
+  it("should hold a rate limit for longer than an ordinary failure", async () => {
+    vi.useFakeTimers();
+    signIn(EXPIRED);
+    mock.onPost("/auth/refresh").reply(429);
+    mock.onGet("/title").reply(200, []);
+
+    await api.get("/title");
+    vi.advanceTimersByTime(30_001);
+    await api.get("/title");
+    expect(mock.history.post).toHaveLength(1);
+
+    vi.advanceTimersByTime(30_000);
+    await api.get("/title");
+
+    expect(mock.history.post).toHaveLength(2);
+  });
+
+  it("should clear the window as soon as a refresh succeeds", async () => {
+    vi.useFakeTimers();
+    signIn(EXPIRED);
+    mock.onPost("/auth/refresh").replyOnce(500);
+    mock.onGet("/title").reply(200, []);
+
+    await api.get("/title");
+    vi.advanceTimersByTime(30_001);
+
+    mock.onPost("/auth/refresh").reply(200, { accessToken: FRESH, userId: "u1", role: Role.USER });
+    await api.get("/title");
+    authStore.getState().setSession({ token: EXPIRED, userId: "u1", role: Role.USER });
+    await api.get("/title");
+
+    // Third refresh attempted immediately: the success wiped the window rather
+    // than leaving it to expire.
+    expect(mock.history.post).toHaveLength(3);
+  });
+});
+
+describe("a server minting tokens that already read as expired", () => {
+  // Otherwise a refresh per request, forever, rotating the refresh cookie each time.
+  it("should stop pre-empting rather than retrying on every request", async () => {
     signIn(EXPIRED);
     mock.onPost("/auth/refresh").reply(200, { accessToken: EXPIRED, userId: "u1", role: Role.USER });
     mock.onGet("/title").reply(200, []);
@@ -155,5 +253,75 @@ describe("a clock this device cannot be trusted on", () => {
 
     expect(mock.history.post).toHaveLength(1);
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("Pausing pre-emptive token refresh"));
+  });
+});
+
+/**
+ * The other half of the file: the branch that clears sessions and navigates the
+ * browser. Driven through a 401 on a normal request rather than an expired token,
+ * so the request interceptor stays out of the way.
+ */
+describe("the reactive 401 path", () => {
+  it("should refresh once and retry the original request", async () => {
+    signIn(FRESH);
+    mock
+      .onGet("/title")
+      .replyOnce(401)
+      .onGet("/title")
+      .reply(200, [{ id: "t1" }]);
+    mock.onPost("/auth/refresh").reply(200, { accessToken: FRESH, userId: "u1", role: Role.USER });
+
+    const response = await api.get("/title");
+
+    expect(response.status).toBe(200);
+    expect(mock.history.post).toHaveLength(1);
+    expect(authStore.getState().token).toBe(FRESH);
+  });
+
+  it("should end the session and send the viewer to login when the refresh is refused", async () => {
+    signIn(FRESH);
+    mock.onGet("/title").reply(401);
+    mock.onPost("/auth/refresh").reply(401);
+
+    await expect(api.get("/title")).rejects.toThrow();
+
+    expect(authStore.getState().token).toBeNull();
+    expect(window.location.href).toBe(APP.LOGIN);
+  });
+
+  // The rule the request-interceptor cases already pin, on the branch that can
+  // also navigate away: a dropped packet must not sign anyone out.
+  it("should keep the session when the refresh fails for a transient reason", async () => {
+    signIn(FRESH);
+    mock.onGet("/title").reply(401);
+    mock.onPost("/auth/refresh").reply(500);
+
+    await expect(api.get("/title")).rejects.toThrow();
+
+    expect(authStore.getState().token).toBe(FRESH);
+    expect(window.location.href).toBe("");
+  });
+
+  it("should not retry the same request twice", async () => {
+    signIn(FRESH);
+    mock.onGet("/title").reply(401);
+    mock.onPost("/auth/refresh").reply(200, { accessToken: FRESH, userId: "u1", role: Role.USER });
+
+    await expect(api.get("/title")).rejects.toThrow();
+
+    expect(mock.history.get).toHaveLength(2);
+  });
+
+  // Each concurrent 401 firing its own refresh would rotate the refresh cookie
+  // N times and invalidate the winners.
+  it("should coalesce concurrent refreshes into one call", async () => {
+    signIn(FRESH);
+    mock.onGet("/title").replyOnce(401).onGet("/title").reply(200, []);
+    mock.onGet("/genre").replyOnce(401).onGet("/genre").reply(200, []);
+    mock.onPost("/auth/refresh").reply(200, { accessToken: FRESH, userId: "u1", role: Role.USER });
+
+    await Promise.all([api.get("/title"), api.get("/genre")]);
+
+    expect(mock.history.post).toHaveLength(1);
   });
 });

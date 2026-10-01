@@ -46,8 +46,8 @@ export default function TitleCard({ id, name, posterUrl, type, genres, externalR
   // anonymous viewer is missing a session, so their click goes to the login page.
   //
   // The other two states still swallow it — the boot window, and viewer state we
-  // could not read. Both are transient and the label says which, but there is
-  // nothing to route them to yet.
+  // could not read. The label distinguishes them, but neither has anywhere to be
+  // routed to yet.
   const toggleWatchlist = (event: { stopPropagation: () => void; preventDefault: () => void }) => {
     event.stopPropagation();
     event.preventDefault();
@@ -61,13 +61,15 @@ export default function TitleCard({ id, name, posterUrl, type, genres, externalR
 
   const toggleLabel = failed
     ? "Could not update your watchlist — try again"
-    : viewer.status === "pending" || stateUnknown
-      ? "Watchlist"
-      : viewer.status === "anonymous"
-        ? "Sign in to add to your watchlist"
-        : saved
-          ? "Remove from watchlist"
-          : "Add to watchlist";
+    : viewer.status === "pending"
+      ? "Watchlist — still signing you in"
+      : stateUnknown
+        ? "Watchlist — could not tell whether this is saved"
+        : viewer.status === "anonymous"
+          ? "Sign in to add to your watchlist"
+          : saved
+            ? "Remove from watchlist"
+            : "Add to watchlist";
 
   return (
     // The card is not itself a button: it holds a second control (the watchlist
