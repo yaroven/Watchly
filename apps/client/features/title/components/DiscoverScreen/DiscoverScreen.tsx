@@ -1,5 +1,6 @@
 "use client";
 
+import { useWatchlist } from "@/features/title-engagement";
 import { ExternalRatingSource, Title, TitleType } from "@/features/title/schemas/title";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import { APP } from "@/shared/lib/routes";
@@ -9,6 +10,7 @@ import Catalog from "@features/title/components/Catalog";
 import type { SpotlightTitle } from "@features/title/components/SpotlightGrid";
 import SpotlightGrid from "@features/title/components/SpotlightGrid";
 import { Box } from "@mui/material";
+import Typography from "@mui/material/Typography";
 import HeroSlider, { type SliderTitle } from "@shared/ui/HeroSlider";
 import HotNewsSection from "@shared/ui/HotNewsSection";
 import { useRouter } from "next/navigation";
@@ -57,6 +59,9 @@ export default function DiscoverScreen() {
     transcodingStatus: TranscodingStatus.COMPLETED,
   });
 
+  const { data: watchlist, isError: watchlistFailed } = useWatchlist({ page: 1, limit: 12 });
+  const watchlistItems = watchlist?.items ?? [];
+
   const items = data?.items || [];
   // Each row browses the closest real filter we have (`Title.type`) — there's
   // no backend concept yet of "trending"/"genre"/"IMDB rank"/"watchlist" to
@@ -94,7 +99,20 @@ export default function DiscoverScreen() {
         <Catalog title="IMDB Top Movies" bleed items={items} onViewAll={viewAllMovies} />
         <Catalog title="IMDB Top Series" bleed items={items} onViewAll={viewAllSeries} />
         <Catalog title="Trending TV Shows" bleed items={items} onViewAll={viewAllSeries} />
-        <Catalog title="My Watchlist" bleed items={items} onViewAll={() => router.push(APP.WATCHLIST)} />
+        {/* Kept visible on failure: a row that simply disappears is indistinguishable
+            from an empty watchlist, and leaves nothing to report. */}
+        {watchlistFailed ? (
+          <Box>
+            <Typography variant="h3" sx={{ mb: "12px" }}>
+              My Watchlist
+            </Typography>
+            <Typography sx={{ color: "text.secondary" }}>Could not load your watchlist right now.</Typography>
+          </Box>
+        ) : (
+          watchlistItems.length > 0 && (
+            <Catalog title="My Watchlist" bleed items={watchlistItems} onViewAll={() => router.push(APP.WATCHLIST)} />
+          )
+        )}
       </Box>
     </Box>
   );

@@ -1,13 +1,14 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Put, Req } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Put } from "@nestjs/common";
 import {
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
-import type { Request } from "express";
 import { Auth } from "../auth/decorators/auth.decorator";
+import { CurrentUserId, OptionalUserId } from "../auth/decorators/current-user-id.decorator";
 import { OptionalAuth } from "../auth/decorators/optional-auth.decorator";
 import { SetTitleRatingDto } from "./dto/request/set-title-rating.dto";
 import { TitleRatingSummaryDto } from "./dto/response/title-rating-summary.dto";
@@ -25,32 +26,36 @@ export class TitleRatingController {
   })
   @ApiParam({ name: "id", format: "uuid" })
   @ApiOkResponse({ type: TitleRatingSummaryDto })
+  @ApiNotFoundResponse({ description: "Title not found" })
   @OptionalAuth()
   @Get()
-  get(@Param("id", ParseUUIDPipe) id: string, @Req() { userId }: Request) {
-    return this.titleRatingService.summarize(id, userId);
+  get(@Param("id", ParseUUIDPipe) id: string, @OptionalUserId() userId?: string) {
+    return this.titleRatingService.summarize(id, userId ?? null);
   }
 
   @ApiOperation({ summary: "Set or change your score for a title" })
   @ApiParam({ name: "id", format: "uuid" })
   @ApiOkResponse({ type: TitleRatingSummaryDto })
+  @ApiUnauthorizedResponse({ description: "Not signed in" })
+  @ApiNotFoundResponse({ description: "Title not found" })
   @Auth()
   @Put()
   set(
     @Param("id", ParseUUIDPipe) id: string,
     @Body() data: SetTitleRatingDto,
-    @Req() { userId }: Request,
+    @CurrentUserId() userId: string,
   ) {
-    return this.titleRatingService.set(id, userId!, data.score);
+    return this.titleRatingService.set(id, userId, data.score);
   }
 
   @ApiOperation({ summary: "Withdraw your score" })
   @ApiParam({ name: "id", format: "uuid" })
   @ApiOkResponse({ type: TitleRatingSummaryDto })
-  @ApiNotFoundResponse({ description: "You have not rated this title" })
+  @ApiUnauthorizedResponse({ description: "Not signed in" })
+  @ApiNotFoundResponse({ description: "Title not found, or you have not rated it" })
   @Auth()
   @Delete()
-  remove(@Param("id", ParseUUIDPipe) id: string, @Req() { userId }: Request) {
-    return this.titleRatingService.remove(id, userId!);
+  remove(@Param("id", ParseUUIDPipe) id: string, @CurrentUserId() userId: string) {
+    return this.titleRatingService.remove(id, userId);
   }
 }

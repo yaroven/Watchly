@@ -1,3 +1,4 @@
+import { useViewer } from "@shared/lib/use-viewer";
 import { useQuery, UseQueryOptions } from "@tanstack/react-query";
 import { GetAllTitlesDto, Title } from "../schemas/title";
 import titleKeys from "./title.keys";
@@ -10,8 +11,10 @@ const useTitles = (
     "queryKey" | "queryFn"
   >,
 ) => {
+  const { viewerKey } = useViewer();
+
   return useQuery({
-    queryKey: titleKeys.list(params),
+    queryKey: titleKeys.listFor(params, viewerKey),
     queryFn: () => titleService.getAll(params),
     ...options,
   });

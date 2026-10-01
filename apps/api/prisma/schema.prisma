@@ -49,10 +49,12 @@ model User {
   displayName String?
   avatarUrl   String?
 
-  ratings   TitleRating[]
-  comments  TitleComment[]
-  reactions CommentReaction[]
-  reports   CommentReport[]
+  ratings        TitleRating[]
+  comments       TitleComment[]
+  reactions      CommentReaction[]
+  reports        CommentReport[]
+  titleReactions TitleReaction[]
+  watchlist      WatchlistItem[]
 }
 
 model Title {
@@ -78,13 +80,45 @@ model Title {
 
   videoTranscodingProgress VideoTranscodingProgress?
 
-  seasons     Season[]
-  castCredits CastCredit[]
-  genres      Genre[]
-  ratings     TitleRating[]
-  comments    TitleComment[]
+  seasons          Season[]
+  castCredits      CastCredit[]
+  genres           Genre[]
+  ratings          TitleRating[]
+  comments         TitleComment[]
+  reactions        TitleReaction[]
+  watchlistEntries WatchlistItem[]
 
   @@index([type, transcodingStatus])
+}
+
+/// A thumbs up or down on the title itself, distinct from TitleRating: the
+/// score says how good it is, this says whether the viewer enjoyed it.
+model TitleReaction {
+  id        String       @id @default(uuid())
+  titleId   String
+  title     Title        @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      ReactionType
+  createdAt DateTime     @default(now())
+
+  // One vote per person; switching sides updates this row rather than adding one.
+  @@unique([titleId, userId])
+  @@index([titleId, type])
+}
+
+model WatchlistItem {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  titleId   String
+  title     Title    @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, titleId])
+  // The watchlist page reads one user's rows newest first.
+  @@index([userId, createdAt])
+  @@index([titleId])
 }
 
 /// A viewer's score for a title, independent of whether they wrote anything.

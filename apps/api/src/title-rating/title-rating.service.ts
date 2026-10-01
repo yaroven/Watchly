@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { TitleRatingSummaryDto } from "./dto/response/title-rating-summary.dto";
 
@@ -27,7 +27,7 @@ export class TitleRatingService {
     return this.summarize(titleId, userId);
   }
 
-  async summarize(titleId: string, userId?: string): Promise<TitleRatingSummaryDto> {
+  async summarize(titleId: string, userId: string | null): Promise<TitleRatingSummaryDto> {
     const [aggregate, mine] = await Promise.all([
       this.prisma.titleRating.aggregate({
         where: { titleId },
@@ -61,7 +61,7 @@ export class TitleRatingService {
       _count: { _all: true },
     });
 
-    return new Map(
+    const byTitle = new Map(
       grouped.map((row) => [
         row.titleId,
         {
@@ -70,6 +70,13 @@ export class TitleRatingService {
         },
       ]),
     );
+
+    // One entry per requested id — groupBy only answers for titles that have
+    // ratings, and a caller must not have to tell "nobody rated it" apart from
+    // "this id was never asked about".
+    return new Map(
+      titleIds.map((titleId) => [titleId, byTitle.get(titleId) ?? { average: null, count: 0 }]),
+    );
   }
 
   private async assertTitleExists(titleId: string) {
@@ -77,6 +84,8 @@ export class TitleRatingService {
       where: { id: titleId },
       select: { id: true },
     });
-    if (!title) throw new BadRequestException(`Title with id ${titleId} not found`);
+    // 404 like every other route that takes a title id — the request is
+    // well-formed, the resource is gone.
+    if (!title) throw new NotFoundException(`Title with id ${titleId} not found`);
   }
 }

@@ -1,3 +1,4 @@
+import { useViewer } from "@shared/lib/use-viewer";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { CommentSortMode } from "../schemas/comment";
 import commentKeys from "./comment.keys";
@@ -8,9 +9,11 @@ import commentService, { CommentPage } from "./comment.service";
  * response carries the viewer's own reaction, which comes back empty on an anonymous call.
  */
 const useComments = (titleId: string, sort: CommentSortMode = "newest", limit = 10, enabled = true) => {
+  const viewer = useViewer();
+
   return useInfiniteQuery({
-    enabled,
-    queryKey: commentKeys.list(titleId, sort, limit),
+    enabled: enabled && viewer.status !== "pending",
+    queryKey: commentKeys.list(titleId, sort, limit, viewer.viewerKey),
     queryFn: ({ pageParam }) => commentService.getForTitle(titleId, { page: pageParam, limit, sort }),
     initialPageParam: 1,
     getNextPageParam: (lastPage: CommentPage, pages: CommentPage[]) => {

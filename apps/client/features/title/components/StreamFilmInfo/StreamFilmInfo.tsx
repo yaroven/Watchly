@@ -1,5 +1,6 @@
 "use client";
 
+import { ReactionType, useReactToTitle, useSetTitleWatchlist, useTitleEngagement } from "@/features/title-engagement";
 import type { Title } from "@/features/title/schemas/title";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import AddIcon from "@mui/icons-material/Add";
@@ -7,13 +8,17 @@ import IosShareIcon from "@mui/icons-material/IosShare";
 import StarIcon from "@mui/icons-material/Star";
 import ThumbDownIcon from "@mui/icons-material/ThumbDown";
 import ThumbUpIcon from "@mui/icons-material/ThumbUp";
+import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
 import Typography from "@mui/material/Typography";
 import { formatCount } from "@shared/lib/format-count";
+import { APP } from "@shared/lib/routes";
+import { useViewer } from "@shared/lib/use-viewer";
+import Button from "@shared/ui/Button";
 import Image from "next/image";
-import { useState } from "react";
-import { getTitleOverviewFixture } from "../TitleOverview/mocks";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 interface StreamFilmInfoProps {
   title: Title;
@@ -22,34 +27,73 @@ interface StreamFilmInfoProps {
 }
 
 export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFilmInfoProps) {
-  const { stream } = getTitleOverviewFixture(title.id);
-  // PLACEHOLDER: like/dislike/watchlist below are local-only state — nothing is persisted.
-  // Needs like/dislike + watchlist endpoints on the backend and initial values from them.
-  const [reaction, setReaction] = useState<"like" | "dislike" | null>(null);
-  const [likes, setLikes] = useState(stream.likes);
-  const [inWatchlist, setInWatchlist] = useState(false);
+  const router = useRouter();
+  const viewer = useViewer();
   const [expanded, setExpanded] = useState(false);
+  const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
+  const shareTimer = useRef<number | undefined>(undefined);
+
+  useEffect(() => () => window.clearTimeout(shareTimer.current), []);
+
+  // The page is server-rendered with no session — `shared/api/axios.ts` reads its
+  // bearer from the auth store, which is empty there, and the refresh cookie is not
+  // forwarded. So `title.engagement` seeds the public counts, and its `viewer` is
+  // null by construction; only the client query can fill that in.
+  // `isError` covers a failed refetch too: query-core sets `status: "error"`
+  // whether or not data is already held — that is what `isRefetchError` is
+  // derived from. Stale viewer state is as dangerous here as missing state.
+  const { data: liveEngagement, isError: engagementFailed, refetch } = useTitleEngagement(title.id);
+  const engagement = liveEngagement ?? title.engagement;
+  const viewerEngagement = engagement.viewer;
+
+  const react = useReactToTitle(title.id);
+  const setWatchlist = useSetTitleWatchlist(title.id);
+  const writeError = react.error ?? setWatchlist.error;
+
+  // Without trustworthy viewer state a toggle is a coin flip: the server toggles,
+  // so clicking an un-lit thumb on behalf of someone who has already liked the
+  // title would withdraw the like they meant to keep.
+  const viewerStateUnknown = viewer.status === "signed-in" && (viewerEngagement === null || engagementFailed);
+  const togglesDisabled = viewer.status !== "signed-in" || viewerStateUnknown;
+
+  // Each of the three viewer states gets its own answer. Anonymous is not a
+  // failure — it is a viewer who needs an account, and the sibling TitleCard
+  // sends them to one rather than dimming a control at them.
+  const handleToggleWhileAnonymous = () => router.push(APP.LOGIN);
 
   // The design shows a dislike toggle with no visible counter — only the
   // like count and the active/inactive colour change.
-  const handleLike = () => {
-    if (reaction === "like") {
-      setLikes((value) => value - 1);
-      setReaction(null);
-      return;
-    }
-    setLikes((value) => value + 1);
-    setReaction("like");
+  const handleReact = (type: ReactionType) => {
+    if (viewer.status === "anonymous") return handleToggleWhileAnonymous();
+    if (togglesDisabled || react.isPending) return;
+    react.mutate(type);
   };
 
-  const handleDislike = () => {
-    if (reaction === "dislike") {
-      setReaction(null);
+  const flashShareState = (next: "copied" | "failed") => {
+    setShareState(next);
+    window.clearTimeout(shareTimer.current);
+    shareTimer.current = window.setTimeout(() => setShareState("idle"), 2000);
+  };
+
+  const handleShare = async () => {
+    // `navigator.clipboard` is undefined outside a secure context, so this is a
+    // plain failure on any http deployment rather than something exceptional.
+    if (!navigator.clipboard) {
+      flashShareState("failed");
       return;
     }
-    if (reaction === "like") setLikes((value) => value - 1);
-    setReaction("dislike");
+
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+    } catch (error) {
+      console.error("Failed to copy the title link", error);
+      flashShareState("failed");
+      return;
+    }
+    flashShareState("copied");
   };
+
+  const shareLabel = shareState === "copied" ? "Copied" : shareState === "failed" ? "Copy failed" : "Share";
 
   const storyline = title.description || "Description will appear here once added.";
   const isLong = storyline.length > 220;
@@ -74,35 +118,42 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
           <Box
             component="button"
             type="button"
-            onClick={handleLike}
-            sx={{ ...actionButtonSx, color: reaction === "like" ? "primary.main" : "#ffffff" }}
+            aria-label={viewerEngagement?.myReaction === ReactionType.LIKE ? "Remove like" : "Like"}
+            aria-pressed={viewerEngagement ? viewerEngagement.myReaction === ReactionType.LIKE : undefined}
+            disabled={viewerStateUnknown || viewer.status === "pending" || react.isPending}
+            onClick={() => handleReact(ReactionType.LIKE)}
+            sx={{ ...actionButtonSx, color: viewerEngagement?.myReaction === ReactionType.LIKE ? "primary.main" : "#ffffff" }}
           >
             <ThumbUpIcon sx={{ fontSize: "18px" }} />
             <Typography component="span" sx={{ fontSize: "13px" }}>
-              {formatCount(likes)}
+              {formatCount(engagement.likes)}
             </Typography>
           </Box>
           <Box
             component="button"
             type="button"
-            onClick={handleDislike}
-            sx={{ ...actionButtonSx, color: reaction === "dislike" ? "primary.main" : "#ffffff" }}
+            aria-label={viewerEngagement?.myReaction === ReactionType.DISLIKE ? "Remove dislike" : "Dislike"}
+            aria-pressed={viewerEngagement ? viewerEngagement.myReaction === ReactionType.DISLIKE : undefined}
+            disabled={viewerStateUnknown || viewer.status === "pending" || react.isPending}
+            onClick={() => handleReact(ReactionType.DISLIKE)}
+            sx={{ ...actionButtonSx, color: viewerEngagement?.myReaction === ReactionType.DISLIKE ? "primary.main" : "#ffffff" }}
           >
             <ThumbDownIcon sx={{ fontSize: "18px" }} />
           </Box>
-          <Box component="button" type="button" sx={actionButtonSx}>
+          <Box component="button" type="button" aria-label="Copy link to this title" onClick={handleShare} sx={actionButtonSx}>
             <IosShareIcon sx={{ fontSize: "18px" }} />
-            <Typography component="span" sx={{ fontSize: "13px" }}>
-              {formatCount(stream.shares)}
+            <Typography component="span" sx={{ fontSize: "13px", color: shareState === "failed" ? "error.main" : "inherit" }}>
+              {shareLabel}
             </Typography>
           </Box>
-          <Box sx={{ display: "flex", alignItems: "center", gap: "6px", color: "primary.main" }}>
-            <StarIcon sx={{ fontSize: "18px" }} />
-            {/* PLACEHOLDER: 9 is a hardcoded fallback when no score prop is passed */}
-            <Typography component="span" sx={{ fontSize: "13px", fontWeight: 600 }}>
-              {(rating ?? 9).toFixed(1)}
-            </Typography>
-          </Box>
+          {(rating ?? title.rating?.average) !== null && (rating ?? title.rating?.average) !== undefined && (
+            <Box sx={{ display: "flex", alignItems: "center", gap: "6px", color: "primary.main" }}>
+              <StarIcon sx={{ fontSize: "18px" }} />
+              <Typography component="span" sx={{ fontSize: "13px", fontWeight: 600 }}>
+                {(rating ?? title.rating!.average!).toFixed(1)}
+              </Typography>
+            </Box>
+          )}
         </Box>
       </Box>
 
@@ -128,13 +179,19 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
         <Box
           component="button"
           type="button"
-          onClick={() => setInWatchlist((value) => !value)}
+          aria-pressed={viewerEngagement ? viewerEngagement.inWatchlist : undefined}
+          disabled={viewerStateUnknown || viewer.status === "pending" || setWatchlist.isPending}
+          onClick={() => {
+            if (viewer.status === "anonymous") return handleToggleWhileAnonymous();
+            if (viewerEngagement) setWatchlist.mutate(!viewerEngagement.inWatchlist);
+          }}
           sx={{
             display: "flex",
             alignItems: "center",
             gap: "10px",
             border: "none",
-            cursor: "pointer",
+            cursor: togglesDisabled ? "default" : "pointer",
+            opacity: togglesDisabled ? 0.6 : 1,
             borderRadius: "12px",
             backgroundColor: "primary.main",
             px: "18px",
@@ -157,14 +214,38 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
           </Box>
           <Box sx={{ textAlign: "left" }}>
             <Typography sx={{ fontSize: "14px", fontWeight: 700, color: "#191919", lineHeight: 1.2 }}>
-              {inWatchlist ? "In Watchlist" : "Add to Watchlist"}
+              {viewerEngagement ? (viewerEngagement.inWatchlist ? "In Watchlist" : "Add to Watchlist") : "Watchlist"}
             </Typography>
             <Typography sx={{ fontSize: "11px", color: "#191919", opacity: 0.75, lineHeight: 1.2 }}>
-              Add by {formatCount(stream.watchlistCount)} Users
+              Added by {formatCount(engagement.watchlistCount)} {engagement.watchlistCount === 1 ? "User" : "Users"}
             </Typography>
           </Box>
         </Box>
       </Box>
+
+      {/* `viewerStateUnknown` is true in a case where nothing failed: the read
+          succeeded and simply carried no viewer. Leaving it out of this condition
+          disabled every control with no explanation at all. */}
+      {(writeError || engagementFailed || viewerStateUnknown) && (
+        <Alert
+          severity="error"
+          variant="outlined"
+          sx={{ alignItems: "center" }}
+          action={
+            viewerStateUnknown || engagementFailed ? (
+              <Button variant="outlined" onClick={() => void refetch()} sx={{ paddingBlock: "4px", minHeight: "unset" }}>
+                Retry
+              </Button>
+            ) : undefined
+          }
+        >
+          {writeError
+            ? `Could not save that: ${writeError.message}`
+            : viewerStateUnknown
+              ? "We could not tell whether you have liked or saved this title, so those controls are disabled. The counts below may also be out of date."
+              : "Could not refresh the likes and watchlist counts for this title, so they may be out of date."}
+        </Alert>
+      )}
 
       <Divider sx={{ borderColor: "divider" }} />
 

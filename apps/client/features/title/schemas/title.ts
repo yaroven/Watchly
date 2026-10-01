@@ -1,3 +1,4 @@
+import type { TitleEngagement } from "@/features/title-engagement/schemas/title-engagement";
 import TranscodingStatus from "@/types/transcoding-status";
 import { z } from "zod";
 
@@ -73,6 +74,11 @@ export interface Title {
   genres: TitleGenre[];
   /** Watchly's own score, aggregated from viewer ratings — `average` is null until someone rates it. */
   rating: { average: number | null; count: number };
+  /**
+   * Likes, dislikes and watchlist state; the viewer's own included when signed in.
+   * Always present — every construction site on the api passes it explicitly.
+   */
+  engagement: TitleEngagement;
 }
 
 export interface GetAllTitlesDto {

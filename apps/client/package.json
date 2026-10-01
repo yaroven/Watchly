@@ -6,6 +6,8 @@
     "commitlint": "commitlint",
     "dev": "next dev --webpack --hostname 0.0.0.0 -p 4000",
     "build": "next build",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "dev:up": "pnpm -w run dev:up",
     "dev:down": "pnpm -w run dev:down",
     "docker:build": "pnpm -w run docker:build:client",
@@ -51,12 +53,15 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "^3.2.7",
+    "axios-mock-adapter": "^2.1.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
     "prettier": "^3.7.4",
     "prettier-plugin-organize-imports": "^4.3.0",
     "sass": "^1.97.2",
     "sass-embedded": "^1.97.2",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "vitest": "^3.2.7"
   }
 }

@@ -6,12 +6,13 @@ import { CastCredit, CastCreditInput, CreateTitleDto, ExternalRating, GetAllTitl
 
 const prefix = "title";
 
-interface ApiTitle extends Omit<Title, "createdAt" | "updatedAt"> {
+export interface ApiTitle extends Omit<Title, "createdAt" | "updatedAt"> {
   createdAt: string;
   updatedAt: string;
 }
 
-const mapTitle = (title: ApiTitle): Title => ({
+/** Dates arrive as ISO strings; `Title` declares them as `Date`. Every title read goes through this. */
+export const mapTitle = (title: ApiTitle): Title => ({
   ...title,
   createdAt: parseApiDate(title.createdAt),
   updatedAt: parseApiDate(title.updatedAt),
