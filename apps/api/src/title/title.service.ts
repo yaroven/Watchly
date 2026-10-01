@@ -15,6 +15,7 @@ import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { MultipartUploadPart } from "../s3/multipart.constants";
+import { buildVideoPrefix } from "../s3/processed-key";
 import { SeasonService } from "../season/season.service";
 import {
   TitleEngagementDto,
@@ -237,11 +238,7 @@ export class TitleService {
   }
 
   async getMovieUrl(id: string): Promise<{ url: string }> {
-    const url = await this.mediaAssetService.getReadUrl(`videos/${id}/master.m3u8`);
-    if (!url) {
-      throw new NotFoundException(`No media for title ${id}`);
-    }
-    return url;
+    return this.mediaAssetService.getPlaybackUrl({ type: VideoType.MOVIE, titleId: id });
   }
 
   async delete(id: string): Promise<TitleResponseDto> {
@@ -264,7 +261,11 @@ export class TitleService {
         .catch((error: unknown) =>
           this.logger.error(`Failed to clean up poster after deleting title ${id}`, error),
         ),
-      this.mediaAssetService.cleanupVideoAsset(id, VideoType.MOVIE, `videos/${id}/`),
+      this.mediaAssetService.cleanupVideoAsset(
+        id,
+        VideoType.MOVIE,
+        buildVideoPrefix({ type: VideoType.MOVIE, titleId: id }),
+      ),
       title.type === TitleType.SERIES &&
         settleAllOrLog(
           title.seasons,

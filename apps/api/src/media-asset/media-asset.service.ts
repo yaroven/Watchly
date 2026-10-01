@@ -1,7 +1,8 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { settleAllOrLog } from "../common/settle-all-or-throw.util";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { MultipartUploadPart } from "../s3/multipart.constants";
+import { buildVideoManifestKey, VideoLocation } from "../s3/processed-key";
 import { buildVideoRawKey } from "../s3/raw-key";
 import { S3Service } from "../s3/s3.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
@@ -54,9 +55,24 @@ export class MediaAssetService {
     await this.videoTranscoderService.scheduleTranscodeVideo({ id, type });
   }
 
-  async getReadUrl(key: string): Promise<{ url: string }> {
-    const url = await this.s3Service.getReadPresignedUrl(key, BucketType.PROCESSED);
-    return { url };
+  /**
+   * A playback URL, or 404 if there is nothing to play.
+   *
+   * The existence check is the point. Presigning is string construction, so the
+   * previous shape — hand a key in, get a URL back — could not fail, and both
+   * callers had a `if (!url) throw new NotFoundException(...)` that never once
+   * ran: one of them was testing a wrapper object that is always truthy, and the
+   * other a string that is always non-empty. A title that was never transcoded
+   * answered 200 with a URL the browser then 404s on.
+   */
+  async getPlaybackUrl(location: VideoLocation): Promise<{ url: string }> {
+    const key = buildVideoManifestKey(location);
+
+    if (!(await this.s3Service.objectExists(key, BucketType.PROCESSED))) {
+      throw new NotFoundException("This title has no playable media yet");
+    }
+
+    return { url: await this.s3Service.getReadPresignedUrl(key, BucketType.PROCESSED) };
   }
 
   async deleteProcessedFolder(prefix: string): Promise<void> {

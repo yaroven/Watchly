@@ -6,6 +6,7 @@ import { settleAllOrLog } from "../common/settle-all-or-throw.util";
 import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { buildSeasonVideoPrefix } from "../s3/processed-key";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { CreateSeasonDto } from "./dto/request/create-season.dto";
 import { UpdateSeasonDto } from "./dto/request/update-season.dto";
@@ -107,7 +108,9 @@ export class SeasonService {
         {
           id: "processed-folder",
           run: () =>
-            this.mediaAssetService.deleteProcessedFolder(`videos/${season.titleId}/${season.id}/`),
+            this.mediaAssetService.deleteProcessedFolder(
+              buildSeasonVideoPrefix(season.titleId, season.id),
+            ),
         },
       ],
       (task) => task.run(),

@@ -1,3 +1,4 @@
+import { NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
@@ -21,6 +22,7 @@ describe("MediaAssetService", () => {
             completeMultipartUpload: jest.fn(),
             abortMultipartUpload: jest.fn(),
             getReadPresignedUrl: jest.fn(),
+            objectExists: jest.fn(),
             deleteObject: jest.fn(),
             deleteFolder: jest.fn(),
           },
@@ -125,19 +127,61 @@ describe("MediaAssetService", () => {
     });
   });
 
-  describe("getReadUrl", () => {
-    describe("should return a presigned read url", () => {
-      it("always", async () => {
-        s3ServiceMock.getReadPresignedUrl.mockResolvedValue("read-url");
+  describe("getPlaybackUrl", () => {
+    const MOVIE = { type: VideoType.MOVIE, titleId: "title-1" } as const;
+    const EPISODE = {
+      type: VideoType.EPISODE,
+      titleId: "title-1",
+      seasonId: "season-1",
+      episodeId: "episode-1",
+    } as const;
 
-        const result = await service.getReadUrl("videos/asset-1/master.m3u8");
+    it("returns a presigned url for the movie's manifest", async () => {
+      s3ServiceMock.objectExists.mockResolvedValue(true);
+      s3ServiceMock.getReadPresignedUrl.mockResolvedValue("read-url");
 
-        expect(s3ServiceMock.getReadPresignedUrl).toHaveBeenCalledWith(
-          "videos/asset-1/master.m3u8",
-          BucketType.PROCESSED,
-        );
-        expect(result).toEqual({ url: "read-url" });
-      });
+      const result = await service.getPlaybackUrl(MOVIE);
+
+      expect(s3ServiceMock.getReadPresignedUrl).toHaveBeenCalledWith(
+        "videos/title-1/master.m3u8",
+        BucketType.PROCESSED,
+      );
+      expect(result).toEqual({ url: "read-url" });
+    });
+
+    it("builds the nested key for an episode", async () => {
+      s3ServiceMock.objectExists.mockResolvedValue(true);
+      s3ServiceMock.getReadPresignedUrl.mockResolvedValue("read-url");
+
+      await service.getPlaybackUrl(EPISODE);
+
+      expect(s3ServiceMock.getReadPresignedUrl).toHaveBeenCalledWith(
+        "videos/title-1/season-1/episode-1/master.m3u8",
+        BucketType.PROCESSED,
+      );
+    });
+
+    // Presigning cannot fail for a key that was never written, so without this
+    // check the caller gets a valid-looking URL that 404s in the browser.
+    it("answers 404 when the manifest is not there", async () => {
+      s3ServiceMock.objectExists.mockResolvedValue(false);
+
+      await expect(service.getPlaybackUrl(MOVIE)).rejects.toThrow(NotFoundException);
+    });
+
+    it("does not presign a key it could not confirm", async () => {
+      s3ServiceMock.objectExists.mockResolvedValue(false);
+
+      await expect(service.getPlaybackUrl(MOVIE)).rejects.toThrow(NotFoundException);
+      expect(s3ServiceMock.getReadPresignedUrl).not.toHaveBeenCalled();
+    });
+
+    // An outage is not an answer of "no media": reporting it as 404 would tell
+    // the client the title is empty when the bucket is simply unreachable.
+    it("lets a stat failure surface instead of reading as absent", async () => {
+      s3ServiceMock.objectExists.mockRejectedValue(new Error("network down"));
+
+      await expect(service.getPlaybackUrl(MOVIE)).rejects.toThrow("network down");
     });
   });
 

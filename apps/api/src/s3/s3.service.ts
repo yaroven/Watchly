@@ -6,6 +6,7 @@ import {
   DeleteObjectsCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  HeadObjectCommand,
   ListObjectsV2Command,
   NotFound,
   PutObjectCommand,
@@ -217,6 +218,28 @@ export class S3Service implements OnModuleInit {
   getPublicUrl(key: string, type: BucketType): string {
     const endpoint = this.s3Config.publicEndpoint.replace(/\/$/, "");
     return `${endpoint}/${this.getBucketName(type)}/${key}`;
+  }
+
+  /**
+   * Whether the object is actually there.
+   *
+   * Presigning never asks: `getSignedUrl` is string construction, so a URL for a
+   * key that was never written comes back looking perfectly valid and fails only
+   * when the browser follows it. Anything that wants to answer 404 for missing
+   * media has to ask here first.
+   */
+  async objectExists(key: string, type: BucketType): Promise<boolean> {
+    const bucketName = this.getBucketName(type);
+    try {
+      await this.s3Client.send(new HeadObjectCommand({ Bucket: bucketName, Key: key }));
+      return true;
+    } catch (error) {
+      if (error instanceof NotFound) return false;
+      // Anything else — credentials, network, a bucket that is gone — is not an
+      // answer of "no". Reporting it as absent would turn an outage into a 404.
+      this.logger.error(`Failed to stat object "${key}" in bucket "${bucketName}":`, error);
+      throw error;
+    }
   }
 
   async deleteObject(key: string, type: BucketType) {
