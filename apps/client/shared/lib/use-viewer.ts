@@ -33,10 +33,9 @@ const ANONYMOUS_KEY = "anonymous" as ViewerKey;
  * then re-keys — one extra fetch, rather than blocking every title read on the
  * session and delaying first paint for everyone.
  *
- * Title and title-engagement keys carry the viewer. Rating and comment keys do
- * **not** yet — `titleRatingKeys.detail` and `commentKeys.list` are shared across
- * viewers even though `myScore` and `myReaction` are per-viewer, so a sign-out in
- * the same tab still leaves the previous viewer's values in those caches.
+ * Every key whose response is viewer-dependent now carries it: title, title-engagement,
+ * title-rating and comment. Each of those key objects names its viewer-less rungs
+ * `*Prefix` and keeps them for invalidation only.
  */
 export function useViewer(): Viewer {
   const userId = useAuthStore((state) => state.userId);

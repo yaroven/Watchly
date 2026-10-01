@@ -19,7 +19,9 @@ export const useCreateComment = (titleId: string, options?: Omit<UseMutationOpti
   const useCreate = createMutationHook({
     mutationFn: (data: CreateCommentDto) => commentService.create(titleId, data),
     getInvalidateKeys: (data: CreateCommentDto) =>
-      data.parentId ? [commentKeys.titleLists(titleId), commentKeys.reply(data.parentId)] : [commentKeys.titleLists(titleId)],
+      data.parentId
+        ? [commentKeys.titleListsPrefix(titleId), commentKeys.replyPrefix(data.parentId)]
+        : [commentKeys.titleListsPrefix(titleId)],
   });
   return useCreate(options);
 };
@@ -27,7 +29,7 @@ export const useCreateComment = (titleId: string, options?: Omit<UseMutationOpti
 export const useDeleteComment = (titleId: string, options?: Omit<UseMutationOptions<void, Error, string>, "mutationFn">) => {
   const useDelete = createMutationHook({
     mutationFn: (commentId: string) => commentService.delete(commentId),
-    getInvalidateKeys: () => [commentKeys.titleLists(titleId), commentKeys.replies()],
+    getInvalidateKeys: () => [commentKeys.titleListsPrefix(titleId), commentKeys.repliesPrefix()],
   });
   return useDelete(options);
 };
@@ -48,7 +50,7 @@ export const useReactToComment = (
     ...options,
     mutationFn: ({ commentId, type }: { commentId: string; type: ReactionType }) => commentService.react(commentId, type),
     onSuccess: (result, variables, onMutateResult, context) => {
-      queryClient.setQueriesData<InfiniteComments>({ queryKey: commentKeys.lists() }, (data) =>
+      queryClient.setQueriesData<InfiniteComments>({ queryKey: commentKeys.listsPrefix() }, (data) =>
         data
           ? {
               ...data,
@@ -60,7 +62,7 @@ export const useReactToComment = (
           : data,
       );
 
-      queryClient.setQueriesData<CommentPage>({ queryKey: commentKeys.replies() }, (data) =>
+      queryClient.setQueriesData<CommentPage>({ queryKey: commentKeys.repliesPrefix() }, (data) =>
         data ? { ...data, items: data.items.map((item) => applyReaction(item, variables.commentId, result)) } : data,
       );
 

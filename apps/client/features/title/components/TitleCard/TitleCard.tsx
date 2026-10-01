@@ -28,10 +28,9 @@ export default function TitleCard({ id, name, posterUrl, type, genres, externalR
   const router = useRouter();
   const viewer = useViewer();
   const setWatchlist = useSetTitleWatchlist(id);
-  // A tinted 12px icon and a changed label are thin feedback — on touch there is
-  // no hover to reveal anything. The card has no room for a message, so this
-  // wants an app-level snackbar fed by the mutation cache; not built here.
-  // `isError` at least clears itself on the next attempt.
+  // A tinted 12px icon is not feedback a touch user can read — there is no hover
+  // to reveal a tooltip, and the icon still shows the pre-click state. The banner
+  // below says what happened in words, over the poster, where the click was.
   const failed = setWatchlist.isError;
 
   // A null `viewer` on the payload means it was read without a session — server
@@ -201,6 +200,28 @@ export default function TitleCard({ id, name, posterUrl, type, genres, externalR
             )}
           </Box>
         </Box>
+
+        {failed && (
+          <Box
+            role="status"
+            sx={{
+              position: "absolute",
+              top: 32,
+              right: 0,
+              left: 0,
+              zIndex: 3,
+              px: "6px",
+              py: "4px",
+              bgcolor: "error.main",
+              color: "#ffffff",
+              fontSize: 10,
+              lineHeight: 1.3,
+              textAlign: "center",
+            }}
+          >
+            Could not save — tap to retry
+          </Box>
+        )}
 
         <Box
           sx={{
