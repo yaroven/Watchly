@@ -45,9 +45,14 @@ are unique per comment per user.
 
 ## Users
 
-`role: ADMIN | USER`. `displayName` and `avatarUrl` are nullable because every account
+`role: ADMIN | USER`. `displayName` and `avatarKey` are nullable because every account
 that already existed predates them; the API falls back to the email local part — never
 the address itself, which is not the commenter's to publish.
+
+`avatarKey` holds an object key in the processed bucket, **not a URL**. A presigned URL
+stored in a row outlives its own expiry; the URL is derived on read instead. One avatar
+per user is a consequence of the key shape, `avatars/<userId>/<uploadId>.webp`: attaching
+a new one deletes the superseded object in the same step.
 
 ## Transcoding
 
