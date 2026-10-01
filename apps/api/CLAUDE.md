@@ -37,7 +37,8 @@ shared DTOs, `env.util.ts`).
   `deleteMany({ where: { titleId, userId: undefined } })` deletes every user's row and
   answers 200. The decorator is what keeps `undefined` out of that position.
 - `@CurrentUserId()` on an `@OptionalAuth()` route compiles and 500s every anonymous
-  caller. Nothing enforces the pairing yet — check it by hand.
+  caller. The four controllers with a `*.controller.spec.ts` pin their own pairing
+  through supertest; anywhere else, check it by hand.
 
 ### Responses that depend on who is asking
 
@@ -64,6 +65,11 @@ shared DTOs, `env.util.ts`).
 
 Jest, `rootDir: src`, `*.spec.ts` beside the unit under test. No coverage floor is
 enforced and specs are excluded from ESLint and from `tsconfig.build.json`.
+
+Routes that read the viewer need a **request-level** spec (supertest +
+`overrideGuard`), not a handler call — see `title.controller.viewer.spec.ts` and the
+three controller specs. A direct call never runs the param decorator, so it cannot tell
+`@CurrentUserId()` from a hardcoded value.
 
 **Write the test so it can fail.** Before trusting a new test, break the behaviour it
 names and confirm _that_ test goes red. The ones that have slipped through here:

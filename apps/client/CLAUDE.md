@@ -4,9 +4,11 @@ Next.js 16 App Router, React 19, MUI + Emotion, TanStack Query, zustand, zod,
 react-hook-form, hls.js. Dev server on port 4000. `README.md` here is
 `create-next-app` boilerplate — ignore it.
 
-**There is no test runner in this app.** No jest, no vitest, no testing-library, no
-playwright — 365 source files, zero specs. `pnpm lint` and `next build` are the only
-gates, and neither runs in CI as a lint. Verify behaviour in the browser and say so.
+Tests are **vitest, unit only** (`pnpm --filter client test`, run in CI by Build Client).
+Coverage is thin and deliberate: the auth plumbing in `shared/` and the JWT helpers,
+because they are module-level state that no type can hold. There is no DOM environment
+and no component test yet, so behaviour in a component is still verified in the browser —
+say so when you do.
 
 ## Layout
 
@@ -40,8 +42,9 @@ This is where the bugs have been. The rules exist because each was broken:
 - **Viewer identity belongs in the cache key.** A title response carries that viewer's
   own `engagement`, so `titleKeys.listFor(params, viewerKey)` /
   `detailFor(id, viewerKey)` are the query keys; the bare `listPrefix` / `detailPrefix`
-  rungs are for invalidation only. `ViewerKey` is branded so only `useViewer()` can mint
-  one. Without this, the request that goes out during the boot exchange is anonymous,
+  rungs are for invalidation only — the `*Prefix` naming is what marks them, since a
+  prefix is structurally still a valid query key. The `ViewerKey` brand does enforce that
+  a complete key cannot be built from a bare string. Without this, the request that goes out during the boot exchange is anonymous,
   answers **200** (not 401, these routes are `@OptionalAuth()`), and caches "not on your
   watchlist" for everyone for a full staleTime.
 - `useViewer()` returns a union: `pending` | `anonymous` | `signed-in`. They are not
@@ -52,11 +55,14 @@ This is where the bugs have been. The rules exist because each was broken:
   carry no bearer token, so they can never know. Don't coerce it with `?? false` — show
   an indeterminate control and disable the toggle. The server toggles, so acting on a
   wrong assumption _withdraws_ the like the viewer wanted to keep.
-- A failed refetch leaves stale-but-present data: `isError` stays false. Check
-  `failureCount` too where stale viewer state is dangerous.
+- A failed refetch still sets `isError`: query-core moves the query to `status: "error"`
+  whether or not it already holds data (that is what `isRefetchError` is derived from).
+  Don't reach for `failureCount` — it is also non-zero mid-retry on a fetch that will
+  succeed, which disables controls for no reason.
 - A failed mutation is invisible by default — every control renders from server values,
-  so a rejected click looks identical to no click. Pass `onError` and show something.
-  `createMutationHook`'s mutation cache only logs to the console.
+  so a rejected click looks identical to no click. Pass `onError` and show something —
+  the QueryClient's mutation cache logs every failure but shows the viewer nothing. An
+  app-level surface reading from that cache is still missing.
 
 ### Auth plumbing (`shared/api/axios.ts`)
 
@@ -66,9 +72,10 @@ arrive to trigger a retry. Two invariants there, both of which were violated onc
 
 - Only a **401 from `/auth/refresh`** clears the session. A timeout, a 5xx or a 429 must
   not — clearing on any failure signs a viewer out over a dropped packet.
-- A token minted moments ago that already reads expired means this device's clock is
-  wrong; the proactive path switches itself off for the session rather than refreshing
-  on every request forever.
+- A refresh that fails, and a token minted moments ago that already reads expired, both
+  pause the pre-emptive path for a while — time-boxed, not a latch. A permanent kill
+  switch has nothing to recover into, because the 401 that would trigger the reactive
+  path never arrives on these routes.
 
 ## Placeholder data
 
