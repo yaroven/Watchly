@@ -28,7 +28,7 @@ export function useTitleSubmissionWorkflow({ initialData }: UseTitleSubmissionWo
 
     try {
       if (initialData) {
-        await updateTitle({ id: initialData.id, payload: data, currentPosterUrl: initialData.posterUrl });
+        await updateTitle({ id: initialData.id, payload: data });
         setUploadProgress(0);
         return { createdId: initialData.id };
       }

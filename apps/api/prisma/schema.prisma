@@ -68,7 +68,9 @@ model Title {
   name              String
   description       String
   type              TitleType
-  posterUrl         String?
+  /// Object key in the processed bucket, not a URL. A presigned URL stored in a
+  /// row outlives its own expiry; the URL is derived on read.
+  posterKey         String?
   ageRating         AgeRating
   country           String
   releaseDate       DateTime
@@ -234,7 +236,8 @@ model Artist {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   name      String
-  photoUrl  String?
+  /// Object key in the processed bucket, not a URL. See Title.posterKey.
+  photoKey  String?
 
   castCredits CastCredit[]
 }
@@ -275,7 +278,8 @@ model Season {
   number      Int
   name        String
   description String
-  posterUrl   String?
+  /// Object key in the processed bucket, not a URL. See Title.posterKey.
+  posterKey   String?
   titleId     String
   title       Title     @relation(fields: [titleId], references: [id], onDelete: Cascade)
   episodes    Episode[]

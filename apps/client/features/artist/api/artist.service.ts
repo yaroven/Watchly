@@ -58,7 +58,7 @@ const ArtistService = {
     await api.delete(`/${prefix}/${id}`);
   },
 
-  getPhotoUploadUrl: async (id: string): Promise<{ uploadUrl: string; posterUrl: string }> => {
+  getPhotoUploadUrl: async (id: string): Promise<{ uploadUrl: string }> => {
     const { data } = await api.get<{ uploadUrl: string; posterUrl: string }>(`/${prefix}/${id}/photo-upload-url`);
     return data;
   },

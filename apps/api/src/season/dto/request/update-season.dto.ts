@@ -1,16 +1,14 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { IsOptional, IsString, MaxLength } from "class-validator";
+import { IsBoolean, IsOptional } from "class-validator";
 import { CreateSeasonDto } from "./create-season.dto";
 
-/**
- * Full-object update: every field the client already has (from a prior GET) must be resent.
- * `posterUrl` stays optional — a season has no poster until one is uploaded, unlike Title's
- * always-present default.
- */
+/** Full-object update: every field the client already has (from a prior GET) must be resent. */
 export class UpdateSeasonDto extends CreateSeasonDto {
-  @ApiPropertyOptional({ maxLength: 2048, description: "Must be a backend-generated poster URL" })
-  @IsString()
+  @ApiPropertyOptional({
+    description:
+      "True once the image has been PUT to the upload URL. The key is derived from the season, so no URL is sent; the server checks the object is there before storing it. False clears the poster.",
+  })
   @IsOptional()
-  @MaxLength(2048)
-  posterUrl?: string;
+  @IsBoolean()
+  posterUploaded?: boolean;
 }

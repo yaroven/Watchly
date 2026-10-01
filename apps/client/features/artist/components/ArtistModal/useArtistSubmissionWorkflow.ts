@@ -26,7 +26,7 @@ export function useArtistSubmissionWorkflow({ initialData }: UseArtistSubmission
 
     try {
       if (initialData) {
-        await updateArtist({ id: initialData.id, payload: data, currentPhotoUrl: initialData.photoUrl ?? "" });
+        await updateArtist({ id: initialData.id, payload: data });
       } else {
         await createArtist(data);
       }

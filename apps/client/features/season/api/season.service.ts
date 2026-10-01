@@ -44,7 +44,7 @@ const SeasonService = {
     await api.delete(`/${prefix}/${id}`);
   },
 
-  getPosterUploadUrl: async (id: string): Promise<{ uploadUrl: string; posterUrl: string }> => {
+  getPosterUploadUrl: async (id: string): Promise<{ uploadUrl: string }> => {
     const { data } = await api.get<{ uploadUrl: string; posterUrl: string }>(`/${prefix}/${id}/poster-upload-url`);
     return data;
   },
