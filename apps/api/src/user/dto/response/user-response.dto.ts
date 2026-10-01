@@ -20,15 +20,17 @@ export class UserResponseDto {
   })
   displayName: string | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description: "Built from the stored object key; the row holds a key, never a URL",
+  })
   avatarUrl: string | null;
 
-  constructor(user: Omit<User, "password">) {
+  constructor(user: Omit<User, "password">, avatarUrl: string | null = null) {
     this.id = user.id;
     this.email = user.email;
     this.role = user.role;
     this.createdAt = user.createdAt;
     this.displayName = user.displayName;
-    this.avatarUrl = user.avatarUrl;
+    this.avatarUrl = avatarUrl;
   }
 }

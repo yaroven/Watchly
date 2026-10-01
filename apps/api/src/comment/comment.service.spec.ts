@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, NotFoundException } from "@nes
 import { Test, TestingModule } from "@nestjs/testing";
 import { ReactionType, Role } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { S3Service } from "../s3/s3.service";
 import { CommentService } from "./comment.service";
 
 describe("CommentService", () => {
@@ -12,7 +13,7 @@ describe("CommentService", () => {
   const userId = "22222222-2222-4222-8222-222222222222";
   const commentId = "33333333-3333-4333-8333-333333333333";
 
-  const author = { id: userId, email: "viewer@example.com", displayName: null, avatarUrl: null };
+  const author = { id: userId, email: "viewer@example.com", displayName: null, avatarKey: null };
   const rootComment = {
     id: commentId,
     titleId,
@@ -28,6 +29,10 @@ describe("CommentService", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CommentService,
+        {
+          provide: S3Service,
+          useValue: { getPublicUrl: jest.fn((key: string) => `https://cdn.test/${key}`) },
+        },
         {
           provide: PrismaService,
           useValue: {

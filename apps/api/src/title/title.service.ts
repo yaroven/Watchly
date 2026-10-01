@@ -208,7 +208,7 @@ export class TitleService {
 
   async startMovieUpload(id: string, fileSize: number) {
     await this.assertExists(id);
-    return this.mediaAssetService.startUpload(id, fileSize);
+    return this.mediaAssetService.startUpload(id, fileSize, VideoType.MOVIE);
   }
 
   async completeMovieUpload(
@@ -221,7 +221,7 @@ export class TitleService {
   }
 
   async abortMovieUpload(id: string, uploadId: string): Promise<void> {
-    await this.mediaAssetService.abortUpload(id, uploadId);
+    await this.mediaAssetService.abortUpload(id, uploadId, VideoType.MOVIE);
   }
 
   async createPosterUploadingUrl(id: string): Promise<{ uploadUrl: string; posterUrl: string }> {

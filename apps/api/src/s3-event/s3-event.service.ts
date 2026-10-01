@@ -9,6 +9,8 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/commo
 import { ConfigService } from "@nestjs/config";
 import { S3Config, S3ConfigName } from "../config/s3.config";
 import { PrismaService } from "../prisma/prisma.service";
+import { isLegacyBareUuidKey, parseRawKey, RawObjectKind } from "../s3/raw-key";
+import { UserAvatarService } from "../user-avatar/user-avatar.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
 
@@ -26,6 +28,7 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly videoTranscoderService: VideoTranscoderService,
+    private readonly userAvatarService: UserAvatarService,
   ) {
     this.config = this.configService.getOrThrow<S3Config>(S3ConfigName);
     const credentials = {
@@ -146,20 +149,59 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
     await this.deleteMessage(message);
   }
 
+  /**
+   * The key says what the object is. It used to say only which row it belonged
+   * to, and the kind was inferred by probing for an episode and then a title —
+   * so anything that was neither was indistinguishable from a stale upload, and
+   * a new kind of object could not be added without another probe.
+   */
   private async processRecord(record: { s3: { object: { key: string } } }) {
     const key = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
+    const parsed = parseRawKey(key);
 
-    if (!this.isUuid(key)) {
-      this.logger.warn(`Skipping S3 event for non-UUID object key "${key}"`);
+    if (!parsed) {
+      await this.processLegacyRecord(key);
       return;
     }
 
-    const task = await this.resolveTask(key);
-    if (task) {
-      await this.videoTranscoderService.scheduleTranscodeVideo(task);
-    } else {
-      this.logger.warn(`No title or episode found for uploaded object "${key}"`);
+    switch (parsed.kind) {
+      case RawObjectKind.TITLE_VIDEO:
+        await this.videoTranscoderService.scheduleTranscodeVideo({
+          id: parsed.ownerId,
+          type: VideoType.MOVIE,
+        });
+        return;
+      case RawObjectKind.EPISODE_VIDEO:
+        await this.videoTranscoderService.scheduleTranscodeVideo({
+          id: parsed.ownerId,
+          type: VideoType.EPISODE,
+        });
+        return;
+      case RawObjectKind.USER_AVATAR:
+        await this.userAvatarService.scheduleProcessing({ userId: parsed.ownerId, rawKey: key });
+        return;
     }
+  }
+
+  /**
+   * Uploads started before the key scheme landed are still bare uuids. Resolved
+   * the old way so an upload in flight across the deploy is not dropped; remove
+   * once nothing of that shape is left in the bucket.
+   */
+  private async processLegacyRecord(key: string) {
+    if (!isLegacyBareUuidKey(key)) {
+      this.logger.warn(`Skipping S3 event for unrecognised object key "${key}"`);
+      return;
+    }
+
+    const task = await this.resolveLegacyTask(key);
+    if (!task) {
+      this.logger.warn(`No title or episode found for uploaded object "${key}"`);
+      return;
+    }
+
+    this.logger.warn(`Resolved "${key}" by database probe — it predates the raw key scheme`);
+    await this.videoTranscoderService.scheduleTranscodeVideo(task);
   }
 
   private async deleteMessage(message: Message) {
@@ -171,11 +213,7 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  private isUuid(value: string): boolean {
-    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
-  }
-
-  private async resolveTask(id: string) {
+  private async resolveLegacyTask(id: string) {
     const episode = await this.prisma.episode.findUnique({ where: { id } });
     if (episode) return { id, type: VideoType.EPISODE };
 

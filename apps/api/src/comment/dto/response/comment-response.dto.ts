@@ -18,18 +18,19 @@ export class CommentAuthorDto {
   score: number | null;
 
   constructor(
-    user: Pick<User, "id" | "email" | "displayName" | "avatarUrl">,
+    user: Pick<User, "id" | "email" | "displayName" | "avatarKey">,
     score: number | null,
+    avatarUrl: string | null = null,
   ) {
     this.id = user.id;
     this.name = user.displayName ?? user.email.split("@")[0];
-    this.avatarUrl = user.avatarUrl;
+    this.avatarUrl = avatarUrl;
     this.score = score;
   }
 }
 
 export type CommentWithAuthor = TitleComment & {
-  user: Pick<User, "id" | "email" | "displayName" | "avatarUrl">;
+  user: Pick<User, "id" | "email" | "displayName" | "avatarKey">;
 };
 
 export class CommentResponseDto {
@@ -75,9 +76,10 @@ export class CommentResponseDto {
     authorScore: number | null,
     replies: CommentResponseDto[] = [],
     replyCount = 0,
+    authorAvatarUrl: string | null = null,
   ) {
     this.id = comment.id;
-    this.author = new CommentAuthorDto(comment.user, authorScore);
+    this.author = new CommentAuthorDto(comment.user, authorScore, authorAvatarUrl);
     this.text = comment.text;
     this.hasSpoiler = comment.hasSpoiler;
     this.createdAt = comment.createdAt;
