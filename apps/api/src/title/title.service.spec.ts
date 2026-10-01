@@ -62,7 +62,7 @@ describe("TitleService", () => {
             completeUpload: jest.fn(),
             abortUpload: jest.fn(),
             scheduleTranscode: jest.fn(),
-            getReadUrl: jest.fn(),
+            getPlaybackUrl: jest.fn(),
             cleanupVideoAsset: jest.fn(),
           },
         },
@@ -704,15 +704,31 @@ describe("TitleService", () => {
   });
 
   describe("getMovieUrl", () => {
-    describe("should return the movie's presigned url", () => {
-      it("always", async () => {
+    describe("should return the movie's playback url", () => {
+      it("when there is media to play", async () => {
         const url = "movie-url";
-        (mediaAssetServiceMock.getReadUrl as jest.Mock).mockResolvedValue({ url });
+        (mediaAssetServiceMock.getPlaybackUrl as jest.Mock).mockResolvedValue({ url });
 
         const result = await service.getMovieUrl("title-1");
 
-        expect(mediaAssetServiceMock.getReadUrl).toHaveBeenCalledWith("videos/title-1/master.m3u8");
+        expect(mediaAssetServiceMock.getPlaybackUrl).toHaveBeenCalledWith({
+          type: VideoType.MOVIE,
+          titleId: "title-1",
+        });
         expect(result).toEqual({ url });
+      });
+    });
+
+    // The old guard here read `if (!url)` on a wrapper object and never fired, so
+    // an untranscoded title answered 200. Absence is MediaAssetService's to decide
+    // now; this pins that the answer is passed through rather than swallowed.
+    describe("should not invent a url when there is no media", () => {
+      it("when the asset is missing", async () => {
+        (mediaAssetServiceMock.getPlaybackUrl as jest.Mock).mockRejectedValue(
+          new NotFoundException("This title has no playable media yet"),
+        );
+
+        await expect(service.getMovieUrl("title-1")).rejects.toThrow(NotFoundException);
       });
     });
   });

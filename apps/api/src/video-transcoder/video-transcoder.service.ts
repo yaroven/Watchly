@@ -10,6 +10,7 @@ import { Readable } from "stream";
 import { getEpisodeTitleAndSeasonId } from "../episode/episode-path.util";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
+import { VIDEO_ROOT, videoPath } from "../s3/processed-key";
 import { S3Service } from "../s3/s3.service";
 import { TranscodeVideoDto } from "./dto/request/transcode-video.dto";
 import { VideoType } from "./enums/video-type.enum";
@@ -194,7 +195,7 @@ export class VideoTranscoderService {
         const localFilePath = path.join(outputDir, file);
         if ((await fs.stat(localFilePath)).isDirectory()) return;
 
-        const s3Key = `videos/${key}/${file}`;
+        const s3Key = `${VIDEO_ROOT}/${key}/${file}`;
         const contentType = file.endsWith(".m3u8") ? "application/x-mpegURL" : "video/MP2T";
 
         await this.s3Service.uploadStream(
@@ -221,10 +222,10 @@ export class VideoTranscoderService {
       if (!episode) throw new BadRequestException("Episode not found");
 
       const { seasonId, titleId } = getEpisodeTitleAndSeasonId(episode);
-      return `${titleId}/${seasonId}/${episode.id}`;
+      return videoPath({ type, titleId, seasonId, episodeId: episode.id });
     }
 
-    return id;
+    return videoPath({ type: VideoType.MOVIE, titleId: id });
   }
 
   private readonly entityExistsCheckers: Record<VideoType, (id: string) => Promise<boolean>> = {
