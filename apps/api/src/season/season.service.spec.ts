@@ -37,6 +37,8 @@ describe("SeasonService", () => {
             getReadPresignedUrl: jest.fn(),
             getUploadPresignedUrl: jest.fn(),
             deleteObject: jest.fn(),
+            objectExists: jest.fn(),
+            getPublicUrl: jest.fn((key: string) => `https://cdn.example.com/${key}`),
             deleteFolder: jest.fn(),
           },
         },
@@ -76,7 +78,7 @@ describe("SeasonService", () => {
         const result = await service.create(createData as any);
 
         expect(prismaMock.season.create).toHaveBeenCalledWith({ data: createData });
-        expect(result).toEqual(createdSeason);
+        expect(result).toEqual({ ...createdSeason, posterUrl: null });
       });
     });
   });
@@ -95,7 +97,7 @@ describe("SeasonService", () => {
           where: { titleId: "title-1" },
           orderBy: { number: "asc" },
         });
-        expect(result).toEqual(seasons);
+        expect(result).toEqual(seasons.map((season) => ({ ...season, posterUrl: null })));
       });
 
       it("if no filters are provided", async () => {
@@ -108,7 +110,7 @@ describe("SeasonService", () => {
           where: {},
           orderBy: { number: "asc" },
         });
-        expect(result).toEqual(seasons);
+        expect(result).toEqual(seasons.map((season) => ({ ...season, posterUrl: null })));
       });
     });
   });
@@ -124,7 +126,7 @@ describe("SeasonService", () => {
         expect(prismaMock.season.findUnique).toHaveBeenCalledWith({
           where: { id: "season-1" },
         });
-        expect(result).toEqual(season);
+        expect(result).toEqual({ ...season, posterUrl: null });
       });
     });
 
@@ -157,19 +159,16 @@ describe("SeasonService", () => {
         await expect(action).rejects.toThrow(BadRequestException);
       });
 
-      it("if the season exists but the posterUrl does not match the backend url's path", async () => {
-        const season = { id: "season-1" };
-        const backendPoster =
-          "https://s3.example.com/posters/seasons/season-1?X-Amz-Date=1&X-Amz-Signature=aaa";
-        (prismaMock.season.findUnique as jest.Mock).mockResolvedValue(season);
-        s3ServiceMock.getReadPresignedUrl.mockResolvedValue(backendPoster);
+      it("if the season exists but nothing was uploaded to the key", async () => {
+        (prismaMock.season.findUnique as jest.Mock).mockResolvedValue({ id: "season-1" });
+        s3ServiceMock.objectExists.mockResolvedValue(false);
 
         const action = service.update("season-1", {
           number: 1,
           name: "New Title",
           description: "Desc",
           titleId: "title-1",
-          posterUrl: "https://s3.example.com/some/other/path",
+          posterUploaded: true,
         });
 
         await expect(action).rejects.toThrow(BadRequestException);
@@ -177,38 +176,49 @@ describe("SeasonService", () => {
       });
     });
 
-    describe("should assert the poster url and update the season", () => {
-      it("if the season exists and the posterUrl matches the backend url's path", async () => {
+    describe("should store the key, never a url", () => {
+      it("if the upload is actually there", async () => {
         const season = { id: "season-1" };
-        const backendPoster =
-          "https://s3.example.com/posters/seasons/season-1?X-Amz-Date=1&X-Amz-Signature=aaa";
-        const submittedPoster =
-          "https://s3.example.com/posters/seasons/season-1?X-Amz-Date=2&X-Amz-Signature=bbb";
         (prismaMock.season.findUnique as jest.Mock).mockResolvedValue(season);
-        s3ServiceMock.getReadPresignedUrl.mockResolvedValue(backendPoster);
-        (prismaMock.season.update as jest.Mock).mockResolvedValue({
-          ...season,
-          name: "New Title",
-        });
-        const updateData = {
+        s3ServiceMock.objectExists.mockResolvedValue(true);
+        (prismaMock.season.update as jest.Mock).mockResolvedValue({ ...season, name: "New Title" });
+
+        await service.update("season-1", {
           number: 1,
           name: "New Title",
           description: "Desc",
           titleId: "title-1",
-          posterUrl: submittedPoster,
-        };
+          posterUploaded: true,
+        });
 
-        const result = await service.update("season-1", updateData);
-
-        expect(s3ServiceMock.getReadPresignedUrl).toHaveBeenCalledWith(
+        expect(s3ServiceMock.objectExists).toHaveBeenCalledWith(
           "posters/seasons/season-1",
           BucketType.PROCESSED,
         );
         expect(prismaMock.season.update).toHaveBeenCalledWith({
           where: { id: "season-1" },
-          data: updateData,
+          data: expect.objectContaining({ posterKey: "posters/seasons/season-1" }),
         });
-        expect(result).toEqual({ ...season, name: "New Title" });
+      });
+
+      it("and clears it when the flag says the poster is gone", async () => {
+        const season = { id: "season-1" };
+        (prismaMock.season.findUnique as jest.Mock).mockResolvedValue(season);
+        (prismaMock.season.update as jest.Mock).mockResolvedValue(season);
+
+        await service.update("season-1", {
+          number: 1,
+          name: "New Title",
+          description: "Desc",
+          titleId: "title-1",
+          posterUploaded: false,
+        });
+
+        expect(s3ServiceMock.objectExists).not.toHaveBeenCalled();
+        expect(prismaMock.season.update).toHaveBeenCalledWith({
+          where: { id: "season-1" },
+          data: expect.objectContaining({ posterKey: null }),
+        });
       });
     });
 
@@ -234,7 +244,7 @@ describe("SeasonService", () => {
           where: { id: "season-1" },
           data: updateData,
         });
-        expect(result).toEqual({ ...season, name: "New Title" });
+        expect(result).toEqual({ ...season, name: "New Title", posterUrl: null });
       });
     });
   });
@@ -257,7 +267,6 @@ describe("SeasonService", () => {
         const posterUrl = "poster-url";
         (prismaMock.season.findUnique as jest.Mock).mockResolvedValue(season);
         s3ServiceMock.getUploadPresignedUrl.mockResolvedValue(uploadUrl);
-        s3ServiceMock.getReadPresignedUrl.mockResolvedValue(posterUrl);
 
         const result = await service.createPosterUploadingUrl("season-1");
 
@@ -267,8 +276,10 @@ describe("SeasonService", () => {
           BucketType.PROCESSED,
           120,
         );
-        expect(s3ServiceMock.getReadPresignedUrl).toHaveBeenCalledWith(key, BucketType.PROCESSED);
-        expect(result).toEqual({ uploadUrl, posterUrl });
+        // No read URL comes back any more: one presigned for an hour used to be
+        // handed to the client and stored verbatim in the row.
+        expect(s3ServiceMock.getReadPresignedUrl).not.toHaveBeenCalled();
+        expect(result).toEqual({ uploadUrl });
       });
     });
   });
@@ -324,7 +335,7 @@ describe("SeasonService", () => {
         expect(prismaMock.season.delete).toHaveBeenCalledWith({
           where: { id: "season-1" },
         });
-        expect(result).toEqual({ id: season.id, titleId: season.titleId });
+        expect(result).toEqual({ id: season.id, titleId: season.titleId, posterUrl: null });
       });
     });
   });

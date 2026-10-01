@@ -1,5 +1,5 @@
 import createMutationHook from "@/shared/api/createMutationHook";
-import { updateEntityPoster, withUploadedPosterUrl } from "@/shared/api/upload-media";
+import { updateEntityPoster, withPosterUploaded } from "@/shared/api/upload-media";
 import { UseMutationOptions } from "@tanstack/react-query";
 import { CreateSeasonDto, Season, SeasonFormValues, UpdateSeasonDto } from "../schemas/season";
 import seasonKeys from "./season.keys";
@@ -17,12 +17,12 @@ export const useCreateSeason = (options?: Omit<UseMutationOptions<Season, Error,
         files: posterFile,
         getPosterUploadUrl: SeasonService.getPosterUploadUrl,
         uploadToUrl: SeasonService.uploadToS3,
-        buildPayload: (season, posterUrl): UpdateSeasonDto => ({
+        buildPayload: (season, posterUploaded): UpdateSeasonDto => ({
           number: season.number,
           name: season.name,
           description: season.description,
           titleId: season.titleId,
-          posterUrl,
+          posterUploaded,
         }),
         update: SeasonService.update,
       });
@@ -38,7 +38,7 @@ export const useUpdateSeason = (
   const useUpdateSeason = createMutationHook({
     mutationFn: async ({ id, payload }: { id: string; payload: UpdateSeasonWithPosterPayload }) => {
       const { posterFile, ...seasonPayload } = payload;
-      const nextPayload = await withUploadedPosterUrl<UpdateSeasonDto>({
+      const nextPayload = await withPosterUploaded<UpdateSeasonDto>({
         payload: seasonPayload,
         files: posterFile,
         getPosterUploadUrl: () => SeasonService.getPosterUploadUrl(id),

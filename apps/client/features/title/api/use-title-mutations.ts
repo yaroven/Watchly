@@ -1,5 +1,5 @@
 import createMutationHook from "@/shared/api/createMutationHook";
-import { updateEntityPoster, uploadMultipartFile, withUploadedPosterUrl } from "@/shared/api/upload-media";
+import { updateEntityPoster, uploadMultipartFile, withPosterUploaded } from "@/shared/api/upload-media";
 import { UseMutationOptions } from "@tanstack/react-query";
 import {
   CastCredit,
@@ -21,26 +21,9 @@ type CreateTitleWithUploadOptions = Omit<UseMutationOptions<Title, Error, Create
   onUploadProgress?: (progress: number) => void;
   onUploadPartProgress?: (completedParts: number, totalParts: number) => void;
 };
-type UpdateTitleMutationArgs = { id: string; payload: UpdateTitleWithUploadPayload; currentPosterUrl: string };
+type UpdateTitleMutationArgs = { id: string; payload: UpdateTitleWithUploadPayload };
 
-const getTitleUpdatePayload = (
-  {
-    name,
-    description,
-    type,
-    ageRating,
-    country,
-    releaseDate,
-    language,
-    trailerUrl,
-    runtime,
-    network,
-    director,
-    closedCaption,
-    genreIds,
-  }: UpdateTitleWithUploadPayload,
-  posterUrl: string,
-): UpdateTitleDto => ({
+const getTitleUpdatePayload = ({
   name,
   description,
   type,
@@ -54,7 +37,20 @@ const getTitleUpdatePayload = (
   director,
   closedCaption,
   genreIds,
-  posterUrl,
+}: UpdateTitleWithUploadPayload): UpdateTitleDto => ({
+  name,
+  description,
+  type,
+  ageRating,
+  country,
+  releaseDate,
+  language,
+  trailerUrl,
+  runtime,
+  network,
+  director,
+  closedCaption,
+  genreIds,
 });
 
 export const useCreateTitle = (options?: Omit<UseMutationOptions<Title, Error, CreateTitlePayload>, "mutationFn">) => {
@@ -77,7 +73,7 @@ export const useCreateTitleWithUpload = (options?: CreateTitleWithUploadOptions)
           files: posterFile,
           getPosterUploadUrl: titleService.getPosterUploadUrl,
           uploadToUrl: titleService.uploadToS3,
-          buildPayload: (title, posterUrl): UpdateTitleDto => ({
+          buildPayload: (title, posterUploaded): UpdateTitleDto => ({
             name: title.name,
             description: title.description,
             type: title.type,
@@ -91,7 +87,7 @@ export const useCreateTitleWithUpload = (options?: CreateTitleWithUploadOptions)
             director: title.director,
             closedCaption: title.closedCaption,
             genreIds: title.genres?.map((genre) => genre.id),
-            posterUrl,
+            posterUploaded,
           }),
           update: titleService.update,
           onProgress: options?.onUploadProgress,
@@ -130,10 +126,12 @@ export const useCreateTitleWithUpload = (options?: CreateTitleWithUploadOptions)
 
 export const useUpdateTitle = (options?: Omit<UseMutationOptions<Title, Error, UpdateTitleMutationArgs>, "mutationFn">) => {
   const useUpdateTitle = createMutationHook({
-    mutationFn: async ({ id, payload, currentPosterUrl }: UpdateTitleMutationArgs) => {
+    mutationFn: async ({ id, payload }: UpdateTitleMutationArgs) => {
       const { posterFile } = payload;
-      const nextPayload = await withUploadedPosterUrl<UpdateTitleDto>({
-        payload: getTitleUpdatePayload(payload, currentPosterUrl),
+      // The existing poster no longer has to be resent to survive the update:
+      // the server leaves the stored key alone unless the flag says otherwise.
+      const nextPayload = await withPosterUploaded<UpdateTitleDto>({
+        payload: getTitleUpdatePayload(payload),
         files: posterFile,
         getPosterUploadUrl: () => titleService.getPosterUploadUrl(id),
         uploadToUrl: titleService.uploadToS3,

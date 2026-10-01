@@ -19,8 +19,15 @@ export class ArtistService {
   ) {}
 
   async create(data: CreateArtistDto): Promise<ArtistResponseDto> {
-    const artist = await this.prisma.artist.create({ data });
-    return new ArtistResponseDto(artist);
+    const { photoUploaded: _photoUploaded, ...rest } = data;
+    // No photo on create: the key is derived from the id, which does not exist
+    // until this row does, so there is nowhere to have uploaded it yet.
+    const artist = await this.prisma.artist.create({ data: rest });
+    return this.toResponse(artist);
+  }
+
+  private toResponse(artist: Artist): ArtistResponseDto {
+    return new ArtistResponseDto(artist, this.posterService.toPublicUrl(artist.photoKey));
   }
 
   async findAll(
@@ -38,12 +45,12 @@ export class ArtistService {
       limit,
     });
 
-    return { items: items.map((artist) => new ArtistResponseDto(artist)), totalCount };
+    return { items: items.map((artist) => this.toResponse(artist)), totalCount };
   }
 
   async findOne(id: string): Promise<ArtistResponseDto | null> {
     const artist = await this.prisma.artist.findUnique({ where: { id } });
-    return artist ? new ArtistResponseDto(artist) : null;
+    return artist ? this.toResponse(artist) : null;
   }
 
   async update(id: string, data: UpdateArtistDto): Promise<ArtistResponseDto> {
@@ -51,15 +58,25 @@ export class ArtistService {
     if (!artist) {
       throw new BadRequestException(`Artist with id ${id} not found`);
     }
-    if (data.photoUrl !== undefined) {
-      await this.posterService.assertManagedPosterUrl("artists", id, data.photoUrl);
-    }
+    const { photoUploaded, ...rest } = data;
 
-    const updated = await this.prisma.artist.update({ where: { id }, data });
-    return new ArtistResponseDto(updated);
+    const updated = await this.prisma.artist.update({
+      where: { id },
+      data: {
+        ...rest,
+        ...(photoUploaded === undefined
+          ? {}
+          : {
+              photoKey: photoUploaded
+                ? await this.posterService.confirmUpload("artists", id)
+                : null,
+            }),
+      },
+    });
+    return this.toResponse(updated);
   }
 
-  async createPhotoUploadUrl(id: string): Promise<{ uploadUrl: string; posterUrl: string }> {
+  async createPhotoUploadUrl(id: string): Promise<{ uploadUrl: string }> {
     const artist = await this.findOne(id);
     if (!artist) {
       throw new BadRequestException(`Artist with id ${id} not found`);
@@ -73,7 +90,13 @@ export class ArtistService {
       include: { title: true },
       orderBy: { title: { releaseDate: "desc" } },
     });
-    return credits.map((credit) => new ArtistFilmographyItemDto(credit));
+    return credits.map(
+      (credit) =>
+        new ArtistFilmographyItemDto(
+          credit,
+          this.posterService.toPublicUrl(credit.title.posterKey),
+        ),
+    );
   }
 
   async delete(id: string): Promise<ArtistResponseDto> {
