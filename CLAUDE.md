@@ -5,8 +5,9 @@ Streaming catalogue with a video transcoding pipeline. pnpm workspace: `apps/api
 Redis for jobs, S3 + SQS for media ingest (LocalStack in dev), Loki for logs, Kubernetes
 via kustomize overlays under `k8s/`.
 
-See `docs/ARCHITECTURE.md` for how the services fit together, `docs/DOMAIN.md` for the
-data model, `docs/adr/` for why things are the way they are.
+`apps/api/prisma/schema.prisma` is the source of truth for the domain. The Makefile,
+that schema and `pnpm-workspace.yaml` carry the rationale for most of the decisions
+that would otherwise be puzzling.
 
 ## Commands
 
