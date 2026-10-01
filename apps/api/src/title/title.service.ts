@@ -163,7 +163,7 @@ export class TitleService {
     if (!title) return null;
 
     const [{ average, count }, engagement] = await Promise.all([
-      this.titleRatingService.summarize(id),
+      this.titleRatingService.summarize(id, viewerId ?? null),
       this.titleEngagementService.summarize(id, viewerId ?? null),
     ]);
     return new TitleResponseDto(title, { average, count }, engagement);
@@ -194,7 +194,7 @@ export class TitleService {
       });
 
       const [rating, engagement] = await Promise.all([
-        this.titleRatingService.summarize(id),
+        this.titleRatingService.summarize(id, viewerId ?? null),
         this.titleEngagementService.summarize(id, viewerId ?? null),
       ]);
       return new TitleResponseDto(updated, rating, engagement);

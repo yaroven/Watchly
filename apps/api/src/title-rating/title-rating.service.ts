@@ -27,7 +27,7 @@ export class TitleRatingService {
     return this.summarize(titleId, userId);
   }
 
-  async summarize(titleId: string, userId?: string): Promise<TitleRatingSummaryDto> {
+  async summarize(titleId: string, userId: string | null): Promise<TitleRatingSummaryDto> {
     const [aggregate, mine] = await Promise.all([
       this.prisma.titleRating.aggregate({
         where: { titleId },

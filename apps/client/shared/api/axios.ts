@@ -26,15 +26,20 @@ const api = axios.create({
 });
 
 /**
- * Proactive refresh backs off for a while after it fails; `0` means "allowed".
+ * Refreshing is paused until this timestamp; `0` means allowed.
  *
- * One time-boxed window rather than a permanent kill switch. Both failure modes
- * it covers — a refresh endpoint that is down, and a device clock so wrong that
- * every freshly minted token reads as already expired — would otherwise make
- * *every* request fire its own doomed refresh first. A latch stops that but
- * never recovers, and there is nothing to recover into: `@OptionalAuth()` routes
- * answer an expired token with 200-anonymous, so no 401 ever arrives for the
- * response interceptor to act on and the viewer reads as signed-out until reload.
+ * Set from two places: a refresh attempt that failed, and a refresh that
+ * succeeded into a token already past its `exp`. Without it every request fires
+ * its own doomed refresh first, doubling the load against one rate limiter.
+ *
+ * **While a window is open the viewer reads as signed-out on public routes** —
+ * their token goes out stale and `@OptionalAuth()` answers 200-anonymous, so no
+ * 401 arrives for the response interceptor either. Time-boxing bounds that
+ * symptom; it does not remove it. Thirty seconds of it is a reasonable trade
+ * against a refresh storm, which is why the windows are short and why the
+ * ten-minute one is reserved for a server anomaly rather than a clock problem —
+ * clock skew is handled by measuring against the server's `Date` header instead,
+ * precisely so it never reaches here and never re-arms on success.
  */
 let proactiveRefreshBlockedUntil = 0;
 

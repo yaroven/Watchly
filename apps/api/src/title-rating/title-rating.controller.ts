@@ -5,6 +5,7 @@ import {
   ApiOperation,
   ApiParam,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
 import { Auth } from "../auth/decorators/auth.decorator";
 import { CurrentUserId, OptionalUserId } from "../auth/decorators/current-user-id.decorator";
@@ -25,15 +26,18 @@ export class TitleRatingController {
   })
   @ApiParam({ name: "id", format: "uuid" })
   @ApiOkResponse({ type: TitleRatingSummaryDto })
+  @ApiNotFoundResponse({ description: "Title not found" })
   @OptionalAuth()
   @Get()
   get(@Param("id", ParseUUIDPipe) id: string, @OptionalUserId() userId?: string) {
-    return this.titleRatingService.summarize(id, userId);
+    return this.titleRatingService.summarize(id, userId ?? null);
   }
 
   @ApiOperation({ summary: "Set or change your score for a title" })
   @ApiParam({ name: "id", format: "uuid" })
   @ApiOkResponse({ type: TitleRatingSummaryDto })
+  @ApiUnauthorizedResponse({ description: "Not signed in" })
+  @ApiNotFoundResponse({ description: "Title not found" })
   @Auth()
   @Put()
   set(
@@ -47,7 +51,8 @@ export class TitleRatingController {
   @ApiOperation({ summary: "Withdraw your score" })
   @ApiParam({ name: "id", format: "uuid" })
   @ApiOkResponse({ type: TitleRatingSummaryDto })
-  @ApiNotFoundResponse({ description: "You have not rated this title" })
+  @ApiUnauthorizedResponse({ description: "Not signed in" })
+  @ApiNotFoundResponse({ description: "Title not found, or you have not rated it" })
   @Auth()
   @Delete()
   remove(@Param("id", ParseUUIDPipe) id: string, @CurrentUserId() userId: string) {

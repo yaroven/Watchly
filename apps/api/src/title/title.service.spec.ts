@@ -385,6 +385,18 @@ describe("TitleService", () => {
       expect(engagementServiceMock.summarizeMany).toHaveBeenCalledWith(["title-1"], "viewer-1");
     });
 
+    it("should forward the viewer from update, so an admin's echo is not blank", async () => {
+      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({ id: "title-1" });
+      (prismaServiceMock.title.update as jest.Mock).mockResolvedValue({
+        id: "title-1",
+        genres: [],
+      });
+
+      await service.update("title-1", {} as never, "viewer-1");
+
+      expect(engagementServiceMock.summarize).toHaveBeenCalledWith("title-1", "viewer-1");
+    });
+
     it("should pass null rather than undefined when there is no viewer", async () => {
       (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
         id: "title-1",

@@ -103,7 +103,7 @@ describe("TitleRatingService", () => {
 
     describe("should report no personal score", () => {
       it("if the caller is anonymous, without querying for one", async () => {
-        const result = await service.summarize(titleId);
+        const result = await service.summarize(titleId, null);
 
         expect(result.myScore).toBeNull();
         expect(prismaMock.titleRating.findUnique).not.toHaveBeenCalled();
@@ -117,7 +117,7 @@ describe("TitleRatingService", () => {
           _count: { _all: 0 },
         });
 
-        const result = await service.summarize(titleId);
+        const result = await service.summarize(titleId, null);
 
         expect(result.average).toBeNull();
         expect(result.count).toBe(0);
