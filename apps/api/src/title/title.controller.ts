@@ -20,6 +20,8 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
+import { CurrentUserId, OptionalUserId } from "../auth/decorators/current-user-id.decorator";
+import { OptionalAuth } from "../auth/decorators/optional-auth.decorator";
 import { AdminOnly } from "../auth/decorators/roles.decorator";
 import { CompleteMultipartUploadDto } from "../common/dto/request/complete-multipart-upload.dto";
 import { StartMultipartUploadDto } from "../common/dto/request/start-multipart-upload.dto";
@@ -68,6 +70,7 @@ export class TitleController {
       "`sort`: `property:direction`. Sortable: name, createdAt, releaseDate.",
   })
   @ApiOkResponse({ type: PaginatedResponseOf(TitleResponseDto) })
+  @OptionalAuth()
   @Get()
   async findAll(
     @Query() query: GetAllTitleDto,
@@ -84,17 +87,19 @@ export class TitleController {
       "genres",
     ])
     filters?: Filter[],
+    @OptionalUserId() userId?: string,
   ) {
-    return this.titleService.findAll(query, sort, filters);
+    return this.titleService.findAll(query, sort, filters, userId);
   }
 
   @ApiOperation({ summary: "Get a title by id" })
   @ApiParam({ name: "id", format: "uuid" })
   @ApiOkResponse({ type: TitleResponseDto })
   @ApiNotFoundResponse({ description: "Title not found" })
+  @OptionalAuth()
   @Get(":id")
-  async findOne(@Param("id", ParseUUIDPipe) id: string) {
-    const title = await this.titleService.findOne(id);
+  async findOne(@Param("id", ParseUUIDPipe) id: string, @OptionalUserId() userId?: string) {
+    const title = await this.titleService.findOne(id, userId);
 
     if (!title) throw new NotFoundException(`Title with id ${id} not found`);
 
@@ -107,8 +112,14 @@ export class TitleController {
   @ApiNotFoundResponse({ description: "Title not found" })
   @AdminOnly()
   @Patch(":id")
-  async update(@Param("id", ParseUUIDPipe) id: string, @Body() data: UpdateTitleDto) {
-    return this.titleService.update(id, data);
+  async update(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() data: UpdateTitleDto,
+    @CurrentUserId() userId: string,
+  ) {
+    // The viewer goes through so the echoed engagement block is this admin's own
+    // state rather than a confident "you have not liked or saved this".
+    return this.titleService.update(id, data, userId);
   }
 
   @ApiOperation({ summary: "Start a multipart upload for the raw movie file" })

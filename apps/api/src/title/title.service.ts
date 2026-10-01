@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
 import { ExternalRatings, Genre, Prisma, Title, TitleType } from "@prisma/client";
 import { FilterRule } from "../common/pagination/filter-rule.enum";
 import { paginate } from "../common/pagination/paginate.util";
@@ -10,6 +16,11 @@ import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { MultipartUploadPart } from "../s3/multipart.constants";
 import { SeasonService } from "../season/season.service";
+import {
+  TitleEngagementDto,
+  ViewerTitleEngagementDto,
+} from "../title-engagement/dto/response/title-engagement.dto";
+import { TitleEngagementService } from "../title-engagement/title-engagement.service";
 import { TitleRatingService } from "../title-rating/title-rating.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { CreateTitleDto } from "./dto/request/create-title.dto";
@@ -29,6 +40,7 @@ export class TitleService {
     private readonly seasonService: SeasonService,
     private readonly mediaAssetService: MediaAssetService,
     private readonly titleRatingService: TitleRatingService,
+    private readonly titleEngagementService: TitleEngagementService,
   ) {}
 
   async create(data: CreateTitleDto): Promise<TitleResponseDto> {
@@ -43,7 +55,13 @@ export class TitleService {
         },
         include: { genres: true, externalRatings: true },
       });
-      return new TitleResponseDto(title);
+      // Nothing has been rated or reacted to yet, and the admin creating it
+      // provably has no vote on it — that is known, not unknown.
+      return new TitleResponseDto(
+        title,
+        { average: null, count: 0 },
+        TitleEngagementDto.empty(new ViewerTitleEngagementDto(null, false)),
+      );
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
         throw new BadRequestException("One or more genreIds do not exist");
@@ -56,6 +74,7 @@ export class TitleService {
     { page = 1, limit = 10 }: GetAllTitleDto,
     sort?: Sorting,
     filters: Filter[] = [],
+    viewerId?: string,
   ): Promise<{ items: TitleResponseDto[]; totalCount: number }> {
     const genreFilters = filters.filter((filter) => filter.property === "genres");
     const scalarFilters = filters.filter((filter) => filter.property !== "genres");
@@ -81,30 +100,77 @@ export class TitleService {
       extra: { include: { genres: true, externalRatings: true } },
     });
 
-    const ratings = await this.titleRatingService.summarizeMany(items.map((title) => title.id));
+    const ids = items.map((title) => title.id);
+    const [ratings, engagement] = await Promise.all([
+      this.titleRatingService.summarizeMany(ids),
+      this.titleEngagementService.summarizeMany(ids, viewerId ?? null),
+    ]);
 
     return {
-      items: items.map((title) => new TitleResponseDto(title, ratings.get(title.id))),
+      items: items.map((title) => this.toResponse(title, ratings, engagement)),
       totalCount,
     };
   }
 
-  async findOne(id: string): Promise<TitleResponseDto | null> {
+  /// Newest addition first. The ordering lives in the id list and nowhere else:
+  /// `findMany({ id: { in: ids } })` returns rows in whatever order the database
+  /// finds convenient, so the rows are re-sorted back onto `titleIds` below.
+  async findWatchlist(
+    viewerId: string,
+    { page = 1, limit = 10 }: { page?: number; limit?: number },
+  ): Promise<{ items: TitleResponseDto[]; totalCount: number }> {
+    const { titleIds, totalCount } = await this.titleEngagementService.findWatchlistTitleIds(
+      viewerId,
+      { page, limit },
+    );
+    if (titleIds.length === 0) return { items: [], totalCount };
+
+    const [titles, ratings, engagement] = await Promise.all([
+      this.prisma.title.findMany({
+        where: { id: { in: titleIds } },
+        include: { genres: true, externalRatings: true },
+      }),
+      this.titleRatingService.summarizeMany(titleIds),
+      this.titleEngagementService.summarizeMany(titleIds, viewerId),
+    ]);
+
+    const byId = new Map(titles.map((title) => [title.id, title]));
+
+    // The ids were already filtered through `title`, so a gap here means a row
+    // vanished between the two queries — rare, and not something to paper over
+    // with a short page and an unchanged count.
+    const missing = titleIds.filter((id) => !byId.has(id));
+    if (missing.length > 0) {
+      this.logger.error(
+        `Watchlist of user ${viewerId} references titles that no longer exist: ${missing.join(", ")}`,
+      );
+    }
+
+    return {
+      items: titleIds
+        .map((id) => byId.get(id))
+        .filter((title): title is (typeof titles)[number] => Boolean(title))
+        .map((title) => this.toResponse(title, ratings, engagement)),
+      totalCount: totalCount - missing.length,
+    };
+  }
+
+  async findOne(id: string, viewerId?: string): Promise<TitleResponseDto | null> {
     const title = await this.prisma.title.findUnique({
       where: { id },
       include: { genres: true, externalRatings: true },
     });
     if (!title) return null;
 
-    const { average, count } = await this.titleRatingService.summarize(id);
-    return new TitleResponseDto(title, { average, count });
+    const [{ average, count }, engagement] = await Promise.all([
+      this.titleRatingService.summarize(id, viewerId ?? null),
+      this.titleEngagementService.summarize(id, viewerId ?? null),
+    ]);
+    return new TitleResponseDto(title, { average, count }, engagement);
   }
 
-  async update(id: string, data: UpdateTitleDto): Promise<TitleResponseDto> {
-    const title = await this.findOne(id);
-    if (!title) {
-      throw new BadRequestException(`Title with id ${id} not found`);
-    }
+  async update(id: string, data: UpdateTitleDto, viewerId?: string): Promise<TitleResponseDto> {
+    await this.assertExists(id);
     if (data.posterUrl !== undefined) {
       await this.posterService.assertManagedPosterUrl("titles", id, data.posterUrl);
     }
@@ -126,7 +192,12 @@ export class TitleService {
         },
         include: { genres: true, externalRatings: true },
       });
-      return new TitleResponseDto(updated);
+
+      const [rating, engagement] = await Promise.all([
+        this.titleRatingService.summarize(id, viewerId ?? null),
+        this.titleEngagementService.summarize(id, viewerId ?? null),
+      ]);
+      return new TitleResponseDto(updated, rating, engagement);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
         throw new BadRequestException("One or more genreIds do not exist");
@@ -136,10 +207,7 @@ export class TitleService {
   }
 
   async startMovieUpload(id: string, fileSize: number) {
-    const movie = await this.findOne(id);
-    if (!movie) {
-      throw new BadRequestException(`Movie with id ${id} not found`);
-    }
+    await this.assertExists(id);
     return this.mediaAssetService.startUpload(id, fileSize);
   }
 
@@ -148,10 +216,7 @@ export class TitleService {
     uploadId: string,
     parts: MultipartUploadPart[],
   ): Promise<void> {
-    const movie = await this.findOne(id);
-    if (!movie) {
-      throw new BadRequestException(`Movie with id ${id} not found`);
-    }
+    await this.assertExists(id);
     await this.mediaAssetService.completeUpload(id, uploadId, parts, VideoType.MOVIE);
   }
 
@@ -160,20 +225,13 @@ export class TitleService {
   }
 
   async createPosterUploadingUrl(id: string): Promise<{ uploadUrl: string; posterUrl: string }> {
-    const title = await this.findOne(id);
-    if (!title) {
-      throw new BadRequestException(`Title with id ${id} not found`);
-    }
+    await this.assertExists(id);
 
     return this.posterService.createUploadUrl("titles", id);
   }
 
   async transcode(id: string): Promise<void> {
-    const title = await this.findOne(id);
-
-    if (!title) {
-      throw new BadRequestException(`Movie with id ${id} not found`);
-    }
+    await this.assertExists(id);
 
     await this.mediaAssetService.scheduleTranscode(id, VideoType.MOVIE);
   }
@@ -195,7 +253,7 @@ export class TitleService {
     });
 
     if (!title) {
-      throw new BadRequestException(`Title with id ${id} not found`);
+      throw new NotFoundException(`Title with id ${id} not found`);
     }
 
     const deleted = await this.prisma.title.delete({ where: { id }, include: { genres: true } });
@@ -217,14 +275,17 @@ export class TitleService {
         ),
     ]);
 
-    return new TitleResponseDto(deleted);
+    // The row is gone and its ratings/reactions/watchlist entries cascaded with it,
+    // so nobody has any state on it, the caller included.
+    return new TitleResponseDto(
+      deleted,
+      { average: null, count: 0 },
+      TitleEngagementDto.empty(new ViewerTitleEngagementDto(null, false)),
+    );
   }
 
   async getCast(id: string): Promise<CastCreditResponseDto[]> {
-    const title = await this.findOne(id);
-    if (!title) {
-      throw new BadRequestException(`Title with id ${id} not found`);
-    }
+    await this.assertExists(id);
 
     const credits = await this.prisma.castCredit.findMany({
       where: { titleId: id },
@@ -236,10 +297,7 @@ export class TitleService {
   }
 
   async setCast(id: string, credits: CastCreditInputDto[]): Promise<CastCreditResponseDto[]> {
-    const title = await this.findOne(id);
-    if (!title) {
-      throw new BadRequestException(`Title with id ${id} not found`);
-    }
+    await this.assertExists(id);
 
     try {
       await this.prisma.$transaction([
@@ -261,5 +319,38 @@ export class TitleService {
     }
 
     return this.getCast(id);
+  }
+
+  /**
+   * Existence only. `findOne` builds a whole response — two aggregate round trips
+   * since this phase — and every caller here threw it away.
+   */
+  private async assertExists(id: string): Promise<void> {
+    const title = await this.prisma.title.findUnique({ where: { id }, select: { id: true } });
+    if (!title) throw new NotFoundException(`Title with id ${id} not found`);
+  }
+
+  /**
+   * Both aggregate maps answer for every id they were given, so a miss here is a
+   * broken invariant rather than "nothing to report" — serialising it as zeroes
+   * would be indistinguishable from a title nobody has touched.
+   */
+  private toResponse(
+    title: Title & { genres: Genre[]; externalRatings: ExternalRatings[] },
+    ratings: Map<string, { average: number | null; count: number }>,
+    engagement: Map<string, TitleEngagementDto>,
+  ): TitleResponseDto {
+    const rating = ratings.get(title.id);
+    const titleEngagement = engagement.get(title.id);
+    if (!rating || !titleEngagement) {
+      // Logged, then thrown bare: Nest's default filter does not log HttpExceptions,
+      // and the invariant text and row id are not the client's business. This is
+      // mapped over every row of a list, so one bad title fails the whole page.
+      this.logger.error(
+        `No ${!rating ? "rating" : "engagement"} aggregate was built for title ${title.id}`,
+      );
+      throw new InternalServerErrorException();
+    }
+    return new TitleResponseDto(title, rating, titleEngagement);
   }
 }

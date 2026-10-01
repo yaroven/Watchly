@@ -18,3 +18,4 @@ export { default as TitleOverview } from "./components/TitleOverview";
 export { default as TitleReviews } from "./components/TitleReviews";
 export { default as TitlesLibrary } from "./components/TitlesLibrary";
 export { default as TitleTabs } from "./components/TitleTabs";
+export { default as WatchlistScreen } from "./components/WatchlistScreen";

@@ -23,6 +23,7 @@ import {
 } from "@nestjs/swagger";
 import type { Request } from "express";
 import { Auth } from "../auth/decorators/auth.decorator";
+import { CurrentUserId, OptionalUserId } from "../auth/decorators/current-user-id.decorator";
 import { OptionalAuth } from "../auth/decorators/optional-auth.decorator";
 import { PaginatedResponseOf } from "../common/utils/paginated-response-of.util";
 import { CommentService } from "./comment.service";
@@ -49,7 +50,7 @@ export class CommentController {
   findForTitle(
     @Param("id", ParseUUIDPipe) id: string,
     @Query() query: GetCommentsDto,
-    @Req() { userId }: Request,
+    @OptionalUserId() userId?: string,
   ) {
     return this.commentService.findForTitle(id, query, userId);
   }
@@ -66,7 +67,7 @@ export class CommentController {
   findReplies(
     @Param("id", ParseUUIDPipe) id: string,
     @Query() query: GetCommentsDto,
-    @Req() { userId }: Request,
+    @OptionalUserId() userId?: string,
   ) {
     return this.commentService.findReplies(id, query, userId);
   }
@@ -79,9 +80,9 @@ export class CommentController {
   create(
     @Param("id", ParseUUIDPipe) id: string,
     @Body() data: CreateCommentDto,
-    @Req() { userId }: Request,
+    @CurrentUserId() userId: string,
   ) {
-    return this.commentService.create(id, userId!, data);
+    return this.commentService.create(id, userId, data);
   }
 
   @ApiOperation({
@@ -97,9 +98,9 @@ export class CommentController {
   react(
     @Param("id", ParseUUIDPipe) id: string,
     @Body() data: ReactToCommentDto,
-    @Req() { userId }: Request,
+    @CurrentUserId() userId: string,
   ) {
-    return this.commentService.react(id, userId!, data.type);
+    return this.commentService.react(id, userId, data.type);
   }
 
   @ApiOperation({ summary: "Report a comment" })
@@ -112,9 +113,9 @@ export class CommentController {
   report(
     @Param("id", ParseUUIDPipe) id: string,
     @Body() data: ReportCommentDto,
-    @Req() { userId }: Request,
+    @CurrentUserId() userId: string,
   ) {
-    return this.commentService.report(id, userId!, data.reason);
+    return this.commentService.report(id, userId, data.reason);
   }
 
   @ApiOperation({
@@ -127,7 +128,11 @@ export class CommentController {
   @Auth()
   @Delete("comments/:id")
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param("id", ParseUUIDPipe) id: string, @Req() { userId, role }: Request) {
-    return this.commentService.remove(id, userId!, role);
+  remove(
+    @Param("id", ParseUUIDPipe) id: string,
+    @CurrentUserId() userId: string,
+    @Req() { role }: Request,
+  ) {
+    return this.commentService.remove(id, userId, role);
   }
 }
