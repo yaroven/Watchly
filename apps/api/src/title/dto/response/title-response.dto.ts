@@ -88,6 +88,7 @@ export class TitleResponseDto {
     title: Title & { genres: Genre[]; externalRatings?: ExternalRatings[] },
     rating: { average: number | null; count: number },
     engagement: TitleEngagementDto,
+    posterUrl: string | null = null,
   ) {
     this.id = title.id;
     this.createdAt = title.createdAt;
@@ -95,7 +96,9 @@ export class TitleResponseDto {
     this.name = title.name;
     this.description = title.description;
     this.type = title.type;
-    this.posterUrl = title.posterUrl;
+    // Derived from `title.posterKey` by the caller, never stored: a presigned
+    // URL in a row keeps claiming it works after its signature expires.
+    this.posterUrl = posterUrl;
     this.ageRating = title.ageRating;
     this.country = title.country;
     this.releaseDate = title.releaseDate;

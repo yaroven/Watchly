@@ -15,6 +15,10 @@ import redisConfig, {
 import s3Config from "../config/s3.config";
 import { PrismaModule } from "../prisma/prisma.module";
 import { S3Module } from "../s3/s3.module";
+import { AvatarImageConverter } from "../user-avatar/avatar-image.converter";
+import { AVATAR_QUEUE_OPTIONS } from "../user-avatar/avatar-queue.options";
+import { UserAvatarProcessor } from "../user-avatar/user-avatar.processor";
+import { UserAvatarService } from "../user-avatar/user-avatar.service";
 import { VIDEO_TRANSCODE_QUEUE_OPTIONS } from "./video-transcode-queue.options";
 import { VideoTranscoderProcessor } from "./video-transcoder-processor";
 import { VideoTranscoderService } from "./video-transcoder.service";
@@ -23,6 +27,9 @@ import { VideoTranscoderService } from "./video-transcoder.service";
  * Standalone worker: the only process that runs ffmpeg. Deployed as its own
  * container so heavy transcoding load and its resource limits are isolated
  * from the HTTP API — see docker-compose service "transcoder-worker".
+ *
+ * It carries the avatar queue for the same reason: converting an image needs
+ * ffmpeg, which the API image does not install.
  */
 @Module({
   imports: [
@@ -39,10 +46,16 @@ import { VideoTranscoderService } from "./video-transcoder.service";
         return { connection: redisConnectionOptions(redis) };
       },
     }),
-    BullModule.registerQueue(VIDEO_TRANSCODE_QUEUE_OPTIONS),
+    BullModule.registerQueue(VIDEO_TRANSCODE_QUEUE_OPTIONS, AVATAR_QUEUE_OPTIONS),
     S3Module,
     PrismaModule,
   ],
-  providers: [VideoTranscoderService, VideoTranscoderProcessor],
+  providers: [
+    VideoTranscoderService,
+    VideoTranscoderProcessor,
+    UserAvatarService,
+    AvatarImageConverter,
+    UserAvatarProcessor,
+  ],
 })
 export class VideoTranscoderWorkerModule {}

@@ -15,6 +15,7 @@ import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { MultipartUploadPart } from "../s3/multipart.constants";
+import { buildVideoPrefix } from "../s3/processed-key";
 import { SeasonService } from "../season/season.service";
 import {
   TitleEngagementDto,
@@ -57,6 +58,8 @@ export class TitleService {
       });
       // Nothing has been rated or reacted to yet, and the admin creating it
       // provably has no vote on it — that is known, not unknown.
+      // No poster yet: the key is derived from the id, which does not exist
+      // until this row does, so there is nowhere to have uploaded one.
       return new TitleResponseDto(
         title,
         { average: null, count: 0 },
@@ -166,22 +169,33 @@ export class TitleService {
       this.titleRatingService.summarize(id, viewerId ?? null),
       this.titleEngagementService.summarize(id, viewerId ?? null),
     ]);
-    return new TitleResponseDto(title, { average, count }, engagement);
+    return new TitleResponseDto(
+      title,
+      { average, count },
+      engagement,
+      this.posterService.toPublicUrl(title.posterKey),
+    );
   }
 
   async update(id: string, data: UpdateTitleDto, viewerId?: string): Promise<TitleResponseDto> {
     await this.assertExists(id);
-    if (data.posterUrl !== undefined) {
-      await this.posterService.assertManagedPosterUrl("titles", id, data.posterUrl);
-    }
+    const { genreIds, posterUploaded, ...rest } = data;
 
-    const { genreIds, ...rest } = data;
+    // Resolved before the write, and outside the try: a missing upload is the
+    // client's mistake (400), not one of the genre errors caught below.
+    const posterKey =
+      posterUploaded === undefined
+        ? undefined
+        : posterUploaded
+          ? await this.posterService.confirmUpload("titles", id)
+          : null;
 
     try {
       const updated = await this.prisma.title.update({
         where: { id },
         data: {
           ...rest,
+          ...(posterKey !== undefined ? { posterKey } : {}),
           // A partial update may omit it; `new Date(undefined)` is an Invalid
           // Date, which Prisma rejects.
           ...(rest.releaseDate !== undefined ? { releaseDate: new Date(rest.releaseDate) } : {}),
@@ -197,7 +211,12 @@ export class TitleService {
         this.titleRatingService.summarize(id, viewerId ?? null),
         this.titleEngagementService.summarize(id, viewerId ?? null),
       ]);
-      return new TitleResponseDto(updated, rating, engagement);
+      return new TitleResponseDto(
+        updated,
+        rating,
+        engagement,
+        this.posterService.toPublicUrl(updated.posterKey),
+      );
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
         throw new BadRequestException("One or more genreIds do not exist");
@@ -208,7 +227,7 @@ export class TitleService {
 
   async startMovieUpload(id: string, fileSize: number) {
     await this.assertExists(id);
-    return this.mediaAssetService.startUpload(id, fileSize);
+    return this.mediaAssetService.startUpload(id, fileSize, VideoType.MOVIE);
   }
 
   async completeMovieUpload(
@@ -221,10 +240,10 @@ export class TitleService {
   }
 
   async abortMovieUpload(id: string, uploadId: string): Promise<void> {
-    await this.mediaAssetService.abortUpload(id, uploadId);
+    await this.mediaAssetService.abortUpload(id, uploadId, VideoType.MOVIE);
   }
 
-  async createPosterUploadingUrl(id: string): Promise<{ uploadUrl: string; posterUrl: string }> {
+  async createPosterUploadingUrl(id: string): Promise<{ uploadUrl: string }> {
     await this.assertExists(id);
 
     return this.posterService.createUploadUrl("titles", id);
@@ -237,11 +256,7 @@ export class TitleService {
   }
 
   async getMovieUrl(id: string): Promise<{ url: string }> {
-    const url = await this.mediaAssetService.getReadUrl(`videos/${id}/master.m3u8`);
-    if (!url) {
-      throw new NotFoundException(`No media for title ${id}`);
-    }
-    return url;
+    return this.mediaAssetService.getPlaybackUrl({ type: VideoType.MOVIE, titleId: id });
   }
 
   async delete(id: string): Promise<TitleResponseDto> {
@@ -264,7 +279,11 @@ export class TitleService {
         .catch((error: unknown) =>
           this.logger.error(`Failed to clean up poster after deleting title ${id}`, error),
         ),
-      this.mediaAssetService.cleanupVideoAsset(id, VideoType.MOVIE, `videos/${id}/`),
+      this.mediaAssetService.cleanupVideoAsset(
+        id,
+        VideoType.MOVIE,
+        buildVideoPrefix({ type: VideoType.MOVIE, titleId: id }),
+      ),
       title.type === TitleType.SERIES &&
         settleAllOrLog(
           title.seasons,
@@ -293,7 +312,10 @@ export class TitleService {
       orderBy: { order: "asc" },
     });
 
-    return credits.map((credit) => new CastCreditResponseDto(credit));
+    return credits.map(
+      (credit) =>
+        new CastCreditResponseDto(credit, this.posterService.toPublicUrl(credit.artist.photoKey)),
+    );
   }
 
   async setCast(id: string, credits: CastCreditInputDto[]): Promise<CastCreditResponseDto[]> {
@@ -351,6 +373,11 @@ export class TitleService {
       );
       throw new InternalServerErrorException();
     }
-    return new TitleResponseDto(title, rating, titleEngagement);
+    return new TitleResponseDto(
+      title,
+      rating,
+      titleEngagement,
+      this.posterService.toPublicUrl(title.posterKey),
+    );
   }
 }

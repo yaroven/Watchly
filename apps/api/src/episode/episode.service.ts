@@ -1,10 +1,11 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { Filter, Sorting } from "../common/pagination/pagination.types";
 import { buildOrderBy, buildWhere } from "../common/pagination/prisma-query.util";
 import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { MultipartUploadPart } from "../s3/multipart.constants";
+import { buildVideoPrefix } from "../s3/processed-key";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { CreateEpisodeDto } from "./dto/request/create-episode.dto";
 import { UpdateEpisodeDto } from "./dto/request/update-episode.dto";
@@ -102,7 +103,7 @@ export class EpisodeService {
     await this.mediaAssetService.cleanupVideoAsset(
       id,
       VideoType.EPISODE,
-      `videos/${titleId}/${seasonId}/${id}/`,
+      buildVideoPrefix({ type: VideoType.EPISODE, titleId, seasonId, episodeId: id }),
     );
 
     return new EpisodeResponseDto(deleted);
@@ -120,7 +121,7 @@ export class EpisodeService {
     const episode = await this.findOne(id);
     if (!episode) throw new BadRequestException(`Episode with id ${id} not found`);
 
-    return this.mediaAssetService.startUpload(id, fileSize);
+    return this.mediaAssetService.startUpload(id, fileSize, VideoType.EPISODE);
   }
 
   async completeUpload(id: string, uploadId: string, parts: MultipartUploadPart[]): Promise<void> {
@@ -131,7 +132,7 @@ export class EpisodeService {
   }
 
   async abortUpload(id: string, uploadId: string): Promise<void> {
-    await this.mediaAssetService.abortUpload(id, uploadId);
+    await this.mediaAssetService.abortUpload(id, uploadId, VideoType.EPISODE);
   }
 
   async getStreamUrl(id: string): Promise<{ url: string }> {
@@ -140,14 +141,12 @@ export class EpisodeService {
     if (!episode) throw new BadRequestException(`Episode with id ${id} not found`);
 
     const { seasonId, titleId } = getEpisodeTitleAndSeasonId(episode);
-    const { url } = await this.mediaAssetService.getReadUrl(
-      `videos/${titleId}/${seasonId}/${episode.id}/master.m3u8`,
-    );
 
-    if (!url) {
-      throw new NotFoundException(`No media for episode ${id}`);
-    }
-
-    return { url };
+    return this.mediaAssetService.getPlaybackUrl({
+      type: VideoType.EPISODE,
+      titleId,
+      seasonId,
+      episodeId: episode.id,
+    });
   }
 }

@@ -15,10 +15,10 @@ export class CastCreditResponseDto {
   @ApiProperty({ type: ArtistResponseDto })
   artist: ArtistResponseDto;
 
-  constructor(castCredit: CastCredit & { artist: Artist }) {
+  constructor(castCredit: CastCredit & { artist: Artist }, artistPhotoUrl: string | null = null) {
     this.id = castCredit.id;
     this.character = castCredit.character;
     this.order = castCredit.order;
-    this.artist = new ArtistResponseDto(castCredit.artist);
+    this.artist = new ArtistResponseDto(castCredit.artist, artistPhotoUrl);
   }
 }

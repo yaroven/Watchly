@@ -30,6 +30,10 @@ export class OptionalJwtAuthGuard extends AuthGuard("jwt") {
     context: ExecutionContext,
   ): TUser {
     const request = context.switchToHttp().getRequest<Request>();
+    // Stamped before the branches below, because all three of them are this
+    // guard answering "there may or may not be a viewer" — including the two
+    // that leave `userId` unset.
+    request.viewerScope = "optional";
 
     if (err) {
       // The strategy itself failed — e.g. the user lookup it runs on every

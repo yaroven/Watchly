@@ -6,18 +6,30 @@ import {
 } from "@nestjs/common";
 import { Prisma, ReactionType, Role } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import BucketType from "../s3/enums/bucket-type.enum";
+import { S3Service } from "../s3/s3.service";
 import { CommentSortMode, GetCommentsDto } from "./dto/request/get-comments.dto";
 import { CommentResponseDto, CommentWithAuthor } from "./dto/response/comment-response.dto";
 
 const REPLY_PREVIEW_SIZE = 3;
 
-const AUTHOR_SELECT = { id: true, email: true, displayName: true, avatarUrl: true } as const;
+const AUTHOR_SELECT = { id: true, email: true, displayName: true, avatarKey: true } as const;
 
 type ReactionCounts = { likes: number; dislikes: number };
 
 @Injectable()
 export class CommentService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly s3Service: S3Service,
+  ) {}
+
+  /** The row holds an object key; the URL is derived so nothing stored can expire. */
+  private avatarUrl(user: { avatarKey: string | null }): string | null {
+    return user.avatarKey
+      ? this.s3Service.getPublicUrl(user.avatarKey, BucketType.PROCESSED)
+      : null;
+  }
 
   async findForTitle(
     titleId: string,
@@ -68,6 +80,7 @@ export class CommentService {
         authorScores.get(comment.userId) ?? null,
         children,
         replyCount,
+        this.avatarUrl(comment.user),
       );
 
     const repliesByParent = new Map<string, CommentResponseDto[]>();
@@ -111,6 +124,9 @@ export class CommentService {
       { likes: 0, dislikes: 0 },
       null,
       authorScores.get(userId) ?? null,
+      [],
+      0,
+      this.avatarUrl(comment.user),
     );
   }
 
@@ -210,6 +226,9 @@ export class CommentService {
             counts.get(reply.id) ?? { likes: 0, dislikes: 0 },
             myReactions.get(reply.id) ?? null,
             authorScores.get(reply.userId) ?? null,
+            [],
+            0,
+            this.avatarUrl(reply.user),
           ),
       ),
       totalCount,

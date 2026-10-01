@@ -46,8 +46,7 @@ export class AuthService {
     return this.issueTokens({ userId: user.id, role: user.role });
   }
 
-  async getMe(userId: string | undefined): Promise<UserResponseDto | null> {
-    if (!userId) throw new UnauthorizedException("Unauthorized access");
+  async getMe(userId: string): Promise<UserResponseDto | null> {
     const user = await this.userService.findOne(userId);
     if (!user) throw new NotFoundException("User not found");
     return user;

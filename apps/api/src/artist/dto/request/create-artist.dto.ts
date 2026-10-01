@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsOptional, IsString, MaxLength } from "class-validator";
+import { IsBoolean, IsOptional, IsString, MaxLength } from "class-validator";
 
 export class CreateArtistDto {
   @ApiProperty({ maxLength: 255 })
@@ -7,9 +7,11 @@ export class CreateArtistDto {
   @MaxLength(255)
   name: string;
 
-  @ApiPropertyOptional({ maxLength: 2048 })
+  @ApiPropertyOptional({
+    description:
+      "True once the image has been PUT to the upload URL. The key is derived from the artist, so no URL is sent; the server checks the object is there before storing it. False clears the photo.",
+  })
   @IsOptional()
-  @IsString()
-  @MaxLength(2048)
-  photoUrl?: string;
+  @IsBoolean()
+  photoUploaded?: boolean;
 }

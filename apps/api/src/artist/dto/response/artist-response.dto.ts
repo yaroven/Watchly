@@ -17,11 +17,13 @@ export class ArtistResponseDto {
   @ApiPropertyOptional()
   photoUrl?: string | null;
 
-  constructor(artist: Artist) {
+  constructor(artist: Artist, photoUrl: string | null = null) {
     this.id = artist.id;
     this.createdAt = artist.createdAt;
     this.updatedAt = artist.updatedAt;
     this.name = artist.name;
-    this.photoUrl = artist.photoUrl;
+    // Derived from `artist.photoKey` by the caller, never stored: a presigned
+    // URL in a row keeps claiming it works after its signature expires.
+    this.photoUrl = photoUrl;
   }
 }

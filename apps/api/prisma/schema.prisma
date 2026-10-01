@@ -47,7 +47,11 @@ model User {
   // that already exists predates them; the api falls back to the email local
   // part until the user sets one.
   displayName String?
-  avatarUrl   String?
+
+  /// Object key in the processed bucket, not a URL. A URL would bake the host
+  /// and — if it were presigned — an expiry into the row; the API builds one
+  /// when it serialises the user. Null until an avatar finishes processing.
+  avatarKey String?
 
   ratings        TitleRating[]
   comments       TitleComment[]
@@ -64,7 +68,9 @@ model Title {
   name              String
   description       String
   type              TitleType
-  posterUrl         String?
+  /// Object key in the processed bucket, not a URL. A presigned URL stored in a
+  /// row outlives its own expiry; the URL is derived on read.
+  posterKey         String?
   ageRating         AgeRating
   country           String
   releaseDate       DateTime
@@ -230,7 +236,8 @@ model Artist {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   name      String
-  photoUrl  String?
+  /// Object key in the processed bucket, not a URL. See Title.posterKey.
+  photoKey  String?
 
   castCredits CastCredit[]
 }
@@ -271,7 +278,8 @@ model Season {
   number      Int
   name        String
   description String
-  posterUrl   String?
+  /// Object key in the processed bucket, not a URL. See Title.posterKey.
+  posterKey   String?
   titleId     String
   title       Title     @relation(fields: [titleId], references: [id], onDelete: Cascade)
   episodes    Episode[]

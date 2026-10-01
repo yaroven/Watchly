@@ -36,7 +36,7 @@ describe("EpisodeService", () => {
             completeUpload: jest.fn(),
             abortUpload: jest.fn(),
             scheduleTranscode: jest.fn(),
-            getReadUrl: jest.fn(),
+            getPlaybackUrl: jest.fn(),
             cleanupVideoAsset: jest.fn(),
           },
         },
@@ -310,7 +310,11 @@ describe("EpisodeService", () => {
 
         const result = await service.startUpload("episode-1", 1000);
 
-        expect(mediaAssetServiceMock.startUpload).toHaveBeenCalledWith("episode-1", 1000);
+        expect(mediaAssetServiceMock.startUpload).toHaveBeenCalledWith(
+          "episode-1",
+          1000,
+          VideoType.EPISODE,
+        );
         expect(result).toEqual(startResponse);
       });
     });
@@ -349,7 +353,11 @@ describe("EpisodeService", () => {
       it("regardless of episode state", async () => {
         await service.abortUpload("episode-1", "upload-1");
 
-        expect(mediaAssetServiceMock.abortUpload).toHaveBeenCalledWith("episode-1", "upload-1");
+        expect(mediaAssetServiceMock.abortUpload).toHaveBeenCalledWith(
+          "episode-1",
+          "upload-1",
+          VideoType.EPISODE,
+        );
       });
     });
   });
@@ -374,13 +382,16 @@ describe("EpisodeService", () => {
         };
         const url = "stream-url";
         (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(episode);
-        (mediaAssetServiceMock.getReadUrl as jest.Mock).mockResolvedValue({ url });
+        (mediaAssetServiceMock.getPlaybackUrl as jest.Mock).mockResolvedValue({ url });
 
         const result = await service.getStreamUrl("episode-1");
 
-        expect(mediaAssetServiceMock.getReadUrl).toHaveBeenCalledWith(
-          "videos/title-1/season-1/episode-1/master.m3u8",
-        );
+        expect(mediaAssetServiceMock.getPlaybackUrl).toHaveBeenCalledWith({
+          type: VideoType.EPISODE,
+          titleId: "title-1",
+          seasonId: "season-1",
+          episodeId: "episode-1",
+        });
         expect(result).toEqual({ url });
       });
     });

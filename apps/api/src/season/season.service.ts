@@ -6,6 +6,7 @@ import { settleAllOrLog } from "../common/settle-all-or-throw.util";
 import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { buildSeasonVideoPrefix } from "../s3/processed-key";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { CreateSeasonDto } from "./dto/request/create-season.dto";
 import { UpdateSeasonDto } from "./dto/request/update-season.dto";
@@ -24,7 +25,7 @@ export class SeasonService {
   async create(data: CreateSeasonDto): Promise<SeasonResponseDto> {
     try {
       const season = await this.prisma.season.create({ data });
-      return new SeasonResponseDto(season);
+      return this.toResponse(season);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
         throw new BadRequestException(`Title with id ${data.titleId} not found`);
@@ -40,12 +41,12 @@ export class SeasonService {
     }) as Prisma.SeasonOrderByWithRelationInput;
 
     const seasons = await this.prisma.season.findMany({ where, orderBy });
-    return seasons.map((season) => new SeasonResponseDto(season));
+    return seasons.map((season) => this.toResponse(season));
   }
 
   async findOne(id: string): Promise<SeasonResponseDto | null> {
     const season = await this.prisma.season.findUnique({ where: { id } });
-    return season ? new SeasonResponseDto(season) : null;
+    return season ? this.toResponse(season) : null;
   }
 
   async update(id: string, data: UpdateSeasonDto): Promise<SeasonResponseDto> {
@@ -54,15 +55,29 @@ export class SeasonService {
       throw new BadRequestException(`Season with id ${id} not found`);
     }
 
-    if (data.posterUrl !== undefined) {
-      await this.posterService.assertManagedPosterUrl("seasons", id, data.posterUrl);
-    }
+    const { posterUploaded, ...rest } = data;
 
-    const updated = await this.prisma.season.update({ where: { id }, data });
-    return new SeasonResponseDto(updated);
+    const updated = await this.prisma.season.update({
+      where: { id },
+      data: {
+        ...rest,
+        ...(posterUploaded === undefined
+          ? {}
+          : {
+              posterKey: posterUploaded
+                ? await this.posterService.confirmUpload("seasons", id)
+                : null,
+            }),
+      },
+    });
+    return this.toResponse(updated);
   }
 
-  async createPosterUploadingUrl(id: string): Promise<{ uploadUrl: string; posterUrl: string }> {
+  private toResponse(season: Season): SeasonResponseDto {
+    return new SeasonResponseDto(season, this.posterService.toPublicUrl(season.posterKey));
+  }
+
+  async createPosterUploadingUrl(id: string): Promise<{ uploadUrl: string }> {
     const season = await this.findOne(id);
     if (!season) {
       throw new BadRequestException(`Season with id ${id} not found`);
@@ -84,7 +99,7 @@ export class SeasonService {
     const deleted = await this.prisma.season.delete({ where: { id } });
     await this.cleanupAssets(season);
 
-    return new SeasonResponseDto(deleted);
+    return this.toResponse(deleted);
   }
 
   /**
@@ -107,7 +122,9 @@ export class SeasonService {
         {
           id: "processed-folder",
           run: () =>
-            this.mediaAssetService.deleteProcessedFolder(`videos/${season.titleId}/${season.id}/`),
+            this.mediaAssetService.deleteProcessedFolder(
+              buildSeasonVideoPrefix(season.titleId, season.id),
+            ),
         },
       ],
       (task) => task.run(),

@@ -1,3 +1,4 @@
+import { NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
@@ -21,6 +22,7 @@ describe("MediaAssetService", () => {
             completeMultipartUpload: jest.fn(),
             abortMultipartUpload: jest.fn(),
             getReadPresignedUrl: jest.fn(),
+            objectExists: jest.fn(),
             deleteObject: jest.fn(),
             deleteFolder: jest.fn(),
           },
@@ -56,10 +58,12 @@ describe("MediaAssetService", () => {
         const startResponse = { uploadId: "upload-1", partSize: 8, parts: [] };
         (s3ServiceMock.startMultipartUpload as jest.Mock).mockResolvedValue(startResponse);
 
-        const result = await service.startUpload("asset-1", 1000);
+        const result = await service.startUpload("asset-1", 1000, VideoType.MOVIE);
 
+        // Prefixed: the consumer of the S3 event reads the kind out of the key
+        // rather than probing the database to guess what the object is.
         expect(s3ServiceMock.startMultipartUpload).toHaveBeenCalledWith(
-          "asset-1",
+          "title-video/asset-1",
           BucketType.RAW,
           1000,
         );
@@ -76,7 +80,7 @@ describe("MediaAssetService", () => {
         await service.completeUpload("asset-1", "upload-1", parts, VideoType.MOVIE);
 
         expect(s3ServiceMock.completeMultipartUpload).toHaveBeenCalledWith(
-          "asset-1",
+          "title-video/asset-1",
           BucketType.RAW,
           "upload-1",
           parts,
@@ -99,10 +103,10 @@ describe("MediaAssetService", () => {
   describe("abortUpload", () => {
     describe("should delegate to S3Service", () => {
       it("always", async () => {
-        await service.abortUpload("asset-1", "upload-1");
+        await service.abortUpload("asset-1", "upload-1", VideoType.EPISODE);
 
         expect(s3ServiceMock.abortMultipartUpload).toHaveBeenCalledWith(
-          "asset-1",
+          "episode-video/asset-1",
           BucketType.RAW,
           "upload-1",
         );
@@ -123,19 +127,61 @@ describe("MediaAssetService", () => {
     });
   });
 
-  describe("getReadUrl", () => {
-    describe("should return a presigned read url", () => {
-      it("always", async () => {
-        s3ServiceMock.getReadPresignedUrl.mockResolvedValue("read-url");
+  describe("getPlaybackUrl", () => {
+    const MOVIE = { type: VideoType.MOVIE, titleId: "title-1" } as const;
+    const EPISODE = {
+      type: VideoType.EPISODE,
+      titleId: "title-1",
+      seasonId: "season-1",
+      episodeId: "episode-1",
+    } as const;
 
-        const result = await service.getReadUrl("videos/asset-1/master.m3u8");
+    it("returns a presigned url for the movie's manifest", async () => {
+      s3ServiceMock.objectExists.mockResolvedValue(true);
+      s3ServiceMock.getReadPresignedUrl.mockResolvedValue("read-url");
 
-        expect(s3ServiceMock.getReadPresignedUrl).toHaveBeenCalledWith(
-          "videos/asset-1/master.m3u8",
-          BucketType.PROCESSED,
-        );
-        expect(result).toEqual({ url: "read-url" });
-      });
+      const result = await service.getPlaybackUrl(MOVIE);
+
+      expect(s3ServiceMock.getReadPresignedUrl).toHaveBeenCalledWith(
+        "videos/title-1/master.m3u8",
+        BucketType.PROCESSED,
+      );
+      expect(result).toEqual({ url: "read-url" });
+    });
+
+    it("builds the nested key for an episode", async () => {
+      s3ServiceMock.objectExists.mockResolvedValue(true);
+      s3ServiceMock.getReadPresignedUrl.mockResolvedValue("read-url");
+
+      await service.getPlaybackUrl(EPISODE);
+
+      expect(s3ServiceMock.getReadPresignedUrl).toHaveBeenCalledWith(
+        "videos/title-1/season-1/episode-1/master.m3u8",
+        BucketType.PROCESSED,
+      );
+    });
+
+    // Presigning cannot fail for a key that was never written, so without this
+    // check the caller gets a valid-looking URL that 404s in the browser.
+    it("answers 404 when the manifest is not there", async () => {
+      s3ServiceMock.objectExists.mockResolvedValue(false);
+
+      await expect(service.getPlaybackUrl(MOVIE)).rejects.toThrow(NotFoundException);
+    });
+
+    it("does not presign a key it could not confirm", async () => {
+      s3ServiceMock.objectExists.mockResolvedValue(false);
+
+      await expect(service.getPlaybackUrl(MOVIE)).rejects.toThrow(NotFoundException);
+      expect(s3ServiceMock.getReadPresignedUrl).not.toHaveBeenCalled();
+    });
+
+    // An outage is not an answer of "no media": reporting it as 404 would tell
+    // the client the title is empty when the bucket is simply unreachable.
+    it("lets a stat failure surface instead of reading as absent", async () => {
+      s3ServiceMock.objectExists.mockRejectedValue(new Error("network down"));
+
+      await expect(service.getPlaybackUrl(MOVIE)).rejects.toThrow("network down");
     });
   });
 
