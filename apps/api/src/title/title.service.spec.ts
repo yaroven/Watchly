@@ -582,7 +582,11 @@ describe("TitleService", () => {
 
         const result = await service.startMovieUpload("title-1", 1000);
 
-        expect(mediaAssetServiceMock.startUpload).toHaveBeenCalledWith("title-1", 1000);
+        expect(mediaAssetServiceMock.startUpload).toHaveBeenCalledWith(
+          "title-1",
+          1000,
+          VideoType.MOVIE,
+        );
         expect(result).toEqual(startResponse);
       });
     });
@@ -634,7 +638,11 @@ describe("TitleService", () => {
       it("regardless of title state", async () => {
         await service.abortMovieUpload("title-1", "upload-1");
 
-        expect(mediaAssetServiceMock.abortUpload).toHaveBeenCalledWith("title-1", "upload-1");
+        expect(mediaAssetServiceMock.abortUpload).toHaveBeenCalledWith(
+          "title-1",
+          "upload-1",
+          VideoType.MOVIE,
+        );
       });
     });
   });

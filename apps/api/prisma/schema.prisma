@@ -47,7 +47,11 @@ model User {
   // that already exists predates them; the api falls back to the email local
   // part until the user sets one.
   displayName String?
-  avatarUrl   String?
+
+  /// Object key in the processed bucket, not a URL. A URL would bake the host
+  /// and — if it were presigned — an expiry into the row; the API builds one
+  /// when it serialises the user. Null until an avatar finishes processing.
+  avatarKey String?
 
   ratings        TitleRating[]
   comments       TitleComment[]

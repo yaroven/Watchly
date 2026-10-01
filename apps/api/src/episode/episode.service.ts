@@ -120,7 +120,7 @@ export class EpisodeService {
     const episode = await this.findOne(id);
     if (!episode) throw new BadRequestException(`Episode with id ${id} not found`);
 
-    return this.mediaAssetService.startUpload(id, fileSize);
+    return this.mediaAssetService.startUpload(id, fileSize, VideoType.EPISODE);
   }
 
   async completeUpload(id: string, uploadId: string, parts: MultipartUploadPart[]): Promise<void> {
@@ -131,7 +131,7 @@ export class EpisodeService {
   }
 
   async abortUpload(id: string, uploadId: string): Promise<void> {
-    await this.mediaAssetService.abortUpload(id, uploadId);
+    await this.mediaAssetService.abortUpload(id, uploadId, VideoType.EPISODE);
   }
 
   async getStreamUrl(id: string): Promise<{ url: string }> {

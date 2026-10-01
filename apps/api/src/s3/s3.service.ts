@@ -206,6 +206,19 @@ export class S3Service implements OnModuleInit {
     return this.mapSignedUrlToPublicEndpoint(signedUrl);
   }
 
+  /**
+   * A stable, unsigned URL for an object meant to be publicly readable.
+   *
+   * Not presigned: a signature has an expiry, and anything that stores the
+   * result — a row, a cache, a rendered page — keeps claiming it works long
+   * after it stops. The processed bucket is served read-only to anonymous
+   * callers, which is what makes this safe.
+   */
+  getPublicUrl(key: string, type: BucketType): string {
+    const endpoint = this.s3Config.publicEndpoint.replace(/\/$/, "");
+    return `${endpoint}/${this.getBucketName(type)}/${key}`;
+  }
+
   async deleteObject(key: string, type: BucketType) {
     const bucketName = this.getBucketName(type);
     try {

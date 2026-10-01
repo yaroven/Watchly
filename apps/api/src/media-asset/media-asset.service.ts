@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { settleAllOrLog } from "../common/settle-all-or-throw.util";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { MultipartUploadPart } from "../s3/multipart.constants";
+import { buildVideoRawKey } from "../s3/raw-key";
 import { S3Service } from "../s3/s3.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
@@ -15,8 +16,12 @@ export class MediaAssetService {
     private readonly videoTranscoderService: VideoTranscoderService,
   ) {}
 
-  async startUpload(id: string, fileSize: number) {
-    return this.s3Service.startMultipartUpload(id, BucketType.RAW, fileSize);
+  async startUpload(id: string, fileSize: number, type: VideoType) {
+    return this.s3Service.startMultipartUpload(
+      buildVideoRawKey(id, type),
+      BucketType.RAW,
+      fileSize,
+    );
   }
 
   /**
@@ -32,12 +37,17 @@ export class MediaAssetService {
     parts: MultipartUploadPart[],
     type: VideoType,
   ): Promise<void> {
-    await this.s3Service.completeMultipartUpload(id, BucketType.RAW, uploadId, parts);
+    await this.s3Service.completeMultipartUpload(
+      buildVideoRawKey(id, type),
+      BucketType.RAW,
+      uploadId,
+      parts,
+    );
     await this.scheduleTranscode(id, type);
   }
 
-  async abortUpload(id: string, uploadId: string): Promise<void> {
-    await this.s3Service.abortMultipartUpload(id, BucketType.RAW, uploadId);
+  async abortUpload(id: string, uploadId: string, type: VideoType): Promise<void> {
+    await this.s3Service.abortMultipartUpload(buildVideoRawKey(id, type), BucketType.RAW, uploadId);
   }
 
   async scheduleTranscode(id: string, type: VideoType): Promise<void> {
@@ -59,7 +69,13 @@ export class MediaAssetService {
         id: "scheduled-transcodes",
         run: () => this.videoTranscoderService.cancelScheduledTranscodes(id, type),
       },
-      { id: "raw-video", run: () => this.s3Service.deleteObject(id, BucketType.RAW) },
+      {
+        id: "raw-video",
+        run: () => this.s3Service.deleteObject(buildVideoRawKey(id, type), BucketType.RAW),
+      },
+      // Uploads that predate the key scheme are still sitting under the bare id.
+      // Best-effort, and it disappears once nothing old is left in the bucket.
+      { id: "raw-video-legacy", run: () => this.s3Service.deleteObject(id, BucketType.RAW) },
     ];
 
     if (processedPath !== undefined) {

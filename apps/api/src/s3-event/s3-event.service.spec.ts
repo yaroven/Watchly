@@ -2,6 +2,7 @@ import { DeleteMessageCommand } from "@aws-sdk/client-sqs";
 import { ConfigService } from "@nestjs/config";
 import { Test, TestingModule } from "@nestjs/testing";
 import { PrismaService } from "../prisma/prisma.service";
+import { UserAvatarService } from "../user-avatar/user-avatar.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
 import { S3EventService } from "./s3-event.service";
@@ -26,6 +27,7 @@ describe("S3EventService", () => {
   let service: S3EventService;
   let prismaMock: jest.Mocked<PrismaService>;
   let videoTranscoderServiceMock: jest.Mocked<VideoTranscoderService>;
+  let userAvatarServiceMock: { scheduleProcessing: jest.Mock };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -47,6 +49,10 @@ describe("S3EventService", () => {
           },
         },
         {
+          provide: UserAvatarService,
+          useValue: { scheduleProcessing: jest.fn() },
+        },
+        {
           provide: ConfigService,
           useValue: {
             getOrThrow: jest.fn().mockReturnValue(mockConfig),
@@ -60,6 +66,7 @@ describe("S3EventService", () => {
     videoTranscoderServiceMock = module.get(
       VideoTranscoderService,
     ) as jest.Mocked<VideoTranscoderService>;
+    userAvatarServiceMock = module.get(UserAvatarService);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (service as any).sqsClient = { send: mockSend };
@@ -96,14 +103,16 @@ describe("S3EventService", () => {
     });
   });
 
-  describe("resolveTask", () => {
+  describe("resolveLegacyTask", () => {
     it("should return EPISODE task when episode exists", async () => {
       (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue({
         id: "11111111-1111-4111-8111-111111111111",
       });
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = await (service as any).resolveTask("11111111-1111-4111-8111-111111111111");
+      const result = await (service as any).resolveLegacyTask(
+        "11111111-1111-4111-8111-111111111111",
+      );
 
       expect(result).toEqual({
         id: "11111111-1111-4111-8111-111111111111",
@@ -119,7 +128,9 @@ describe("S3EventService", () => {
       });
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = await (service as any).resolveTask("22222222-2222-4222-8222-222222222222");
+      const result = await (service as any).resolveLegacyTask(
+        "22222222-2222-4222-8222-222222222222",
+      );
 
       expect(result).toEqual({ id: "22222222-2222-4222-8222-222222222222", type: VideoType.MOVIE });
     });
@@ -129,9 +140,87 @@ describe("S3EventService", () => {
       (prismaMock.title.findUnique as jest.Mock).mockResolvedValue(null);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = await (service as any).resolveTask("33333333-3333-4333-8333-333333333333");
+      const result = await (service as any).resolveLegacyTask(
+        "33333333-3333-4333-8333-333333333333",
+      );
 
       expect(result).toBeNull();
+    });
+  });
+
+  /**
+   * The key says what the object is. Before this the kind was inferred by
+   * probing for an episode and then a title, so a new kind of raw object was
+   * indistinguishable from a stale one.
+   */
+  describe("dispatch by key prefix", () => {
+    const TITLE_ID = "11111111-1111-4111-8111-111111111111";
+    const USER_ID = "44444444-4444-4444-8444-444444444444";
+
+    const messageFor = (key: string) => ({
+      MessageId: "msg-1",
+      ReceiptHandle: "receipt-123",
+      Body: JSON.stringify({ Records: [{ s3: { object: { key } } }] }),
+    });
+
+    it("should schedule a movie transcode without asking the database what the id is", async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (service as any).processMessage(messageFor(`title-video/${TITLE_ID}`));
+
+      expect(videoTranscoderServiceMock.scheduleTranscodeVideo).toHaveBeenCalledWith({
+        id: TITLE_ID,
+        type: VideoType.MOVIE,
+      });
+      expect(prismaMock.title.findUnique).not.toHaveBeenCalled();
+      expect(prismaMock.episode.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("should schedule an episode transcode from the episode prefix", async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (service as any).processMessage(messageFor(`episode-video/${TITLE_ID}`));
+
+      expect(videoTranscoderServiceMock.scheduleTranscodeVideo).toHaveBeenCalledWith({
+        id: TITLE_ID,
+        type: VideoType.EPISODE,
+      });
+    });
+
+    it("should hand an avatar to the avatar queue, not the transcoder", async () => {
+      const key = `user-avatar/${USER_ID}/abc-123`;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (service as any).processMessage(messageFor(key));
+
+      expect(userAvatarServiceMock.scheduleProcessing).toHaveBeenCalledWith({
+        userId: USER_ID,
+        rawKey: key,
+      });
+      expect(videoTranscoderServiceMock.scheduleTranscodeVideo).not.toHaveBeenCalled();
+    });
+
+    // Dropping it is right; retrying forever on something this build cannot
+    // name would block the queue behind it.
+    it("should ignore a prefix it does not recognise, and still delete the message", async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (service as any).processMessage(messageFor("something-else/abc"));
+
+      expect(videoTranscoderServiceMock.scheduleTranscodeVideo).not.toHaveBeenCalled();
+      expect(userAvatarServiceMock.scheduleProcessing).not.toHaveBeenCalled();
+      expect(mockSend.mock.calls[0][0]).toBeInstanceOf(DeleteMessageCommand);
+    });
+
+    // An upload started before the scheme shipped is still a bare uuid, and
+    // dropping it would lose a video somebody is waiting on.
+    it("should still resolve a bare uuid by database probe", async () => {
+      (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue({ id: TITLE_ID });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (service as any).processMessage(messageFor(TITLE_ID));
+
+      expect(videoTranscoderServiceMock.scheduleTranscodeVideo).toHaveBeenCalledWith({
+        id: TITLE_ID,
+        type: VideoType.EPISODE,
+      });
     });
   });
 

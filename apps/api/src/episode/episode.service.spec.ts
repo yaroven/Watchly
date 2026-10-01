@@ -310,7 +310,11 @@ describe("EpisodeService", () => {
 
         const result = await service.startUpload("episode-1", 1000);
 
-        expect(mediaAssetServiceMock.startUpload).toHaveBeenCalledWith("episode-1", 1000);
+        expect(mediaAssetServiceMock.startUpload).toHaveBeenCalledWith(
+          "episode-1",
+          1000,
+          VideoType.EPISODE,
+        );
         expect(result).toEqual(startResponse);
       });
     });
@@ -349,7 +353,11 @@ describe("EpisodeService", () => {
       it("regardless of episode state", async () => {
         await service.abortUpload("episode-1", "upload-1");
 
-        expect(mediaAssetServiceMock.abortUpload).toHaveBeenCalledWith("episode-1", "upload-1");
+        expect(mediaAssetServiceMock.abortUpload).toHaveBeenCalledWith(
+          "episode-1",
+          "upload-1",
+          VideoType.EPISODE,
+        );
       });
     });
   });

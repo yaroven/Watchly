@@ -217,7 +217,41 @@ model WatchlistItem {
 
 </details>
 
-## Phase 5 — Title photos
+## Phase 5 — User avatars — **shipped**
+
+Not what this document originally had under phase 5 (that was Title photos, now 5b).
+The order was swapped deliberately: avatars are the smaller problem and they force the
+image pipeline — presigned upload, an S3 event, an ffmpeg conversion to webp, a stored
+key — to exist. Title photos then reuse it instead of growing a second one.
+
+What shipped:
+
+| Endpoint                          | Notes                                              |
+| --------------------------------- | -------------------------------------------------- |
+| `POST /user/me/avatar/upload-url` | Presigned PUT plus the raw key it will land on     |
+| `DELETE /user/me/avatar`          | Clears the column and deletes the processed object |
+
+- `User.avatarUrl` became `User.avatarKey`: a key in the processed bucket, not a URL.
+  Storing a presigned URL bakes an expiry into a row that outlives it; the URL is built
+  on read instead (`S3Service.getPublicUrl`).
+- One avatar per user is enforced by the key, `avatars/<userId>/<uploadId>.webp`: attaching
+  a new one deletes the superseded object in the same step.
+- Conversion runs on the transcoder worker, the only image that installs ffmpeg. 256×256
+  webp at quality 80, scale-then-centre-crop, one frame. A 1600×1200 jpeg measured
+  129617 → 3822 bytes end-to-end against LocalStack.
+- Size and decodability are checked in the worker, not at the presign step: a presigned
+  PUT carries no size limit, so the byte count is only knowable once the object exists.
+
+### Raw-bucket key scheme (prerequisite, shipped with this phase)
+
+`s3-event` used to identify an uploaded object by probing the database for a row whose id
+matched the key — which only worked because every raw key was a bare uuid, and could not
+tell a title from an episode without the lookup. Every raw object now carries a kind
+prefix (`title-video/`, `episode-video/`, `user-avatar/`) and dispatch is a `switch` on
+the parsed prefix. `src/s3/raw-key/` owns the scheme; bare-uuid keys still route through
+the old probe so objects uploaded before the change keep working.
+
+## Phase 5b — Title photos
 
 ```prisma
 model TitlePhoto {
@@ -230,8 +264,9 @@ model TitlePhoto {
 ```
 
 - `GET /titles/:id/photos`
-- `POST /titles/:id/photos/upload-url` (reuse the same S3 presigned-url pattern already
-  used for poster/movie uploads)
+- `POST /titles/:id/photos/upload-url` — reuse the avatar pipeline from phase 5: a
+  `title-photo/` raw prefix, a new `RawObjectKind`, and a queue whose processor differs
+  from the avatar one only in output size and in what it writes the key to.
 
 Unblocks `StreamPhotos.tsx`.
 

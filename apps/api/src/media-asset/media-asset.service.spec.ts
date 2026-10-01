@@ -56,10 +56,12 @@ describe("MediaAssetService", () => {
         const startResponse = { uploadId: "upload-1", partSize: 8, parts: [] };
         (s3ServiceMock.startMultipartUpload as jest.Mock).mockResolvedValue(startResponse);
 
-        const result = await service.startUpload("asset-1", 1000);
+        const result = await service.startUpload("asset-1", 1000, VideoType.MOVIE);
 
+        // Prefixed: the consumer of the S3 event reads the kind out of the key
+        // rather than probing the database to guess what the object is.
         expect(s3ServiceMock.startMultipartUpload).toHaveBeenCalledWith(
-          "asset-1",
+          "title-video/asset-1",
           BucketType.RAW,
           1000,
         );
@@ -76,7 +78,7 @@ describe("MediaAssetService", () => {
         await service.completeUpload("asset-1", "upload-1", parts, VideoType.MOVIE);
 
         expect(s3ServiceMock.completeMultipartUpload).toHaveBeenCalledWith(
-          "asset-1",
+          "title-video/asset-1",
           BucketType.RAW,
           "upload-1",
           parts,
@@ -99,10 +101,10 @@ describe("MediaAssetService", () => {
   describe("abortUpload", () => {
     describe("should delegate to S3Service", () => {
       it("always", async () => {
-        await service.abortUpload("asset-1", "upload-1");
+        await service.abortUpload("asset-1", "upload-1", VideoType.EPISODE);
 
         expect(s3ServiceMock.abortMultipartUpload).toHaveBeenCalledWith(
-          "asset-1",
+          "episode-video/asset-1",
           BucketType.RAW,
           "upload-1",
         );
