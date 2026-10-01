@@ -33,19 +33,26 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
 
   // The page is server-rendered with no session — `shared/api/axios.ts` reads its
   // bearer from the auth store, which is empty there, and the refresh cookie is not
-  // forwarded. So `title.engagement` seeds the public counts only; the viewer's own
-  // vote and watchlist state are always null until the client query lands.
+  // forwarded. So `title.engagement` seeds the public counts, and its `viewer` is
+  // null by construction; only the client query can fill that in.
   const { data: liveEngagement, isError: engagementFailed } = useTitleEngagement(title.id);
   const engagement = liveEngagement ?? title.engagement;
+  const viewer = engagement.viewer;
 
   const react = useReactToTitle(title.id);
   const setWatchlist = useSetTitleWatchlist(title.id);
   const writeError = react.error ?? setWatchlist.error;
 
+  // Without the viewer's own state a toggle is a coin flip: the server toggles,
+  // so clicking an un-lit thumb on behalf of someone who has already liked the
+  // title would withdraw the like they meant to keep.
+  const viewerStateUnknown = isSignedIn && viewer === null;
+  const togglesDisabled = !isSignedIn || viewerStateUnknown;
+
   // The design shows a dislike toggle with no visible counter — only the
   // like count and the active/inactive colour change.
   const handleReact = (type: ReactionType) => {
-    if (!isSignedIn) return;
+    if (togglesDisabled || react.isPending) return;
     react.mutate(type);
   };
 
@@ -98,11 +105,11 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
           <Box
             component="button"
             type="button"
-            aria-label={engagement.myReaction === ReactionType.LIKE ? "Remove like" : "Like"}
-            aria-pressed={engagement.myReaction === ReactionType.LIKE}
-            disabled={!isSignedIn || react.isPending}
+            aria-label={viewer?.myReaction === ReactionType.LIKE ? "Remove like" : "Like"}
+            aria-pressed={viewer?.myReaction === ReactionType.LIKE}
+            disabled={togglesDisabled || react.isPending}
             onClick={() => handleReact(ReactionType.LIKE)}
-            sx={{ ...actionButtonSx, color: engagement.myReaction === ReactionType.LIKE ? "primary.main" : "#ffffff" }}
+            sx={{ ...actionButtonSx, color: viewer?.myReaction === ReactionType.LIKE ? "primary.main" : "#ffffff" }}
           >
             <ThumbUpIcon sx={{ fontSize: "18px" }} />
             <Typography component="span" sx={{ fontSize: "13px" }}>
@@ -112,11 +119,11 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
           <Box
             component="button"
             type="button"
-            aria-label={engagement.myReaction === ReactionType.DISLIKE ? "Remove dislike" : "Dislike"}
-            aria-pressed={engagement.myReaction === ReactionType.DISLIKE}
-            disabled={!isSignedIn || react.isPending}
+            aria-label={viewer?.myReaction === ReactionType.DISLIKE ? "Remove dislike" : "Dislike"}
+            aria-pressed={viewer?.myReaction === ReactionType.DISLIKE}
+            disabled={togglesDisabled || react.isPending}
             onClick={() => handleReact(ReactionType.DISLIKE)}
-            sx={{ ...actionButtonSx, color: engagement.myReaction === ReactionType.DISLIKE ? "primary.main" : "#ffffff" }}
+            sx={{ ...actionButtonSx, color: viewer?.myReaction === ReactionType.DISLIKE ? "primary.main" : "#ffffff" }}
           >
             <ThumbDownIcon sx={{ fontSize: "18px" }} />
           </Box>
@@ -159,16 +166,16 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
         <Box
           component="button"
           type="button"
-          aria-pressed={engagement.inWatchlist}
-          disabled={!isSignedIn || setWatchlist.isPending}
-          onClick={() => setWatchlist.mutate(!engagement.inWatchlist)}
+          aria-pressed={viewer?.inWatchlist ?? false}
+          disabled={togglesDisabled || setWatchlist.isPending}
+          onClick={() => viewer && setWatchlist.mutate(!viewer.inWatchlist)}
           sx={{
             display: "flex",
             alignItems: "center",
             gap: "10px",
             border: "none",
-            cursor: isSignedIn ? "pointer" : "default",
-            opacity: isSignedIn ? 1 : 0.6,
+            cursor: togglesDisabled ? "default" : "pointer",
+            opacity: togglesDisabled ? 0.6 : 1,
             borderRadius: "12px",
             backgroundColor: "primary.main",
             px: "18px",
@@ -191,7 +198,7 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
           </Box>
           <Box sx={{ textAlign: "left" }}>
             <Typography sx={{ fontSize: "14px", fontWeight: 700, color: "#191919", lineHeight: 1.2 }}>
-              {engagement.inWatchlist ? "In Watchlist" : "Add to Watchlist"}
+              {viewer?.inWatchlist ? "In Watchlist" : "Add to Watchlist"}
             </Typography>
             <Typography sx={{ fontSize: "11px", color: "#191919", opacity: 0.75, lineHeight: 1.2 }}>
               Added by {formatCount(engagement.watchlistCount)} {engagement.watchlistCount === 1 ? "User" : "Users"}
@@ -204,7 +211,7 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
         <Alert severity="error" variant="outlined" sx={{ alignItems: "center" }}>
           {writeError
             ? `Could not save that: ${writeError.message}`
-            : "Could not load the likes and watchlist state for this title — the counts below may be out of date."}
+            : "Could not load whether you have liked or saved this title, so the controls are disabled — the counts below may also be out of date."}
         </Alert>
       )}
 

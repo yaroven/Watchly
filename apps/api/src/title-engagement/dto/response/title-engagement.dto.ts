@@ -7,6 +7,19 @@ export interface TitleEngagementCounts {
   watchlistCount: number;
 }
 
+export class ViewerTitleEngagementDto {
+  @ApiProperty({ enum: ReactionType, nullable: true, description: "The viewer's own vote" })
+  myReaction: ReactionType | null;
+
+  @ApiProperty({ description: "Whether the title is on the viewer's watchlist" })
+  inWatchlist: boolean;
+
+  constructor(myReaction: ReactionType | null, inWatchlist: boolean) {
+    this.myReaction = myReaction;
+    this.inWatchlist = inWatchlist;
+  }
+}
+
 export class TitleEngagementDto {
   @ApiProperty()
   likes: number;
@@ -18,26 +31,24 @@ export class TitleEngagementDto {
   watchlistCount: number;
 
   @ApiProperty({
-    enum: ReactionType,
+    type: ViewerTitleEngagementDto,
     nullable: true,
-    description: "The current viewer's own vote, null if they have not voted or are anonymous",
+    description:
+      "The viewer's own vote and watchlist state, or null when the read had no viewer in scope — an anonymous caller, or a server-side render. Distinct from a viewer who simply has not voted.",
   })
-  myReaction: ReactionType | null;
+  viewer: ViewerTitleEngagementDto | null;
 
-  @ApiProperty({ description: "Whether the title is on the current viewer's watchlist" })
-  inWatchlist: boolean;
+  // Required, not defaulted: "nobody has engaged with this" and "the aggregate was
+  // never fetched" must not be able to serialise identically.
+  constructor(counts: TitleEngagementCounts, viewer: ViewerTitleEngagementDto | null) {
+    this.likes = counts.likes;
+    this.dislikes = counts.dislikes;
+    this.watchlistCount = counts.watchlistCount;
+    this.viewer = viewer;
+  }
 
-  constructor({
-    likes = 0,
-    dislikes = 0,
-    watchlistCount = 0,
-    myReaction = null,
-    inWatchlist = false,
-  }: Partial<TitleEngagementCounts & { myReaction: ReactionType | null; inWatchlist: boolean }>) {
-    this.likes = likes;
-    this.dislikes = dislikes;
-    this.watchlistCount = watchlistCount;
-    this.myReaction = myReaction;
-    this.inWatchlist = inWatchlist;
+  /** For a title that provably has no engagement — one just created, or just deleted. */
+  static empty(viewer: ViewerTitleEngagementDto | null = null): TitleEngagementDto {
+    return new TitleEngagementDto({ likes: 0, dislikes: 0, watchlistCount: 0 }, viewer);
   }
 }

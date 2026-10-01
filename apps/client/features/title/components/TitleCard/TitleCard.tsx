@@ -7,8 +7,10 @@ import { BookmarkBorder as BookmarkBorderIcon, Bookmark as BookmarkIcon, Star as
 import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
+import { APP } from "@shared/lib/routes";
 import { useViewer } from "@shared/lib/use-viewer";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 /**
@@ -24,9 +26,7 @@ export default function TitleCard({ id, name, posterUrl, type, genres, externalR
   const subtitle = genres.length ? genres.map((genre) => genre.name).join(", ") : type === "MOVIE" ? "Movie" : "Series";
   const rating = externalRatings.find((r) => r.source === ExternalRatingSource.IMDB)?.rating;
 
-  // `isSignedIn` waits for the session: during the boot exchange `userId` is still
-  // null for someone who is in fact signed in, and a control disabled then is
-  // indistinguishable from one disabled for good.
+  const router = useRouter();
   const { isSignedIn, sessionReady } = useViewer();
   const [failed, setFailed] = useState(false);
   const setWatchlist = useSetTitleWatchlist(id, {
@@ -36,16 +36,35 @@ export default function TitleCard({ id, name, posterUrl, type, genres, externalR
     },
     onSuccess: () => setFailed(false),
   });
-  const inWatchlist = engagement.inWatchlist;
 
-  const toggleWatchlist = (event: { stopPropagation: () => void; preventDefault?: () => void }) => {
+  // A null viewer means the payload was read without a session — server-side, or
+  // before the boot exchange finished. Unknown, not "not saved".
+  const inWatchlist = engagement.viewer?.inWatchlist ?? false;
+
+  // Enabled for signed-out viewers too: a disabled button swallows the click
+  // without letting it reach the open-title overlay underneath, which would make
+  // the corner of every poster inert. Signing in is what they are missing, so
+  // that is where the click goes.
+  const toggleWatchlist = (event: { stopPropagation: () => void; preventDefault: () => void }) => {
     event.stopPropagation();
-    event.preventDefault?.();
-    if (!isSignedIn || setWatchlist.isPending) return;
+    event.preventDefault();
+    if (setWatchlist.isPending) return;
+    if (!isSignedIn) {
+      router.push(APP.LOGIN);
+      return;
+    }
     setWatchlist.mutate(!inWatchlist);
   };
 
-  const toggleLabel = failed ? "Could not update the watchlist — try again" : inWatchlist ? "Remove from watchlist" : "Add to watchlist";
+  const toggleLabel = failed
+    ? "Could not update your watchlist — try again"
+    : !sessionReady
+      ? "Watchlist"
+      : !isSignedIn
+        ? "Sign in to add to your watchlist"
+        : inWatchlist
+          ? "Remove from watchlist"
+          : "Add to watchlist";
 
   return (
     // The card is not itself a button: it holds a second control (the watchlist
@@ -148,23 +167,23 @@ export default function TitleCard({ id, name, posterUrl, type, genres, externalR
             component="button"
             type="button"
             aria-label={toggleLabel}
-            aria-pressed={inWatchlist}
-            disabled={!isSignedIn || setWatchlist.isPending}
+            aria-pressed={isSignedIn ? inWatchlist : undefined}
+            title={failed ? "Could not update your watchlist — try again" : undefined}
+            disabled={!sessionReady || setWatchlist.isPending}
             onClick={toggleWatchlist}
             sx={{
+              // Fills the notch: a smaller button would leave an inert strip of it
+              // sitting over the open-title overlay.
               position: "absolute",
-              top: 0,
-              right: 0,
-              width: 24,
-              height: 24,
+              inset: 0,
               // Same fill as the card frame, so the button reads as a notch
               // cut out of the poster rather than a chip floating on top of it.
               borderRadius: "8px",
               border: "none",
               padding: 0,
               bgcolor: "#ffffff1a",
-              cursor: isSignedIn ? "pointer" : "default",
-              opacity: sessionReady ? 1 : 0.5,
+              cursor: sessionReady ? "pointer" : "default",
+              opacity: isSignedIn || !sessionReady ? 1 : 0.6,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",

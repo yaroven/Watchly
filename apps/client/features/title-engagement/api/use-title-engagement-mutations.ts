@@ -8,9 +8,17 @@ import titleEngagementService from "./title-engagement.service";
 /**
  * Every title read carries the engagement block, so the title caches go stale with
  * it — toggling from one poster has to update the same title in the other rails it
- * appears in. The prefixes cover every viewer-scoped variant of those keys.
+ * appears in. Each entry is a prefix, which covers every viewer-scoped variant
+ * beneath it; `stream` and `cast` sit outside `details()` so they are not dragged
+ * along. `lists()` is unavoidably broad: a list page holds the toggled title
+ * somewhere inside a payload this layer cannot address more precisely.
  */
-const invalidateFor = (titleId: string) => [titleEngagementKeys.all(), titleKeys.detail(titleId), titleKeys.lists()];
+const invalidateFor = (titleId: string) => [
+  titleEngagementKeys.details(),
+  titleEngagementKeys.watchlists(),
+  titleKeys.detail(titleId),
+  titleKeys.lists(),
+];
 
 export const useReactToTitle = (
   titleId: string,

@@ -25,7 +25,11 @@ export function useTitleDetails({ title, initialSeasons }: UseTitleDetailsContro
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
-  const { data: titleData } = useTitle(title.id, { initialData: title });
+  // `initialDataUpdatedAt: 0` marks the server-rendered payload as already stale.
+  // It was fetched without a session, so its viewer-scoped engagement block is
+  // empty; without this the fresh viewer-keyed cache entry would adopt it as
+  // current and skip the refetch for the whole staleTime.
+  const { data: titleData } = useTitle(title.id, { initialData: title, initialDataUpdatedAt: 0 });
   const isSeries = titleData?.type === TitleType.SERIES;
   const currentTitle = titleData ?? title;
 

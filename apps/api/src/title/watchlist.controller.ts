@@ -1,9 +1,9 @@
-import { Controller, Get, Query, Req } from "@nestjs/common";
-import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
-import type { Request } from "express";
+import { Controller, Get, Query } from "@nestjs/common";
+import { ApiOkResponse, ApiOperation, ApiTags, ApiUnauthorizedResponse } from "@nestjs/swagger";
 import { Auth } from "../auth/decorators/auth.decorator";
+import { CurrentUserId } from "../auth/decorators/current-user-id.decorator";
+import { PaginatedQueryDto } from "../common/dto/paginated-query.dto";
 import { PaginatedResponseOf } from "../common/utils/paginated-response-of.util";
-import { GetAllTitleDto } from "./dto/request/get-all-title.dto";
 import { TitleResponseDto } from "./dto/response/title-response.dto";
 import { TitleService } from "./title.service";
 
@@ -14,11 +14,15 @@ import { TitleService } from "./title.service";
 export class WatchlistController {
   constructor(private readonly titleService: TitleService) {}
 
-  @ApiOperation({ summary: "List the titles on your watchlist", description: "Newest first." })
+  @ApiOperation({
+    summary: "List the titles on your watchlist",
+    description: "Newest addition first. Not sortable or filterable — page and limit only.",
+  })
   @ApiOkResponse({ type: PaginatedResponseOf(TitleResponseDto) })
+  @ApiUnauthorizedResponse({ description: "Not signed in" })
   @Auth()
   @Get()
-  findAll(@Query() query: GetAllTitleDto, @Req() { userId }: Request) {
-    return this.titleService.findWatchlist(userId!, query);
+  findAll(@Query() query: PaginatedQueryDto, @CurrentUserId() userId: string) {
+    return this.titleService.findWatchlist(userId, query);
   }
 }
