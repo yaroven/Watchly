@@ -8,7 +8,6 @@ import type { Season } from "@features/season/schemas/season";
 import StreamEpisodesSidebar from "@features/title/components/StreamEpisodesSidebar";
 import StreamFilmInfo from "@features/title/components/StreamFilmInfo";
 import StreamPhotos from "@features/title/components/StreamPhotos";
-import { getTitleOverviewFixture } from "@features/title/components/TitleOverview/mocks";
 import TitleReviews from "@features/title/components/TitleReviews";
 import type { Title } from "@features/title/schemas/title";
 import Box from "@mui/material/Box";
@@ -28,7 +27,6 @@ interface SeriesStreamProps {
 
 export default function SeriesStream({ title, season, episodes, initialEpisodeUrl, initialEpisodeId }: SeriesStreamProps) {
   const router = useRouter();
-  const { scores } = getTitleOverviewFixture(title.id);
   const [episodeId, setEpisodeId] = useQueryState("episode", { history: "replace", shallow: true });
 
   const activeEpisodeId = episodeId ?? initialEpisodeId;
@@ -116,7 +114,6 @@ export default function SeriesStream({ title, season, episodes, initialEpisodeUr
 
       <StreamFilmInfo
         title={title}
-        rating={scores.tmovie}
         episodeLabel={activeEpisode ? `(Season ${season.number}, Episode ${activeEpisode.number})` : undefined}
       />
       <StreamPhotos title={title} />

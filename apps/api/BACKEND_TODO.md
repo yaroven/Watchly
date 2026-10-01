@@ -9,7 +9,7 @@ Discover ranking → Artists → Blog/Article. The first five phases close almos
 in the client TODO for existing pages; the last two are brand-new Figma pages with no
 client feature yet either.
 
-## Phase 0 — Auth (blocks everything else)
+## Phase 0 — Auth (blocks everything else) — **shipped** (#50, #51)
 
 `User` model already exists (`email`, `password`, `role`), but there is no backend auth
 module at all — no `AuthModule`, no JWT. Login/Register forms on the client only validate
@@ -21,7 +21,10 @@ locally (`LoginForm.tsx`, `RegisterForm.tsx` — see PLACEHOLDER comments).
 
 Unblocks: reviews, watchlist, like/dislike, admin auth, Header notifications/avatar.
 
-## Phase 1 — Title: missing fields & endpoints
+## Phase 1 — Title: missing fields & endpoints — **shipped** (#52, #53)
+
+Landed as planned, plus `MediaAsset` extracted from `Title` and `hlsUrl` dropped;
+`CastCredit` folded into the Title module rather than kept as its own.
 
 `Title` currently has: `name, description, type, posterUrl, hlsUrl, transcodingStatus`.
 Add:
@@ -69,7 +72,14 @@ Endpoints:
 - `GET /titles?genre=` — genre filter (extend `GetAllTitleDto`)
 - IMDB-ranked sort — `sortBy=imdbScore` or a dedicated trending query param
 
-## Phase 2 — Score / Rating
+## Phase 2 — Score / Rating — **shipped** (#58, with phase 3)
+
+Landed as a separate `ExternalRating` row per source (IMDb / Rotten Tomatoes /
+Metacritic, backfilled from OMDb) rather than columns on `Title`, because the three
+sources refresh on their own cadence and a missing source has to be distinguishable
+from a zero. The Watchly score is not stored at all: it is the average of
+`TitleRating`, computed per request, since a title has few enough raters that a cached
+average would only be one more thing to drift.
 
 ```prisma
 model TitleScore {
@@ -85,7 +95,21 @@ model TitleScore {
 Or just plain fields on `Title` — simpler, recommended unless these need independent
 update cadences.
 
-## Phase 3 — Reviews / Comments (Title)
+## Phase 3 — Reviews / Comments (Title) — **shipped** (#58)
+
+Split in two rather than built as the `Review` below. A `Review` carrying both a score
+and text makes "I rated it, I have nothing to say" unexpressible, and leaves replies
+with a mostly-null score column. What shipped:
+
+- `TitleRating` — one row per (title, viewer), upserted. `GET/PUT/DELETE /title/:id/rating`.
+- `TitleComment` — text only, one level of threading (the column allows deeper, the
+  service refuses it). `GET/POST /title/:id/comments`, `GET /comments/:id/replies`.
+- `CommentReaction` / `CommentReport` — as the `Review*` models below, renamed.
+  `POST /comments/:id/reactions`, `POST /comments/:id/report`, `DELETE /comments/:id`.
+- `@OptionalAuth()` — the public reads still fill in the caller's own vote when a token
+  is present, instead of turning anonymous access into a 401.
+
+The shape below is kept for the record; the models it describes were not built.
 
 ```prisma
 model Review {
@@ -135,7 +159,37 @@ Endpoints:
 Unblocks `TitleReviews.tsx` + `CommentCard.tsx` (both have explicit PLACEHOLDER comments
 pointing here).
 
-## Phase 4 — Engagement (like/dislike/watchlist on Title)
+## Phase 4 — Engagement (like/dislike/watchlist on Title) — **shipped** (#60)
+
+Both models shipped with more than the sketch below carries: `title`/`user` relations
+with `onDelete: Cascade` on each, `createdAt`, and indexes. Neither addition is
+cosmetic — the cascade is why an orphaned watchlist row is a broken-database case
+rather than a routine one, and `@@index([userId, createdAt])` is what makes "newest
+addition first" cheap. `apps/api/prisma/schema.prisma` is the current shape.
+
+The endpoints diverged from the plan:
+
+| Planned                             | Shipped                            |
+| ----------------------------------- | ---------------------------------- |
+| `POST/DELETE /titles/:id/reaction`  | `POST/DELETE /title/:id/reaction`  |
+| `POST/DELETE /titles/:id/watchlist` | `POST/DELETE /title/:id/watchlist` |
+| `GET /users/me/watchlist`           | `GET /watchlist`                   |
+| `GET /titles/:id/stats`             | `GET /title/:id/engagement`        |
+
+`stats` was not dropped so much as moved and renamed. The counts and the viewer's own
+state ride on the title response itself, beside the rating block, so the detail page,
+every list and the watchlist page get them from a read they already make — title reads
+became `@OptionalAuth()` to carry it. `GET /title/:id/engagement` serves the same
+payload for the one case with no title read to piggyback on.
+
+The one planned field with no counterpart is `shares`: nothing tracks sharing, and the
+client's share button copies the link rather than reporting a number.
+
+Unblocked `StreamFilmInfo.tsx`, the "My Watchlist" row on Discover, the poster bookmark
+on `TitleCard`, and the `/watchlist` page (which did not exist).
+
+<details>
+<summary>The original plan, kept for the record — not what shipped</summary>
 
 ```prisma
 model TitleReaction {
@@ -157,13 +211,11 @@ model WatchlistItem {
 }
 ```
 
-Endpoints:
-
 - `POST /titles/:id/reaction`, `DELETE /titles/:id/reaction`
 - `POST /titles/:id/watchlist`, `DELETE /titles/:id/watchlist`, `GET /users/me/watchlist`
 - `GET /titles/:id/stats` — aggregate likes/dislikes/shares/watchlistCount
 
-Unblocks `StreamFilmInfo.tsx` and the "My Watchlist" row on Discover.
+</details>
 
 ## Phase 5 — Title photos
 

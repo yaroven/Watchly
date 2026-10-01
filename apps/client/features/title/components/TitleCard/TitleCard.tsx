@@ -1,44 +1,114 @@
 "use client";
 
+import { useSetTitleWatchlist } from "@/features/title-engagement";
 import { ExternalRatingSource, type Title } from "@/features/title/schemas/title";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
-import { Favorite as FavoriteIcon, Star as StarIcon } from "@mui/icons-material";
+import { BookmarkBorder as BookmarkBorderIcon, Bookmark as BookmarkIcon, Star as StarIcon } from "@mui/icons-material";
 import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
+import { APP } from "@shared/lib/routes";
+import { useViewer } from "@shared/lib/use-viewer";
 import Image from "next/image";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
 
-interface TitleProps extends Omit<Title, "seasons"> {
+/**
+ * Only the fields the card draws, so adding a column to `Title` cannot silently
+ * change this component's contract. Callers may still spread a whole Title.
+ */
+type TitleProps = Pick<Title, "id" | "name" | "posterUrl" | "type" | "genres" | "externalRatings" | "engagement"> & {
   onClick: () => void;
-  isFavorite?: boolean;
-}
+};
 
-export default function TitleCard({ name, posterUrl, type, genres, externalRatings, onClick, isFavorite = false }: TitleProps) {
+export default function TitleCard({ id, name, posterUrl, type, genres, externalRatings, engagement, onClick }: TitleProps) {
   const posterSrc = getOptimizedImageSrc(posterUrl);
   const subtitle = genres.length ? genres.map((genre) => genre.name).join(", ") : type === "MOVIE" ? "Movie" : "Series";
   const rating = externalRatings.find((r) => r.source === ExternalRatingSource.IMDB)?.rating;
 
-  const [favorite, setFavorite] = useState(isFavorite);
+  const router = useRouter();
+  const viewer = useViewer();
+  const setWatchlist = useSetTitleWatchlist(id);
+  // A tinted 12px icon is not feedback a touch user can read — there is no hover
+  // to reveal a tooltip, and the icon still shows the pre-click state. The banner
+  // below says what happened in words, over the poster, where the click was.
+  const failed = setWatchlist.isError;
+
+  // A null `viewer` on the payload means it was read without a session — server
+  // side, or during the boot exchange — so their own state is unknown, which is
+  // not the same as not saved. Rendering an empty bookmark for it would assert
+  // something false to anyone reading the page with assistive tech.
+  const saved = engagement.viewer?.inWatchlist ?? null;
+  const stateUnknown = viewer.status === "signed-in" && saved === null;
+
+  // Never `disabled`: a disabled button fires no click at all, and a bookmark
+  // that silently does nothing is indistinguishable from a broken one. An
+  // anonymous viewer is missing a session, so their click goes to the login page.
+  //
+  // The other two states still swallow it — the boot window, and viewer state we
+  // could not read. The label distinguishes them, but neither has anywhere to be
+  // routed to yet.
+  const toggleWatchlist = (event: { stopPropagation: () => void; preventDefault: () => void }) => {
+    event.stopPropagation();
+    event.preventDefault();
+    if (setWatchlist.isPending || viewer.status === "pending" || stateUnknown) return;
+    if (viewer.status === "anonymous") {
+      router.push(APP.LOGIN);
+      return;
+    }
+    setWatchlist.mutate(!saved);
+  };
+
+  const toggleLabel = failed
+    ? "Could not update your watchlist — try again"
+    : viewer.status === "pending"
+      ? "Watchlist — still signing you in"
+      : stateUnknown
+        ? "Watchlist — could not tell whether this is saved"
+        : viewer.status === "anonymous"
+          ? "Sign in to add to your watchlist"
+          : saved
+            ? "Remove from watchlist"
+            : "Add to watchlist";
 
   return (
+    // The card is not itself a button: it holds a second control (the watchlist
+    // toggle), and a button may not contain another interactive element — nesting
+    // one hides it from assistive tech and makes its focus order unreliable. The
+    // "open title" affordance is a sibling button stretched over the card instead.
     <Card
       variant="poster"
-      component="button"
-      type="button"
-      onClick={onClick}
-      aria-label={name}
       sx={{
         // Grows smoothly with the viewport instead of stepping, so a row of
         // cards never changes size all at once. 193 is the 1440-wide design.
+        position: "relative",
         width: "clamp(150px, 13vw, 260px)",
-        cursor: "pointer",
         display: "block",
         textAlign: "left",
-        font: "inherit",
-        "&:focus-visible": { outline: "2px solid", outlineColor: "primary.main", outlineOffset: 2 },
+        "&:has(.title-card-open:focus-visible)": {
+          outline: "2px solid",
+          outlineColor: "primary.main",
+          outlineOffset: 2,
+        },
       }}
     >
+      <Box
+        component="button"
+        type="button"
+        className="title-card-open"
+        onClick={onClick}
+        aria-label={name}
+        sx={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 1,
+          border: "none",
+          padding: 0,
+          background: "none",
+          cursor: "pointer",
+          font: "inherit",
+          "&:focus-visible": { outline: "none" },
+        }}
+      />
       <Box
         sx={{
           position: "relative",
@@ -83,12 +153,11 @@ export default function TitleCard({ name, posterUrl, type, genres, externalRatin
 
         <Box
           component="span"
-          role="button"
-          aria-label="Add to watchlist"
           sx={{
             position: "absolute",
             top: 0,
             right: 0,
+            zIndex: 2,
             width: 32,
             height: 32,
             borderBottomLeftRadius: "8px",
@@ -99,33 +168,60 @@ export default function TitleCard({ name, posterUrl, type, genres, externalRatin
           }}
         >
           <Box
-            component="span"
-            role="button"
-            aria-label="Add to watchlist"
+            component="button"
+            type="button"
+            aria-label={toggleLabel}
+            // Only claim a state we actually know — never while it is unknown.
+            aria-pressed={saved === null ? undefined : saved}
+            aria-busy={setWatchlist.isPending}
+            onClick={toggleWatchlist}
             sx={{
+              // Fills the notch: a smaller button would leave an inert strip of it
+              // sitting over the open-title overlay.
               position: "absolute",
-              top: 0,
-              right: 0,
-              width: 24,
-              height: 24,
+              inset: 0,
               // Same fill as the card frame, so the button reads as a notch
               // cut out of the poster rather than a chip floating on top of it.
               borderRadius: "8px",
+              border: "none",
+              padding: 0,
               bgcolor: "#ffffff1a",
+              cursor: viewer.status === "pending" || stateUnknown ? "default" : "pointer",
+              opacity: viewer.status === "anonymous" || stateUnknown ? 0.6 : 1,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <FavoriteIcon
-              sx={{ fontSize: "12px", color: favorite ? "primary.main" : "#ffffff" }}
-              onClick={(e) => {
-                e.stopPropagation();
-                setFavorite((value) => !value);
-              }}
-            />
+            {saved ? (
+              <BookmarkIcon sx={{ fontSize: "12px", color: failed ? "error.main" : "primary.main" }} />
+            ) : (
+              <BookmarkBorderIcon sx={{ fontSize: "12px", color: failed ? "error.main" : "#ffffff" }} />
+            )}
           </Box>
         </Box>
+
+        {failed && (
+          <Box
+            role="status"
+            sx={{
+              position: "absolute",
+              top: 32,
+              right: 0,
+              left: 0,
+              zIndex: 3,
+              px: "6px",
+              py: "4px",
+              bgcolor: "error.main",
+              color: "#ffffff",
+              fontSize: 10,
+              lineHeight: 1.3,
+              textAlign: "center",
+            }}
+          >
+            Could not save — tap to retry
+          </Box>
+        )}
 
         <Box
           sx={{

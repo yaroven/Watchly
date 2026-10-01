@@ -94,7 +94,7 @@ describe("TitleController", () => {
 
         const result = await controller.findAll(query, sort, filters);
 
-        expect(titleServiceMock.findAll).toHaveBeenCalledWith(query, sort, filters);
+        expect(titleServiceMock.findAll).toHaveBeenCalledWith(query, sort, filters, undefined);
         expect(result).toEqual(titlesResponse);
       });
     });
@@ -108,7 +108,7 @@ describe("TitleController", () => {
 
         const result = await controller.findOne("title-1");
 
-        expect(titleServiceMock.findOne).toHaveBeenCalledWith("title-1");
+        expect(titleServiceMock.findOne).toHaveBeenCalledWith("title-1", undefined);
         expect(result).toEqual(title);
       });
     });
@@ -131,9 +131,9 @@ describe("TitleController", () => {
         const updatedTitle = { id: "title-1", name: "New Title" };
         (titleServiceMock.update as jest.Mock).mockResolvedValue(updatedTitle);
 
-        const result = await controller.update("title-1", updateData as any);
+        const result = await controller.update("title-1", updateData as any, "admin-1");
 
-        expect(titleServiceMock.update).toHaveBeenCalledWith("title-1", updateData);
+        expect(titleServiceMock.update).toHaveBeenCalledWith("title-1", updateData, "admin-1");
         expect(result).toEqual(updatedTitle);
       });
     });

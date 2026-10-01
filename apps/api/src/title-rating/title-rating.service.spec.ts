@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from "@nestjs/common";
+import { NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { PrismaService } from "../prisma/prisma.service";
 import { TitleRatingService } from "./title-rating.service";
@@ -56,11 +56,11 @@ describe("TitleRatingService", () => {
       });
     });
 
-    describe("should throw BadRequestException", () => {
+    describe("should throw NotFoundException", () => {
       it("if the title does not exist", async () => {
         (prismaMock.title.findUnique as jest.Mock).mockResolvedValue(null);
 
-        await expect(service.set(titleId, userId, 8)).rejects.toThrow(BadRequestException);
+        await expect(service.set(titleId, userId, 8)).rejects.toThrow(NotFoundException);
         expect(prismaMock.titleRating.upsert).not.toHaveBeenCalled();
       });
     });
@@ -72,6 +72,20 @@ describe("TitleRatingService", () => {
         (prismaMock.titleRating.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
 
         await expect(service.remove(titleId, userId)).rejects.toThrow(NotFoundException);
+      });
+    });
+
+    describe("should delete only the viewer's own rating", () => {
+      // Prisma reads a missing `userId` in a `where` as "no filter", so a widened
+      // clause wipes every user's rating for the title and still answers 200.
+      it("so one person withdrawing a score cannot wipe everyone's", async () => {
+        (prismaMock.titleRating.deleteMany as jest.Mock).mockResolvedValue({ count: 1 });
+
+        await service.remove(titleId, userId);
+
+        expect(prismaMock.titleRating.deleteMany).toHaveBeenCalledWith({
+          where: { titleId, userId },
+        });
       });
     });
   });
@@ -89,7 +103,7 @@ describe("TitleRatingService", () => {
 
     describe("should report no personal score", () => {
       it("if the caller is anonymous, without querying for one", async () => {
-        const result = await service.summarize(titleId);
+        const result = await service.summarize(titleId, null);
 
         expect(result.myScore).toBeNull();
         expect(prismaMock.titleRating.findUnique).not.toHaveBeenCalled();
@@ -103,7 +117,7 @@ describe("TitleRatingService", () => {
           _count: { _all: 0 },
         });
 
-        const result = await service.summarize(titleId);
+        const result = await service.summarize(titleId, null);
 
         expect(result.average).toBeNull();
         expect(result.count).toBe(0);
@@ -130,6 +144,23 @@ describe("TitleRatingService", () => {
         const result = await service.summarizeMany([titleId]);
 
         expect(result.get(titleId)).toEqual({ average: 6.7, count: 3 });
+      });
+    });
+
+    describe("should answer for every id it was given", () => {
+      // groupBy only returns titles that have ratings. The caller treats a map
+      // miss as a broken invariant and throws, so an unrated title in a list
+      // would 500 the whole page if it were simply absent here.
+      it("including one nobody has rated", async () => {
+        const unratedId = "44444444-4444-4444-8444-444444444444";
+        (prismaMock.titleRating.groupBy as jest.Mock).mockResolvedValue([
+          { titleId, _avg: { score: 8 }, _count: { _all: 2 } },
+        ]);
+
+        const result = await service.summarizeMany([titleId, unratedId]);
+
+        expect(result.get(titleId)).toEqual({ average: 8, count: 2 });
+        expect(result.get(unratedId)).toEqual({ average: null, count: 0 });
       });
     });
   });
