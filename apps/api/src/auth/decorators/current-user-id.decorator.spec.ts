@@ -23,6 +23,20 @@ describe("CurrentUserId", () => {
     expect(error).toHaveBeenCalledWith(expect.stringContaining("DELETE /title/x/reaction"));
   });
 
+  // Same 500 either way; the log is the only thing that tells the two apart, and
+  // which one it is decides whether the fix is adding a guard or swapping the
+  // decorator. `viewer-pairing.spec.ts` is what stops this one reaching production.
+  it("should name the mispairing when the route turns out to be @OptionalAuth()", () => {
+    const error = jest.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
+
+    expect(() =>
+      readCurrentUserId(
+        contextFor({ method: "GET", url: "/title/x/rating", viewerScope: "optional" }),
+      ),
+    ).toThrow(InternalServerErrorException);
+    expect(error).toHaveBeenCalledWith(expect.stringContaining("@OptionalUserId()"));
+  });
+
   it("should not leak the internal reason to the caller", () => {
     jest.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
 

@@ -23,6 +23,7 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
     const validatedUser = super.handleRequest(err, user, info, context, status);
 
     const request = context.switchToHttp().getRequest<Request>();
+    request.viewerScope = "required";
     request.userId = (validatedUser as unknown as UserResponseDto).id;
     request.role = (validatedUser as UserResponseDto).role;
 
