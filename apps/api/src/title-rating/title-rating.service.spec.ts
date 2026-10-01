@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from "@nestjs/common";
+import { NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { PrismaService } from "../prisma/prisma.service";
 import { TitleRatingService } from "./title-rating.service";
@@ -56,11 +56,11 @@ describe("TitleRatingService", () => {
       });
     });
 
-    describe("should throw BadRequestException", () => {
+    describe("should throw NotFoundException", () => {
       it("if the title does not exist", async () => {
         (prismaMock.title.findUnique as jest.Mock).mockResolvedValue(null);
 
-        await expect(service.set(titleId, userId, 8)).rejects.toThrow(BadRequestException);
+        await expect(service.set(titleId, userId, 8)).rejects.toThrow(NotFoundException);
         expect(prismaMock.titleRating.upsert).not.toHaveBeenCalled();
       });
     });
@@ -72,6 +72,20 @@ describe("TitleRatingService", () => {
         (prismaMock.titleRating.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
 
         await expect(service.remove(titleId, userId)).rejects.toThrow(NotFoundException);
+      });
+    });
+
+    describe("should delete only the viewer's own rating", () => {
+      // Prisma reads a missing `userId` in a `where` as "no filter", so a widened
+      // clause wipes every user's rating for the title and still answers 200.
+      it("so one person withdrawing a score cannot wipe everyone's", async () => {
+        (prismaMock.titleRating.deleteMany as jest.Mock).mockResolvedValue({ count: 1 });
+
+        await service.remove(titleId, userId);
+
+        expect(prismaMock.titleRating.deleteMany).toHaveBeenCalledWith({
+          where: { titleId, userId },
+        });
       });
     });
   });

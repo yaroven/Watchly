@@ -4,9 +4,10 @@ import { useMemo } from "react";
 import { useAuthStore } from "./auth-store";
 
 /**
- * A cache-key dimension, mintable only here. Branded so a call site cannot pass a
- * bare string — `detailFor(id, "anonymous")` would compile and quietly share one
- * entry between viewers, and two positional strings can be swapped unnoticed.
+ * A cache-key dimension. The brand rejects a bare `string`, so
+ * `detailFor(id, "anonymous")` and swapped positional arguments stop compiling —
+ * which is the mistake worth catching. It does not make the type unforgeable:
+ * `"x" as ViewerKey` still compiles anywhere, and nothing lints for that.
  */
 export type ViewerKey = string & { readonly __viewerKey: unique symbol };
 
@@ -28,11 +29,9 @@ const ANONYMOUS_KEY = "anonymous" as ViewerKey;
 /**
  * Identity for cache keys of anything whose response depends on who is asking.
  *
- * `pending` and `anonymous` share a key on purpose: the request that goes out
- * during the boot exchange is itself anonymous, so it belongs in the anonymous
- * entry. The cost is one extra fetch per cold load once the key re-keys to the
- * viewer's id; blocking every title read on the session would delay first paint
- * for everyone instead.
+ * A cold load keys as anonymous until the refresh exchange produces an identity,
+ * then re-keys — one extra fetch, rather than blocking every title read on the
+ * session and delaying first paint for everyone.
  *
  * Title and title-engagement keys carry the viewer. Rating and comment keys do
  * **not** yet — `titleRatingKeys.detail` and `commentKeys.list` are shared across
@@ -44,8 +43,16 @@ export function useViewer(): Viewer {
   const status = useAuthStore((state) => state.status);
 
   return useMemo(() => {
-    if (status !== "resolved") return { status: "pending", viewerKey: ANONYMOUS_KEY };
-    if (!userId) return { status: "anonymous", viewerKey: ANONYMOUS_KEY };
-    return { status: "signed-in", viewerKey: userId as ViewerKey, userId };
+    // The key follows `userId`, not `status`. Restoring a session writes the
+    // identity and flips the status in two separate store updates, so there is a
+    // render where the token is already attached to outgoing requests while the
+    // status is still "loading" — keying that render as anonymous would file the
+    // viewer's own data under the shared key, which is the leak this type exists
+    // to prevent. `status` answers "may I decide yet", never "whose data is this".
+    const viewerKey = (userId ?? ANONYMOUS_KEY) as ViewerKey;
+
+    if (status !== "resolved") return { status: "pending", viewerKey };
+    if (!userId) return { status: "anonymous", viewerKey };
+    return { status: "signed-in", viewerKey, userId };
   }, [status, userId]);
 }

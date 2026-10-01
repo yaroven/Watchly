@@ -5,8 +5,9 @@ import { GetAllTitlesDto } from "../schemas/title";
  * `listsPrefix`, `listPrefix`, `detailsPrefix` and `detailPrefix` are for
  * invalidation only — a title response carries the viewer's own engagement, so a
  * key without a viewer in it would share one cache entry between viewers. The
- * names say so, and `listFor`/`detailFor` require a `ViewerKey` that only
- * `useViewer` can mint.
+ * names say so. A prefix is structurally still a valid `queryKey`, so the naming
+ * is the only thing marking the difference; the `ViewerKey` brand does enforce
+ * that a complete key cannot be built from a bare string.
  *
  * `stream` and `cast` deliberately hang off `all()` rather than the detail rung:
  * neither is viewer-dependent, and underneath `detail` every like and watchlist

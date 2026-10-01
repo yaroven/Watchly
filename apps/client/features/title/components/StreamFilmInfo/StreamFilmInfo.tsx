@@ -14,6 +14,7 @@ import Divider from "@mui/material/Divider";
 import Typography from "@mui/material/Typography";
 import { formatCount } from "@shared/lib/format-count";
 import { useViewer } from "@shared/lib/use-viewer";
+import Button from "@shared/ui/Button";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
@@ -24,7 +25,7 @@ interface StreamFilmInfoProps {
 }
 
 export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFilmInfoProps) {
-  const isSignedIn = useViewer().status === "signed-in";
+  const viewer = useViewer();
   const [expanded, setExpanded] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
   const shareTimer = useRef<number | undefined>(undefined);
@@ -35,14 +36,12 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
   // bearer from the auth store, which is empty there, and the refresh cookie is not
   // forwarded. So `title.engagement` seeds the public counts, and its `viewer` is
   // null by construction; only the client query can fill that in.
-  // `isError` only covers a first load that failed; once there has been one
-  // success React Query keeps serving that data and reports the failed refetch
-  // through `failureCount` instead. Stale viewer state is exactly as dangerous
-  // as missing viewer state here, so both count as unknown.
-  const { data: liveEngagement, isError: loadFailed, failureCount } = useTitleEngagement(title.id);
-  const engagementFailed = loadFailed || failureCount > 0;
+  // `isError` covers a failed refetch too: query-core sets `status: "error"`
+  // whether or not data is already held — that is what `isRefetchError` is
+  // derived from. Stale viewer state is as dangerous here as missing state.
+  const { data: liveEngagement, isError: engagementFailed, refetch } = useTitleEngagement(title.id);
   const engagement = liveEngagement ?? title.engagement;
-  const viewer = engagement.viewer;
+  const viewerEngagement = engagement.viewer;
 
   const react = useReactToTitle(title.id);
   const setWatchlist = useSetTitleWatchlist(title.id);
@@ -51,8 +50,10 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
   // Without trustworthy viewer state a toggle is a coin flip: the server toggles,
   // so clicking an un-lit thumb on behalf of someone who has already liked the
   // title would withdraw the like they meant to keep.
-  const viewerStateUnknown = isSignedIn && (viewer === null || engagementFailed);
-  const togglesDisabled = !isSignedIn || viewerStateUnknown;
+  // Three viewer states, three answers — flattening them to "signed in or not"
+  // is how a control ends up disabled for someone who is in fact signed in.
+  const viewerStateUnknown = viewer.status === "signed-in" && (viewerEngagement === null || engagementFailed);
+  const togglesDisabled = viewer.status !== "signed-in" || viewerStateUnknown;
 
   // The design shows a dislike toggle with no visible counter — only the
   // like count and the active/inactive colour change.
@@ -110,11 +111,11 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
           <Box
             component="button"
             type="button"
-            aria-label={viewer?.myReaction === ReactionType.LIKE ? "Remove like" : "Like"}
-            aria-pressed={viewer?.myReaction === ReactionType.LIKE}
+            aria-label={viewerEngagement?.myReaction === ReactionType.LIKE ? "Remove like" : "Like"}
+            aria-pressed={viewerEngagement?.myReaction === ReactionType.LIKE}
             disabled={togglesDisabled || react.isPending}
             onClick={() => handleReact(ReactionType.LIKE)}
-            sx={{ ...actionButtonSx, color: viewer?.myReaction === ReactionType.LIKE ? "primary.main" : "#ffffff" }}
+            sx={{ ...actionButtonSx, color: viewerEngagement?.myReaction === ReactionType.LIKE ? "primary.main" : "#ffffff" }}
           >
             <ThumbUpIcon sx={{ fontSize: "18px" }} />
             <Typography component="span" sx={{ fontSize: "13px" }}>
@@ -124,11 +125,11 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
           <Box
             component="button"
             type="button"
-            aria-label={viewer?.myReaction === ReactionType.DISLIKE ? "Remove dislike" : "Dislike"}
-            aria-pressed={viewer?.myReaction === ReactionType.DISLIKE}
+            aria-label={viewerEngagement?.myReaction === ReactionType.DISLIKE ? "Remove dislike" : "Dislike"}
+            aria-pressed={viewerEngagement?.myReaction === ReactionType.DISLIKE}
             disabled={togglesDisabled || react.isPending}
             onClick={() => handleReact(ReactionType.DISLIKE)}
-            sx={{ ...actionButtonSx, color: viewer?.myReaction === ReactionType.DISLIKE ? "primary.main" : "#ffffff" }}
+            sx={{ ...actionButtonSx, color: viewerEngagement?.myReaction === ReactionType.DISLIKE ? "primary.main" : "#ffffff" }}
           >
             <ThumbDownIcon sx={{ fontSize: "18px" }} />
           </Box>
@@ -171,9 +172,9 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
         <Box
           component="button"
           type="button"
-          aria-pressed={viewer?.inWatchlist ?? false}
+          aria-pressed={viewerEngagement?.inWatchlist ?? false}
           disabled={togglesDisabled || setWatchlist.isPending}
-          onClick={() => viewer && setWatchlist.mutate(!viewer.inWatchlist)}
+          onClick={() => viewerEngagement && setWatchlist.mutate(!viewerEngagement.inWatchlist)}
           sx={{
             display: "flex",
             alignItems: "center",
@@ -203,7 +204,7 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
           </Box>
           <Box sx={{ textAlign: "left" }}>
             <Typography sx={{ fontSize: "14px", fontWeight: 700, color: "#191919", lineHeight: 1.2 }}>
-              {viewer?.inWatchlist ? "In Watchlist" : "Add to Watchlist"}
+              {viewerEngagement?.inWatchlist ? "In Watchlist" : "Add to Watchlist"}
             </Typography>
             <Typography sx={{ fontSize: "11px", color: "#191919", opacity: 0.75, lineHeight: 1.2 }}>
               Added by {formatCount(engagement.watchlistCount)} {engagement.watchlistCount === 1 ? "User" : "Users"}
@@ -212,12 +213,26 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
         </Box>
       </Box>
 
-      {(writeError || engagementFailed) && (
-        <Alert severity="error" variant="outlined" sx={{ alignItems: "center" }}>
+      {/* `viewerStateUnknown` is true in a case where nothing failed: the read
+          succeeded and simply carried no viewer. Leaving it out of this condition
+          disabled every control with no explanation at all. */}
+      {(writeError || engagementFailed || viewerStateUnknown) && (
+        <Alert
+          severity="error"
+          variant="outlined"
+          sx={{ alignItems: "center" }}
+          action={
+            viewerStateUnknown || engagementFailed ? (
+              <Button variant="outlined" onClick={() => void refetch()} sx={{ paddingBlock: "4px", minHeight: "unset" }}>
+                Retry
+              </Button>
+            ) : undefined
+          }
+        >
           {writeError
             ? `Could not save that: ${writeError.message}`
             : viewerStateUnknown
-              ? "Could not load whether you have liked or saved this title, so the controls are disabled — the counts below may also be out of date."
+              ? "We could not tell whether you have liked or saved this title, so those controls are disabled. The counts below may also be out of date."
               : "Could not refresh the likes and watchlist counts for this title, so they may be out of date."}
         </Alert>
       )}
