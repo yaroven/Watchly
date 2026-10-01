@@ -72,7 +72,11 @@ describe("TitleService", () => {
             // Ratings are their own module; TitleService only asks it to fill
             // the Watchly score on a response.
             summarize: jest.fn().mockResolvedValue({ average: null, count: 0, myScore: null }),
-            summarizeMany: jest.fn().mockResolvedValue(new Map()),
+            summarizeMany: jest
+              .fn()
+              .mockImplementation((ids: string[]) =>
+                Promise.resolve(new Map(ids.map((id) => [id, { average: null, count: 0 }]))),
+              ),
           },
         },
         {
@@ -80,8 +84,15 @@ describe("TitleService", () => {
           useValue: {
             // Likewise its own module; TitleService only asks it to fill the
             // like/watchlist block on a response.
-            summarize: jest.fn().mockResolvedValue(new TitleEngagementDto({})),
-            summarizeMany: jest.fn().mockResolvedValue(new Map()),
+            summarize: jest.fn().mockResolvedValue(TitleEngagementDto.empty()),
+            // Total, like the real one: TitleService treats a miss as a broken
+            // invariant, so a mock that answers for nothing would make every
+            // list test fail for the wrong reason.
+            summarizeMany: jest
+              .fn()
+              .mockImplementation((ids: string[]) =>
+                Promise.resolve(new Map(ids.map((id) => [id, TitleEngagementDto.empty()]))),
+              ),
             findWatchlistTitleIds: jest.fn().mockResolvedValue({ titleIds: [], totalCount: 0 }),
           },
         },
@@ -371,7 +382,7 @@ describe("TitleService", () => {
       expect(engagementServiceMock.summarizeMany).toHaveBeenCalledWith(["title-a"], viewerId);
     });
 
-    it("should drop a title that no longer exists without inventing a row", async () => {
+    it("should drop a title that no longer exists, and not count it either", async () => {
       (engagementServiceMock.findWatchlistTitleIds as jest.Mock).mockResolvedValue({
         titleIds: ["title-a", "gone"],
         totalCount: 2,
@@ -383,6 +394,9 @@ describe("TitleService", () => {
       const result = await service.findWatchlist(viewerId, {});
 
       expect(result.items.map((item) => item.id)).toEqual(["title-a"]);
+      // A count that still includes the dropped row makes the pager advertise a
+      // page that renders short.
+      expect(result.totalCount).toBe(1);
     });
 
     it("should not query titles at all for an empty watchlist", async () => {

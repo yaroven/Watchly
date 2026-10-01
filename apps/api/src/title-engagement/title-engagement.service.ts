@@ -1,127 +1,131 @@
-import {
-  BadRequestException,
-  Injectable,
-  InternalServerErrorException,
-  UnauthorizedException,
-} from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { ReactionType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
-import { TitleEngagementCounts, TitleEngagementDto } from "./dto/response/title-engagement.dto";
+import {
+  TitleEngagementCounts,
+  TitleEngagementDto,
+  ViewerTitleEngagementDto,
+} from "./dto/response/title-engagement.dto";
 
 const EMPTY_COUNTS: TitleEngagementCounts = { likes: 0, dislikes: 0, watchlistCount: 0 };
 
-/// Prisma reads `undefined` in a `where` as "no filter", so an unset viewer would
-/// turn a delete of one person's row into a delete of everyone's.
-function assertViewer(userId: string | undefined): asserts userId is string {
-  if (!userId) throw new UnauthorizedException();
-}
+/** The slice of the client that both the service and a transaction expose. */
+type PrismaClientLike = Pick<PrismaService, "title" | "titleReaction" | "watchlistItem">;
 
 @Injectable()
 export class TitleEngagementService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async react(
-    titleId: string,
-    userId: string | undefined,
-    type: ReactionType,
-  ): Promise<TitleEngagementDto> {
-    assertViewer(userId);
-    await this.assertTitleExists(titleId);
+  /**
+   * Sending the vote already cast withdraws it; the other one switches sides.
+   *
+   * The delete's row count answers "had they already cast this exact vote?" with no
+   * separate read. The write and the summary read back from it share one transaction,
+   * so a failure cannot leave the previous vote deleted with nothing in its place, and
+   * the response can never describe a state that was not committed. Concurrent requests
+   * for the same vote resolve last-writer-wins.
+   */
+  async react(titleId: string, userId: string, type: ReactionType): Promise<TitleEngagementDto> {
+    return this.prisma.$transaction(async (tx) => {
+      await this.assertTitleExists(titleId, tx);
 
-    // The delete answers "had they already cast this exact vote?" without a
-    // separate read — its row count is the whole state machine. Both statements
-    // run in one transaction so a failing write cannot leave the viewer's
-    // previous vote deleted with nothing put back.
-    //
-    // Two *concurrent* clicks on the same vote still resolve last-writer-wins:
-    // one deletes, the other finds nothing to delete and re-inserts. That is a
-    // double-click, which the client prevents by disabling the control while
-    // the request is in flight; the guarantee here is only that no state is lost.
-    await this.prisma.$transaction(async (tx) => {
       const { count: withdrawn } = await tx.titleReaction.deleteMany({
         where: { titleId, userId, type },
       });
-      if (withdrawn > 0) return;
 
-      await tx.titleReaction.upsert({
-        where: { titleId_userId: { titleId, userId } },
-        create: { titleId, userId, type },
-        update: { type },
+      if (withdrawn === 0) {
+        await tx.titleReaction.upsert({
+          where: { titleId_userId: { titleId, userId } },
+          create: { titleId, userId, type },
+          update: { type },
+        });
+      }
+
+      return this.summarizeWith(tx, titleId, userId);
+    });
+  }
+
+  async removeReaction(titleId: string, userId: string): Promise<TitleEngagementDto> {
+    return this.prisma.$transaction(async (tx) => {
+      await this.assertTitleExists(titleId, tx);
+      await tx.titleReaction.deleteMany({ where: { titleId, userId } });
+      return this.summarizeWith(tx, titleId, userId);
+    });
+  }
+
+  async addToWatchlist(titleId: string, userId: string): Promise<TitleEngagementDto> {
+    return this.prisma.$transaction(async (tx) => {
+      await this.assertTitleExists(titleId, tx);
+
+      await tx.watchlistItem.upsert({
+        where: { userId_titleId: { userId, titleId } },
+        create: { userId, titleId },
+        update: {},
       });
+
+      return this.summarizeWith(tx, titleId, userId);
     });
-
-    return this.summarize(titleId, userId);
   }
 
-  async removeReaction(titleId: string, userId: string | undefined): Promise<TitleEngagementDto> {
-    assertViewer(userId);
-    await this.assertTitleExists(titleId);
-
-    await this.prisma.titleReaction.deleteMany({ where: { titleId, userId } });
-    return this.summarize(titleId, userId);
-  }
-
-  async addToWatchlist(titleId: string, userId: string | undefined): Promise<TitleEngagementDto> {
-    assertViewer(userId);
-    await this.assertTitleExists(titleId);
-
-    await this.prisma.watchlistItem.upsert({
-      where: { userId_titleId: { userId, titleId } },
-      create: { userId, titleId },
-      update: {},
+  async removeFromWatchlist(titleId: string, userId: string): Promise<TitleEngagementDto> {
+    return this.prisma.$transaction(async (tx) => {
+      await this.assertTitleExists(titleId, tx);
+      await tx.watchlistItem.deleteMany({ where: { userId, titleId } });
+      return this.summarizeWith(tx, titleId, userId);
     });
-
-    return this.summarize(titleId, userId);
   }
 
-  async removeFromWatchlist(
-    titleId: string,
-    userId: string | undefined,
-  ): Promise<TitleEngagementDto> {
-    assertViewer(userId);
-    await this.assertTitleExists(titleId);
-
-    await this.prisma.watchlistItem.deleteMany({ where: { userId, titleId } });
-    return this.summarize(titleId, userId);
-  }
-
-  async summarize(titleId: string, viewerId?: string): Promise<TitleEngagementDto> {
-    const summaries = await this.summarizeMany([titleId], viewerId);
-
-    const summary = summaries.get(titleId);
-    // summarizeMany answers for every id it is handed, so a miss means it stopped
-    // doing that. Better a 500 than a write that succeeded reporting itself as zeroes.
-    if (!summary) {
-      throw new InternalServerErrorException(`No engagement summary built for title ${titleId}`);
-    }
-    return summary;
+  /** `viewerId` is explicit even when there is none, so no caller omits it by accident. */
+  async summarize(titleId: string, viewerId: string | null): Promise<TitleEngagementDto> {
+    // Zeroes for an id that does not exist would be a plausible-looking answer to
+    // a question about nothing, and the write paths already 404 on it.
+    await this.assertTitleExists(titleId, this.prisma);
+    return this.summarizeWith(this.prisma, titleId, viewerId);
   }
 
   async summarizeMany(
     titleIds: string[],
-    viewerId?: string,
+    viewerId: string | null,
+  ): Promise<Map<string, TitleEngagementDto>> {
+    return this.summarizeManyWith(this.prisma, titleIds, viewerId);
+  }
+
+  private async summarizeWith(
+    client: PrismaClientLike,
+    titleId: string,
+    viewerId: string | null,
+  ): Promise<TitleEngagementDto> {
+    const summaries = await this.summarizeManyWith(client, [titleId], viewerId);
+    // summarizeManyWith builds one entry per requested id, so this cannot miss.
+    return summaries.get(titleId)!;
+  }
+
+  private async summarizeManyWith(
+    client: PrismaClientLike,
+    titleIds: string[],
+    viewerId: string | null,
   ): Promise<Map<string, TitleEngagementDto>> {
     if (titleIds.length === 0) return new Map();
 
     const [reactions, watchlisted, mine, myWatchlist] = await Promise.all([
-      this.prisma.titleReaction.groupBy({
+      client.titleReaction.groupBy({
         by: ["titleId", "type"],
         where: { titleId: { in: titleIds } },
         _count: { _all: true },
       }),
-      this.prisma.watchlistItem.groupBy({
+      client.watchlistItem.groupBy({
         by: ["titleId"],
         where: { titleId: { in: titleIds } },
         _count: { _all: true },
       }),
       viewerId
-        ? this.prisma.titleReaction.findMany({
+        ? client.titleReaction.findMany({
             where: { userId: viewerId, titleId: { in: titleIds } },
             select: { titleId: true, type: true },
           })
         : Promise.resolve<{ titleId: string; type: ReactionType }[]>([]),
       viewerId
-        ? this.prisma.watchlistItem.findMany({
+        ? client.watchlistItem.findMany({
             where: { userId: viewerId, titleId: { in: titleIds } },
             select: { titleId: true },
           })
@@ -149,14 +153,19 @@ export class TitleEngagementService {
     );
     const inWatchlist = new Set<string>(myWatchlist.map((row) => row.titleId));
 
+    // One entry per requested id, so no caller can mistake "no entry" for "no engagement".
     return new Map<string, TitleEngagementDto>(
       titleIds.map((titleId) => [
         titleId,
-        new TitleEngagementDto({
-          ...(counts.get(titleId) ?? EMPTY_COUNTS),
-          myReaction: myReactions.get(titleId) ?? null,
-          inWatchlist: inWatchlist.has(titleId),
-        }),
+        new TitleEngagementDto(
+          counts.get(titleId) ?? EMPTY_COUNTS,
+          viewerId
+            ? new ViewerTitleEngagementDto(
+                myReactions.get(titleId) ?? null,
+                inWatchlist.has(titleId),
+              )
+            : null,
+        ),
       ]),
     );
   }
@@ -179,11 +188,9 @@ export class TitleEngagementService {
     return { titleIds: items.map((item) => item.titleId), totalCount };
   }
 
-  private async assertTitleExists(titleId: string) {
-    const title = await this.prisma.title.findUnique({
-      where: { id: titleId },
-      select: { id: true },
-    });
-    if (!title) throw new BadRequestException(`Title with id ${titleId} not found`);
+  private async assertTitleExists(titleId: string, client: PrismaClientLike) {
+    const title = await client.title.findUnique({ where: { id: titleId }, select: { id: true } });
+    // 404, matching GET /title/:id — the request is well-formed, the resource is gone.
+    if (!title) throw new NotFoundException(`Title with id ${titleId} not found`);
   }
 }

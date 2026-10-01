@@ -1,5 +1,5 @@
 import { authStore } from "@shared/lib/auth-store";
-import { decodeAccessToken } from "@shared/lib/decode-jwt";
+import { decodeAccessToken, isAccessTokenExpired } from "@shared/lib/decode-jwt";
 import { APP } from "@shared/lib/routes";
 import axios from "axios";
 import { toApiError } from "./api-error";
@@ -15,9 +15,29 @@ const api = axios.create({
   withCredentials: true,
 });
 
-api.interceptors.request.use((config) => {
+api.interceptors.request.use(async (config) => {
   const token = authStore.getState().token;
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (!token) return config;
+
+  const isRefreshCall = typeof config.url === "string" && config.url.includes("/auth/refresh");
+  if (isRefreshCall || !isAccessTokenExpired(token)) {
+    config.headers.Authorization = `Bearer ${token}`;
+    return config;
+  }
+
+  // Refresh before sending rather than after being refused. Public reads are
+  // `@OptionalAuth()`: an expired token there answers 200-anonymous, so the
+  // viewer's own likes and watchlist would quietly read as empty and no 401
+  // would ever arrive to trigger the response interceptor.
+  try {
+    config.headers.Authorization = `Bearer ${await getOrRefreshAccessToken()}`;
+  } catch {
+    // The session is gone. Send the request anonymously instead of redirecting:
+    // the caller may well be a public read, and the response interceptor still
+    // handles the 401 for anything that genuinely needs the identity.
+    authStore.getState().clear();
+    delete config.headers.Authorization;
+  }
   return config;
 });
 

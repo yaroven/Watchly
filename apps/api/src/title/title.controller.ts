@@ -10,7 +10,6 @@ import {
   Post,
   Put,
   Query,
-  Req,
 } from "@nestjs/common";
 import {
   ApiCreatedResponse,
@@ -21,7 +20,7 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
-import type { Request } from "express";
+import { CurrentUserId, OptionalUserId } from "../auth/decorators/current-user-id.decorator";
 import { OptionalAuth } from "../auth/decorators/optional-auth.decorator";
 import { AdminOnly } from "../auth/decorators/roles.decorator";
 import { CompleteMultipartUploadDto } from "../common/dto/request/complete-multipart-upload.dto";
@@ -88,9 +87,9 @@ export class TitleController {
       "genres",
     ])
     filters?: Filter[],
-    @Req() request?: Request,
+    @OptionalUserId() userId?: string,
   ) {
-    return this.titleService.findAll(query, sort, filters, request?.userId);
+    return this.titleService.findAll(query, sort, filters, userId);
   }
 
   @ApiOperation({ summary: "Get a title by id" })
@@ -99,7 +98,7 @@ export class TitleController {
   @ApiNotFoundResponse({ description: "Title not found" })
   @OptionalAuth()
   @Get(":id")
-  async findOne(@Param("id", ParseUUIDPipe) id: string, @Req() { userId }: Request) {
+  async findOne(@Param("id", ParseUUIDPipe) id: string, @OptionalUserId() userId?: string) {
     const title = await this.titleService.findOne(id, userId);
 
     if (!title) throw new NotFoundException(`Title with id ${id} not found`);
@@ -113,8 +112,14 @@ export class TitleController {
   @ApiNotFoundResponse({ description: "Title not found" })
   @AdminOnly()
   @Patch(":id")
-  async update(@Param("id", ParseUUIDPipe) id: string, @Body() data: UpdateTitleDto) {
-    return this.titleService.update(id, data);
+  async update(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() data: UpdateTitleDto,
+    @CurrentUserId() userId: string,
+  ) {
+    // The viewer goes through so the echoed engagement block is this admin's own
+    // state rather than a confident "you have not liked or saved this".
+    return this.titleService.update(id, data, userId);
   }
 
   @ApiOperation({ summary: "Start a multipart upload for the raw movie file" })

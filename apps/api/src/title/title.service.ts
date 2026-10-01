@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
 import { ExternalRatings, Genre, Prisma, Title, TitleType } from "@prisma/client";
 import { FilterRule } from "../common/pagination/filter-rule.enum";
 import { paginate } from "../common/pagination/paginate.util";
@@ -20,8 +26,6 @@ import { CastCreditInputDto } from "./dto/request/set-title-cast.dto";
 import { UpdateTitleDto } from "./dto/request/update-title.dto";
 import { CastCreditResponseDto } from "./dto/response/cast-credit-response.dto";
 import { TitleResponseDto } from "./dto/response/title-response.dto";
-
-const EMPTY_RATING = { average: null, count: 0 };
 
 @Injectable()
 export class TitleService {
@@ -49,7 +53,7 @@ export class TitleService {
         include: { genres: true, externalRatings: true },
       });
       // A title created a moment ago has no raters and no reactions yet.
-      return new TitleResponseDto(title, EMPTY_RATING, new TitleEngagementDto({}));
+      return new TitleResponseDto(title, { average: null, count: 0 }, TitleEngagementDto.empty());
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
         throw new BadRequestException("One or more genreIds do not exist");
@@ -91,18 +95,11 @@ export class TitleService {
     const ids = items.map((title) => title.id);
     const [ratings, engagement] = await Promise.all([
       this.titleRatingService.summarizeMany(ids),
-      this.titleEngagementService.summarizeMany(ids, viewerId),
+      this.titleEngagementService.summarizeMany(ids, viewerId ?? null),
     ]);
 
     return {
-      items: items.map(
-        (title) =>
-          new TitleResponseDto(
-            title,
-            ratings.get(title.id) ?? EMPTY_RATING,
-            engagement.get(title.id) ?? new TitleEngagementDto({}),
-          ),
-      ),
+      items: items.map((title) => this.toResponse(title, ratings, engagement)),
       totalCount,
     };
   }
@@ -112,7 +109,7 @@ export class TitleService {
   /// finds convenient, so the rows are re-sorted back onto `titleIds` below.
   async findWatchlist(
     viewerId: string,
-    { page = 1, limit = 10 }: GetAllTitleDto,
+    { page = 1, limit = 10 }: { page?: number; limit?: number },
   ): Promise<{ items: TitleResponseDto[]; totalCount: number }> {
     const { titleIds, totalCount } = await this.titleEngagementService.findWatchlistTitleIds(
       viewerId,
@@ -132,10 +129,10 @@ export class TitleService {
     const byId = new Map(titles.map((title) => [title.id, title]));
 
     // Unreachable while the FK cascade holds: a deleted title takes its watchlist
-    // rows with it. If it ever fires the database is inconsistent, and a silently
-    // short page with an unchanged totalCount is the worst way to find that out.
-    if (titles.length !== titleIds.length) {
-      const missing = titleIds.filter((id) => !byId.has(id));
+    // rows with it. If it ever fires the database is inconsistent — drop the rows
+    // from the count as well, or the pager advertises pages that render short.
+    const missing = titleIds.filter((id) => !byId.has(id));
+    if (missing.length > 0) {
       this.logger.error(
         `Watchlist of user ${viewerId} references titles that no longer exist: ${missing.join(", ")}`,
       );
@@ -145,15 +142,8 @@ export class TitleService {
       items: titleIds
         .map((id) => byId.get(id))
         .filter((title): title is (typeof titles)[number] => Boolean(title))
-        .map(
-          (title) =>
-            new TitleResponseDto(
-              title,
-              ratings.get(title.id) ?? EMPTY_RATING,
-              engagement.get(title.id) ?? new TitleEngagementDto({}),
-            ),
-        ),
-      totalCount,
+        .map((title) => this.toResponse(title, ratings, engagement)),
+      totalCount: totalCount - missing.length,
     };
   }
 
@@ -166,12 +156,12 @@ export class TitleService {
 
     const [{ average, count }, engagement] = await Promise.all([
       this.titleRatingService.summarize(id),
-      this.titleEngagementService.summarize(id, viewerId),
+      this.titleEngagementService.summarize(id, viewerId ?? null),
     ]);
     return new TitleResponseDto(title, { average, count }, engagement);
   }
 
-  async update(id: string, data: UpdateTitleDto): Promise<TitleResponseDto> {
+  async update(id: string, data: UpdateTitleDto, viewerId?: string): Promise<TitleResponseDto> {
     const title = await this.findOne(id);
     if (!title) {
       throw new BadRequestException(`Title with id ${id} not found`);
@@ -200,7 +190,7 @@ export class TitleService {
 
       const [rating, engagement] = await Promise.all([
         this.titleRatingService.summarize(id),
-        this.titleEngagementService.summarize(id),
+        this.titleEngagementService.summarize(id, viewerId ?? null),
       ]);
       return new TitleResponseDto(updated, rating, engagement);
     } catch (error) {
@@ -294,7 +284,7 @@ export class TitleService {
     ]);
 
     // The row is gone and its ratings/reactions/watchlist entries cascaded with it.
-    return new TitleResponseDto(deleted, EMPTY_RATING, new TitleEngagementDto({}));
+    return new TitleResponseDto(deleted, { average: null, count: 0 }, TitleEngagementDto.empty());
   }
 
   async getCast(id: string): Promise<CastCreditResponseDto[]> {
@@ -338,5 +328,23 @@ export class TitleService {
     }
 
     return this.getCast(id);
+  }
+
+  /**
+   * Both aggregate maps answer for every id they were given, so a miss here is a
+   * broken invariant rather than "nothing to report" — serialising it as zeroes
+   * would be indistinguishable from a title nobody has touched.
+   */
+  private toResponse(
+    title: Title & { genres: Genre[]; externalRatings: ExternalRatings[] },
+    ratings: Map<string, { average: number | null; count: number }>,
+    engagement: Map<string, TitleEngagementDto>,
+  ): TitleResponseDto {
+    const rating = ratings.get(title.id);
+    const titleEngagement = engagement.get(title.id);
+    if (!rating || !titleEngagement) {
+      throw new InternalServerErrorException(`No aggregates were built for title ${title.id}`);
+    }
+    return new TitleResponseDto(title, rating, titleEngagement);
   }
 }

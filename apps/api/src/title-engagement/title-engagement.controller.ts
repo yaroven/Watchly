@@ -8,11 +8,17 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
-  Req,
 } from "@nestjs/common";
-import { ApiOkResponse, ApiOperation, ApiParam, ApiTags } from "@nestjs/swagger";
-import type { Request } from "express";
+import {
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from "@nestjs/swagger";
 import { Auth } from "../auth/decorators/auth.decorator";
+import { CurrentUserId, OptionalUserId } from "../auth/decorators/current-user-id.decorator";
 import { OptionalAuth } from "../auth/decorators/optional-auth.decorator";
 import { ReactToTitleDto } from "./dto/request/react-to-title.dto";
 import { TitleEngagementDto } from "./dto/response/title-engagement.dto";
@@ -30,10 +36,11 @@ export class TitleEngagementController {
   })
   @ApiParam({ name: "id", format: "uuid" })
   @ApiOkResponse({ type: TitleEngagementDto })
+  @ApiNotFoundResponse({ description: "Title not found" })
   @OptionalAuth()
   @Get("engagement")
-  get(@Param("id", ParseUUIDPipe) id: string, @Req() { userId }: Request) {
-    return this.engagement.summarize(id, userId);
+  get(@Param("id", ParseUUIDPipe) id: string, @OptionalUserId() userId?: string) {
+    return this.engagement.summarize(id, userId ?? null);
   }
 
   @ApiOperation({
@@ -42,13 +49,15 @@ export class TitleEngagementController {
   })
   @ApiParam({ name: "id", format: "uuid" })
   @ApiOkResponse({ type: TitleEngagementDto })
+  @ApiUnauthorizedResponse({ description: "Not signed in" })
+  @ApiNotFoundResponse({ description: "Title not found" })
   @Auth()
   @HttpCode(HttpStatus.OK)
   @Post("reaction")
   react(
     @Param("id", ParseUUIDPipe) id: string,
     @Body() { type }: ReactToTitleDto,
-    @Req() { userId }: Request,
+    @CurrentUserId() userId: string,
   ) {
     return this.engagement.react(id, userId, type);
   }
@@ -56,28 +65,34 @@ export class TitleEngagementController {
   @ApiOperation({ summary: "Withdraw your vote on a title" })
   @ApiParam({ name: "id", format: "uuid" })
   @ApiOkResponse({ type: TitleEngagementDto })
+  @ApiUnauthorizedResponse({ description: "Not signed in" })
+  @ApiNotFoundResponse({ description: "Title not found" })
   @Auth()
   @Delete("reaction")
-  removeReaction(@Param("id", ParseUUIDPipe) id: string, @Req() { userId }: Request) {
+  removeReaction(@Param("id", ParseUUIDPipe) id: string, @CurrentUserId() userId: string) {
     return this.engagement.removeReaction(id, userId);
   }
 
   @ApiOperation({ summary: "Put a title on your watchlist" })
   @ApiParam({ name: "id", format: "uuid" })
   @ApiOkResponse({ type: TitleEngagementDto })
+  @ApiUnauthorizedResponse({ description: "Not signed in" })
+  @ApiNotFoundResponse({ description: "Title not found" })
   @Auth()
   @HttpCode(HttpStatus.OK)
   @Post("watchlist")
-  addToWatchlist(@Param("id", ParseUUIDPipe) id: string, @Req() { userId }: Request) {
+  addToWatchlist(@Param("id", ParseUUIDPipe) id: string, @CurrentUserId() userId: string) {
     return this.engagement.addToWatchlist(id, userId);
   }
 
   @ApiOperation({ summary: "Take a title off your watchlist" })
   @ApiParam({ name: "id", format: "uuid" })
   @ApiOkResponse({ type: TitleEngagementDto })
+  @ApiUnauthorizedResponse({ description: "Not signed in" })
+  @ApiNotFoundResponse({ description: "Title not found" })
   @Auth()
   @Delete("watchlist")
-  removeFromWatchlist(@Param("id", ParseUUIDPipe) id: string, @Req() { userId }: Request) {
+  removeFromWatchlist(@Param("id", ParseUUIDPipe) id: string, @CurrentUserId() userId: string) {
     return this.engagement.removeFromWatchlist(id, userId);
   }
 }

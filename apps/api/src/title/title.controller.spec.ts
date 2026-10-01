@@ -106,7 +106,7 @@ describe("TitleController", () => {
         const title = { id: "title-1" };
         (titleServiceMock.findOne as jest.Mock).mockResolvedValue(title);
 
-        const result = await controller.findOne("title-1", {} as never);
+        const result = await controller.findOne("title-1");
 
         expect(titleServiceMock.findOne).toHaveBeenCalledWith("title-1", undefined);
         expect(result).toEqual(title);
@@ -117,7 +117,7 @@ describe("TitleController", () => {
       it("if the title does not exist", async () => {
         (titleServiceMock.findOne as jest.Mock).mockResolvedValue(null);
 
-        const action = controller.findOne("non-existent", {} as never);
+        const action = controller.findOne("non-existent");
 
         await expect(action).rejects.toThrow(NotFoundException);
       });
@@ -131,9 +131,9 @@ describe("TitleController", () => {
         const updatedTitle = { id: "title-1", name: "New Title" };
         (titleServiceMock.update as jest.Mock).mockResolvedValue(updatedTitle);
 
-        const result = await controller.update("title-1", updateData as any);
+        const result = await controller.update("title-1", updateData as any, "admin-1");
 
-        expect(titleServiceMock.update).toHaveBeenCalledWith("title-1", updateData);
+        expect(titleServiceMock.update).toHaveBeenCalledWith("title-1", updateData, "admin-1");
         expect(result).toEqual(updatedTitle);
       });
     });
