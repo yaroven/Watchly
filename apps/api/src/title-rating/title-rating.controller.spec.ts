@@ -71,6 +71,7 @@ describe("TitleRatingController (viewer propagation)", () => {
 
     await request(app.getHttpServer()).get(`/title/${titleId}/rating`).expect(200);
 
-    expect(rating.summarize).toHaveBeenCalledWith(titleId, undefined);
+    // `null`, matching the engagement controller: "no viewer" is stated, not defaulted.
+    expect(rating.summarize).toHaveBeenCalledWith(titleId, null);
   });
 });

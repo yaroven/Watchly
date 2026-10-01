@@ -72,10 +72,12 @@ arrive to trigger a retry. Two invariants there, both of which were violated onc
 
 - Only a **401 from `/auth/refresh`** clears the session. A timeout, a 5xx or a 429 must
   not — clearing on any failure signs a viewer out over a dropped packet.
-- A refresh that fails, and a token minted moments ago that already reads expired, both
-  pause the pre-emptive path for a while — time-boxed, not a latch. A permanent kill
-  switch has nothing to recover into, because the 401 that would trigger the reactive
-  path never arrives on these routes.
+- A failed refresh pauses the pre-emptive path for a bounded window, and the window
+  pauses the reactive retry too. While it is open the viewer reads as signed-out on
+  public routes — bounded, not removed, so keep the windows short.
+- Expiry is measured against the server's `Date` header, not this device's clock. A
+  machine an hour fast would otherwise read every token as expired and refresh on every
+  request forever.
 
 ## Placeholder data
 
