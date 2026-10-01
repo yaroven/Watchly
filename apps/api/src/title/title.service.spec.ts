@@ -1,4 +1,4 @@
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { AgeRating, Prisma, TitleType } from "@prisma/client";
 import { FilterRule } from "../common/pagination/filter-rule.enum";
@@ -84,14 +84,14 @@ describe("TitleService", () => {
           useValue: {
             // Likewise its own module; TitleService only asks it to fill the
             // like/watchlist block on a response.
-            summarize: jest.fn().mockResolvedValue(TitleEngagementDto.empty()),
+            summarize: jest.fn().mockResolvedValue(TitleEngagementDto.empty(null)),
             // Total, like the real one: TitleService treats a miss as a broken
             // invariant, so a mock that answers for nothing would make every
             // list test fail for the wrong reason.
             summarizeMany: jest
               .fn()
               .mockImplementation((ids: string[]) =>
-                Promise.resolve(new Map(ids.map((id) => [id, TitleEngagementDto.empty()]))),
+                Promise.resolve(new Map(ids.map((id) => [id, TitleEngagementDto.empty(null)]))),
               ),
             findWatchlistTitleIds: jest.fn().mockResolvedValue({ titleIds: [], totalCount: 0 }),
           },
@@ -440,13 +440,13 @@ describe("TitleService", () => {
   });
 
   describe("update", () => {
-    describe("should throw BadRequestException", () => {
+    describe("should throw NotFoundException", () => {
       it("if the title does not exist", async () => {
         (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(null);
 
         const action = service.update("non-existent", { name: "New Name" } as any);
 
-        await expect(action).rejects.toThrow(BadRequestException);
+        await expect(action).rejects.toThrow(NotFoundException);
       });
 
       it("if the poster url is an external, non-managed url", async () => {
@@ -525,13 +525,13 @@ describe("TitleService", () => {
       });
     });
 
-    describe("should throw BadRequestException", () => {
+    describe("should throw NotFoundException", () => {
       it("if the title does not exist", async () => {
         (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(null);
 
         const action = service.startMovieUpload("non-existent", 1000);
 
-        await expect(action).rejects.toThrow(BadRequestException);
+        await expect(action).rejects.toThrow(NotFoundException);
       });
     });
   });
@@ -556,13 +556,13 @@ describe("TitleService", () => {
       });
     });
 
-    describe("should throw BadRequestException", () => {
+    describe("should throw NotFoundException", () => {
       it("if the title does not exist", async () => {
         (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(null);
 
         const action = service.completeMovieUpload("non-existent", "upload-1", []);
 
-        await expect(action).rejects.toThrow(BadRequestException);
+        await expect(action).rejects.toThrow(NotFoundException);
       });
     });
   });
@@ -622,13 +622,13 @@ describe("TitleService", () => {
       });
     });
 
-    describe("should throw BadRequestException", () => {
+    describe("should throw NotFoundException", () => {
       it("if the title does not exist", async () => {
         (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(null);
 
         const action = service.transcode("non-existent");
 
-        await expect(action).rejects.toThrow(BadRequestException);
+        await expect(action).rejects.toThrow(NotFoundException);
       });
     });
   });
@@ -736,25 +736,25 @@ describe("TitleService", () => {
       });
     });
 
-    describe("should throw BadRequestException", () => {
+    describe("should throw NotFoundException", () => {
       it("if the title does not exist", async () => {
         (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(null);
 
         const action = service.delete("non-existent");
 
-        await expect(action).rejects.toThrow(BadRequestException);
+        await expect(action).rejects.toThrow(NotFoundException);
       });
     });
   });
 
   describe("getCast", () => {
-    describe("should throw BadRequestException", () => {
+    describe("should throw NotFoundException", () => {
       it("if the title does not exist", async () => {
         (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(null);
 
         const action = service.getCast("non-existent");
 
-        await expect(action).rejects.toThrow(BadRequestException);
+        await expect(action).rejects.toThrow(NotFoundException);
       });
     });
 
@@ -789,13 +789,13 @@ describe("TitleService", () => {
   });
 
   describe("setCast", () => {
-    describe("should throw BadRequestException", () => {
+    describe("should throw NotFoundException", () => {
       it("if the title does not exist", async () => {
         (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(null);
 
         const action = service.setCast("non-existent", [{ artistId: "artist-1" }]);
 
-        await expect(action).rejects.toThrow(BadRequestException);
+        await expect(action).rejects.toThrow(NotFoundException);
       });
 
       it("if one or more artistId values do not exist, instead of the raw Prisma error", async () => {

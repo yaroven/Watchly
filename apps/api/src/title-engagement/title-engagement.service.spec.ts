@@ -124,6 +124,21 @@ describe("TitleEngagementService", () => {
       expect(prismaMock.titleReaction.upsert).not.toHaveBeenCalled();
     });
 
+    it("should use one transaction, so the write and its read-back cannot be split apart", async () => {
+      await service.react(titleId, userId, ReactionType.LIKE);
+
+      // Two sequential transactions would satisfy "never on the base client"
+      // while letting the delete commit and the upsert fail after it.
+      expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it("should read the summary back from inside the same transaction", async () => {
+      await service.react(titleId, userId, ReactionType.LIKE);
+
+      expect(txMock.titleReaction.groupBy).toHaveBeenCalled();
+      expect(prismaMock.titleReaction.groupBy).not.toHaveBeenCalled();
+    });
+
     it("should reject, committing nothing, when the write fails", async () => {
       txMock.titleReaction.upsert.mockRejectedValue(new Error("deadlock"));
 
@@ -197,14 +212,18 @@ describe("TitleEngagementService", () => {
 
       const result = await service.findWatchlistTitleIds(userId, { page: 2, limit: 5 });
 
+      // Filtered through `title` so the page and the count cannot disagree.
       expect(prismaMock.watchlistItem.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { userId },
+          where: { userId, title: { is: {} } },
           orderBy: { createdAt: "desc" },
           skip: 5,
           take: 5,
         }),
       );
+      expect(prismaMock.watchlistItem.count).toHaveBeenCalledWith({
+        where: { userId, title: { is: {} } },
+      });
       expect(result).toEqual({ titleIds: [otherTitleId, titleId], totalCount: 2 });
     });
   });
@@ -258,6 +277,31 @@ describe("TitleEngagementService", () => {
       expect(result.get(titleId)?.viewer).toBeNull();
       expect(prismaMock.titleReaction.findMany).not.toHaveBeenCalled();
       expect(prismaMock.watchlistItem.findMany).not.toHaveBeenCalled();
+    });
+
+    it("should answer for every id in the batch, not just the first", async () => {
+      // The list and watchlist pages read through here. Answering for a subset
+      // would leave the rest looking like "we did not ask", which the client
+      // renders as unknown and disables.
+      prismaMock.titleReaction.groupBy.mockResolvedValue([
+        { titleId: otherTitleId, type: ReactionType.LIKE, _count: { _all: 4 } },
+      ]);
+      prismaMock.watchlistItem.groupBy.mockResolvedValue([
+        { titleId: otherTitleId, _count: { _all: 1 } },
+      ]);
+
+      const result = await service.summarizeMany([titleId, otherTitleId], null);
+
+      expect([...result.keys()]).toEqual([titleId, otherTitleId]);
+      // The id with no rows still gets a zeroed entry rather than being dropped.
+      expect(result.get(titleId)).toEqual({
+        likes: 0,
+        dislikes: 0,
+        watchlistCount: 0,
+        viewer: null,
+      });
+      expect(result.get(otherTitleId)?.likes).toBe(4);
+      expect(result.get(otherTitleId)?.watchlistCount).toBe(1);
     });
 
     it("should skip the database entirely for an empty list", async () => {

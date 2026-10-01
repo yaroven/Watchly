@@ -24,7 +24,7 @@ interface StreamFilmInfoProps {
 }
 
 export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFilmInfoProps) {
-  const { isSignedIn } = useViewer();
+  const isSignedIn = useViewer().status === "signed-in";
   const [expanded, setExpanded] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
   const shareTimer = useRef<number | undefined>(undefined);
@@ -35,7 +35,12 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
   // bearer from the auth store, which is empty there, and the refresh cookie is not
   // forwarded. So `title.engagement` seeds the public counts, and its `viewer` is
   // null by construction; only the client query can fill that in.
-  const { data: liveEngagement, isError: engagementFailed } = useTitleEngagement(title.id);
+  // `isError` only covers a first load that failed; once there has been one
+  // success React Query keeps serving that data and reports the failed refetch
+  // through `failureCount` instead. Stale viewer state is exactly as dangerous
+  // as missing viewer state here, so both count as unknown.
+  const { data: liveEngagement, isError: loadFailed, failureCount } = useTitleEngagement(title.id);
+  const engagementFailed = loadFailed || failureCount > 0;
   const engagement = liveEngagement ?? title.engagement;
   const viewer = engagement.viewer;
 
@@ -43,10 +48,10 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
   const setWatchlist = useSetTitleWatchlist(title.id);
   const writeError = react.error ?? setWatchlist.error;
 
-  // Without the viewer's own state a toggle is a coin flip: the server toggles,
+  // Without trustworthy viewer state a toggle is a coin flip: the server toggles,
   // so clicking an un-lit thumb on behalf of someone who has already liked the
   // title would withdraw the like they meant to keep.
-  const viewerStateUnknown = isSignedIn && viewer === null;
+  const viewerStateUnknown = isSignedIn && (viewer === null || engagementFailed);
   const togglesDisabled = !isSignedIn || viewerStateUnknown;
 
   // The design shows a dislike toggle with no visible counter — only the
@@ -211,7 +216,9 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
         <Alert severity="error" variant="outlined" sx={{ alignItems: "center" }}>
           {writeError
             ? `Could not save that: ${writeError.message}`
-            : "Could not load whether you have liked or saved this title, so the controls are disabled — the counts below may also be out of date."}
+            : viewerStateUnknown
+              ? "Could not load whether you have liked or saved this title, so the controls are disabled — the counts below may also be out of date."
+              : "Could not refresh the likes and watchlist counts for this title, so they may be out of date."}
         </Alert>
       )}
 

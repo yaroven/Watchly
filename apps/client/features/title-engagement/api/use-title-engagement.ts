@@ -11,13 +11,13 @@ const useTitleEngagement = (
   // Two separate hazards: the key carries the viewer so one person's vote is never
   // served to another, and the fetch waits for the session so the boot window does
   // not fill the anonymous entry on a signed-in viewer's behalf.
-  const { viewerKey, sessionReady } = useViewer();
+  const viewer = useViewer();
 
   return useQuery({
-    queryKey: titleEngagementKeys.detail(titleId, viewerKey),
+    queryKey: titleEngagementKeys.detail(titleId, viewer.viewerKey),
     queryFn: () => titleEngagementService.get(titleId),
     ...options,
-    enabled: sessionReady && (options?.enabled ?? true),
+    enabled: viewer.status !== "pending" && (options?.enabled ?? true),
   });
 };
 

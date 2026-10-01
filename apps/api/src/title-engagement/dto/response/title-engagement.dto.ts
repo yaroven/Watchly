@@ -47,8 +47,12 @@ export class TitleEngagementDto {
     this.viewer = viewer;
   }
 
-  /** For a title that provably has no engagement — one just created, or just deleted. */
-  static empty(viewer: ViewerTitleEngagementDto | null = null): TitleEngagementDto {
+  /**
+   * For a title that provably has no engagement — one just created, or just
+   * deleted. `viewer` is required: null here means "we did not ask", which the
+   * client renders as unknown, and these callers know the answer.
+   */
+  static empty(viewer: ViewerTitleEngagementDto | null): TitleEngagementDto {
     return new TitleEngagementDto({ likes: 0, dislikes: 0, watchlistCount: 0 }, viewer);
   }
 }
