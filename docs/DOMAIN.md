@@ -13,9 +13,9 @@ External scores live in `ExternalRatings`, one row per title per source (IMDB,
 METACRITIC, ROTTEN_TOMATOES). `votesCount` is nullable because only IMDb exposes one
 through OMDb. `TitleExternalId` maps a title to its id at each source.
 
-## Four engagement concepts — deliberately separate
+## Four engagement concepts — four tables, two modules
 
-They look mergeable. They are not:
+They look mergeable as *tables*. They are not:
 
 | Model | Shape | Question it answers |
 | --- | --- | --- |
@@ -26,6 +26,12 @@ They look mergeable. They are not:
 
 Rating and comment are split so that "I rated it, I have nothing to say" is
 expressible, and so replies don't carry a mostly-null score column.
+
+The *modules* do not follow the tables one-to-one. `TitleRating`, `TitleReaction`
+and `WatchlistItem` are served by `title/` as one `engagement` block, because every
+consumer that wants one wants the rest and there was exactly one caller between
+them. `TitleComment` is still its own module — nothing imports it, and it is a
+paginated thread rather than an aggregate. See ADR-0011.
 
 Watchly's own score is the **mean of `TitleRating`, computed per request** — it is not
 stored. A cached average would be one more thing to drift.
