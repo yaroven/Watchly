@@ -9,6 +9,16 @@ const TitleEngagementService = {
     return data;
   },
 
+  rate: async (titleId: string, score: number): Promise<TitleEngagement> => {
+    const { data } = await api.put<TitleEngagement>(`/title/${titleId}/rating`, { score });
+    return data;
+  },
+
+  removeRating: async (titleId: string): Promise<TitleEngagement> => {
+    const { data } = await api.delete<TitleEngagement>(`/title/${titleId}/rating`);
+    return data;
+  },
+
   react: async (titleId: string, type: ReactionType): Promise<TitleEngagement> => {
     const { data } = await api.post<TitleEngagement>(`/title/${titleId}/reaction`, { type });
     return data;

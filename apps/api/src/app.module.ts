@@ -31,8 +31,6 @@ import { PrismaModule } from "./prisma/prisma.module";
 import { S3EventModule } from "./s3-event/s3-event.module";
 import { S3Module } from "./s3/s3.module";
 import { SeasonModule } from "./season/season.module";
-import { TitleEngagementModule } from "./title-engagement/title-engagement.module";
-import { TitleRatingModule } from "./title-rating/title-rating.module";
 import { TitleModule } from "./title/title.module";
 import { UserAvatarModule } from "./user-avatar/user-avatar.module";
 import { UserModule } from "./user/user.module";
@@ -94,8 +92,6 @@ import { VideoTranscoderModule } from "./video-transcoder/video-transcoder.modul
     GenreModule,
     MediaAssetModule,
     ExternalRatingsModule,
-    TitleRatingModule,
-    TitleEngagementModule,
     CommentModule,
   ],
   controllers: [AppController],

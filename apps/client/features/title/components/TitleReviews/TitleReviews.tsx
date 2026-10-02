@@ -1,7 +1,7 @@
 "use client";
 
 import { type CommentSortMode, useComments, useCreateComment } from "@/features/comment";
-import { useRemoveTitleRating, useSetTitleRating, useTitleRating } from "@/features/title-rating";
+import { useRemoveTitleRating, useSetTitleRating, useTitleEngagement } from "@/features/title-engagement";
 import type { Title } from "@/features/title/schemas/title";
 import ExpandMore from "@mui/icons-material/ExpandMore";
 import ForumIcon from "@mui/icons-material/Forum";
@@ -40,7 +40,7 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
   const [hasSpoiler, setHasSpoiler] = useState(false);
   const [score, setScore] = useState(0);
 
-  const { data: rating } = useTitleRating(title.id);
+  const { data: engagement } = useTitleEngagement(title.id);
   const setRating = useSetTitleRating(title.id);
   const removeRating = useRemoveTitleRating(title.id);
 
@@ -58,9 +58,12 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
   // Adjusting state during render rather than in an effect: the slider follows the saved score
   // whenever the server's value changes, but stays put while the viewer is dragging it.
   const [syncedScore, setSyncedScore] = useState<number | null>(null);
-  if (rating !== undefined && syncedScore !== rating.myScore) {
-    setSyncedScore(rating.myScore);
-    setScore(rating.myScore ?? 0);
+  // `viewer` is null when the read had nobody in scope, which is not the same as
+  // a viewer who has not rated — only the second should move the slider.
+  const myScore = engagement?.viewer?.score ?? null;
+  if (engagement?.viewer != null && syncedScore !== myScore) {
+    setSyncedScore(myScore);
+    setScore(myScore ?? 0);
   }
 
   const handleSubmit = () => {
@@ -73,9 +76,9 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
       <Box sx={{ display: "flex", alignItems: "baseline", gap: "16px", flexWrap: "wrap" }}>
         <Typography variant="h3">Reviews</Typography>
         <Typography sx={{ fontSize: "15px", color: "text.secondary" }}>
-          {rating?.average === null || rating === undefined
+          {engagement?.averageScore == null
             ? "Not rated yet"
-            : `${rating.average}/10 from ${formatCount(rating.count)} ${rating.count === 1 ? "viewer" : "viewers"}`}
+            : `${engagement.averageScore}/10 from ${formatCount(engagement.ratingCount)} ${engagement.ratingCount === 1 ? "viewer" : "viewers"}`}
         </Typography>
       </Box>
 
@@ -104,9 +107,9 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
           />
           <Typography sx={{ fontSize: "14px", color: "#ffffff", width: "24px" }}>{score}</Typography>
           <Button variant="contained" disabled={score < 1 || setRating.isPending} onClick={() => setRating.mutate(score)}>
-            {rating?.myScore === null ? "Rate" : "Update"}
+            {myScore === null ? "Rate" : "Update"}
           </Button>
-          {rating?.myScore !== null && rating !== undefined && (
+          {myScore !== null && (
             <Button variant="outlined" disabled={removeRating.isPending} onClick={() => removeRating.mutate()}>
               Clear
             </Button>

@@ -8,16 +8,12 @@ import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
 import { SeasonService } from "../season/season.service";
-import { TitleEngagementDto } from "../title-engagement/dto/response/title-engagement.dto";
-import { TitleEngagementService } from "../title-engagement/title-engagement.service";
-import { TitleRatingService } from "../title-rating/title-rating.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { TitleService } from "./title.service";
 
 describe("TitleService", () => {
   let service: TitleService;
   let prismaServiceMock: jest.Mocked<PrismaService>;
-  let engagementServiceMock: jest.Mocked<TitleEngagementService>;
   let s3ServiceMock: jest.Mocked<S3Service>;
   let mediaAssetServiceMock: jest.Mocked<MediaAssetService>;
   let seasonServiceMock: jest.Mocked<SeasonService>;
@@ -41,6 +37,28 @@ describe("TitleService", () => {
               findMany: jest.fn(),
               deleteMany: jest.fn(),
               createMany: jest.fn(),
+            },
+            // The aggregates are no longer a collaborator to stub out — they are
+            // this service's own queries now. Every groupBy answers empty by
+            // default, which is the shape a title nobody has touched produces.
+            titleRating: {
+              groupBy: jest.fn().mockResolvedValue([]),
+              findMany: jest.fn().mockResolvedValue([]),
+              upsert: jest.fn(),
+              deleteMany: jest.fn(),
+            },
+            titleReaction: {
+              groupBy: jest.fn().mockResolvedValue([]),
+              findMany: jest.fn().mockResolvedValue([]),
+              upsert: jest.fn(),
+              deleteMany: jest.fn(),
+            },
+            watchlistItem: {
+              groupBy: jest.fn().mockResolvedValue([]),
+              findMany: jest.fn().mockResolvedValue([]),
+              count: jest.fn().mockResolvedValue(0),
+              upsert: jest.fn(),
+              deleteMany: jest.fn(),
             },
             $transaction: jest.fn(),
           },
@@ -69,36 +87,6 @@ describe("TitleService", () => {
           },
         },
         {
-          provide: TitleRatingService,
-          useValue: {
-            // Ratings are their own module; TitleService only asks it to fill
-            // the Watchly score on a response.
-            summarize: jest.fn().mockResolvedValue({ average: null, count: 0, myScore: null }),
-            summarizeMany: jest
-              .fn()
-              .mockImplementation((ids: string[]) =>
-                Promise.resolve(new Map(ids.map((id) => [id, { average: null, count: 0 }]))),
-              ),
-          },
-        },
-        {
-          provide: TitleEngagementService,
-          useValue: {
-            // Likewise its own module; TitleService only asks it to fill the
-            // like/watchlist block on a response.
-            summarize: jest.fn().mockResolvedValue(TitleEngagementDto.empty(null)),
-            // Total, like the real one: TitleService treats a miss as a broken
-            // invariant, so a mock that answers for nothing would make every
-            // list test fail for the wrong reason.
-            summarizeMany: jest
-              .fn()
-              .mockImplementation((ids: string[]) =>
-                Promise.resolve(new Map(ids.map((id) => [id, TitleEngagementDto.empty(null)]))),
-              ),
-            findWatchlistTitleIds: jest.fn().mockResolvedValue({ titleIds: [], totalCount: 0 }),
-          },
-        },
-        {
           provide: SeasonService,
           useValue: {
             delete: jest.fn(),
@@ -110,9 +98,6 @@ describe("TitleService", () => {
 
     service = module.get<TitleService>(TitleService);
     prismaServiceMock = module.get(PrismaService) as jest.Mocked<PrismaService>;
-    engagementServiceMock = module.get(
-      TitleEngagementService,
-    ) as jest.Mocked<TitleEngagementService>;
     s3ServiceMock = module.get(S3Service) as jest.Mocked<S3Service>;
     mediaAssetServiceMock = module.get(MediaAssetService) as jest.Mocked<MediaAssetService>;
     seasonServiceMock = module.get(SeasonService) as jest.Mocked<SeasonService>;
@@ -133,7 +118,7 @@ describe("TitleService", () => {
 
       const result = await service.create({ name: "Title", genreIds: [] } as never);
 
-      expect(result.engagement.viewer).toEqual({ myReaction: null, inWatchlist: false });
+      expect(result.engagement.viewer).toEqual({ score: null, reaction: null, inWatchlist: false });
     });
 
     describe("should return the created title with no poster", () => {
@@ -363,64 +348,76 @@ describe("TitleService", () => {
   });
 
   describe("the viewer on read paths", () => {
-    // Replacing any of these with `null` makes every signed-in viewer read as
-    // anonymous — the failure the supertest spec catches one layer up.
-    it("should forward the viewer from findOne", async () => {
-      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
-        id: "title-1",
-        genres: [],
-      });
+    // `viewer: null` means "we did not ask", which the client renders as unknown.
+    // Dropping the viewer on the way in makes every signed-in read look anonymous,
+    // and the controls render as not-yet-set rather than as unknown.
+    const titleRow = { id: "title-1", genres: [] };
+
+    it("should build a viewer block for findOne when there is a viewer", async () => {
+      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(titleRow);
+      (prismaServiceMock.titleRating.findMany as jest.Mock).mockResolvedValue([
+        { titleId: "title-1", score: 8 },
+      ]);
+
+      const result = await service.findOne("title-1", "viewer-1");
+
+      expect(result?.engagement.viewer).toEqual({ score: 8, reaction: null, inWatchlist: false });
+    });
+
+    it("should scope the viewer's own rows to that viewer", async () => {
+      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(titleRow);
 
       await service.findOne("title-1", "viewer-1");
 
-      expect(engagementServiceMock.summarize).toHaveBeenCalledWith("title-1", "viewer-1");
+      expect(prismaServiceMock.titleRating.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ userId: "viewer-1" }) }),
+      );
     });
 
-    it("should forward the viewer from findAll", async () => {
-      (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([
-        { id: "title-1", genres: [] },
-      ]);
+    it("should build a viewer block for findAll when there is a viewer", async () => {
+      (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([titleRow]);
       (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(1);
 
-      await service.findAll({ page: 1, limit: 10 }, undefined, [], "viewer-1");
+      const result = await service.findAll({ page: 1, limit: 10 }, undefined, [], "viewer-1");
 
-      expect(engagementServiceMock.summarizeMany).toHaveBeenCalledWith(["title-1"], "viewer-1");
+      expect(result.items[0].engagement.viewer).not.toBeNull();
     });
 
     it("should forward the viewer from update, so an admin's echo is not blank", async () => {
       (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({ id: "title-1" });
-      (prismaServiceMock.title.update as jest.Mock).mockResolvedValue({
-        id: "title-1",
-        genres: [],
-      });
+      (prismaServiceMock.title.update as jest.Mock).mockResolvedValue(titleRow);
 
-      await service.update("title-1", {} as never, "viewer-1");
+      const result = await service.update("title-1", {} as never, "viewer-1");
 
-      expect(engagementServiceMock.summarize).toHaveBeenCalledWith("title-1", "viewer-1");
+      expect(result.engagement.viewer).not.toBeNull();
     });
 
-    it("should pass null rather than undefined when there is no viewer", async () => {
-      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
-        id: "title-1",
-        genres: [],
-      });
+    it("should answer null, not an empty viewer block, when there is no viewer", async () => {
+      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(titleRow);
 
-      await service.findOne("title-1");
+      const result = await service.findOne("title-1");
 
-      expect(engagementServiceMock.summarize).toHaveBeenCalledWith("title-1", null);
+      expect(result?.engagement.viewer).toBeNull();
+      // Nothing viewer-scoped should have been asked for at all.
+      expect(prismaServiceMock.titleRating.findMany).not.toHaveBeenCalled();
     });
   });
 
   describe("findWatchlist", () => {
     const viewerId = "viewer-1";
 
+    /** The page of ids and the total both come from `watchlistItem` now. */
+    const watchlistPage = (titleIds: string[], totalCount: number) => {
+      (prismaServiceMock.watchlistItem.findMany as jest.Mock).mockResolvedValueOnce(
+        titleIds.map((titleId) => ({ titleId })),
+      );
+      (prismaServiceMock.watchlistItem.count as jest.Mock).mockResolvedValue(totalCount);
+    };
+
     it("should return the titles in the order the watchlist gave them, not the database's", async () => {
       // `findMany({ id: { in: [...] } })` answers in arbitrary order, so the id
       // list is the only thing carrying "newest addition first".
-      (engagementServiceMock.findWatchlistTitleIds as jest.Mock).mockResolvedValue({
-        titleIds: ["title-b", "title-a"],
-        totalCount: 2,
-      });
+      watchlistPage(["title-b", "title-a"], 2);
       (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([
         { id: "title-a", genres: [] },
         { id: "title-b", genres: [] },
@@ -433,24 +430,18 @@ describe("TitleService", () => {
     });
 
     it("should ask for the viewer's own engagement, or every row renders as unsaved", async () => {
-      (engagementServiceMock.findWatchlistTitleIds as jest.Mock).mockResolvedValue({
-        titleIds: ["title-a"],
-        totalCount: 1,
-      });
+      watchlistPage(["title-a"], 1);
       (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([
         { id: "title-a", genres: [] },
       ]);
 
-      await service.findWatchlist(viewerId, {});
+      const result = await service.findWatchlist(viewerId, {});
 
-      expect(engagementServiceMock.summarizeMany).toHaveBeenCalledWith(["title-a"], viewerId);
+      expect(result.items[0].engagement.viewer).not.toBeNull();
     });
 
     it("should drop a title that no longer exists, and not count it either", async () => {
-      (engagementServiceMock.findWatchlistTitleIds as jest.Mock).mockResolvedValue({
-        titleIds: ["title-a", "gone"],
-        totalCount: 2,
-      });
+      watchlistPage(["title-a", "gone"], 2);
       (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([
         { id: "title-a", genres: [] },
       ]);
@@ -464,10 +455,7 @@ describe("TitleService", () => {
     });
 
     it("should not query titles at all for an empty watchlist", async () => {
-      (engagementServiceMock.findWatchlistTitleIds as jest.Mock).mockResolvedValue({
-        titleIds: [],
-        totalCount: 0,
-      });
+      watchlistPage([], 0);
 
       const result = await service.findWatchlist(viewerId, {});
 
