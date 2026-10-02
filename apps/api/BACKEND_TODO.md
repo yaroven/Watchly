@@ -101,7 +101,8 @@ Split in two rather than built as the `Review` below. A `Review` carrying both a
 and text makes "I rated it, I have nothing to say" unexpressible, and leaves replies
 with a mostly-null score column. What shipped:
 
-- `TitleRating` — one row per (title, viewer), upserted. `GET/PUT/DELETE /title/:id/rating`.
+- `TitleRating` — one row per (title, viewer), upserted. `PUT/DELETE /title/:id/rating`.
+  (The `GET` was later folded into `GET /title/:id/engagement` — see ADR-0011.)
 - `TitleComment` — text only, one level of threading (the column allows deeper, the
   service refuses it). `GET/POST /title/:id/comments`, `GET /comments/:id/replies`.
 - `CommentReaction` / `CommentReport` — as the `Review*` models below, renamed.
@@ -177,10 +178,14 @@ The endpoints diverged from the plan:
 | `GET /titles/:id/stats`             | `GET /title/:id/engagement`        |
 
 `stats` was not dropped so much as moved and renamed. The counts and the viewer's own
-state ride on the title response itself, beside the rating block, so the detail page,
-every list and the watchlist page get them from a read they already make — title reads
-became `@OptionalAuth()` to carry it. `GET /title/:id/engagement` serves the same
-payload for the one case with no title read to piggyback on.
+state ride on the title response itself, so the detail page, every list and the
+watchlist page get them from a read they already make — title reads became
+`@OptionalAuth()` to carry it. `GET /title/:id/engagement` serves the same payload for
+the one case with no title read to piggyback on.
+
+Since ADR-0011 that block also carries the score: `engagement` is one object with
+`averageScore`, `ratingCount`, the reaction counts, the watchlist count and a
+`viewer` envelope. There is no separate `rating` block any more.
 
 The one planned field with no counterpart is `shares`: nothing tracks sharing, and the
 client's share button copies the link rather than reporting a number.

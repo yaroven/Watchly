@@ -1,3 +1,4 @@
+import commentKeys from "@/features/comment/api/comment.keys";
 import titleKeys from "@/features/title/api/title.keys";
 import createMutationHook from "@shared/api/createMutationHook";
 import { UseMutationOptions } from "@tanstack/react-query";
@@ -15,12 +16,17 @@ import titleEngagementService from "./title-engagement.service";
  *
  * `watchlistsPrefix()` and `listsPrefix()` are genuinely broad — the toggled title sits
  * somewhere inside a paginated payload this layer cannot address more precisely.
+ *
+ * The comment lists are in here because a viewer's score also shows next to every
+ * comment they left on the title. That used to live in a second `invalidateFor`
+ * in the rating slice, which is one of the reasons the two merged.
  */
 const invalidateFor = (titleId: string) => [
   titleEngagementKeys.detailPrefix(titleId),
   titleEngagementKeys.watchlistsPrefix(),
   titleKeys.detailPrefix(titleId),
   titleKeys.listsPrefix(),
+  commentKeys.titleListsPrefix(titleId),
 ];
 
 export const useReactToTitle = (
@@ -44,4 +50,20 @@ export const useSetTitleWatchlist = (
     getInvalidateKeys: () => invalidateFor(titleId),
   });
   return useSet(options);
+};
+
+export const useSetTitleRating = (titleId: string, options?: Omit<UseMutationOptions<TitleEngagement, Error, number>, "mutationFn">) => {
+  const useSet = createMutationHook({
+    mutationFn: (score: number) => titleEngagementService.rate(titleId, score),
+    getInvalidateKeys: () => invalidateFor(titleId),
+  });
+  return useSet(options);
+};
+
+export const useRemoveTitleRating = (titleId: string, options?: Omit<UseMutationOptions<TitleEngagement, Error, void>, "mutationFn">) => {
+  const useRemove = createMutationHook<TitleEngagement, void>({
+    mutationFn: () => titleEngagementService.removeRating(titleId),
+    getInvalidateKeys: () => invalidateFor(titleId),
+  });
+  return useRemove(options);
 };

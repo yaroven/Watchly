@@ -13,7 +13,7 @@ One directory per domain under `src/`, each with `*.module.ts`, `*.controller.ts
 `external-ratings` has no `dto/request` either):
 
 `artist` `comment` `episode` `external-ratings` `genre` `season` `title`
-`title-engagement` `title-rating` `user`
+`title-engagement` `user`
 
 Infrastructure: `auth`, `prisma`, `s3`, `s3-event`, `media-asset`, `poster`,
 `video-transcoder`, `config` (typed `registerAs` factories), `common` (pagination,
@@ -39,9 +39,13 @@ shared DTOs, `env.util.ts`).
   `deleteMany({ where: { titleId, userId: undefined } })` deletes every user's row and
   answers 200. The decorator is what keeps `undefined` out of that position.
 - `@CurrentUserId()` on an `@OptionalAuth()` route compiles and 500s every anonymous
-  caller. Four specs pin the pairing through supertest — `title.controller.viewer`,
-  `title-engagement.controller`, `title-rating.controller`, `watchlist.controller`.
-  Every other route, check by hand.
+  caller. **`auth/viewer-pairing.spec.ts` checks this on every route there is** — it
+  walks the route metadata of every `*.controller.ts`, so a route added tomorrow is
+  covered the moment its file lands. Nothing to remember when adding one.
+- That spec checks the pairing, not the value. That the viewer actually _arrives_ is
+  pinned by supertest in `title.controller.viewer` and `watchlist.controller` —
+  including the case that matters most, a withdrawal refusing to run without a
+  viewer filter rather than deleting everyone's row.
 
 ### Responses that depend on who is asking
 

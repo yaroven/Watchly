@@ -19,7 +19,7 @@ pnpm dev:down
 pnpm lint                   # lint-staged in both apps (prettier + eslint --fix on staged files)
 pnpm test                   # api (jest) + client (vitest)
 pnpm --filter api test      # jest; rootDir=src, *.spec.ts only
-pnpm --filter api test -- --testPathPattern=title-rating    # one suite
+pnpm --filter api test -- --testPathPattern=title-engagement # one suite
 pnpm --filter client test   # vitest; unit only, no DOM environment
 ```
 
