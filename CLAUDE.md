@@ -66,11 +66,8 @@ Worth knowing before trusting a green build:
 
 ## Planning docs
 
-- `apps/api/BACKEND_TODO.md` — phased roadmap with shipped status and the PR that
-  implemented each phase. Phases 0–4 shipped (auth, title fields, rating, comments,
-  engagement); 5–8 open (title photos, discover/editorial, artists, blog).
 - `apps/client/PLACEHOLDER_DATA_BACKEND_TODO.md` — client screens still rendering
   hardcoded data.
 
-Read both before starting feature work, and update them in the same change that makes
-them wrong.
+Read it before starting feature work, and update it in the same change that makes it
+wrong.
