@@ -20,6 +20,7 @@ k8s/**/.env*
 dist
 *.code-workspace
 tsconfig.build.tsbuildinfo
+tsconfig.spec.tsbuildinfo
 tsconfig.tsbuildinfo
 .idea
 
