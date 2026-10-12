@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { settleAllOrLog } from "../common/settle-all-or-throw.util";
+import { settleAllOrLog } from "../common/utils/settle-all-or-throw.util";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { MultipartUploadPart } from "../s3/multipart.constants";
 import { buildVideoManifestKey, VideoLocation } from "../s3/processed-key";

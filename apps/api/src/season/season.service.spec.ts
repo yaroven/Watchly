@@ -1,4 +1,4 @@
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { FilterRule } from "../common/pagination/filter-rule.enum";
 import { MediaAssetService } from "../media-asset/media-asset.service";
@@ -145,8 +145,8 @@ describe("SeasonService", () => {
   });
 
   describe("update", () => {
-    describe("should throw BadRequestException", () => {
-      it("if the season does not exist", async () => {
+    describe("should refuse", () => {
+      it("with 404 if the season does not exist", async () => {
         (prismaMock.season.findUnique as jest.Mock).mockResolvedValue(null);
 
         const action = service.update("non-existent", {
@@ -156,10 +156,10 @@ describe("SeasonService", () => {
           titleId: "title-1",
         });
 
-        await expect(action).rejects.toThrow(BadRequestException);
+        await expect(action).rejects.toThrow(NotFoundException);
       });
 
-      it("if the season exists but nothing was uploaded to the key", async () => {
+      it("with 400 if the season exists but nothing was uploaded to the key", async () => {
         (prismaMock.season.findUnique as jest.Mock).mockResolvedValue({ id: "season-1" });
         s3ServiceMock.objectExists.mockResolvedValue(false);
 
@@ -249,49 +249,14 @@ describe("SeasonService", () => {
     });
   });
 
-  describe("createPosterUploadingUrl", () => {
-    describe("should throw BadRequestException", () => {
-      it("if the season does not exist", async () => {
-        (prismaMock.season.findUnique as jest.Mock).mockResolvedValue(null);
-
-        const action = service.createPosterUploadingUrl("non-existent");
-
-        await expect(action).rejects.toThrow(BadRequestException);
-      });
-    });
-
-    describe("should return upload and poster URLs", () => {
-      it("if the season exists", async () => {
-        const season = { id: "season-1" };
-        const uploadUrl = "upload-url";
-        const posterUrl = "poster-url";
-        (prismaMock.season.findUnique as jest.Mock).mockResolvedValue(season);
-        s3ServiceMock.getUploadPresignedUrl.mockResolvedValue(uploadUrl);
-
-        const result = await service.createPosterUploadingUrl("season-1");
-
-        const key = "posters/seasons/season-1";
-        expect(s3ServiceMock.getUploadPresignedUrl).toHaveBeenCalledWith(
-          key,
-          BucketType.PROCESSED,
-          120,
-        );
-        // No read URL comes back any more: one presigned for an hour used to be
-        // handed to the client and stored verbatim in the row.
-        expect(s3ServiceMock.getReadPresignedUrl).not.toHaveBeenCalled();
-        expect(result).toEqual({ uploadUrl });
-      });
-    });
-  });
-
   describe("delete", () => {
-    describe("should throw BadRequestException", () => {
+    describe("should throw NotFoundException", () => {
       it("if the season does not exist", async () => {
         (prismaMock.season.findUnique as jest.Mock).mockResolvedValue(null);
 
         const action = service.delete("non-existent");
 
-        await expect(action).rejects.toThrow(BadRequestException);
+        await expect(action).rejects.toThrow(NotFoundException);
       });
     });
 

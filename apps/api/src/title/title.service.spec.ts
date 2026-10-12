@@ -33,16 +33,13 @@ describe("TitleService", () => {
               delete: jest.fn(),
               count: jest.fn(),
             },
-            castCredit: {
-              findMany: jest.fn(),
-              deleteMany: jest.fn(),
-              createMany: jest.fn(),
-            },
             // The aggregates are no longer a collaborator to stub out — they are
-            // this service's own queries now. Every groupBy answers empty by
+            // this service's own queries now. Every delegate answers empty by
             // default, which is the shape a title nobody has touched produces.
             titleRating: {
-              groupBy: jest.fn().mockResolvedValue([]),
+              aggregate: jest
+                .fn()
+                .mockResolvedValue({ _avg: { score: null }, _count: { _all: 0 } }),
               findMany: jest.fn().mockResolvedValue([]),
               upsert: jest.fn(),
               deleteMany: jest.fn(),
@@ -54,11 +51,14 @@ describe("TitleService", () => {
               deleteMany: jest.fn(),
             },
             watchlistItem: {
-              groupBy: jest.fn().mockResolvedValue([]),
               findMany: jest.fn().mockResolvedValue([]),
               count: jest.fn().mockResolvedValue(0),
               upsert: jest.fn(),
               deleteMany: jest.fn(),
+            },
+            titleEngagement: {
+              findMany: jest.fn().mockResolvedValue([]),
+              upsert: jest.fn(),
             },
             $transaction: jest.fn(),
           },
@@ -170,7 +170,7 @@ describe("TitleService", () => {
           skip: 0,
           take: 10,
           orderBy: { createdAt: "desc" },
-          include: { genres: true, externalRatings: true },
+          include: { genres: true, externalRatings: true, engagement: true },
         });
         expect(result.totalCount).toBe(1);
         expect(result.items).toMatchObject([{ id: "title-1", name: "Title 1", genres: [] }]);
@@ -354,10 +354,10 @@ describe("TitleService", () => {
     const titleRow = { id: "title-1", genres: [] };
 
     it("should build a viewer block for findOne when there is a viewer", async () => {
-      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(titleRow);
-      (prismaServiceMock.titleRating.findMany as jest.Mock).mockResolvedValue([
-        { titleId: "title-1", score: 8 },
-      ]);
+      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
+        ...titleRow,
+        ratings: [{ score: 8 }],
+      });
 
       const result = await service.findOne("title-1", "viewer-1");
 
@@ -369,8 +369,12 @@ describe("TitleService", () => {
 
       await service.findOne("title-1", "viewer-1");
 
-      expect(prismaServiceMock.titleRating.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: expect.objectContaining({ userId: "viewer-1" }) }),
+      expect(prismaServiceMock.title.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: expect.objectContaining({
+            ratings: { where: { userId: "viewer-1" }, select: { score: true } },
+          }),
+        }),
       );
     });
 
@@ -398,69 +402,12 @@ describe("TitleService", () => {
       const result = await service.findOne("title-1");
 
       expect(result?.engagement.viewer).toBeNull();
-      // Nothing viewer-scoped should have been asked for at all.
-      expect(prismaServiceMock.titleRating.findMany).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("findWatchlist", () => {
-    const viewerId = "viewer-1";
-
-    /** The page of ids and the total both come from `watchlistItem` now. */
-    const watchlistPage = (titleIds: string[], totalCount: number) => {
-      (prismaServiceMock.watchlistItem.findMany as jest.Mock).mockResolvedValueOnce(
-        titleIds.map((titleId) => ({ titleId })),
-      );
-      (prismaServiceMock.watchlistItem.count as jest.Mock).mockResolvedValue(totalCount);
-    };
-
-    it("should return the titles in the order the watchlist gave them, not the database's", async () => {
-      // `findMany({ id: { in: [...] } })` answers in arbitrary order, so the id
-      // list is the only thing carrying "newest addition first".
-      watchlistPage(["title-b", "title-a"], 2);
-      (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([
-        { id: "title-a", genres: [] },
-        { id: "title-b", genres: [] },
-      ]);
-
-      const result = await service.findWatchlist(viewerId, {});
-
-      expect(result.items.map((item) => item.id)).toEqual(["title-b", "title-a"]);
-      expect(result.totalCount).toBe(2);
-    });
-
-    it("should ask for the viewer's own engagement, or every row renders as unsaved", async () => {
-      watchlistPage(["title-a"], 1);
-      (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([
-        { id: "title-a", genres: [] },
-      ]);
-
-      const result = await service.findWatchlist(viewerId, {});
-
-      expect(result.items[0].engagement.viewer).not.toBeNull();
-    });
-
-    it("should drop a title that no longer exists, and not count it either", async () => {
-      watchlistPage(["title-a", "gone"], 2);
-      (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([
-        { id: "title-a", genres: [] },
-      ]);
-
-      const result = await service.findWatchlist(viewerId, {});
-
-      expect(result.items.map((item) => item.id)).toEqual(["title-a"]);
-      // A count that still includes the dropped row makes the pager advertise a
-      // page that renders short.
-      expect(result.totalCount).toBe(1);
-    });
-
-    it("should not query titles at all for an empty watchlist", async () => {
-      watchlistPage([], 0);
-
-      const result = await service.findWatchlist(viewerId, {});
-
-      expect(result).toEqual({ items: [], totalCount: 0 });
-      expect(prismaServiceMock.title.findMany).not.toHaveBeenCalled();
+      // Nothing viewer-scoped should have been asked for at all. An empty
+      // `where` would read as "no filter" and return every user's rows.
+      const { include } = (prismaServiceMock.title.findUnique as jest.Mock).mock.calls[0][0];
+      expect(include).not.toHaveProperty("ratings");
+      expect(include).not.toHaveProperty("reactions");
+      expect(include).not.toHaveProperty("watchlistEntries");
     });
   });
 
@@ -474,7 +421,7 @@ describe("TitleService", () => {
 
         expect(prismaServiceMock.title.findUnique).toHaveBeenCalledWith({
           where: { id: "title-1" },
-          include: { genres: true, externalRatings: true },
+          include: { genres: true, externalRatings: true, engagement: true },
         });
         expect(result).toMatchObject({ id: "title-1", genres: [] });
       });
@@ -515,6 +462,41 @@ describe("TitleService", () => {
         await expect(action).rejects.toThrow(BadRequestException);
         expect(prismaServiceMock.title.update).not.toHaveBeenCalled();
       });
+
+      // Prisma answers P2025 both for a missing genre in `set` and for a missing
+      // Title row. Mapping it straight to 400 told a client whose title had been
+      // deleted mid-request that its own genreIds were wrong.
+      it("if the title is deleted between the check and the write", async () => {
+        (prismaServiceMock.title.findUnique as jest.Mock)
+          .mockResolvedValueOnce({ id: "title-1" })
+          .mockResolvedValueOnce(null);
+        (prismaServiceMock.title.update as jest.Mock).mockRejectedValue(
+          new Prisma.PrismaClientKnownRequestError("gone", {
+            code: "P2025",
+            clientVersion: "7.8.0",
+          }),
+        );
+
+        const action = service.update("title-1", { name: "New Name" } as any);
+
+        await expect(action).rejects.toThrow(NotFoundException);
+      });
+    });
+
+    describe("should throw BadRequestException", () => {
+      it("if a genreId does not exist and the title is still there", async () => {
+        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({ id: "title-1" });
+        (prismaServiceMock.title.update as jest.Mock).mockRejectedValue(
+          new Prisma.PrismaClientKnownRequestError("bad genre", {
+            code: "P2025",
+            clientVersion: "7.8.0",
+          }),
+        );
+
+        const action = service.update("title-1", { genreIds: ["nope"] } as any);
+
+        await expect(action).rejects.toThrow("One or more genreIds do not exist");
+      });
     });
 
     describe("should update the title without a presigned url check", () => {
@@ -531,7 +513,7 @@ describe("TitleService", () => {
         expect(prismaServiceMock.title.update).toHaveBeenCalledWith({
           where: { id: "title-1" },
           data: { ...updateData, genres: undefined },
-          include: { genres: true, externalRatings: true },
+          include: { genres: true, externalRatings: true, engagement: true },
         });
         expect(result).toMatchObject({ id: "title-1", name: "New Name", genres: [] });
       });
@@ -553,170 +535,6 @@ describe("TitleService", () => {
         await service.update("title-1", updateData as any);
 
         expect(prismaServiceMock.title.update).toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe("startMovieUpload", () => {
-    describe("should start a multipart upload", () => {
-      it("if the title exists", async () => {
-        const startResponse = {
-          uploadId: "upload-1",
-          partSize: 8,
-          parts: [{ partNumber: 1, url: "u" }],
-        };
-        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
-          id: "title-1",
-          genres: [],
-        });
-        (mediaAssetServiceMock.startUpload as jest.Mock).mockResolvedValue(startResponse);
-
-        const result = await service.startMovieUpload("title-1", 1000);
-
-        expect(mediaAssetServiceMock.startUpload).toHaveBeenCalledWith(
-          "title-1",
-          1000,
-          VideoType.MOVIE,
-        );
-        expect(result).toEqual(startResponse);
-      });
-    });
-
-    describe("should throw NotFoundException", () => {
-      it("if the title does not exist", async () => {
-        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(null);
-
-        const action = service.startMovieUpload("non-existent", 1000);
-
-        await expect(action).rejects.toThrow(NotFoundException);
-      });
-    });
-  });
-
-  describe("completeMovieUpload", () => {
-    describe("should complete the multipart upload", () => {
-      it("if the title exists", async () => {
-        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
-          id: "title-1",
-          genres: [],
-        });
-        const parts = [{ partNumber: 1, eTag: "etag-1" }];
-
-        await service.completeMovieUpload("title-1", "upload-1", parts);
-
-        expect(mediaAssetServiceMock.completeUpload).toHaveBeenCalledWith(
-          "title-1",
-          "upload-1",
-          parts,
-          VideoType.MOVIE,
-        );
-      });
-    });
-
-    describe("should throw NotFoundException", () => {
-      it("if the title does not exist", async () => {
-        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(null);
-
-        const action = service.completeMovieUpload("non-existent", "upload-1", []);
-
-        await expect(action).rejects.toThrow(NotFoundException);
-      });
-    });
-  });
-
-  describe("abortMovieUpload", () => {
-    describe("should abort the multipart upload", () => {
-      it("regardless of title state", async () => {
-        await service.abortMovieUpload("title-1", "upload-1");
-
-        expect(mediaAssetServiceMock.abortUpload).toHaveBeenCalledWith(
-          "title-1",
-          "upload-1",
-          VideoType.MOVIE,
-        );
-      });
-    });
-  });
-
-  describe("createPosterUploadingUrl", () => {
-    describe("should return an upload url and nothing else", () => {
-      it("if the title exists", async () => {
-        const uploadUrl = "upload-url";
-        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
-          id: "title-1",
-          genres: [],
-        });
-        (s3ServiceMock.getUploadPresignedUrl as jest.Mock).mockResolvedValue(uploadUrl);
-
-        const result = await service.createPosterUploadingUrl("title-1");
-
-        expect(s3ServiceMock.getUploadPresignedUrl).toHaveBeenCalledWith(
-          "posters/titles/title-1",
-          expect.any(String),
-          120,
-        );
-        // The read URL used to come back here, go to the client, and return on
-        // the next update to be stored verbatim — signature, expiry and all.
-        expect(s3ServiceMock.getReadPresignedUrl).not.toHaveBeenCalled();
-        expect(result).toEqual({ uploadUrl });
-      });
-    });
-  });
-
-  describe("transcode", () => {
-    describe("should schedule transcoding", () => {
-      it("if the title exists", async () => {
-        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
-          id: "title-1",
-          genres: [],
-        });
-
-        await service.transcode("title-1");
-
-        expect(mediaAssetServiceMock.scheduleTranscode).toHaveBeenCalledWith(
-          "title-1",
-          VideoType.MOVIE,
-        );
-      });
-    });
-
-    describe("should throw NotFoundException", () => {
-      it("if the title does not exist", async () => {
-        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(null);
-
-        const action = service.transcode("non-existent");
-
-        await expect(action).rejects.toThrow(NotFoundException);
-      });
-    });
-  });
-
-  describe("getMovieUrl", () => {
-    describe("should return the movie's playback url", () => {
-      it("when there is media to play", async () => {
-        const url = "movie-url";
-        (mediaAssetServiceMock.getPlaybackUrl as jest.Mock).mockResolvedValue({ url });
-
-        const result = await service.getMovieUrl("title-1");
-
-        expect(mediaAssetServiceMock.getPlaybackUrl).toHaveBeenCalledWith({
-          type: VideoType.MOVIE,
-          titleId: "title-1",
-        });
-        expect(result).toEqual({ url });
-      });
-    });
-
-    // The old guard here read `if (!url)` on a wrapper object and never fired, so
-    // an untranscoded title answered 200. Absence is MediaAssetService's to decide
-    // now; this pins that the answer is passed through rather than swallowed.
-    describe("should not invent a url when there is no media", () => {
-      it("when the asset is missing", async () => {
-        (mediaAssetServiceMock.getPlaybackUrl as jest.Mock).mockRejectedValue(
-          new NotFoundException("This title has no playable media yet"),
-        );
-
-        await expect(service.getMovieUrl("title-1")).rejects.toThrow(NotFoundException);
       });
     });
   });
@@ -817,122 +635,6 @@ describe("TitleService", () => {
         const action = service.delete("non-existent");
 
         await expect(action).rejects.toThrow(NotFoundException);
-      });
-    });
-  });
-
-  describe("getCast", () => {
-    describe("should throw NotFoundException", () => {
-      it("if the title does not exist", async () => {
-        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(null);
-
-        const action = service.getCast("non-existent");
-
-        await expect(action).rejects.toThrow(NotFoundException);
-      });
-    });
-
-    describe("should return the cast ordered for display", () => {
-      it("if the title exists", async () => {
-        const credits = [
-          {
-            id: "credit-1",
-            character: "Neo",
-            order: 0,
-            artist: { id: "artist-1", name: "Keanu Reeves" },
-          },
-        ];
-        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
-          id: "title-1",
-          genres: [],
-        });
-        (prismaServiceMock.castCredit.findMany as jest.Mock).mockResolvedValue(credits);
-
-        const result = await service.getCast("title-1");
-
-        expect(prismaServiceMock.castCredit.findMany).toHaveBeenCalledWith({
-          where: { titleId: "title-1" },
-          include: { artist: true },
-          orderBy: { order: "asc" },
-        });
-        expect(result).toEqual([
-          {
-            id: "credit-1",
-            character: "Neo",
-            order: 0,
-            artist: { ...credits[0].artist, photoUrl: null },
-          },
-        ]);
-      });
-    });
-  });
-
-  describe("setCast", () => {
-    describe("should throw NotFoundException", () => {
-      it("if the title does not exist", async () => {
-        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(null);
-
-        const action = service.setCast("non-existent", [{ artistId: "artist-1" }]);
-
-        await expect(action).rejects.toThrow(NotFoundException);
-      });
-
-      it("if one or more artistId values do not exist, instead of the raw Prisma error", async () => {
-        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
-          id: "title-1",
-          genres: [],
-        });
-        (prismaServiceMock.$transaction as jest.Mock).mockRejectedValue(
-          new Prisma.PrismaClientKnownRequestError("Foreign key constraint failed", {
-            code: "P2003",
-            clientVersion: "test",
-          }),
-        );
-
-        const action = service.setCast("title-1", [{ artistId: "non-existent" }]);
-
-        await expect(action).rejects.toThrow(BadRequestException);
-      });
-    });
-
-    describe("should replace the cast and return the fresh list", () => {
-      it("if the credits are valid", async () => {
-        const credits = [
-          {
-            id: "credit-1",
-            character: "Neo",
-            order: 0,
-            artist: { id: "artist-1", name: "Keanu Reeves" },
-          },
-        ];
-        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
-          id: "title-1",
-          genres: [],
-        });
-        (prismaServiceMock.$transaction as jest.Mock).mockResolvedValue([
-          { count: 0 },
-          { count: 1 },
-        ]);
-        (prismaServiceMock.castCredit.findMany as jest.Mock).mockResolvedValue(credits);
-
-        const result = await service.setCast("title-1", [
-          { artistId: "artist-1", character: "Neo" },
-        ]);
-
-        expect(prismaServiceMock.castCredit.deleteMany).toHaveBeenCalledWith({
-          where: { titleId: "title-1" },
-        });
-        expect(prismaServiceMock.castCredit.createMany).toHaveBeenCalledWith({
-          data: [{ titleId: "title-1", artistId: "artist-1", character: "Neo", order: 0 }],
-        });
-        expect(result).toEqual([
-          {
-            id: "credit-1",
-            character: "Neo",
-            order: 0,
-            artist: { ...credits[0].artist, photoUrl: null },
-          },
-        ]);
       });
     });
   });

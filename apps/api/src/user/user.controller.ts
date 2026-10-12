@@ -26,7 +26,7 @@ import { UserResponseDto } from "./dto/response/user-response.dto";
 import { UserService } from "./user.service";
 
 @ApiTags("users")
-@Controller("user")
+@Controller("users")
 export class UserController {
   constructor(private readonly userService: UserService) {}
 

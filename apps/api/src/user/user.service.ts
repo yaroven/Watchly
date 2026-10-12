@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma, Role, User } from "@prisma/client";
 import { paginate } from "../common/pagination/paginate.util";
 import { Filter, Sorting } from "../common/pagination/pagination.types";
@@ -90,7 +90,7 @@ export class UserService {
 
   async update(id: string, data: UpdateUserDto): Promise<UserResponseDto> {
     const user = await this.findOne(id);
-    if (!user) throw new BadRequestException(`User with id ${id} not found`);
+    if (!user) throw new NotFoundException(`User with id ${id} not found`);
 
     const password = data.password ? await hashPassword(data.password) : undefined;
 
@@ -111,7 +111,7 @@ export class UserService {
 
   async delete(id: string): Promise<UserResponseDto> {
     const user = await this.findOne(id);
-    if (!user) throw new BadRequestException(`User with id ${id} not found`);
+    if (!user) throw new NotFoundException(`User with id ${id} not found`);
 
     const deleted = await this.prisma.user.delete({ where: { id }, select: USER_SAFE_SELECT });
     return this.toResponse(deleted);

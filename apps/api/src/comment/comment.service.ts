@@ -8,6 +8,7 @@ import { Prisma, ReactionType, Role } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
+import assertTitleExists from "../title/utils/assert-title-exists.util";
 import { CommentSortMode, GetCommentsDto } from "./dto/request/get-comments.dto";
 import { CommentResponseDto, CommentWithAuthor } from "./dto/response/comment-response.dto";
 
@@ -110,7 +111,7 @@ export class CommentService {
       parentId,
     }: { text: string; hasSpoiler?: boolean; parentId?: string },
   ): Promise<CommentResponseDto> {
-    await this.assertTitleExists(titleId);
+    await assertTitleExists(this.prisma, titleId);
     if (parentId) await this.assertRepliable(parentId, titleId);
 
     const comment = await this.prisma.titleComment.create({
@@ -336,14 +337,6 @@ export class CommentService {
     return new Map(ratings.map((rating) => [rating.userId, rating.score]));
   }
 
-  private async assertTitleExists(titleId: string) {
-    const title = await this.prisma.title.findUnique({
-      where: { id: titleId },
-      select: { id: true },
-    });
-    if (!title) throw new BadRequestException(`Title with id ${titleId} not found`);
-  }
-
   private async assertCommentExists(commentId: string) {
     const comment = await this.prisma.titleComment.findUnique({
       where: { id: commentId },
@@ -358,7 +351,7 @@ export class CommentService {
       select: { titleId: true, parentId: true },
     });
 
-    if (!parent) throw new BadRequestException(`Comment with id ${parentId} not found`);
+    if (!parent) throw new NotFoundException(`Comment with id ${parentId} not found`);
     if (parent.titleId !== titleId)
       throw new BadRequestException("That comment belongs to a different title");
     if (parent.parentId)

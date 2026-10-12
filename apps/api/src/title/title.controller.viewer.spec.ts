@@ -3,8 +3,10 @@ import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { OptionalJwtAuthGuard } from "../auth/guards/optional-jwt-auth.guard";
+import { PrismaService } from "../prisma/prisma.service";
 import { TitleController } from "./title.controller";
 import { TitleService } from "./title.service";
+import { TitleExistsPipe } from "./utils/title-exists.pipe";
 
 /**
  * Through the HTTP layer rather than by calling the handler: Nest does not run a
@@ -22,23 +24,34 @@ describe("TitleController (viewer propagation)", () => {
   let app: INestApplication;
   let titleService: Record<string, jest.Mock>;
   let viewerId: string | undefined;
+  let titleExists: boolean;
 
   beforeEach(async () => {
+    titleExists = true;
     titleService = {
       findOne: jest.fn().mockResolvedValue({ id: "title-1" }),
       findAll: jest.fn().mockResolvedValue({ items: [], totalCount: 0 }),
-      summarizeEngagement: jest.fn().mockResolvedValue({}),
+      getEngagement: jest.fn().mockResolvedValue({}),
       rate: jest.fn().mockResolvedValue({}),
       removeRating: jest.fn().mockResolvedValue({}),
       react: jest.fn().mockResolvedValue({}),
       removeReaction: jest.fn().mockResolvedValue({}),
-      addToWatchlist: jest.fn().mockResolvedValue({}),
-      removeFromWatchlist: jest.fn().mockResolvedValue({}),
     };
 
     const moduleRef = await Test.createTestingModule({
       controllers: [TitleController],
-      providers: [{ provide: TitleService, useValue: titleService }],
+      providers: [
+        TitleExistsPipe,
+        { provide: TitleService, useValue: titleService },
+        {
+          provide: PrismaService,
+          useValue: {
+            title: {
+              findUnique: jest.fn(() => Promise.resolve(titleExists ? { id: TITLE_ID } : null)),
+            },
+          },
+        },
+      ],
     })
       // Stands in for a real token: whatever the guard would have attached.
       .overrideGuard(OptionalJwtAuthGuard)
@@ -70,12 +83,52 @@ describe("TitleController (viewer propagation)", () => {
     jest.clearAllMocks();
   });
 
+  // The engagement writes dropped their own in-transaction existence check once
+  // the route took `TitleExistsPipe`. A handler call cannot see a param pipe, so
+  // this is where that 404 is pinned.
+  describe("the existence pipe on the engagement writes", () => {
+    beforeEach(() => {
+      viewerId = "user-1";
+      titleExists = false;
+    });
+
+    it("should answer 404 for a missing title without setting a score", async () => {
+      await request(app.getHttpServer())
+        .put(`/titles/${TITLE_ID}/rating`)
+        .send({ score: 9 })
+        .expect(404);
+
+      expect(titleService.rate).not.toHaveBeenCalled();
+    });
+
+    it("should answer 404 for a missing title without casting a vote", async () => {
+      await request(app.getHttpServer())
+        .post(`/titles/${TITLE_ID}/reaction`)
+        .send({ type: "LIKE" })
+        .expect(404);
+
+      expect(titleService.react).not.toHaveBeenCalled();
+    });
+
+    it("should answer 404 for a missing title without withdrawing a score", async () => {
+      await request(app.getHttpServer()).delete(`/titles/${TITLE_ID}/rating`).expect(404);
+
+      expect(titleService.removeRating).not.toHaveBeenCalled();
+    });
+
+    it("should answer 404 for a missing title without withdrawing a vote", async () => {
+      await request(app.getHttpServer()).delete(`/titles/${TITLE_ID}/reaction`).expect(404);
+
+      expect(titleService.removeReaction).not.toHaveBeenCalled();
+    });
+  });
+
   describe("GET /title/:id", () => {
     it("should pass the signed-in viewer through to the service", async () => {
       viewerId = "user-1";
 
       await request(app.getHttpServer())
-        .get("/title/11111111-1111-4111-8111-111111111111")
+        .get("/titles/11111111-1111-4111-8111-111111111111")
         .expect(200);
 
       expect(titleService.findOne).toHaveBeenCalledWith(
@@ -88,7 +141,7 @@ describe("TitleController (viewer propagation)", () => {
       viewerId = undefined;
 
       await request(app.getHttpServer())
-        .get("/title/11111111-1111-4111-8111-111111111111")
+        .get("/titles/11111111-1111-4111-8111-111111111111")
         .expect(200);
 
       expect(titleService.findOne).toHaveBeenCalledWith(
@@ -102,7 +155,7 @@ describe("TitleController (viewer propagation)", () => {
     it("should pass the signed-in viewer through to the service", async () => {
       viewerId = "user-1";
 
-      await request(app.getHttpServer()).get("/title").expect(200);
+      await request(app.getHttpServer()).get("/titles").expect(200);
 
       expect(titleService.findAll).toHaveBeenCalledWith(expect.anything(), undefined, [], "user-1");
     });
@@ -114,24 +167,24 @@ describe("TitleController (viewer propagation)", () => {
     it("should let an anonymous caller read the summary", async () => {
       viewerId = undefined;
 
-      await request(app.getHttpServer()).get(`/title/${TITLE_ID}/engagement`).expect(200);
+      await request(app.getHttpServer()).get(`/titles/${TITLE_ID}/engagement`).expect(200);
 
-      expect(titleService.summarizeEngagement).toHaveBeenCalledWith(TITLE_ID, null);
+      expect(titleService.getEngagement).toHaveBeenCalledWith(TITLE_ID, null);
     });
 
     it("should pass the viewer when reading the summary signed in", async () => {
       viewerId = "user-1";
 
-      await request(app.getHttpServer()).get(`/title/${TITLE_ID}/engagement`).expect(200);
+      await request(app.getHttpServer()).get(`/titles/${TITLE_ID}/engagement`).expect(200);
 
-      expect(titleService.summarizeEngagement).toHaveBeenCalledWith(TITLE_ID, "user-1");
+      expect(titleService.getEngagement).toHaveBeenCalledWith(TITLE_ID, "user-1");
     });
 
     it("should pass the viewer when setting a score", async () => {
       viewerId = "user-1";
 
       await request(app.getHttpServer())
-        .put(`/title/${TITLE_ID}/rating`)
+        .put(`/titles/${TITLE_ID}/rating`)
         .send({ score: 8 })
         .expect(200);
 
@@ -142,43 +195,17 @@ describe("TitleController (viewer propagation)", () => {
       viewerId = "user-1";
 
       await request(app.getHttpServer())
-        .post(`/title/${TITLE_ID}/reaction`)
+        .post(`/titles/${TITLE_ID}/reaction`)
         .send({ type: "LIKE" })
         .expect(200);
 
       expect(titleService.react).toHaveBeenCalledWith(TITLE_ID, "user-1", "LIKE");
     });
 
-    it("should pass the viewer to addToWatchlist", async () => {
-      viewerId = "user-1";
-
-      await request(app.getHttpServer()).post(`/title/${TITLE_ID}/watchlist`).expect(200);
-
-      expect(titleService.addToWatchlist).toHaveBeenCalledWith(TITLE_ID, "user-1");
-    });
-
-    it("should pass the viewer to removeFromWatchlist", async () => {
-      viewerId = "user-1";
-
-      await request(app.getHttpServer()).delete(`/title/${TITLE_ID}/watchlist`).expect(200);
-
-      expect(titleService.removeFromWatchlist).toHaveBeenCalledWith(TITLE_ID, "user-1");
-    });
-
-    // The one that matters most: `userId: undefined` in a Prisma `where` reads as
-    // "no filter", so a withdrawal with no viewer would delete everyone's row.
-    it("should fail loudly instead of deleting without a viewer filter", async () => {
-      viewerId = undefined;
-
-      await request(app.getHttpServer()).delete(`/title/${TITLE_ID}/watchlist`).expect(500);
-
-      expect(titleService.removeFromWatchlist).not.toHaveBeenCalled();
-    });
-
     it("should refuse to withdraw a score without a viewer", async () => {
       viewerId = undefined;
 
-      await request(app.getHttpServer()).delete(`/title/${TITLE_ID}/rating`).expect(500);
+      await request(app.getHttpServer()).delete(`/titles/${TITLE_ID}/rating`).expect(500);
 
       expect(titleService.removeRating).not.toHaveBeenCalled();
     });

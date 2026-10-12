@@ -17,11 +17,7 @@ import {
   ApiParam,
   ApiTags,
 } from "@nestjs/swagger";
-import { Throttle } from "@nestjs/throttler";
 import { AdminOnly } from "../auth/decorators/roles.decorator";
-import { CompleteMultipartUploadDto } from "../common/dto/request/complete-multipart-upload.dto";
-import { StartMultipartUploadDto } from "../common/dto/request/start-multipart-upload.dto";
-import { MultipartUploadResponseDto } from "../common/dto/response/multipart-upload-response.dto";
 import { UrlResponseDto } from "../common/dto/url-response.dto";
 import { FilteringParams } from "../common/pagination/filtering-params.decorator";
 import { Filter, Sorting } from "../common/pagination/pagination.types";
@@ -32,7 +28,7 @@ import { EpisodeResponseDto } from "./dto/response/episode-response.dto";
 import { EpisodeService } from "./episode.service";
 
 @ApiTags("episodes")
-@Controller("episode")
+@Controller("episodes")
 export class EpisodeController {
   constructor(private readonly episodeService: EpisodeService) {}
 
@@ -90,45 +86,6 @@ export class EpisodeController {
   @Delete(":id")
   async delete(@Param("id", ParseUUIDPipe) id: string) {
     return this.episodeService.delete(id);
-  }
-
-  @ApiOperation({ summary: "Schedule HLS transcoding for an episode" })
-  @ApiParam({ name: "id", format: "uuid" })
-  @ApiOkResponse({ description: "Transcoding scheduled" })
-  @ApiNotFoundResponse({ description: "Episode not found" })
-  @AdminOnly()
-  @Throttle({ default: { limit: 3, ttl: 60000 } })
-  @Post(":id/transcode")
-  transcode(@Param("id", ParseUUIDPipe) id: string) {
-    return this.episodeService.transcode(id);
-  }
-
-  @ApiOperation({ summary: "Start a multipart upload for the raw episode file" })
-  @ApiParam({ name: "id", format: "uuid" })
-  @ApiOkResponse({ type: MultipartUploadResponseDto })
-  @ApiNotFoundResponse({ description: "Episode not found" })
-  @AdminOnly()
-  @Throttle({ default: { limit: 3, ttl: 60000 } })
-  @Post(":id/upload-url")
-  startUpload(@Param("id", ParseUUIDPipe) id: string, @Body() dto: StartMultipartUploadDto) {
-    return this.episodeService.startUpload(id, dto.fileSize);
-  }
-
-  @ApiOperation({ summary: "Complete a multipart upload for the raw episode file" })
-  @ApiParam({ name: "id", format: "uuid" })
-  @ApiNotFoundResponse({ description: "Episode not found" })
-  @AdminOnly()
-  @Post(":id/upload-url/complete")
-  completeUpload(@Param("id", ParseUUIDPipe) id: string, @Body() dto: CompleteMultipartUploadDto) {
-    return this.episodeService.completeUpload(id, dto.uploadId, dto.parts);
-  }
-
-  @ApiOperation({ summary: "Abort a multipart upload for the raw episode file" })
-  @ApiParam({ name: "id", format: "uuid" })
-  @AdminOnly()
-  @Delete(":id/upload-url/:uploadId")
-  abortUpload(@Param("id", ParseUUIDPipe) id: string, @Param("uploadId") uploadId: string) {
-    return this.episodeService.abortUpload(id, uploadId);
   }
 
   @ApiOperation({ summary: "Get a presigned playback URL for an episode" })

@@ -1,5 +1,5 @@
 import { InjectQueue } from "@nestjs/bullmq";
-import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { TranscodingStatus } from "@prisma/client";
 import { Queue } from "bullmq";
 import ffmpeg from "fluent-ffmpeg";
@@ -7,7 +7,7 @@ import * as fs from "fs-extra";
 import pMap from "p-map";
 import * as path from "path";
 import { Readable } from "stream";
-import { getEpisodeTitleAndSeasonId } from "../episode/episode-path.util";
+import { getEpisodeTitleAndSeasonId } from "../episode/utils/episode-path.util";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { VIDEO_ROOT, videoPath } from "../s3/processed-key";
@@ -219,7 +219,7 @@ export class VideoTranscoderService {
         include: { season: true },
       });
 
-      if (!episode) throw new BadRequestException("Episode not found");
+      if (!episode) throw new NotFoundException(`Episode with id ${id} not found`);
 
       const { seasonId, titleId } = getEpisodeTitleAndSeasonId(episode);
       return videoPath({ type, titleId, seasonId, episodeId: episode.id });

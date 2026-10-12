@@ -1,5 +1,5 @@
 import { InjectQueue } from "@nestjs/bullmq";
-import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Queue } from "bullmq";
 import { randomUUID } from "node:crypto";
@@ -91,7 +91,7 @@ export class UserAvatarService {
     if (!previous) {
       // The account went away mid-flight; the object has no owner to belong to.
       await this.s3Service.deleteObject(newKey, BucketType.PROCESSED).catch(() => undefined);
-      throw new BadRequestException(`User with id ${userId} not found`);
+      throw new NotFoundException(`User with id ${userId} not found`);
     }
 
     await this.prisma.user.update({ where: { id: userId }, data: { avatarKey: newKey } });

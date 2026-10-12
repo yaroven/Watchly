@@ -1,5 +1,5 @@
 import { registerAs } from "@nestjs/config";
-import { requireInProduction } from "../common/env.util";
+import { requireInProduction } from "../common/utils/env.util";
 
 export const OmdbConfigName = "omdb";
 

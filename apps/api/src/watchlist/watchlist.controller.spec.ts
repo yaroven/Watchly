@@ -2,21 +2,21 @@ import { ExecutionContext, INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
-import { TitleService } from "./title.service";
 import { WatchlistController } from "./watchlist.controller";
+import { WatchlistService } from "./watchlist.service";
 
 /** The cross-tenant read: an unset viewer here would list everyone's watchlist rows. */
 describe("WatchlistController (viewer propagation)", () => {
   let app: INestApplication;
-  let titleService: { findWatchlist: jest.Mock };
+  let watchlistService: { findAll: jest.Mock };
   let viewerId: string | undefined;
 
   beforeEach(async () => {
-    titleService = { findWatchlist: jest.fn().mockResolvedValue({ items: [], totalCount: 0 }) };
+    watchlistService = { findAll: jest.fn().mockResolvedValue({ items: [], totalCount: 0 }) };
 
     const moduleRef = await Test.createTestingModule({
       controllers: [WatchlistController],
-      providers: [{ provide: TitleService, useValue: titleService }],
+      providers: [{ provide: WatchlistService, useValue: watchlistService }],
     })
       .overrideGuard(JwtAuthGuard)
       .useValue({
@@ -41,7 +41,7 @@ describe("WatchlistController (viewer propagation)", () => {
 
     await request(app.getHttpServer()).get("/watchlist").expect(200);
 
-    expect(titleService.findWatchlist).toHaveBeenCalledWith("user-1", expect.anything());
+    expect(watchlistService.findAll).toHaveBeenCalledWith("user-1", expect.anything());
   });
 
   it("should refuse rather than listing without a viewer filter", async () => {
@@ -49,6 +49,6 @@ describe("WatchlistController (viewer propagation)", () => {
 
     await request(app.getHttpServer()).get("/watchlist").expect(500);
 
-    expect(titleService.findWatchlist).not.toHaveBeenCalled();
+    expect(watchlistService.findAll).not.toHaveBeenCalled();
   });
 });

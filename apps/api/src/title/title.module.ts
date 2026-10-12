@@ -5,12 +5,12 @@ import { PrismaModule } from "../prisma/prisma.module";
 import { SeasonModule } from "../season/season.module";
 import { TitleController } from "./title.controller";
 import { TitleService } from "./title.service";
-import { WatchlistController } from "./watchlist.controller";
+import { TitleExistsPipe } from "./utils/title-exists.pipe";
 
 @Module({
   imports: [PrismaModule, PosterModule, SeasonModule, MediaAssetModule],
-  providers: [TitleService],
-  controllers: [TitleController, WatchlistController],
+  providers: [TitleService, TitleExistsPipe],
+  controllers: [TitleController],
   exports: [TitleService],
 })
 export class TitleModule {}
