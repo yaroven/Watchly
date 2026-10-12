@@ -93,8 +93,19 @@ model Title {
   comments         TitleComment[]
   reactions        TitleReaction[]
   watchlistEntries WatchlistItem[]
+  engagement       TitleEngagement?
 
   @@index([type, transcodingStatus])
+}
+
+model TitleEngagement {
+  titleId        String @id
+  title          Title  @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  avgScore       Float?
+  ratingCount    Int    @default(0)
+  likes          Int    @default(0)
+  dislikes       Int    @default(0)
+  watchlistCount Int    @default(0)
 }
 
 /// A thumbs up or down on the title itself, distinct from TitleRating: the
