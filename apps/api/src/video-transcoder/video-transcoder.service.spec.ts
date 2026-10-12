@@ -1,5 +1,5 @@
 import { getQueueToken } from "@nestjs/bullmq";
-import { BadRequestException } from "@nestjs/common";
+import { NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import ffmpeg from "fluent-ffmpeg";
 import { Readable } from "stream";
@@ -304,7 +304,7 @@ describe("VideoTranscoderService", () => {
       });
     });
 
-    describe("should throw BadRequestException", () => {
+    describe("should throw NotFoundException", () => {
       it("if the episode's season/title relation is missing when building the upload path", async () => {
         (prismaMock.episode.findUnique as jest.Mock)
           .mockResolvedValueOnce({ id: "ep-1" }) // first check entityExists
@@ -312,7 +312,7 @@ describe("VideoTranscoderService", () => {
 
         await expect(
           service.transcodeVideo("ep-1", "input.mp4", "out", VideoType.EPISODE),
-        ).rejects.toThrow(BadRequestException);
+        ).rejects.toThrow(NotFoundException);
       });
     });
   });

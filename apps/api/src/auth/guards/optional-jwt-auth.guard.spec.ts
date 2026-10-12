@@ -16,7 +16,7 @@ describe("OptionalJwtAuthGuard", () => {
 
   beforeEach(() => {
     guard = new OptionalJwtAuthGuard();
-    request = { headers: {}, method: "GET", url: "/title" };
+    request = { headers: {}, method: "GET", url: "/titles" };
     context = {
       switchToHttp: () => ({ getRequest: () => request }),
     } as unknown as ExecutionContext;

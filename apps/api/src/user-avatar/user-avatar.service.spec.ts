@@ -1,5 +1,5 @@
 import { getQueueToken } from "@nestjs/bullmq";
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Test, TestingModule } from "@nestjs/testing";
 import { PrismaService } from "../prisma/prisma.service";
@@ -113,7 +113,7 @@ describe("UserAvatarService", () => {
       prismaMock.user.findUnique.mockResolvedValue(null);
 
       await expect(service.attachProcessedAvatar(userId, "avatars/u/new.webp")).rejects.toThrow(
-        BadRequestException,
+        NotFoundException,
       );
       expect(s3Mock.deleteObject).toHaveBeenCalledWith("avatars/u/new.webp", BucketType.PROCESSED);
       expect(prismaMock.user.update).not.toHaveBeenCalled();

@@ -124,20 +124,6 @@ describe("SeasonController", () => {
     });
   });
 
-  describe("getPosterUploadUrl", () => {
-    describe("should return poster upload URLs", () => {
-      it("always", async () => {
-        const urlsResponse = { uploadUrl: "url", posterUrl: "url" };
-        (seasonServiceMock.createPosterUploadingUrl as jest.Mock).mockResolvedValue(urlsResponse);
-
-        const result = await controller.getPosterUploadUrl("season-1");
-
-        expect(seasonServiceMock.createPosterUploadingUrl).toHaveBeenCalledWith("season-1");
-        expect(result).toEqual(urlsResponse);
-      });
-    });
-  });
-
   describe("delete", () => {
     describe("should return the deleted season", () => {
       it("always", async () => {

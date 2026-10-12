@@ -30,7 +30,7 @@ import { GenreResponseDto } from "./dto/response/genre-response.dto";
 import { GenreService } from "./genre.service";
 
 @ApiTags("genres")
-@Controller("genre")
+@Controller("genres")
 export class GenreController {
   constructor(private readonly genreService: GenreService) {}
 

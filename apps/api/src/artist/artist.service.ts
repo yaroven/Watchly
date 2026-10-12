@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { Artist, Prisma } from "@prisma/client";
 import { paginate } from "../common/pagination/paginate.util";
 import { Filter, Sorting } from "../common/pagination/pagination.types";
@@ -36,7 +36,9 @@ export class ArtistService {
     filters: Filter[] = [],
   ): Promise<{ items: ArtistResponseDto[]; totalCount: number }> {
     const where = buildWhere(filters) as Prisma.ArtistWhereInput;
-    const orderBy = buildOrderBy(sort) as Prisma.ArtistOrderByWithRelationInput;
+    const orderBy = (buildOrderBy(sort) ?? {
+      createdAt: "desc",
+    }) as Prisma.ArtistOrderByWithRelationInput;
 
     const { items, totalCount } = await paginate<Artist>(this.prisma.artist, {
       where,
@@ -56,7 +58,7 @@ export class ArtistService {
   async update(id: string, data: UpdateArtistDto): Promise<ArtistResponseDto> {
     const artist = await this.findOne(id);
     if (!artist) {
-      throw new BadRequestException(`Artist with id ${id} not found`);
+      throw new NotFoundException(`Artist with id ${id} not found`);
     }
     const { photoUploaded, ...rest } = data;
 
@@ -79,7 +81,7 @@ export class ArtistService {
   async createPhotoUploadUrl(id: string): Promise<{ uploadUrl: string }> {
     const artist = await this.findOne(id);
     if (!artist) {
-      throw new BadRequestException(`Artist with id ${id} not found`);
+      throw new NotFoundException(`Artist with id ${id} not found`);
     }
     return this.posterService.createUploadUrl("artists", id);
   }
@@ -102,7 +104,7 @@ export class ArtistService {
   async delete(id: string): Promise<ArtistResponseDto> {
     const artist = await this.findOne(id);
     if (!artist) {
-      throw new BadRequestException(`Artist with id ${id} not found`);
+      throw new NotFoundException(`Artist with id ${id} not found`);
     }
 
     const deleted = await this.prisma.artist.delete({ where: { id } });

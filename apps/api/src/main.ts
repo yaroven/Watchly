@@ -6,7 +6,7 @@ import helmet from "helmet";
 import { Logger } from "nestjs-pino";
 import { AppModule } from "./app.module";
 import { DEV_DEFAULTS } from "./common/dev-defaults.const";
-import { requireInProduction } from "./common/env.util";
+import { requireInProduction } from "./common/utils/env.util";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });

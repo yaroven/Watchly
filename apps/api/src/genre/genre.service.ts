@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Genre, Prisma } from "@prisma/client";
 import { paginate } from "../common/pagination/paginate.util";
 import { Filter, Sorting } from "../common/pagination/pagination.types";
@@ -60,7 +60,7 @@ export class GenreService {
   async update(id: string, data: UpdateGenreDto): Promise<GenreResponseDto> {
     const genre = await this.findOne(id);
     if (!genre) {
-      throw new BadRequestException(`Genre with id ${id} not found`);
+      throw new NotFoundException(`Genre with id ${id} not found`);
     }
 
     try {
@@ -77,7 +77,7 @@ export class GenreService {
   async delete(id: string): Promise<GenreResponseDto> {
     const genre = await this.findOne(id);
     if (!genre) {
-      throw new BadRequestException(`Genre with id ${id} not found`);
+      throw new NotFoundException(`Genre with id ${id} not found`);
     }
     if (genre.titleCount) {
       throw new BadRequestException(

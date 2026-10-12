@@ -31,7 +31,7 @@ import { ArtistFilmographyItemDto } from "./dto/response/artist-filmography-item
 import { ArtistResponseDto } from "./dto/response/artist-response.dto";
 
 @ApiTags("artists")
-@Controller("artist")
+@Controller("artists")
 export class ArtistController {
   constructor(private readonly artistService: ArtistService) {}
 

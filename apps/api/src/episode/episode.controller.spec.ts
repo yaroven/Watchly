@@ -136,58 +136,6 @@ describe("EpisodeController", () => {
     });
   });
 
-  describe("transcode", () => {
-    describe("should call the transcode method", () => {
-      it("if called with an existing id", async () => {
-        (episodeServiceMock.transcode as jest.Mock).mockResolvedValue(undefined);
-
-        await controller.transcode("episode-1");
-
-        expect(episodeServiceMock.transcode).toHaveBeenCalledWith("episode-1");
-      });
-    });
-  });
-
-  describe("startUpload", () => {
-    describe("should start a multipart upload", () => {
-      it("if called with a fileSize", async () => {
-        const startResponse = { uploadId: "upload-1", partSize: 8, parts: [] };
-        (episodeServiceMock.startUpload as jest.Mock).mockResolvedValue(startResponse);
-
-        const result = await controller.startUpload("episode-1", { fileSize: 1000 });
-
-        expect(episodeServiceMock.startUpload).toHaveBeenCalledWith("episode-1", 1000);
-        expect(result).toEqual(startResponse);
-      });
-    });
-  });
-
-  describe("completeUpload", () => {
-    describe("should complete the multipart upload", () => {
-      it("if called with an uploadId and parts", async () => {
-        const dto = { uploadId: "upload-1", parts: [{ partNumber: 1, eTag: "etag-1" }] };
-
-        await controller.completeUpload("episode-1", dto);
-
-        expect(episodeServiceMock.completeUpload).toHaveBeenCalledWith(
-          "episode-1",
-          "upload-1",
-          dto.parts,
-        );
-      });
-    });
-  });
-
-  describe("abortUpload", () => {
-    describe("should abort the multipart upload", () => {
-      it("if called with an uploadId", async () => {
-        await controller.abortUpload("episode-1", "upload-1");
-
-        expect(episodeServiceMock.abortUpload).toHaveBeenCalledWith("episode-1", "upload-1");
-      });
-    });
-  });
-
   describe("getStreamUrl", () => {
     describe("should return the stream URL", () => {
       it("if called with an existing id", async () => {

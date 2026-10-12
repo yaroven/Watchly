@@ -18,9 +18,9 @@ describe("CurrentUserId", () => {
     const error = jest.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
 
     expect(() =>
-      readCurrentUserId(contextFor({ method: "DELETE", url: "/title/x/reaction" })),
+      readCurrentUserId(contextFor({ method: "DELETE", url: "/titles/x/reaction" })),
     ).toThrow(InternalServerErrorException);
-    expect(error).toHaveBeenCalledWith(expect.stringContaining("DELETE /title/x/reaction"));
+    expect(error).toHaveBeenCalledWith(expect.stringContaining("DELETE /titles/x/reaction"));
   });
 
   // Same 500 either way; the log is the only thing that tells the two apart, and
@@ -31,7 +31,7 @@ describe("CurrentUserId", () => {
 
     expect(() =>
       readCurrentUserId(
-        contextFor({ method: "GET", url: "/title/x/rating", viewerScope: "optional" }),
+        contextFor({ method: "GET", url: "/titles/x/rating", viewerScope: "optional" }),
       ),
     ).toThrow(InternalServerErrorException);
     expect(error).toHaveBeenCalledWith(expect.stringContaining("@OptionalUserId()"));

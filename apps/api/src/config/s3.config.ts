@@ -1,6 +1,6 @@
 import { registerAs } from "@nestjs/config";
 import { DEV_DEFAULTS } from "../common/dev-defaults.const";
-import { requireInProduction } from "../common/env.util";
+import { requireInProduction } from "../common/utils/env.util";
 
 export const S3ConfigName = "s3";
 
