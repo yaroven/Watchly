@@ -58,11 +58,6 @@ export class GenreService {
   }
 
   async update(id: string, data: UpdateGenreDto): Promise<GenreResponseDto> {
-    const genre = await this.findOne(id);
-    if (!genre) {
-      throw new NotFoundException(`Genre with id ${id} not found`);
-    }
-
     try {
       const updated = await this.prisma.genre.update({ where: { id }, data });
       return new GenreResponseDto(updated);
