@@ -8,11 +8,6 @@ import { TitleExistsPipe } from "../title/utils/title-exists.pipe";
 import { TitleCastController } from "./title-cast.controller";
 import { TitleCastService } from "./title-cast.service";
 
-/**
- * Through the HTTP layer rather than by calling the handler: `TitleExistsPipe`
- * is a param pipe, and Nest does not run those on a direct method call. These
- * cases came over from the service spec with the check.
- */
 describe("TitleCastController", () => {
   const TITLE_ID = "11111111-1111-4111-8111-111111111111";
 

@@ -12,8 +12,6 @@ describe("CurrentUserId", () => {
     expect(readCurrentUserId(contextFor({ userId: "user-1" }))).toBe("user-1");
   });
 
-  // Reaching this means a route is missing its guard. Returning `undefined` would
-  // put it into a Prisma `where`, where it reads as "no filter" rather than "none".
   it("should refuse to hand back an absent viewer, and log where it happened", () => {
     const error = jest.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
 
@@ -23,9 +21,6 @@ describe("CurrentUserId", () => {
     expect(error).toHaveBeenCalledWith(expect.stringContaining("DELETE /titles/x/reaction"));
   });
 
-  // Same 500 either way; the log is the only thing that tells the two apart, and
-  // which one it is decides whether the fix is adding a guard or swapping the
-  // decorator. `viewer-pairing.spec.ts` is what stops this one reaching production.
   it("should name the mispairing when the route turns out to be @OptionalAuth()", () => {
     const error = jest.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
 

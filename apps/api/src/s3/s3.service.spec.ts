@@ -57,7 +57,6 @@ describe("S3Service", () => {
     service = module.get<S3Service>(S3Service);
     configServiceMock = module.get(ConfigService);
 
-    // Override the real S3Client on the service instance
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (service as any).s3Client = { send: mockSend };
   });
@@ -184,8 +183,6 @@ describe("S3Service", () => {
       await expect(service.objectExists("my-key", BucketType.PROCESSED)).resolves.toBe(false);
     });
 
-    // An outage is not an answer of "no". Swallowing it here would turn every
-    // unreachable bucket into a 404 on media that exists.
     it("should rethrow anything that is not a 404", async () => {
       mockSend.mockRejectedValueOnce(new Error("network down"));
 

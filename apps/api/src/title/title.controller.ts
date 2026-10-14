@@ -109,8 +109,6 @@ export class TitleController {
     @Body() data: UpdateTitleDto,
     @CurrentUserId() userId: string,
   ) {
-    // The viewer goes through so the echoed engagement block is this admin's own
-    // state rather than a confident "you have not liked or saved this".
     return this.titleService.update(id, data, userId);
   }
 
@@ -123,10 +121,6 @@ export class TitleController {
   async delete(@Param("id", ParseUUIDPipe) id: string) {
     return this.titleService.delete(id);
   }
-
-  // --- Engagement: score, reactions, watchlist -------------------------------
-  // One block, one read. `GET /titles/:id/rating` is gone — it answered with the
-  // same data this does, from the same tables, under a second cache key.
 
   @ApiOperation({
     summary: "Get a title's score, reactions and watchlist counts",

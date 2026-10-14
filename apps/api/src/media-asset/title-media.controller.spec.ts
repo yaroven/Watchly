@@ -9,12 +9,6 @@ import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { MediaAssetService } from "./media-asset.service";
 import { TitleMediaController } from "./title-media.controller";
 
-/**
- * Through the HTTP layer rather than by calling the handler: `TitleExistsPipe`
- * is a param pipe, and Nest does not run those on a direct method call — so a
- * unit spec could not tell a guarded route from an unguarded one, which is the
- * whole point of moving the check out of the service.
- */
 describe("TitleMediaController", () => {
   const TITLE_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -113,8 +107,6 @@ describe("TitleMediaController", () => {
     });
   });
 
-  // The one route that must work for a title that is already gone: otherwise the
-  // multipart parts it opened stay in S3 with nothing left to abort them.
   describe("abortUpload", () => {
     it("should abort even when the title no longer exists", async () => {
       titleExists = false;
@@ -147,8 +139,6 @@ describe("TitleMediaController", () => {
     });
   });
 
-  // No pipe here on purpose: `getPlaybackUrl` already answers 404 for media that
-  // is not there, so a second round trip would only change the message.
   describe("getPlaybackUrl", () => {
     it("should ask for the movie's manifest without a separate existence check", async () => {
       titleExists = false;

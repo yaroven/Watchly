@@ -29,10 +29,6 @@ async function bootstrap() {
     DEV_DEFAULTS.CORS_ALLOWED_ORIGINS,
   );
   const allowedOrigins = corsAllowedOrigins.split(",").map((origin) => origin.trim());
-  // credentials: true is required for the browser to accept the response at all when the
-  // client sends withCredentials: true (needed to carry the httpOnly refresh-token cookie).
-  // Without it, the request still succeeds server-side but the browser silently blocks the
-  // response as a CORS violation.
   app.enableCors({ origin: allowedOrigins, credentials: true });
 
   const swaggerConfig = new DocumentBuilder()

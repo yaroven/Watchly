@@ -8,18 +8,6 @@ import { TitleController } from "./title.controller";
 import { TitleService } from "./title.service";
 import { TitleExistsPipe } from "./utils/title-exists.pipe";
 
-/**
- * Through the HTTP layer rather than by calling the handler: Nest does not run a
- * param decorator on a direct method call, so a unit spec cannot tell
- * `@OptionalUserId()` from a hardcoded `undefined` — and that difference is every
- * signed-in viewer reading as anonymous.
- *
- * `viewer-pairing.spec.ts` now checks the decorator pairing itself, on every route
- * there is. What stays here is the other half: that the value actually arrives.
- * The engagement cases came from the two controller specs that merged into this
- * one; the pairing-only cases they carried were dropped rather than kept as
- * duplicates.
- */
 describe("TitleController (viewer propagation)", () => {
   let app: INestApplication;
   let titleService: Record<string, jest.Mock>;
@@ -53,7 +41,6 @@ describe("TitleController (viewer propagation)", () => {
         },
       ],
     })
-      // Stands in for a real token: whatever the guard would have attached.
       .overrideGuard(OptionalJwtAuthGuard)
       .useValue({
         canActivate: (context: ExecutionContext) => {
@@ -61,8 +48,6 @@ describe("TitleController (viewer propagation)", () => {
           return true;
         },
       })
-      // The signed-in routes reach `@CurrentUserId()`, which refuses an unset
-      // viewer with a 500 — which is the behaviour two of the cases below pin.
       .overrideGuard(JwtAuthGuard)
       .useValue({
         canActivate: (context: ExecutionContext) => {
@@ -83,9 +68,6 @@ describe("TitleController (viewer propagation)", () => {
     jest.clearAllMocks();
   });
 
-  // The engagement writes dropped their own in-transaction existence check once
-  // the route took `TitleExistsPipe`. A handler call cannot see a param pipe, so
-  // this is where that 404 is pinned.
   describe("the existence pipe on the engagement writes", () => {
     beforeEach(() => {
       viewerId = "user-1";

@@ -35,9 +35,6 @@ export class WatchlistService {
     });
   }
 
-  /// Newest addition first. The ordering lives in the id list and nowhere else:
-  /// `findManyByIds` returns rows in whatever order the database finds
-  /// convenient, so the rows are re-sorted back onto `titleIds` below.
   async findAll(
     viewerId: string,
     { page = 1, limit = 10 }: { page?: number; limit?: number },
@@ -48,9 +45,6 @@ export class WatchlistService {
     const titles = await this.titleService.findManyByIds(titleIds, viewerId);
     const byId = new Map(titles.map((title) => [title.id, title]));
 
-    // The ids were already filtered through `title`, so a gap here means a row
-    // vanished between the id page and this read — rare, and not something to
-    // paper over with a short page and an unchanged count.
     const missing = titleIds.filter((id) => !byId.has(id));
     if (missing.length > 0) {
       this.logger.error(

@@ -96,8 +96,6 @@ describe("TitleCastService", () => {
       expect(result).toEqual(expected);
     });
 
-    // The order column is what the display relies on; falling back to the array
-    // position keeps a client that sends none from getting an all-zero ordering.
     it("should default a credit's order to its array position", async () => {
       await service.replaceForTitle(titleId, [{ artistId: "artist-1" }, { artistId: "artist-2" }]);
 

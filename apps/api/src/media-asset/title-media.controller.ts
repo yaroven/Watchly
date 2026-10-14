@@ -16,12 +16,6 @@ import { TitleExistsPipe } from "../title/utils/title-exists.pipe";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { MediaAssetService } from "./media-asset.service";
 
-/// A movie's raw file and its playback URL. Lives with the service that owns the
-/// mechanics rather than in the title module, where every route was a one-line
-/// forward whose only title-specific part was the existence check — now the pipe.
-///
-/// Kept on the `title` prefix and the `titles` tag so the URLs and the Swagger
-/// section do not move with the module.
 @ApiTags("titles")
 @Controller("titles")
 export class TitleMediaController {
@@ -53,9 +47,6 @@ export class TitleMediaController {
     return this.mediaAssetService.completeUpload(id, dto.uploadId, dto.parts, VideoType.MOVIE);
   }
 
-  /// No existence check, as before: aborting a multipart upload for a title that
-  /// has since been deleted is the one case where the cleanup has to go through,
-  /// or the parts leak in S3.
   @ApiOperation({ summary: "Abort a multipart upload for the raw movie file" })
   @ApiParam({ name: "id", format: "uuid" })
   @AdminOnly()
@@ -75,8 +66,6 @@ export class TitleMediaController {
     return this.mediaAssetService.scheduleTranscode(id, VideoType.MOVIE);
   }
 
-  /// No existence check: `getPlaybackUrl` answers 404 for media that is not
-  /// there, so a second round trip would only change the message.
   @ApiOperation({ summary: "Get a presigned playback URL for a movie" })
   @ApiParam({ name: "id", format: "uuid" })
   @ApiOkResponse({ type: UrlResponseDto })

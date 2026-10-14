@@ -22,8 +22,6 @@ export class ArtistResponseDto {
     this.createdAt = artist.createdAt;
     this.updatedAt = artist.updatedAt;
     this.name = artist.name;
-    // Derived from `artist.photoKey` by the caller, never stored: a presigned
-    // URL in a row keeps claiming it works after its signature expires.
     this.photoUrl = photoUrl;
   }
 }

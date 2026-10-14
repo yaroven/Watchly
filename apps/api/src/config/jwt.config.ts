@@ -7,7 +7,6 @@ export const JwtConfigName = "jwt";
 export interface JwtConfig {
   secret: string;
   expiresIn: string;
-  /** Deliberately a different secret from `secret` — a leaked access-token secret shouldn't let an attacker mint refresh tokens too. */
   refreshSecret: string;
   refreshExpiresIn: string;
 }

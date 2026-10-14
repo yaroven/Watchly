@@ -60,8 +60,6 @@ describe("MediaAssetService", () => {
 
         const result = await service.startUpload("asset-1", 1000, VideoType.MOVIE);
 
-        // Prefixed: the consumer of the S3 event reads the kind out of the key
-        // rather than probing the database to guess what the object is.
         expect(s3ServiceMock.startMultipartUpload).toHaveBeenCalledWith(
           "title-video/asset-1",
           BucketType.RAW,
@@ -161,8 +159,6 @@ describe("MediaAssetService", () => {
       );
     });
 
-    // Presigning cannot fail for a key that was never written, so without this
-    // check the caller gets a valid-looking URL that 404s in the browser.
     it("answers 404 when the manifest is not there", async () => {
       s3ServiceMock.objectExists.mockResolvedValue(false);
 
@@ -176,8 +172,6 @@ describe("MediaAssetService", () => {
       expect(s3ServiceMock.getReadPresignedUrl).not.toHaveBeenCalled();
     });
 
-    // An outage is not an answer of "no media": reporting it as 404 would tell
-    // the client the title is empty when the bucket is simply unreachable.
     it("lets a stat failure surface instead of reading as absent", async () => {
       s3ServiceMock.objectExists.mockRejectedValue(new Error("network down"));
 

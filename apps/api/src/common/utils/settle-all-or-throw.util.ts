@@ -45,11 +45,6 @@ export async function settleAllOrThrow<T>(
   );
 }
 
-/**
- * Same as settleAllOrThrow, but never throws — used for best-effort cleanup that
- * runs after the owning DB row is already committed as deleted, so a storage/queue
- * failure here must not be reported back as a failed delete.
- */
 export async function settleAllOrLog<T>(
   items: T[],
   fn: (item: T) => Promise<unknown>,
