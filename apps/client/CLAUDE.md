@@ -18,7 +18,7 @@ say so when you do.
 - `features/<domain>/` — the real code: `api/` (service + query keys + hooks),
   `components/`, `schemas/` (zod), `index.ts` as the public surface. Slices: `admin`
   `artist` `auth` `comment` `episodes` `genre` `player` `season` `title`
-  `title-engagement` `title-rating` `transcoding` `user`.
+  `title-engagement` `transcoding` `user`.
 - `shared/` — `api/` (axios instance and the auth plumbing), `lib/`, `mui/` (theme
   tokens), `ui/`, `assets/`.
 

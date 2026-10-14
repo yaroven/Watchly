@@ -1,11 +1,12 @@
 import { getQueueToken } from "@nestjs/bullmq";
-import { BadRequestException } from "@nestjs/common";
+import { NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import ffmpeg from "fluent-ffmpeg";
 import { Readable } from "stream";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
+import { VideoTranscodingProgressResponseDto } from "./dto/response/video-transcoding-progress-response.dto";
 import { VideoType } from "./enums/video-type.enum";
 import { TranscodeAbortedError, VideoTranscoderService } from "./video-transcoder.service";
 
@@ -219,6 +220,23 @@ describe("VideoTranscoderService", () => {
         });
         expect(result).toEqual(prog);
       });
+
+      it("as a response dto, not the row", async () => {
+        (prismaMock.videoTranscodingProgress.findUnique as jest.Mock).mockResolvedValue({
+          id: "progress-1",
+          progressPercentage: 50,
+        });
+
+        await expect(service.getProgress("vid-1", VideoType.MOVIE)).resolves.toBeInstanceOf(
+          VideoTranscodingProgressResponseDto,
+        );
+      });
+
+      it("or null when nothing has been recorded", async () => {
+        (prismaMock.videoTranscodingProgress.findUnique as jest.Mock).mockResolvedValue(null);
+
+        await expect(service.getProgress("vid-1", VideoType.MOVIE)).resolves.toBeNull();
+      });
     });
 
     describe("should update the progress", () => {
@@ -276,7 +294,6 @@ describe("VideoTranscoderService", () => {
         expect(s3ServiceMock.get).toHaveBeenCalledWith("vid-1", BucketType.RAW);
         expect(ffmpeg).toHaveBeenCalledWith("input.mp4");
 
-        // uploads 2 files (m3u8, ts), ignores folder
         expect(s3ServiceMock.uploadStream).toHaveBeenCalledTimes(2);
       });
 
@@ -304,7 +321,7 @@ describe("VideoTranscoderService", () => {
       });
     });
 
-    describe("should throw BadRequestException", () => {
+    describe("should throw NotFoundException", () => {
       it("if the episode's season/title relation is missing when building the upload path", async () => {
         (prismaMock.episode.findUnique as jest.Mock)
           .mockResolvedValueOnce({ id: "ep-1" }) // first check entityExists
@@ -312,7 +329,7 @@ describe("VideoTranscoderService", () => {
 
         await expect(
           service.transcodeVideo("ep-1", "input.mp4", "out", VideoType.EPISODE),
-        ).rejects.toThrow(BadRequestException);
+        ).rejects.toThrow(NotFoundException);
       });
     });
   });

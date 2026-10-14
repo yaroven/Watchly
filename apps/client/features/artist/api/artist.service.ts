@@ -3,7 +3,7 @@ import api from "@shared/api/axios";
 import axios from "axios";
 import { Artist, ArtistFilmographyItem, CreateArtistDto, GetAllArtistsDto, UpdateArtistDto } from "../schemas/artist";
 
-const prefix = "artist";
+const prefix = "artists";
 
 interface ApiArtist extends Omit<Artist, "createdAt" | "updatedAt"> {
   createdAt: string;

@@ -37,6 +37,17 @@ describe("raw key", () => {
       expect(parseRawKey(buildRawKey(parsed))).toEqual(parsed);
     });
 
+    it.each([
+      [RawObjectKind.TITLE_POSTER, "title-poster"],
+      [RawObjectKind.SEASON_POSTER, "season-poster"],
+      [RawObjectKind.ARTIST_PHOTO, "artist-photo"],
+    ])("dispatches %s on its own prefix", (kind, prefix) => {
+      const key = buildRawKey({ kind, ownerId: OWNER, name: "upload-1" });
+
+      expect(key.startsWith(`${prefix}/`)).toBe(true);
+      expect(parseRawKey(key)).toEqual({ kind, ownerId: OWNER, name: "upload-1" });
+    });
+
     it("keeps slashes inside the name rather than splitting on them", () => {
       expect(parseRawKey(`user-avatar/${OWNER}/a/b/c`)).toEqual({
         kind: RawObjectKind.USER_AVATAR,

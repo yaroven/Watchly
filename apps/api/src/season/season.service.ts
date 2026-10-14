@@ -1,8 +1,8 @@
-import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { Episode, Prisma, Season } from "@prisma/client";
 import { Filter, Sorting } from "../common/pagination/pagination.types";
 import { buildOrderBy, buildWhere } from "../common/pagination/prisma-query.util";
-import { settleAllOrLog } from "../common/settle-all-or-throw.util";
+import { settleAllOrLog } from "../common/utils/settle-all-or-throw.util";
 import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -28,7 +28,7 @@ export class SeasonService {
       return this.toResponse(season);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
-        throw new BadRequestException(`Title with id ${data.titleId} not found`);
+        throw new NotFoundException(`Title with id ${data.titleId} not found`);
       }
       throw error;
     }
@@ -50,24 +50,17 @@ export class SeasonService {
   }
 
   async update(id: string, data: UpdateSeasonDto): Promise<SeasonResponseDto> {
-    const season = await this.findOne(id);
-    if (!season) {
-      throw new BadRequestException(`Season with id ${id} not found`);
-    }
-
     const { posterUploaded, ...rest } = data;
+
+    if (posterUploaded === false) {
+      await this.posterService.removeStoredImage("seasons", id);
+    }
 
     const updated = await this.prisma.season.update({
       where: { id },
       data: {
         ...rest,
-        ...(posterUploaded === undefined
-          ? {}
-          : {
-              posterKey: posterUploaded
-                ? await this.posterService.confirmUpload("seasons", id)
-                : null,
-            }),
+        ...(posterUploaded === false ? { posterKey: null } : {}),
       },
     });
     return this.toResponse(updated);
@@ -77,15 +70,6 @@ export class SeasonService {
     return new SeasonResponseDto(season, this.posterService.toPublicUrl(season.posterKey));
   }
 
-  async createPosterUploadingUrl(id: string): Promise<{ uploadUrl: string }> {
-    const season = await this.findOne(id);
-    if (!season) {
-      throw new BadRequestException(`Season with id ${id} not found`);
-    }
-
-    return this.posterService.createUploadUrl("seasons", id);
-  }
-
   async delete(id: string): Promise<SeasonResponseDto> {
     const season = await this.prisma.season.findUnique({
       where: { id },
@@ -93,7 +77,7 @@ export class SeasonService {
     });
 
     if (!season) {
-      throw new BadRequestException(`Season with id ${id} not found`);
+      throw new NotFoundException(`Season with id ${id} not found`);
     }
 
     const deleted = await this.prisma.season.delete({ where: { id } });
@@ -102,11 +86,6 @@ export class SeasonService {
     return this.toResponse(deleted);
   }
 
-  /**
-   * Best-effort storage/queue cleanup for a season whose DB row (and cascaded
-   * episodes) is already deleted. Called both from `delete` and from
-   * TitleService when a whole series is removed.
-   */
   async cleanupAssets(season: Season & { episodes: Episode[] }): Promise<void> {
     await settleAllOrLog(
       season.episodes,
@@ -118,7 +97,7 @@ export class SeasonService {
 
     await settleAllOrLog(
       [
-        { id: "poster", run: () => this.posterService.deletePoster("seasons", season.id) },
+        { id: "poster", run: () => this.posterService.deleteStoredImage(season.posterKey) },
         {
           id: "processed-folder",
           run: () =>

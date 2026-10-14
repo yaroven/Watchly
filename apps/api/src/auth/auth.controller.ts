@@ -44,7 +44,6 @@ export class AuthController {
     return this.respondWithSession(res, tokens);
   }
 
-  /** Refresh token goes in the httpOnly cookie only — the JSON body never carries it. */
   private respondWithSession(res: Response, tokens: AuthTokens) {
     const { refreshExpiresIn } = this.configService.get<JwtConfig>(JwtConfigName)!;
     setRefreshCookie(res, tokens.refreshToken, refreshExpiresIn);

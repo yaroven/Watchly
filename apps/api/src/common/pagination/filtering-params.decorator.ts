@@ -3,10 +3,6 @@ import type { Request } from "express";
 import { FilterRule } from "./filter-rule.enum";
 import { Filter } from "./pagination.types";
 
-/**
- * Parses one or more `?filter=property:rule:value` into `Filter[]`, validating `property`
- * against `validParams` and `rule` against `FilterRule`. Empty array when none are sent.
- */
 export const FilteringParams = (validParams: string[]) =>
   createParamDecorator((_data: unknown, ctx: ExecutionContext): Filter[] => {
     const raw = ctx.switchToHttp().getRequest<Request>().query.filter;

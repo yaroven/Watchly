@@ -65,13 +65,6 @@ export class S3Service implements OnModuleInit {
     ]);
   }
 
-  /**
-   * Buckets belong to the environment, not to this service: the LocalStack
-   * init script creates them locally, the cloud account owns them elsewhere.
-   * Checking at boot turns a missing one into a clear failure here instead of
-   * a confusing 404 on the first upload — and keeps this service's
-   * credentials down to reading and writing objects.
-   */
   private async verifyBucket(bucketName: string, retries = 3) {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
@@ -84,7 +77,6 @@ export class S3Service implements OnModuleInit {
             `Bucket "${bucketName}" does not exist. It is provisioned with the environment, not by this service.`,
           );
         }
-        // Storage may simply not be up yet on a cold start.
         if (attempt === retries) throw error;
         this.logger.warn(`Could not reach bucket "${bucketName}". Retrying in 2 seconds...`);
         await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -122,10 +114,6 @@ export class S3Service implements OnModuleInit {
     return this.mapSignedUrlToPublicEndpoint(signedUrl);
   }
 
-  /**
-   * Starts a multipart upload and presigns every part up front, so the browser can PUT parts
-   * directly to S3 (and retry a single failed part) without another round trip to this API.
-   */
   async startMultipartUpload(
     key: string,
     type: BucketType,
@@ -207,27 +195,11 @@ export class S3Service implements OnModuleInit {
     return this.mapSignedUrlToPublicEndpoint(signedUrl);
   }
 
-  /**
-   * A stable, unsigned URL for an object meant to be publicly readable.
-   *
-   * Not presigned: a signature has an expiry, and anything that stores the
-   * result — a row, a cache, a rendered page — keeps claiming it works long
-   * after it stops. The processed bucket is served read-only to anonymous
-   * callers, which is what makes this safe.
-   */
   getPublicUrl(key: string, type: BucketType): string {
     const endpoint = this.s3Config.publicEndpoint.replace(/\/$/, "");
     return `${endpoint}/${this.getBucketName(type)}/${key}`;
   }
 
-  /**
-   * Whether the object is actually there.
-   *
-   * Presigning never asks: `getSignedUrl` is string construction, so a URL for a
-   * key that was never written comes back looking perfectly valid and fails only
-   * when the browser follows it. Anything that wants to answer 404 for missing
-   * media has to ask here first.
-   */
   async objectExists(key: string, type: BucketType): Promise<boolean> {
     const bucketName = this.getBucketName(type);
     try {
@@ -235,8 +207,6 @@ export class S3Service implements OnModuleInit {
       return true;
     } catch (error) {
       if (error instanceof NotFound) return false;
-      // Anything else — credentials, network, a bucket that is gone — is not an
-      // answer of "no". Reporting it as absent would turn an outage into a 404.
       this.logger.error(`Failed to stat object "${key}" in bucket "${bucketName}":`, error);
       throw error;
     }

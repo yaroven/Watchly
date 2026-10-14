@@ -4,7 +4,7 @@ import api from "@shared/api/axios";
 import axios from "axios";
 import { CastCredit, CastCreditInput, CreateTitleDto, ExternalRating, GetAllTitlesDto, Title, UpdateTitleDto } from "../schemas/title";
 
-const prefix = "title";
+const prefix = "titles";
 
 export interface ApiTitle extends Omit<Title, "createdAt" | "updatedAt"> {
   createdAt: string;

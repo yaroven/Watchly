@@ -2,10 +2,6 @@ import { BadRequestException, createParamDecorator, ExecutionContext } from "@ne
 import type { Request } from "express";
 import { Sorting } from "./pagination.types";
 
-/**
- * Parses `?sort=property:direction` into a `Sorting`, validating `property` against
- * `validParams` and `direction` against asc/desc. Absent when no `sort` query param is sent.
- */
 export const SortingParams = (validParams: string[]) =>
   createParamDecorator((_data: unknown, ctx: ExecutionContext): Sorting | undefined => {
     const raw = ctx.switchToHttp().getRequest<Request>().query.sort;

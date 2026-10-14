@@ -9,23 +9,6 @@ import {
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { OptionalJwtAuthGuard } from "./guards/optional-jwt-auth.guard";
 
-/**
- * The pairing rule, checked against every route there is.
- *
- * `@CurrentUserId()` is typed `string` but delivers whatever the guard left on
- * the request, so on an `@OptionalAuth()` route it 500s every anonymous caller.
- * The inverse — `@OptionalUserId()` behind `@Auth()` — is merely redundant, which
- * is what makes the rule easy to forget: only one direction bites.
- *
- * Until now the rule was pinned by four supertest specs, leaving eleven routes
- * covered by attention alone. This walks the route metadata instead, so a route
- * added tomorrow is covered the moment its file lands — including one whose
- * module is never registered in a test.
- */
-
-// This spec loads every controller file, which reaches `external-ratings` and
-// through it `@nestjs/schedule` — ESM-only, and nothing transforms node_modules.
-// Only the decorator is needed here, and only so the import resolves.
 jest.mock("@nestjs/schedule", () => ({ Cron: () => () => undefined, CronExpression: {} }));
 
 const SRC_ROOT = path.join(__dirname, "..");
@@ -66,8 +49,6 @@ function guardsOf(controller: Type<unknown>, method: string): unknown[] {
 }
 
 function scopeOf(guards: unknown[]): ViewerScope {
-  // Checked in this order on purpose: @AdminOnly() stacks RolesGuard on top of
-  // JwtAuthGuard, and no route carries both the mandatory and the optional guard.
   if (guards.includes(OptionalJwtAuthGuard)) return "optional";
   if (guards.includes(JwtAuthGuard)) return "required";
   return "none";

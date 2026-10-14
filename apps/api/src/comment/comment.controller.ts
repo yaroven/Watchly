@@ -46,7 +46,7 @@ export class CommentController {
   @ApiParam({ name: "id", format: "uuid" })
   @ApiOkResponse({ type: PaginatedResponseOf(CommentResponseDto) })
   @OptionalAuth()
-  @Get("title/:id/comments")
+  @Get("titles/:id/comments")
   findForTitle(
     @Param("id", ParseUUIDPipe) id: string,
     @Query() query: GetCommentsDto,
@@ -76,7 +76,7 @@ export class CommentController {
   @ApiParam({ name: "id", format: "uuid" })
   @ApiCreatedResponse({ type: CommentResponseDto })
   @Auth()
-  @Post("title/:id/comments")
+  @Post("titles/:id/comments")
   create(
     @Param("id", ParseUUIDPipe) id: string,
     @Body() data: CreateCommentDto,

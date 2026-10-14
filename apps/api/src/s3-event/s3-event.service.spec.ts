@@ -1,8 +1,9 @@
 import { DeleteMessageCommand } from "@aws-sdk/client-sqs";
 import { ConfigService } from "@nestjs/config";
 import { Test, TestingModule } from "@nestjs/testing";
+import { ImageKind } from "../image-transcoder/image-profile.const";
+import { ImageTranscodeScheduler } from "../image-transcoder/image-transcode-scheduler.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { UserAvatarService } from "../user-avatar/user-avatar.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
 import { S3EventService } from "./s3-event.service";
@@ -27,7 +28,7 @@ describe("S3EventService", () => {
   let service: S3EventService;
   let prismaMock: jest.Mocked<PrismaService>;
   let videoTranscoderServiceMock: jest.Mocked<VideoTranscoderService>;
-  let userAvatarServiceMock: { scheduleProcessing: jest.Mock };
+  let imageSchedulerMock: { schedule: jest.Mock };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -49,8 +50,8 @@ describe("S3EventService", () => {
           },
         },
         {
-          provide: UserAvatarService,
-          useValue: { scheduleProcessing: jest.fn() },
+          provide: ImageTranscodeScheduler,
+          useValue: { schedule: jest.fn() },
         },
         {
           provide: ConfigService,
@@ -66,11 +67,10 @@ describe("S3EventService", () => {
     videoTranscoderServiceMock = module.get(
       VideoTranscoderService,
     ) as jest.Mocked<VideoTranscoderService>;
-    userAvatarServiceMock = module.get(UserAvatarService);
+    imageSchedulerMock = module.get(ImageTranscodeScheduler);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (service as any).sqsClient = { send: mockSend };
-    // Inject fake queueUrl so pollLoop can use it
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (service as any).queueUrl = mockQueueUrl;
   });
@@ -148,11 +148,6 @@ describe("S3EventService", () => {
     });
   });
 
-  /**
-   * The key says what the object is. Before this the kind was inferred by
-   * probing for an episode and then a title, so a new kind of raw object was
-   * indistinguishable from a stale one.
-   */
   describe("dispatch by key prefix", () => {
     const TITLE_ID = "11111111-1111-4111-8111-111111111111";
     const USER_ID = "44444444-4444-4444-8444-444444444444";
@@ -185,32 +180,45 @@ describe("S3EventService", () => {
       });
     });
 
-    it("should hand an avatar to the avatar queue, not the transcoder", async () => {
+    it("should hand an avatar to the image queue, not the transcoder", async () => {
       const key = `user-avatar/${USER_ID}/abc-123`;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (service as any).processMessage(messageFor(key));
 
-      expect(userAvatarServiceMock.scheduleProcessing).toHaveBeenCalledWith({
-        userId: USER_ID,
+      expect(imageSchedulerMock.schedule).toHaveBeenCalledWith({
+        kind: ImageKind.USER_AVATAR,
+        ownerId: USER_ID,
         rawKey: key,
       });
       expect(videoTranscoderServiceMock.scheduleTranscodeVideo).not.toHaveBeenCalled();
     });
 
-    // Dropping it is right; retrying forever on something this build cannot
-    // name would block the queue behind it.
+    it.each([
+      ["a title poster", `title-poster/${TITLE_ID}/abc-123`, ImageKind.TITLE_POSTER],
+      ["a season poster", `season-poster/${TITLE_ID}/abc-123`, ImageKind.SEASON_POSTER],
+      ["an artist photo", `artist-photo/${TITLE_ID}/abc-123`, ImageKind.ARTIST_PHOTO],
+    ])("should name the profile for %s", async (_case, key, kind) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (service as any).processMessage(messageFor(key));
+
+      expect(imageSchedulerMock.schedule).toHaveBeenCalledWith({
+        kind,
+        ownerId: TITLE_ID,
+        rawKey: key,
+      });
+      expect(videoTranscoderServiceMock.scheduleTranscodeVideo).not.toHaveBeenCalled();
+    });
+
     it("should ignore a prefix it does not recognise, and still delete the message", async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (service as any).processMessage(messageFor("something-else/abc"));
 
       expect(videoTranscoderServiceMock.scheduleTranscodeVideo).not.toHaveBeenCalled();
-      expect(userAvatarServiceMock.scheduleProcessing).not.toHaveBeenCalled();
+      expect(imageSchedulerMock.schedule).not.toHaveBeenCalled();
       expect(mockSend.mock.calls[0][0]).toBeInstanceOf(DeleteMessageCommand);
     });
 
-    // An upload started before the scheme shipped is still a bare uuid, and
-    // dropping it would lose a video somebody is waiting on.
     it("should still resolve a bare uuid by database probe", async () => {
       (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue({ id: TITLE_ID });
 
