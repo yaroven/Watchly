@@ -15,12 +15,6 @@ import { EpisodeExistsPipe } from "../episode/utils/episode-exists.pipe";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { MediaAssetService } from "./media-asset.service";
 
-/// An episode's raw file and its transcode. The playback URL is **not** here:
-/// building it needs the episode's season and title, which only the episode
-/// module can resolve — see `EpisodeController.getStreamUrl`.
-///
-/// Kept on the `episode` prefix and the `episodes` tag so the URLs and the
-/// Swagger section do not move with the module.
 @ApiTags("episodes")
 @Controller("episodes")
 export class EpisodeMediaController {
@@ -63,8 +57,6 @@ export class EpisodeMediaController {
     return this.mediaAssetService.completeUpload(id, dto.uploadId, dto.parts, VideoType.EPISODE);
   }
 
-  /// No existence check, as before: aborting a multipart upload for an episode
-  /// that has since been deleted has to go through, or the parts leak in S3.
   @ApiOperation({ summary: "Abort a multipart upload for the raw episode file" })
   @ApiParam({ name: "id", format: "uuid" })
   @AdminOnly()

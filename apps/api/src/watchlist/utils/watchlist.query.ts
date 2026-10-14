@@ -1,11 +1,5 @@
 import { Prisma } from "@prisma/client";
 
-/**
- * `titleIds` is the page: both the rows and the count go through the same
- * `where`, so they agree with each other. `title: { is: {} }` drops rows whose
- * title is gone — counting rows the page cannot render makes the pager advertise
- * pages that come back short.
- */
 const watchlistQuery = {
   forViewer: (userId: string) =>
     ({ userId, title: { is: {} } }) satisfies Prisma.WatchlistItemWhereInput,

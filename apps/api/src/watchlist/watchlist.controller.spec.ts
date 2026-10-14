@@ -5,7 +5,6 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { WatchlistController } from "./watchlist.controller";
 import { WatchlistService } from "./watchlist.service";
 
-/** The cross-tenant read: an unset viewer here would list everyone's watchlist rows. */
 describe("WatchlistController (viewer propagation)", () => {
   let app: INestApplication;
   let watchlistService: { findAll: jest.Mock };

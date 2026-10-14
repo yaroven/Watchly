@@ -12,8 +12,6 @@ import { SetTitleCastDto } from "./dto/request/set-title-cast.dto";
 import { CastCreditResponseDto } from "./dto/response/cast-credit-response.dto";
 import { TitleCastService } from "./title-cast.service";
 
-/// Kept on the `title` prefix and the `titles` tag so the URLs and the Swagger
-/// section do not move with the module.
 @ApiTags("titles")
 @Controller("titles")
 export class TitleCastController {

@@ -1,10 +1,5 @@
 import { NotFoundException } from "@nestjs/common";
 
-/**
- * The delegate shape this needs. `any` on the args for the same reason
- * `paginate` takes it: Prisma's generated delegate types are too precisely
- * overloaded to thread through a generic wrapper.
- */
 interface AssertableDelegate {
   findUnique(args: any): Promise<{ id: string } | null>;
 }

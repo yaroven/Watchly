@@ -7,9 +7,6 @@ import { PaginatedResponseOf } from "../common/utils/paginated-response-of.util"
 import { TitleResponseDto } from "../title/dto/response/title-response.dto";
 import { WatchlistService } from "./watchlist.service";
 
-/// Tagged `titles` rather than `watchlist`: a watchlist page is a list of
-/// titles, and splitting it into its own Swagger section separates it from the
-/// response shape it returns.
 @ApiTags("titles")
 @Controller("watchlist")
 export class WatchlistController {

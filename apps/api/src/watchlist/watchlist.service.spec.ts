@@ -4,11 +4,6 @@ import { PrismaService } from "../prisma/prisma.service";
 import { TitleService } from "../title/title.service";
 import { WatchlistService } from "./watchlist.service";
 
-/**
- * The watchlist page: a page of ids from `watchlistItem`, serialised by the
- * title module. What is asserted here is the ordering and the orphan handling —
- * the two things that live on this side of the seam.
- */
 describe("WatchlistService", () => {
   let service: WatchlistService;
   let prismaMock: {
@@ -77,8 +72,6 @@ describe("WatchlistService", () => {
 
   describe("findAll", () => {
     it("should return the titles in the order the watchlist gave them, not the database's", async () => {
-      // The title read answers in arbitrary order, so the id list is the only
-      // thing carrying "newest addition first".
       watchlistPage(["title-b", "title-a"], 2);
       titleServiceMock.findManyByIds.mockResolvedValue([{ id: "title-a" }, { id: "title-b" }]);
 
@@ -103,8 +96,6 @@ describe("WatchlistService", () => {
       const result = await service.findAll(viewerId, {});
 
       expect(result.items.map((item) => item.id)).toEqual(["title-a"]);
-      // A count that still includes the dropped row makes the pager advertise a
-      // page that renders short.
       expect(result.totalCount).toBe(1);
     });
 
@@ -153,9 +144,6 @@ describe("WatchlistService", () => {
       expect(titleServiceMock.readEngagement).toHaveBeenCalledWith(txMock, titleId, viewerId);
     });
 
-    // The route carries `TitleExistsPipe`. What is left here is the fallback:
-    // the summary read at the end of the transaction refuses, rolling back the
-    // row the upsert already wrote.
     it("should refuse rather than commit against a title that vanished", async () => {
       titleServiceMock.readEngagement.mockRejectedValue(new NotFoundException("not found"));
 
@@ -164,8 +152,6 @@ describe("WatchlistService", () => {
   });
 
   describe("remove", () => {
-    // `userId: undefined` in a Prisma `where` reads as "no filter", so one
-    // person taking a title off their list would wipe everyone's row.
     it("should delete only the viewer's own row", async () => {
       await service.remove(titleId, viewerId);
 

@@ -25,13 +25,6 @@ export class MediaAssetService {
     );
   }
 
-  /**
-   * Schedules the transcode itself rather than waiting for the S3 event to come
-   * back through SQS. The queue job id is derived from (type, id), so when the
-   * event path is also live it dedupes into this same job instead of running a
-   * second one — which is what lets a deployment without S3 notifications
-   * (MinIO, say) still transcode.
-   */
   async completeUpload(
     id: string,
     uploadId: string,
@@ -55,16 +48,6 @@ export class MediaAssetService {
     await this.videoTranscoderService.scheduleTranscodeVideo({ id, type });
   }
 
-  /**
-   * A playback URL, or 404 if there is nothing to play.
-   *
-   * The existence check is the point. Presigning is string construction, so the
-   * previous shape — hand a key in, get a URL back — could not fail, and both
-   * callers had a `if (!url) throw new NotFoundException(...)` that never once
-   * ran: one of them was testing a wrapper object that is always truthy, and the
-   * other a string that is always non-empty. A title that was never transcoded
-   * answered 200 with a URL the browser then 404s on.
-   */
   async getPlaybackUrl(location: VideoLocation): Promise<{ url: string }> {
     const key = buildVideoManifestKey(location);
 
@@ -89,8 +72,6 @@ export class MediaAssetService {
         id: "raw-video",
         run: () => this.s3Service.deleteObject(buildVideoRawKey(id, type), BucketType.RAW),
       },
-      // Uploads that predate the key scheme are still sitting under the bare id.
-      // Best-effort, and it disappears once nothing old is left in the bucket.
       { id: "raw-video-legacy", run: () => this.s3Service.deleteObject(id, BucketType.RAW) },
     ];
 

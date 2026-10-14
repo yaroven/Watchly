@@ -21,8 +21,6 @@ import { TitleEngagementDto } from "../title/dto/response/title-engagement.dto";
 import { TitleExistsPipe } from "../title/utils/title-exists.pipe";
 import { WatchlistService } from "./watchlist.service";
 
-/// The two title-scoped routes, kept on the `title` prefix so the URLs and the
-/// Swagger section do not move with the module.
 @ApiTags("titles")
 @Controller("titles")
 export class TitleWatchlistController {

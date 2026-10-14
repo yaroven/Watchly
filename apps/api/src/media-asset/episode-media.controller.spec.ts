@@ -9,10 +9,6 @@ import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { EpisodeMediaController } from "./episode-media.controller";
 import { MediaAssetService } from "./media-asset.service";
 
-/**
- * Through the HTTP layer rather than by calling the handler: `EpisodeExistsPipe`
- * is a param pipe, and Nest does not run those on a direct method call.
- */
 describe("EpisodeMediaController", () => {
   const EPISODE_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -133,8 +129,6 @@ describe("EpisodeMediaController", () => {
     });
   });
 
-  // The one route that must work for an episode that is already gone: otherwise
-  // the multipart parts it opened stay in S3 with nothing left to abort them.
   describe("abortUpload", () => {
     it("should abort even when the episode no longer exists", async () => {
       episodeExists = false;

@@ -44,10 +44,6 @@ import { WatchlistModule } from "./watchlist/watchlist.module";
       throttlers: [
         {
           ttl: 60000,
-          // A single Discover page load alone fires 7-10+ GET /titles
-          // requests (one per catalog row); 10/min was tripping normal
-          // browsing within seconds. This keeps basic abuse protection
-          // while giving real usage enough headroom.
           limit: 300,
         },
       ],

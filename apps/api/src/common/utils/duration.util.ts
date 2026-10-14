@@ -7,7 +7,6 @@ const UNIT_MS: Record<string, number> = {
   w: 604_800_000,
 };
 
-/** Parses jsonwebtoken-style durations ("30d", "1h", "15m") into milliseconds. */
 export function parseDurationMs(value: string): number {
   const match = /^(\d+)(ms|s|m|h|d|w)$/.exec(value.trim());
   if (!match) throw new Error(`Invalid duration "${value}" — expected e.g. "30d", "1h", "15m"`);

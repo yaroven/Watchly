@@ -7,14 +7,6 @@ import { TitleExistsPipe } from "../title/utils/title-exists.pipe";
 import { TitleWatchlistController } from "./title-watchlist.controller";
 import { WatchlistService } from "./watchlist.service";
 
-/**
- * Through the HTTP layer rather than by calling the handler: Nest does not run a
- * param decorator on a direct method call, so a unit spec cannot tell
- * `@CurrentUserId()` from a hardcoded value — and that difference is a
- * withdrawal running with no viewer filter.
- *
- * These cases came over from `title.controller.viewer.spec.ts` with the routes.
- */
 describe("TitleWatchlistController (viewer propagation)", () => {
   const TITLE_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -78,8 +70,6 @@ describe("TitleWatchlistController (viewer propagation)", () => {
     expect(watchlistService.remove).toHaveBeenCalledWith(TITLE_ID, "user-1");
   });
 
-  // The one that matters most: `userId: undefined` in a Prisma `where` reads as
-  // "no filter", so a withdrawal with no viewer would delete everyone's row.
   it("should fail loudly instead of deleting without a viewer filter", async () => {
     viewerId = undefined;
 

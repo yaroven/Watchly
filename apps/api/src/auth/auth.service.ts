@@ -37,7 +37,6 @@ export class AuthService {
     return this.issueTokens({ userId: user.id, role: user.role });
   }
 
-  /** Creates the account and signs the user straight in — same response shape as `login`. */
   async register({ email, password }: RegistrationRequestDto): Promise<AuthTokens> {
     const existing = await this.userService.findByEmail(email);
     if (existing) throw new ConflictException("User with this email already exists");

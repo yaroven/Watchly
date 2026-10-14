@@ -20,7 +20,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  /** Re-fetches the user on every request so a deleted/banned account loses access immediately, even with a still-valid token. */
   async validate(payload: JwtPayload) {
     const user = await this.userService.findOne(payload.userId);
     if (!user) throw new UnauthorizedException();

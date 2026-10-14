@@ -7,14 +7,6 @@ import { PrismaService } from "../prisma/prisma.service";
 import { SeasonService } from "../season/season.service";
 import { TitleService } from "./title.service";
 
-/**
- * The engagement surface of TitleService — score, reactions, watchlist.
- *
- * Its own file rather than more of `title.service.spec.ts`, which is already 900
- * lines of catalogue behaviour: these cases need a transaction harness that
- * nothing else in that file uses, and the writes have to be shown landing on the
- * transaction client rather than on the base one.
- */
 function createClientMocks() {
   return {
     title: { findUnique: jest.fn(), findMany: jest.fn(), count: jest.fn() },
@@ -81,8 +73,6 @@ describe("TitleService engagement", () => {
       providers: [
         TitleService,
         { provide: PrismaService, useValue: prismaMock },
-        // Unused here, but TitleService owns the catalogue too and will not
-        // construct without them.
         { provide: PosterService, useValue: { toPublicUrl: jest.fn().mockReturnValue(null) } },
         { provide: SeasonService, useValue: {} },
         { provide: MediaAssetService, useValue: {} },
@@ -116,9 +106,6 @@ describe("TitleService engagement", () => {
       expect(prismaMock.titleRating.upsert).not.toHaveBeenCalled();
     });
 
-    // The route carries `TitleExistsPipe`, so a missing title never reaches here
-    // in production. What this pins is the fallback: the summary read at the end
-    // of the transaction still refuses, so the write it already made rolls back.
     it("should refuse rather than commit a score against a title that vanished", async () => {
       txMock.title.findUnique.mockResolvedValue(null);
 
@@ -135,19 +122,12 @@ describe("TitleService engagement", () => {
       await expect(service.removeRating(titleId, userId)).rejects.toThrow(NotFoundException);
     });
 
-    // The hazard this guards: `userId: undefined` in a Prisma `where` reads as
-    // "no filter", so one person withdrawing a score would wipe everyone's.
     it("should delete only the viewer's own rating", async () => {
       await service.removeRating(titleId, userId);
 
       expect(txMock.titleRating.deleteMany).toHaveBeenCalledWith({ where: { titleId, userId } });
     });
 
-    // Without the existence check this answered 404 with "You have not rated
-    // this title", which blames the viewer for a title that is simply gone.
-    // "You have not rated this title" must not be the answer for a title that is
-    // simply gone — the summary read raises the right one, and the delete that
-    // ran before it rolls back with the transaction.
     it("should report a missing title as not found, not as an unrated one", async () => {
       txMock.title.findUnique.mockResolvedValue(null);
 
@@ -286,8 +266,6 @@ describe("TitleService engagement", () => {
       }
     });
 
-    // null is "we did not ask", which the client renders as unknown. A viewer
-    // object full of nulls would read as "asked, and they have done nothing".
     it("should report no viewer at all rather than a viewer with no state, when anonymous", async () => {
       const result = await service.getEngagement(titleId, null);
 
@@ -402,8 +380,6 @@ describe("TitleService engagement", () => {
     it("should not leave a counter row behind when the title vanished mid-write", async () => {
       txMock.title.findUnique.mockResolvedValue(null);
 
-      // Everything here is one transaction, so the recompute that did run is
-      // rolled back by the throw rather than prevented ahead of it.
       await expect(service.rate(titleId, userId, 9)).rejects.toThrow(NotFoundException);
     });
 
