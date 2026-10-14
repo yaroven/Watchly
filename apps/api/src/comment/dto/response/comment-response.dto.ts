@@ -33,6 +33,15 @@ export type CommentWithAuthor = TitleComment & {
   user: Pick<User, "id" | "email" | "displayName" | "avatarKey">;
 };
 
+export interface CommentResponseOptions {
+  counts?: { likes: number; dislikes: number };
+  myReaction?: ReactionType | null;
+  authorScore?: number | null;
+  replies?: CommentResponseDto[];
+  replyCount?: number;
+  authorAvatarUrl?: string | null;
+}
+
 export class CommentResponseDto {
   @ApiProperty({ format: "uuid" })
   id: string;
@@ -71,12 +80,14 @@ export class CommentResponseDto {
 
   constructor(
     comment: CommentWithAuthor,
-    counts: { likes: number; dislikes: number },
-    myReaction: ReactionType | null,
-    authorScore: number | null,
-    replies: CommentResponseDto[] = [],
-    replyCount = 0,
-    authorAvatarUrl: string | null = null,
+    {
+      counts = { likes: 0, dislikes: 0 },
+      myReaction = null,
+      authorScore = null,
+      replies = [],
+      replyCount = 0,
+      authorAvatarUrl = null,
+    }: CommentResponseOptions = {},
   ) {
     this.id = comment.id;
     this.author = new CommentAuthorDto(comment.user, authorScore, authorAvatarUrl);

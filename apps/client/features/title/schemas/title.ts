@@ -72,8 +72,6 @@ export interface Title {
   transcodingStatus: TranscodingStatus;
   externalRatings: ExternalRating[];
   genres: TitleGenre[];
-  /** Watchly's own score, aggregated from viewer ratings — `average` is null until someone rates it. */
-  rating: { average: number | null; count: number };
   /**
    * Likes, dislikes and watchlist state; the viewer's own included when signed in.
    * Always present — every construction site on the api passes it explicitly.

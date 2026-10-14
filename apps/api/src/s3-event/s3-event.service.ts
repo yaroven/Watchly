@@ -8,9 +8,10 @@ import {
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { S3Config, S3ConfigName } from "../config/s3.config";
+import { ImageKind } from "../image-transcoder/image-profile.const";
+import { ImageTranscodeScheduler } from "../image-transcoder/image-transcode-scheduler.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { isLegacyBareUuidKey, parseRawKey, RawObjectKind } from "../s3/raw-key";
-import { UserAvatarService } from "../user-avatar/user-avatar.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
 
@@ -28,7 +29,7 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly videoTranscoderService: VideoTranscoderService,
-    private readonly userAvatarService: UserAvatarService,
+    private readonly imageTranscodeScheduler: ImageTranscodeScheduler,
   ) {
     this.config = this.configService.getOrThrow<S3Config>(S3ConfigName);
     const credentials = {
@@ -36,9 +37,6 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
       secretAccessKey: this.config.secretAccessKey,
     };
 
-    // No endpoint override against real AWS: SQS lives at
-    // sqs.<region>.amazonaws.com. LocalStack serves it from the same port as
-    // S3, which is what sqsEndpoint is for.
     this.sqsClient = new SQSClient({
       region: this.config.region,
       credentials,
@@ -65,12 +63,6 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
     await this.pollLoopFinished;
   }
 
-  /**
-   * The queue is provisioned with the rest of the infrastructure — by the
-   * LocalStack init script locally, by whatever manages the cloud account in
-   * dev and prod. Looking it up rather than creating it keeps this service's
-   * credentials down to receiving and deleting messages.
-   */
   private async resolveQueueUrl(): Promise<string> {
     try {
       const { QueueUrl } = await this.sqsClient.send(
@@ -149,12 +141,6 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
     await this.deleteMessage(message);
   }
 
-  /**
-   * The key says what the object is. It used to say only which row it belonged
-   * to, and the kind was inferred by probing for an episode and then a title —
-   * so anything that was neither was indistinguishable from a stale upload, and
-   * a new kind of object could not be added without another probe.
-   */
   private async processRecord(record: { s3: { object: { key: string } } }) {
     const key = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
     const parsed = parseRawKey(key);
@@ -178,16 +164,24 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
         });
         return;
       case RawObjectKind.USER_AVATAR:
-        await this.userAvatarService.scheduleProcessing({ userId: parsed.ownerId, rawKey: key });
+        await this.scheduleImage(ImageKind.USER_AVATAR, parsed.ownerId, key);
+        return;
+      case RawObjectKind.TITLE_POSTER:
+        await this.scheduleImage(ImageKind.TITLE_POSTER, parsed.ownerId, key);
+        return;
+      case RawObjectKind.SEASON_POSTER:
+        await this.scheduleImage(ImageKind.SEASON_POSTER, parsed.ownerId, key);
+        return;
+      case RawObjectKind.ARTIST_PHOTO:
+        await this.scheduleImage(ImageKind.ARTIST_PHOTO, parsed.ownerId, key);
         return;
     }
   }
 
-  /**
-   * Uploads started before the key scheme landed are still bare uuids. Resolved
-   * the old way so an upload in flight across the deploy is not dropped; remove
-   * once nothing of that shape is left in the bucket.
-   */
+  private async scheduleImage(kind: ImageKind, ownerId: string, rawKey: string) {
+    await this.imageTranscodeScheduler.schedule({ kind, ownerId, rawKey });
+  }
+
   private async processLegacyRecord(key: string) {
     if (!isLegacyBareUuidKey(key)) {
       this.logger.warn(`Skipping S3 event for unrecognised object key "${key}"`);

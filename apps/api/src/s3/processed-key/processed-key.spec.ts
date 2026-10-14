@@ -25,8 +25,6 @@ describe("processed key", () => {
       expect(buildVideoPrefix(EPISODE)).toBe("videos/title-1/season-1/episode-1/");
     });
 
-    // deleteFolder matches on the prefix, so a missing slash would also sweep
-    // "videos/title-10/" when deleting "videos/title-1".
     it.each([MOVIE, EPISODE])("ends in a slash, because it names a folder", (location) => {
       expect(buildVideoPrefix(location).endsWith("/")).toBe(true);
     });
@@ -57,11 +55,6 @@ describe("processed key", () => {
     });
   });
 
-  /**
-   * The worker composes keys per output file from `videoPath` while playback reads
-   * `buildVideoManifestKey`. The two were separate string literals in separate
-   * files; a drift between them writes the output somewhere nothing looks.
-   */
   describe("videoPath agrees with the prefix the reader uses", () => {
     it.each([MOVIE, EPISODE])("for %p", (location) => {
       expect(`videos/${videoPath(location)}/`).toBe(buildVideoPrefix(location));

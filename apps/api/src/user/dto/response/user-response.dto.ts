@@ -1,7 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Role, User } from "@prisma/client";
 
-/** Constructor whitelist-copies fields — `password` is never assigned, even if the input row carries it. */
 export class UserResponseDto {
   @ApiProperty({ format: "uuid" })
   id: string;

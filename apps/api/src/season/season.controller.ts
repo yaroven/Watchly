@@ -17,9 +17,7 @@ import {
   ApiParam,
   ApiTags,
 } from "@nestjs/swagger";
-import { Throttle } from "@nestjs/throttler";
 import { AdminOnly } from "../auth/decorators/roles.decorator";
-import { UploadUrlResponseDto } from "../common/dto/upload-url-response.dto";
 import { FilteringParams } from "../common/pagination/filtering-params.decorator";
 import { Filter, Sorting } from "../common/pagination/pagination.types";
 import { SortingParams } from "../common/pagination/sorting-params.decorator";
@@ -27,14 +25,16 @@ import { CreateSeasonDto } from "./dto/request/create-season.dto";
 import { UpdateSeasonDto } from "./dto/request/update-season.dto";
 import { SeasonResponseDto } from "./dto/response/season-response.dto";
 import { SeasonService } from "./season.service";
+import { SeasonExistsPipe } from "./utils/season-exists.pipe";
 
 @ApiTags("seasons")
-@Controller("season")
+@Controller("seasons")
 export class SeasonController {
   constructor(private readonly seasonService: SeasonService) {}
 
   @ApiOperation({ summary: "Create a season for a title" })
   @ApiCreatedResponse({ type: SeasonResponseDto })
+  @ApiNotFoundResponse({ description: "Title not found" })
   @AdminOnly()
   @Post()
   async create(@Body() createSeasonDto: CreateSeasonDto) {
@@ -77,19 +77,11 @@ export class SeasonController {
   @ApiNotFoundResponse({ description: "Season not found" })
   @AdminOnly()
   @Patch(":id")
-  async update(@Param("id", ParseUUIDPipe) id: string, @Body() updateSeasonDto: UpdateSeasonDto) {
+  async update(
+    @Param("id", ParseUUIDPipe, SeasonExistsPipe) id: string,
+    @Body() updateSeasonDto: UpdateSeasonDto,
+  ) {
     return this.seasonService.update(id, updateSeasonDto);
-  }
-
-  @ApiOperation({ summary: "Get a presigned URL to upload the season's poster" })
-  @ApiParam({ name: "id", format: "uuid" })
-  @ApiOkResponse({ type: UploadUrlResponseDto })
-  @ApiNotFoundResponse({ description: "Season not found" })
-  @AdminOnly()
-  @Throttle({ default: { limit: 3, ttl: 60000 } })
-  @Get(":id/poster-upload-url")
-  getPosterUploadUrl(@Param("id", ParseUUIDPipe) id: string) {
-    return this.seasonService.createPosterUploadingUrl(id);
   }
 
   @ApiOperation({ summary: "Delete a season and cascade-delete its episodes" })

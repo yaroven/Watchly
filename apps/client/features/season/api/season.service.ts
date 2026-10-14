@@ -3,7 +3,7 @@ import api from "@/shared/api/axios";
 import { parseApiDate } from "@/shared/lib/parse-api-date";
 import axios from "axios";
 
-const prefix = "season";
+const prefix = "seasons";
 
 interface ApiSeason extends Omit<Season, "createdAt" | "updatedAt"> {
   createdAt: string;

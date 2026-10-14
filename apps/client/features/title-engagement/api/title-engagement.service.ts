@@ -5,27 +5,37 @@ import { ReactionType, TitleEngagement } from "../schemas/title-engagement";
 
 const TitleEngagementService = {
   get: async (titleId: string): Promise<TitleEngagement> => {
-    const { data } = await api.get<TitleEngagement>(`/title/${titleId}/engagement`);
+    const { data } = await api.get<TitleEngagement>(`/titles/${titleId}/engagement`);
+    return data;
+  },
+
+  rate: async (titleId: string, score: number): Promise<TitleEngagement> => {
+    const { data } = await api.put<TitleEngagement>(`/titles/${titleId}/rating`, { score });
+    return data;
+  },
+
+  removeRating: async (titleId: string): Promise<TitleEngagement> => {
+    const { data } = await api.delete<TitleEngagement>(`/titles/${titleId}/rating`);
     return data;
   },
 
   react: async (titleId: string, type: ReactionType): Promise<TitleEngagement> => {
-    const { data } = await api.post<TitleEngagement>(`/title/${titleId}/reaction`, { type });
+    const { data } = await api.post<TitleEngagement>(`/titles/${titleId}/reaction`, { type });
     return data;
   },
 
   removeReaction: async (titleId: string): Promise<TitleEngagement> => {
-    const { data } = await api.delete<TitleEngagement>(`/title/${titleId}/reaction`);
+    const { data } = await api.delete<TitleEngagement>(`/titles/${titleId}/reaction`);
     return data;
   },
 
   addToWatchlist: async (titleId: string): Promise<TitleEngagement> => {
-    const { data } = await api.post<TitleEngagement>(`/title/${titleId}/watchlist`);
+    const { data } = await api.post<TitleEngagement>(`/titles/${titleId}/watchlist`);
     return data;
   },
 
   removeFromWatchlist: async (titleId: string): Promise<TitleEngagement> => {
-    const { data } = await api.delete<TitleEngagement>(`/title/${titleId}/watchlist`);
+    const { data } = await api.delete<TitleEngagement>(`/titles/${titleId}/watchlist`);
     return data;
   },
 

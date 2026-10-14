@@ -7,7 +7,7 @@ import { AvatarUploadUrlDto } from "./dto/response/avatar-upload-url.dto";
 import { UserAvatarService } from "./user-avatar.service";
 
 @ApiTags("users")
-@Controller("user/me/avatar")
+@Controller("users/me/avatar")
 export class UserAvatarController {
   constructor(private readonly userAvatarService: UserAvatarService) {}
 

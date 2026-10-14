@@ -2,7 +2,7 @@ import { parseApiDate } from "@/shared/lib/parse-api-date";
 import api from "@shared/api/axios";
 import { CreateGenreDto, Genre, GetAllGenresDto, UpdateGenreDto } from "../schemas/genre";
 
-const prefix = "genre";
+const prefix = "genres";
 
 interface ApiGenre extends Omit<Genre, "createdAt" | "updatedAt"> {
   createdAt: string;

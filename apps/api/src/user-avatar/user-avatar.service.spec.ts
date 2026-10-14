@@ -1,11 +1,9 @@
-import { getQueueToken } from "@nestjs/bullmq";
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Test, TestingModule } from "@nestjs/testing";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
-import { AVATAR_QUEUE_NAME } from "./avatar-queue.options";
 import { UserAvatarService } from "./user-avatar.service";
 
 describe("UserAvatarService", () => {
@@ -14,7 +12,6 @@ describe("UserAvatarService", () => {
   let service: UserAvatarService;
   let s3Mock: { getUploadPresignedUrl: jest.Mock; deleteObject: jest.Mock };
   let prismaMock: { user: { findUnique: jest.Mock; update: jest.Mock } };
-  let queueMock: { add: jest.Mock };
 
   beforeEach(async () => {
     s3Mock = {
@@ -22,7 +19,6 @@ describe("UserAvatarService", () => {
       deleteObject: jest.fn().mockResolvedValue(undefined),
     };
     prismaMock = { user: { findUnique: jest.fn(), update: jest.fn() } };
-    queueMock = { add: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -38,7 +34,6 @@ describe("UserAvatarService", () => {
             }),
           },
         },
-        { provide: getQueueToken(AVATAR_QUEUE_NAME), useValue: queueMock },
       ],
     }).compile();
 
@@ -57,8 +52,6 @@ describe("UserAvatarService", () => {
       expect(result.rawKey).toBe(key);
     });
 
-    // Two uploads racing must not land on one key: the second would overwrite
-    // the first and both events would then process the same bytes.
     it("should use a fresh name per upload", async () => {
       const first = await service.createUploadUrl(userId, "image/png");
       const second = await service.createUploadUrl(userId, "image/png");
@@ -71,19 +64,6 @@ describe("UserAvatarService", () => {
         BadRequestException,
       );
       expect(s3Mock.getUploadPresignedUrl).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("scheduleProcessing", () => {
-    // A redelivered SQS message must not convert the same object twice.
-    it("should key the job on the uploaded object", async () => {
-      await service.scheduleProcessing({ userId, rawKey: "user-avatar/u/one" });
-
-      expect(queueMock.add).toHaveBeenCalledWith(
-        expect.any(String),
-        { userId, rawKey: "user-avatar/u/one" },
-        expect.objectContaining({ jobId: "avatar-user-avatar/u/one" }),
-      );
     });
   });
 
@@ -108,12 +88,11 @@ describe("UserAvatarService", () => {
       expect(s3Mock.deleteObject).not.toHaveBeenCalled();
     });
 
-    // Otherwise the object outlives the account that owned it.
     it("should discard the new object when the account is gone", async () => {
       prismaMock.user.findUnique.mockResolvedValue(null);
 
       await expect(service.attachProcessedAvatar(userId, "avatars/u/new.webp")).rejects.toThrow(
-        BadRequestException,
+        NotFoundException,
       );
       expect(s3Mock.deleteObject).toHaveBeenCalledWith("avatars/u/new.webp", BucketType.PROCESSED);
       expect(prismaMock.user.update).not.toHaveBeenCalled();
@@ -144,7 +123,6 @@ describe("UserAvatarService", () => {
   });
 
   describe("buildPublicUrl", () => {
-    // Unsigned on purpose: a signature expires while the row keeps claiming it works.
     it("should build an unsigned URL into the processed bucket", () => {
       expect(service.buildPublicUrl("avatars/u/one.webp")).toBe(
         "http://localhost:4566/content/avatars/u/one.webp",

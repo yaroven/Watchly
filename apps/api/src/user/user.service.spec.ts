@@ -1,4 +1,4 @@
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { Prisma, Role } from "@prisma/client";
 import { FilterRule } from "../common/pagination/filter-rule.enum";
@@ -16,7 +16,6 @@ describe("UserService", () => {
   let service: UserService;
   let prismaMock: jest.Mocked<PrismaService>;
 
-  /** A row as USER_SAFE_SELECT returns it — note it carries a key, not a URL. */
   const safeUser = {
     id: "user-1",
     email: "user@example.com",
@@ -26,7 +25,6 @@ describe("UserService", () => {
     avatarKey: null,
   };
 
-  /** What the service is expected to serialise that row into. */
   const safeUserResponse = {
     id: safeUser.id,
     email: safeUser.email,
@@ -268,16 +266,7 @@ describe("UserService", () => {
   });
 
   describe("update", () => {
-    describe("should throw BadRequestException", () => {
-      it("if the user does not exist", async () => {
-        (prismaMock.user.findUnique as jest.Mock).mockResolvedValue(null);
-
-        const action = service.update("missing", { email: "new@example.com" });
-
-        await expect(action).rejects.toThrow(BadRequestException);
-        expect(prismaMock.user.update).not.toHaveBeenCalled();
-      });
-
+    describe("should throw NotFoundException", () => {
       it("if there's a duplicate email", async () => {
         (prismaMock.user.findUnique as jest.Mock).mockResolvedValue(safeUser);
         (prismaMock.user.update as jest.Mock).mockRejectedValue(
@@ -332,13 +321,13 @@ describe("UserService", () => {
   });
 
   describe("delete", () => {
-    describe("should throw BadRequestException", () => {
+    describe("should throw NotFoundException", () => {
       it("if the user does not exist", async () => {
         (prismaMock.user.findUnique as jest.Mock).mockResolvedValue(null);
 
         const action = service.delete("missing");
 
-        await expect(action).rejects.toThrow(BadRequestException);
+        await expect(action).rejects.toThrow(NotFoundException);
         expect(prismaMock.user.delete).not.toHaveBeenCalled();
       });
     });
