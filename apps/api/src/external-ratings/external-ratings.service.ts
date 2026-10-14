@@ -40,10 +40,6 @@ export class ExternalRatingsService {
     }
   }
 
-  /**
-   * Pulls IMDB, Rotten Tomatoes and Metacritic ratings from OMDb for every title. Runs nightly
-   * via cron; also triggerable on demand through `POST /external-ratings/sync`.
-   */
   @Cron("0 0 * * *")
   async syncExternalRatings(): Promise<SyncExternalRatingsResponseDto> {
     const titles = await this.prisma.title.findMany({
@@ -60,9 +56,6 @@ export class ExternalRatingsService {
         try {
           if (await this.syncTitleRatings(title)) syncedCount++;
         } catch (error) {
-          // One title's OMDb match colliding with another (e.g. duplicate
-          // names in our catalog resolving to the same imdbId) must not
-          // abort the whole sync — skip it and keep going.
           this.logger.error(`Failed to sync ratings for title ${title.id} (${title.name}):`, error);
         }
       },
@@ -73,7 +66,6 @@ export class ExternalRatingsService {
     return new SyncExternalRatingsResponseDto({ total: titles.length, synced: syncedCount });
   }
 
-  /** Pulls OMDb ratings for one title on demand and returns its current rating rows. */
   async syncRatingsForTitle(titleId: string): Promise<ExternalRatingResponseDto[]> {
     const title = await this.prisma.title.findUnique({
       where: { id: titleId },
@@ -106,9 +98,6 @@ export class ExternalRatingsService {
     );
     if (!data) return false;
 
-    // Title lookup succeeded without a stored imdbId (first sync for this
-    // title) — cache it so future runs query OMDb directly by id instead of
-    // searching by name/year again.
     if (!imdbId && data.imdbID) {
       await this.prisma.titleExternalId.upsert({
         where: { titleId_source: { titleId: title.id, source: ExternalRatingSource.IMDB } },

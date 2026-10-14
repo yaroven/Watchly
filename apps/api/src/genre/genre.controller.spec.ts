@@ -1,7 +1,9 @@
 import { NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
+import { PrismaService } from "../prisma/prisma.service";
 import { GenreController } from "./genre.controller";
 import { GenreService } from "./genre.service";
+import { GenreExistsPipe } from "./utils/genre-exists.pipe";
 
 describe("GenreController", () => {
   let controller: GenreController;
@@ -11,6 +13,11 @@ describe("GenreController", () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [GenreController],
       providers: [
+        GenreExistsPipe,
+        {
+          provide: PrismaService,
+          useValue: { genre: { findUnique: jest.fn().mockResolvedValue({ id: "genre-1" }) } },
+        },
         {
           provide: GenreService,
           useValue: {

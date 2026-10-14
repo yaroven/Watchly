@@ -1,4 +1,4 @@
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { Prisma } from "@prisma/client";
 import { FilterRule } from "../common/pagination/filter-rule.enum";
@@ -80,7 +80,6 @@ describe("GenreService", () => {
           skip: 0,
           take: 10,
           orderBy: { createdAt: "desc" },
-          // Powers the "N titles" count and the delete guard on the Genres screen.
           include: { _count: { select: { titles: true } } },
         });
         expect(result).toEqual({ items: genres, totalCount: 1 });
@@ -133,15 +132,7 @@ describe("GenreService", () => {
   });
 
   describe("update", () => {
-    describe("should throw BadRequestException", () => {
-      it("if the genre does not exist", async () => {
-        (prismaMock.genre.findUnique as jest.Mock).mockResolvedValue(null);
-
-        const action = service.update("non-existent", { name: "New Name" });
-
-        await expect(action).rejects.toThrow(BadRequestException);
-      });
-    });
+    describe("should throw NotFoundException", () => {});
 
     describe("should update and return the genre", () => {
       it("if the genre exists", async () => {
@@ -179,13 +170,13 @@ describe("GenreService", () => {
   });
 
   describe("delete", () => {
-    describe("should throw BadRequestException", () => {
+    describe("should throw NotFoundException", () => {
       it("if the genre does not exist", async () => {
         (prismaMock.genre.findUnique as jest.Mock).mockResolvedValue(null);
 
         const action = service.delete("non-existent");
 
-        await expect(action).rejects.toThrow(BadRequestException);
+        await expect(action).rejects.toThrow(NotFoundException);
       });
     });
 

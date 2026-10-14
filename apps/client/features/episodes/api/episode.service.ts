@@ -4,7 +4,7 @@ import { parseApiDate } from "@/shared/lib/parse-api-date";
 import axios from "axios";
 import { CreateEpisodeDto, Episode, UpdateEpisodeDto } from "../schemas/episode";
 
-const prefix = "episode";
+const prefix = "episodes";
 
 interface ApiEpisode extends Omit<Episode, "createdAt" | "updatedAt"> {
   createdAt: string;

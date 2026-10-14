@@ -14,10 +14,10 @@ export class ArtistFilmographyItemDto {
   @ApiPropertyOptional()
   character?: string | null;
 
-  constructor(castCredit: CastCredit & { title: Title }) {
+  constructor(castCredit: CastCredit & { title: Title }, posterUrl: string | null = null) {
     this.titleId = castCredit.title.id;
     this.name = castCredit.title.name;
-    this.posterUrl = castCredit.title.posterUrl;
+    this.posterUrl = posterUrl;
     this.character = castCredit.character;
   }
 }

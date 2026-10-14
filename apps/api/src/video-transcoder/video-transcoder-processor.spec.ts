@@ -2,12 +2,14 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { TranscodingStatus } from "@prisma/client";
 import { Job } from "bullmq";
 import * as fs from "fs-extra";
+import { mkdtemp, rm } from "node:fs/promises";
 import { TranscodeVideoDto } from "./dto/request/transcode-video.dto";
 import { VideoType } from "./enums/video-type.enum";
 import { VideoTranscoderProcessor } from "./video-transcoder-processor";
 import { TranscodeAbortedError, VideoTranscoderService } from "./video-transcoder.service";
 
 jest.mock("fs-extra");
+jest.mock("node:fs/promises");
 
 describe("VideoTranscoderProcessor", () => {
   let processor: VideoTranscoderProcessor;
@@ -21,6 +23,8 @@ describe("VideoTranscoderProcessor", () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    (mkdtemp as jest.Mock).mockImplementation((prefix: string) => Promise.resolve(`${prefix}XXXX`));
+    (rm as jest.Mock).mockResolvedValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -172,25 +176,26 @@ describe("VideoTranscoderProcessor", () => {
       it("on success", async () => {
         (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
         videoTranscoderServiceMock.transcodeVideo.mockResolvedValue(undefined);
-        (fs.remove as jest.Mock).mockResolvedValue(undefined);
 
         const job = mockJob({ id: "ep-1", type: VideoType.EPISODE });
 
         await processor.process(job);
 
-        expect(fs.remove).toHaveBeenCalledWith(expect.stringContaining("transcode-job-123"));
+        expect(rm).toHaveBeenCalledWith(expect.stringContaining("transcode-job-123"), {
+          recursive: true,
+          force: true,
+        });
       });
 
       it("on failure", async () => {
         (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
         videoTranscoderServiceMock.transcodeVideo.mockRejectedValue(new Error("error"));
-        (fs.remove as jest.Mock).mockResolvedValue(undefined);
 
         const job = mockJob({ id: "ep-1", type: VideoType.EPISODE });
 
         await expect(processor.process(job)).rejects.toThrow();
 
-        expect(fs.remove).toHaveBeenCalled();
+        expect(rm).toHaveBeenCalled();
       });
 
       it("on abort", async () => {
@@ -198,13 +203,12 @@ describe("VideoTranscoderProcessor", () => {
         videoTranscoderServiceMock.transcodeVideo.mockRejectedValue(
           new TranscodeAbortedError("cancelled"),
         );
-        (fs.remove as jest.Mock).mockResolvedValue(undefined);
 
         const job = mockJob({ id: "ep-1", type: VideoType.EPISODE });
 
         await processor.process(job);
 
-        expect(fs.remove).toHaveBeenCalled();
+        expect(rm).toHaveBeenCalled();
       });
     });
   });

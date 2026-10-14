@@ -16,7 +16,12 @@ export interface GetAllArtistsDto {
 
 export interface CreateArtistDto {
   name: string;
-  photoUrl?: string;
+  /**
+   * Set once the image has been PUT to the upload URL. The key is derived from
+   * the entity server-side, so no URL is sent; omit it to leave the existing
+   * image alone, and send `false` to clear it.
+   */
+  photoUploaded?: boolean;
 }
 
 export type UpdateArtistDto = CreateArtistDto;

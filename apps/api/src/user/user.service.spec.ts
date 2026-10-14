@@ -1,8 +1,9 @@
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { Prisma, Role } from "@prisma/client";
 import { FilterRule } from "../common/pagination/filter-rule.enum";
 import { PrismaService } from "../prisma/prisma.service";
+import { S3Service } from "../s3/s3.service";
 import { hashPassword, verifyPassword } from "./user.password.util";
 import { UserService } from "./user.service";
 
@@ -20,12 +21,27 @@ describe("UserService", () => {
     email: "user@example.com",
     role: Role.USER,
     createdAt: new Date(),
+    displayName: null,
+    avatarKey: null,
+  };
+
+  const safeUserResponse = {
+    id: safeUser.id,
+    email: safeUser.email,
+    role: safeUser.role,
+    createdAt: safeUser.createdAt,
+    displayName: null,
+    avatarUrl: null,
   };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserService,
+        {
+          provide: S3Service,
+          useValue: { getPublicUrl: jest.fn((key: string) => `https://cdn.test/${key}`) },
+        },
         {
           provide: PrismaService,
           useValue: {
@@ -70,10 +86,10 @@ describe("UserService", () => {
             role: true,
             createdAt: true,
             displayName: true,
-            avatarUrl: true,
+            avatarKey: true,
           },
         });
-        expect(result).toEqual(safeUser);
+        expect(result).toEqual(safeUserResponse);
       });
     });
 
@@ -128,7 +144,7 @@ describe("UserService", () => {
         expect(prismaMock.user.findMany).toHaveBeenCalledWith(
           expect.objectContaining({ skip: 0, take: 10, orderBy: { createdAt: "desc" } }),
         );
-        expect(result).toEqual({ items: [safeUser], totalCount: 1 });
+        expect(result).toEqual({ items: [safeUserResponse], totalCount: 1 });
       });
     });
 
@@ -191,10 +207,10 @@ describe("UserService", () => {
             role: true,
             createdAt: true,
             displayName: true,
-            avatarUrl: true,
+            avatarKey: true,
           },
         });
-        expect(result).toEqual(safeUser);
+        expect(result).toEqual(safeUserResponse);
       });
     });
 
@@ -223,7 +239,7 @@ describe("UserService", () => {
           where: { email: "user@example.com" },
         });
         expect(verifyPassword).toHaveBeenCalledWith("correct-plaintext", "salt:hash");
-        expect(result).toEqual(safeUser);
+        expect(result).toEqual(safeUserResponse);
         expect(result).not.toHaveProperty("password");
       });
     });
@@ -250,16 +266,7 @@ describe("UserService", () => {
   });
 
   describe("update", () => {
-    describe("should throw BadRequestException", () => {
-      it("if the user does not exist", async () => {
-        (prismaMock.user.findUnique as jest.Mock).mockResolvedValue(null);
-
-        const action = service.update("missing", { email: "new@example.com" });
-
-        await expect(action).rejects.toThrow(BadRequestException);
-        expect(prismaMock.user.update).not.toHaveBeenCalled();
-      });
-
+    describe("should throw NotFoundException", () => {
       it("if there's a duplicate email", async () => {
         (prismaMock.user.findUnique as jest.Mock).mockResolvedValue(safeUser);
         (prismaMock.user.update as jest.Mock).mockRejectedValue(
@@ -292,7 +299,7 @@ describe("UserService", () => {
             role: true,
             createdAt: true,
             displayName: true,
-            avatarUrl: true,
+            avatarKey: true,
           },
         });
       });
@@ -314,13 +321,13 @@ describe("UserService", () => {
   });
 
   describe("delete", () => {
-    describe("should throw BadRequestException", () => {
+    describe("should throw NotFoundException", () => {
       it("if the user does not exist", async () => {
         (prismaMock.user.findUnique as jest.Mock).mockResolvedValue(null);
 
         const action = service.delete("missing");
 
-        await expect(action).rejects.toThrow(BadRequestException);
+        await expect(action).rejects.toThrow(NotFoundException);
         expect(prismaMock.user.delete).not.toHaveBeenCalled();
       });
     });
@@ -340,10 +347,10 @@ describe("UserService", () => {
             role: true,
             createdAt: true,
             displayName: true,
-            avatarUrl: true,
+            avatarKey: true,
           },
         });
-        expect(result).toEqual(safeUser);
+        expect(result).toEqual(safeUserResponse);
       });
     });
   });

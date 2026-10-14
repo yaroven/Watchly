@@ -1,5 +1,5 @@
 import createMutationHook from "@/shared/api/createMutationHook";
-import { updateEntityPoster, withUploadedPosterUrl } from "@/shared/api/upload-media";
+import { updateEntityPoster, withPosterUploaded } from "@/shared/api/upload-media";
 import { UseMutationOptions } from "@tanstack/react-query";
 import { Artist, ArtistFormValues, UpdateArtistDto } from "../schemas/artist";
 import artistKeys from "./artist.keys";
@@ -8,7 +8,7 @@ import artistService from "./artist.service";
 type CreateArtistWithUploadOptions = Omit<UseMutationOptions<Artist, Error, ArtistFormValues>, "mutationFn"> & {
   onUploadProgress?: (progress: number) => void;
 };
-type UpdateArtistMutationArgs = { id: string; payload: ArtistFormValues; currentPhotoUrl: string };
+type UpdateArtistMutationArgs = { id: string; payload: ArtistFormValues };
 type UpdateArtistMutationOptions = Omit<UseMutationOptions<Artist, Error, UpdateArtistMutationArgs>, "mutationFn"> & {
   onUploadProgress?: (progress: number) => void;
 };
@@ -25,9 +25,9 @@ export const useCreateArtistWithUpload = (options?: CreateArtistWithUploadOption
           files: photoFile,
           getPosterUploadUrl: artistService.getPhotoUploadUrl,
           uploadToUrl: artistService.uploadToS3,
-          buildPayload: (artist, photoUrl): UpdateArtistDto => ({
+          buildPayload: (artist, photoUploaded): UpdateArtistDto => ({
             name: artist.name,
-            photoUrl,
+            photoUploaded,
           }),
           update: artistService.update,
           onProgress: options?.onUploadProgress,
@@ -53,10 +53,10 @@ export const useCreateArtistWithUpload = (options?: CreateArtistWithUploadOption
 
 export const useUpdateArtistWithUpload = (options?: UpdateArtistMutationOptions) => {
   const useUpdateArtistWithUpload = createMutationHook({
-    mutationFn: async ({ id, payload, currentPhotoUrl }: UpdateArtistMutationArgs) => {
+    mutationFn: async ({ id, payload }: UpdateArtistMutationArgs) => {
       const { name, photoFile } = payload;
-      const nextPayload = await withUploadedPosterUrl<UpdateArtistDto>({
-        payload: { name, photoUrl: currentPhotoUrl },
+      const nextPayload = await withPosterUploaded<UpdateArtistDto>({
+        payload: { name },
         files: photoFile,
         getPosterUploadUrl: () => artistService.getPhotoUploadUrl(id),
         uploadToUrl: artistService.uploadToS3,

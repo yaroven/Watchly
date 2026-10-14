@@ -28,9 +28,10 @@ import { GetAllGenreDto } from "./dto/request/get-all-genre.dto";
 import { UpdateGenreDto } from "./dto/request/update-genre.dto";
 import { GenreResponseDto } from "./dto/response/genre-response.dto";
 import { GenreService } from "./genre.service";
+import { GenreExistsPipe } from "./utils/genre-exists.pipe";
 
 @ApiTags("genres")
-@Controller("genre")
+@Controller("genres")
 export class GenreController {
   constructor(private readonly genreService: GenreService) {}
 
@@ -76,7 +77,7 @@ export class GenreController {
   @ApiNotFoundResponse({ description: "Genre not found" })
   @AdminOnly()
   @Patch(":id")
-  update(@Param("id", ParseUUIDPipe) id: string, @Body() data: UpdateGenreDto) {
+  update(@Param("id", ParseUUIDPipe, GenreExistsPipe) id: string, @Body() data: UpdateGenreDto) {
     return this.genreService.update(id, data);
   }
 

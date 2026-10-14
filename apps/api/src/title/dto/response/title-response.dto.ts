@@ -8,8 +8,13 @@ import {
   TranscodingStatus,
 } from "@prisma/client";
 import { GenreResponseDto } from "../../../genre/dto/response/genre-response.dto";
-import { TitleEngagementDto } from "../../../title-engagement/dto/response/title-engagement.dto";
 import { ExternalRatingResponseDto } from "./external-rating-response.dto";
+import { TitleEngagementDto, ViewerTitleEngagementDto } from "./title-engagement.dto";
+
+export type TitleWithCatalogueRelations = Title & {
+  genres: Genre[];
+  externalRatings?: ExternalRatings[];
+};
 
 export class TitleResponseDto {
   @ApiProperty({ format: "uuid" })
@@ -70,24 +75,16 @@ export class TitleResponseDto {
   externalRatings: ExternalRatingResponseDto[];
 
   @ApiProperty({
-    description:
-      "Watchly's own score — the mean of what viewers rated it, alongside the external ones",
-  })
-  rating: { average: number | null; count: number };
-
-  @ApiProperty({
     type: TitleEngagementDto,
-    description: "Likes, dislikes and watchlist state — the viewer's own included when signed in",
+    description:
+      "Watchly's own score, likes, dislikes and watchlist state — the viewer's own included when signed in. Distinct from `externalRatings`, which are other sites' numbers.",
   })
   engagement: TitleEngagementDto;
 
-  // Neither aggregate is defaulted: a title that nobody has rated or liked and a
-  // title whose aggregates were never fetched would serialise identically, and
-  // the client caches whichever it is handed.
   constructor(
-    title: Title & { genres: Genre[]; externalRatings?: ExternalRatings[] },
-    rating: { average: number | null; count: number },
+    title: TitleWithCatalogueRelations,
     engagement: TitleEngagementDto,
+    posterUrl: string | null = null,
   ) {
     this.id = title.id;
     this.createdAt = title.createdAt;
@@ -95,7 +92,7 @@ export class TitleResponseDto {
     this.name = title.name;
     this.description = title.description;
     this.type = title.type;
-    this.posterUrl = title.posterUrl;
+    this.posterUrl = posterUrl;
     this.ageRating = title.ageRating;
     this.country = title.country;
     this.releaseDate = title.releaseDate;
@@ -107,10 +104,16 @@ export class TitleResponseDto {
     this.closedCaption = title.closedCaption;
     this.genres = title.genres.map((genre) => new GenreResponseDto(genre));
     this.transcodingStatus = title.transcodingStatus;
-    this.rating = rating;
     this.engagement = engagement;
     this.externalRatings = (title.externalRatings ?? []).map(
       (rating) => new ExternalRatingResponseDto(rating),
+    );
+  }
+
+  static withoutEngagement(title: TitleWithCatalogueRelations): TitleResponseDto {
+    return new TitleResponseDto(
+      title,
+      TitleEngagementDto.empty(new ViewerTitleEngagementDto(null, null, false)),
     );
   }
 }

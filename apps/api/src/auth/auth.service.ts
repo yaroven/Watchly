@@ -37,7 +37,6 @@ export class AuthService {
     return this.issueTokens({ userId: user.id, role: user.role });
   }
 
-  /** Creates the account and signs the user straight in — same response shape as `login`. */
   async register({ email, password }: RegistrationRequestDto): Promise<AuthTokens> {
     const existing = await this.userService.findByEmail(email);
     if (existing) throw new ConflictException("User with this email already exists");
@@ -46,8 +45,7 @@ export class AuthService {
     return this.issueTokens({ userId: user.id, role: user.role });
   }
 
-  async getMe(userId: string | undefined): Promise<UserResponseDto | null> {
-    if (!userId) throw new UnauthorizedException("Unauthorized access");
+  async getMe(userId: string): Promise<UserResponseDto | null> {
     const user = await this.userService.findOne(userId);
     if (!user) throw new NotFoundException("User not found");
     return user;

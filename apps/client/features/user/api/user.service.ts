@@ -2,7 +2,7 @@ import { parseApiDate } from "@/shared/lib/parse-api-date";
 import api from "@shared/api/axios";
 import { GetAllUsersDto, UpdateUserRoleDto, User } from "../schemas/user";
 
-const prefix = "user";
+const prefix = "users";
 
 interface ApiUser extends Omit<User, "createdAt"> {
   createdAt: string;

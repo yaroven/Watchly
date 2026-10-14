@@ -16,7 +16,7 @@ describe("OptionalJwtAuthGuard", () => {
 
   beforeEach(() => {
     guard = new OptionalJwtAuthGuard();
-    request = { headers: {}, method: "GET", url: "/title" };
+    request = { headers: {}, method: "GET", url: "/titles" };
     context = {
       switchToHttp: () => ({ getRequest: () => request }),
     } as unknown as ExecutionContext;
@@ -37,13 +37,10 @@ describe("OptionalJwtAuthGuard", () => {
   it("should continue anonymously and say nothing when no credential was presented", () => {
     expect(guard.handleRequest(null, null, { message: "No auth token" }, context)).toBeUndefined();
     expect(request.userId).toBeUndefined();
-    // Anonymous page views are the normal case; logging them would bury the rest.
     expect(warn).not.toHaveBeenCalled();
     expect(error).not.toHaveBeenCalled();
   });
 
-  // The route is public: a 401 here reaches the client's refresh-then-redirect
-  // path, so a dead refresh cookie would eject the viewer off a public page.
   it("should continue anonymously and warn when a presented token was rejected", () => {
     request.headers.authorization = "Bearer expired.token.here";
 
@@ -60,8 +57,6 @@ describe("OptionalJwtAuthGuard", () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("GET /title"));
   });
 
-  // A failure inside the strategy degrades every signed-in read to anonymous —
-  // an outage, not a routine rejection, so it must not land at the same severity.
   it("should continue anonymously and log an error when the strategy itself failed", () => {
     const failure = new Error("connection pool timeout");
 
