@@ -12,7 +12,6 @@ import { UpdateUserDto } from "./dto/request/update-user.dto";
 import { UserResponseDto } from "./dto/response/user-response.dto";
 import { hashPassword, verifyPassword } from "./user.password.util";
 
-/** Every query goes through this select so `password` never leaves the service. */
 const USER_SAFE_SELECT = {
   id: true,
   email: true,
@@ -29,15 +28,11 @@ export class UserService {
     private readonly s3Service: S3Service,
   ) {}
 
-  /**
-   * The row stores an object key, so the URL is built per response. A URL in the
-   * column would bake in the host, and a presigned one would bake in an expiry.
-   */
-  private toResponse(user: { avatarKey: string | null } & Record<string, unknown>) {
+  private toResponse(user: Omit<User, "password">): UserResponseDto {
     const avatarUrl = user.avatarKey
       ? this.s3Service.getPublicUrl(user.avatarKey, BucketType.PROCESSED)
       : null;
-    return new UserResponseDto(user as never, avatarUrl);
+    return new UserResponseDto(user, avatarUrl);
   }
 
   async create(data: CreateUserDto): Promise<UserResponseDto> {
@@ -89,9 +84,6 @@ export class UserService {
   }
 
   async update(id: string, data: UpdateUserDto): Promise<UserResponseDto> {
-    const user = await this.findOne(id);
-    if (!user) throw new NotFoundException(`User with id ${id} not found`);
-
     const password = data.password ? await hashPassword(data.password) : undefined;
 
     try {

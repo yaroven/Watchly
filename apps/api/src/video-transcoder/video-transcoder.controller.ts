@@ -35,13 +35,13 @@ export class VideoTranscoderController {
   async getProgress(
     @Param("id", ParseUUIDPipe) id: string,
     @Query("type", new ParseEnumPipe(VideoType)) type: VideoType,
-  ) {
+  ): Promise<VideoTranscodingProgressResponseDto> {
     const progress = await this.videoTranscoderService.getProgress(id, type);
 
     if (!progress) {
       throw new NotFoundException(`Progress for ${type} ${id} not found`);
     }
 
-    return new VideoTranscodingProgressResponseDto(progress);
+    return progress;
   }
 }

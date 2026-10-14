@@ -13,6 +13,7 @@ import BucketType from "../s3/enums/bucket-type.enum";
 import { VIDEO_ROOT, videoPath } from "../s3/processed-key";
 import { S3Service } from "../s3/s3.service";
 import { TranscodeVideoDto } from "./dto/request/transcode-video.dto";
+import { VideoTranscodingProgressResponseDto } from "./dto/response/video-transcoding-progress-response.dto";
 import { VideoType } from "./enums/video-type.enum";
 import { VIDEO_TRANSCODE_QUEUE_NAME } from "./video-transcode-queue.options";
 
@@ -281,10 +282,13 @@ export class VideoTranscoderService {
     });
   }
 
-  async getProgress(id: string, type: VideoType) {
+  async getProgress(
+    id: string,
+    type: VideoType,
+  ): Promise<VideoTranscodingProgressResponseDto | null> {
     const where = type === VideoType.EPISODE ? { episodeId: id } : { titleId: id };
-    return this.prisma.videoTranscodingProgress.findUnique({
-      where,
-    });
+    const progress = await this.prisma.videoTranscodingProgress.findUnique({ where });
+
+    return progress ? new VideoTranscodingProgressResponseDto(progress) : null;
   }
 }

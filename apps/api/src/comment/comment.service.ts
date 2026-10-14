@@ -10,7 +10,11 @@ import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
 import assertTitleExists from "../title/utils/assert-title-exists.util";
 import { CommentSortMode, GetCommentsDto } from "./dto/request/get-comments.dto";
-import { CommentResponseDto, CommentWithAuthor } from "./dto/response/comment-response.dto";
+import {
+  CommentResponseDto,
+  CommentResponseOptions,
+  CommentWithAuthor,
+} from "./dto/response/comment-response.dto";
 
 const REPLY_PREVIEW_SIZE = 3;
 
@@ -25,11 +29,20 @@ export class CommentService {
     private readonly s3Service: S3Service,
   ) {}
 
-  /** The row holds an object key; the URL is derived so nothing stored can expire. */
   private avatarUrl(user: { avatarKey: string | null }): string | null {
     return user.avatarKey
       ? this.s3Service.getPublicUrl(user.avatarKey, BucketType.PROCESSED)
       : null;
+  }
+
+  private toResponse(
+    comment: CommentWithAuthor,
+    options: Omit<CommentResponseOptions, "authorAvatarUrl"> = {},
+  ): CommentResponseDto {
+    return new CommentResponseDto(comment, {
+      ...options,
+      authorAvatarUrl: this.avatarUrl(comment.user),
+    });
   }
 
   async findForTitle(
@@ -71,18 +84,16 @@ export class CommentService {
 
     const toDto = (
       comment: CommentWithAuthor,
-      children: CommentResponseDto[] = [],
+      replies: CommentResponseDto[] = [],
       replyCount = 0,
     ) =>
-      new CommentResponseDto(
-        comment,
-        counts.get(comment.id) ?? { likes: 0, dislikes: 0 },
-        myReactions.get(comment.id) ?? null,
-        authorScores.get(comment.userId) ?? null,
-        children,
+      this.toResponse(comment, {
+        counts: counts.get(comment.id),
+        myReaction: myReactions.get(comment.id),
+        authorScore: authorScores.get(comment.userId),
+        replies,
         replyCount,
-        this.avatarUrl(comment.user),
-      );
+      });
 
     const repliesByParent = new Map<string, CommentResponseDto[]>();
     for (const reply of replies) {
@@ -120,15 +131,8 @@ export class CommentService {
     });
 
     const authorScores = await this.findAuthorScores(titleId, [userId]);
-    return new CommentResponseDto(
-      comment,
-      { likes: 0, dislikes: 0 },
-      null,
-      authorScores.get(userId) ?? null,
-      [],
-      0,
-      this.avatarUrl(comment.user),
-    );
+
+    return this.toResponse(comment, { authorScore: authorScores.get(userId) });
   }
 
   async react(
@@ -220,17 +224,12 @@ export class CommentService {
     ]);
 
     return {
-      items: replies.map(
-        (reply) =>
-          new CommentResponseDto(
-            reply,
-            counts.get(reply.id) ?? { likes: 0, dislikes: 0 },
-            myReactions.get(reply.id) ?? null,
-            authorScores.get(reply.userId) ?? null,
-            [],
-            0,
-            this.avatarUrl(reply.user),
-          ),
+      items: replies.map((reply) =>
+        this.toResponse(reply, {
+          counts: counts.get(reply.id),
+          myReaction: myReactions.get(reply.id),
+          authorScore: authorScores.get(reply.userId),
+        }),
       ),
       totalCount,
     };
