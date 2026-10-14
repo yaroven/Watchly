@@ -7,18 +7,13 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
+import { ArtistExistsPipe } from "../artist/utils/artist-exists.pipe";
 import { AdminOnly } from "../auth/decorators/roles.decorator";
 import { UploadUrlResponseDto } from "../common/dto/upload-url-response.dto";
 import { SeasonExistsPipe } from "../season/utils/season-exists.pipe";
 import { TitleExistsPipe } from "../title/utils/title-exists.pipe";
 import { PosterService } from "./poster.service";
 
-/// Only the upload URL lives here. Reading a poster back is not a route — the key
-/// is resolved into a URL as part of the title response — and confirming an upload
-/// is part of handling `PATCH /titles/:id`, not a call of its own.
-///
-/// Kept on the `title` prefix and the `titles` tag so the URL and the Swagger
-/// section do not move with the module.
 @ApiTags("titles")
 @Controller("titles")
 export class TitlePosterController {
@@ -36,9 +31,6 @@ export class TitlePosterController {
   }
 }
 
-/// Same route on the season prefix. A second class rather than a parameterised
-/// one because the kind decides which pipe runs, and a pipe is chosen at
-/// decoration time, not per request.
 @ApiTags("seasons")
 @Controller("seasons")
 export class SeasonPosterController {
@@ -53,5 +45,22 @@ export class SeasonPosterController {
   @Get(":id/poster-upload-url")
   getUploadUrl(@Param("id", ParseUUIDPipe, SeasonExistsPipe) id: string) {
     return this.posterService.createUploadUrl("seasons", id);
+  }
+}
+
+@ApiTags("artists")
+@Controller("artists")
+export class ArtistPosterController {
+  constructor(private readonly posterService: PosterService) {}
+
+  @ApiOperation({ summary: "Get a presigned upload URL for an artist's photo" })
+  @ApiParam({ name: "id", format: "uuid" })
+  @ApiOkResponse({ type: UploadUrlResponseDto })
+  @ApiNotFoundResponse({ description: "Artist not found" })
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @AdminOnly()
+  @Get(":id/photo-upload-url")
+  getUploadUrl(@Param("id", ParseUUIDPipe, ArtistExistsPipe) id: string) {
+    return this.posterService.createUploadUrl("artists", id);
   }
 }

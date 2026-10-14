@@ -9,7 +9,7 @@ export class CreateArtistDto {
 
   @ApiPropertyOptional({
     description:
-      "True once the image has been PUT to the upload URL. The key is derived from the artist, so no URL is sent; the server checks the object is there before storing it. False clears the photo.",
+      "False clears the photo. True is accepted and ignored: the upload goes to the raw bucket and the transcoding worker records the converted image on the artist once it lands, so a new photo appears on a later read rather than in this response.",
   })
   @IsOptional()
   @IsBoolean()

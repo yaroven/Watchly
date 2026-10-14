@@ -1,66 +1,120 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { randomUUID } from "node:crypto";
+import { UploadUrlResponseDto } from "../common/dto/upload-url-response.dto";
+import { imageProfile } from "../image-transcoder/image-profile.const";
+import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
+import { buildRawKey } from "../s3/raw-key";
 import { S3Service } from "../s3/s3.service";
+import { POSTER_TARGETS, PosterEntityKind } from "./utils/poster-target.const";
 
-export type PosterEntityKind = "titles" | "seasons" | "artists";
+export type { PosterEntityKind };
 
 const UPLOAD_URL_TTL_SECONDS = 120;
 
-/**
- * Posters, addressed by key rather than by URL.
- *
- * The previous shape handed the client a presigned *read* URL alongside the
- * upload one and took it back on the next update, where it went into the row
- * verbatim — signature, `X-Amz-Expires=3600` and all. A stored signature is a
- * row that keeps claiming it works for an hour after it stops, and the guard
- * meant to police it compared only the URL's pathname, so the query string rode
- * along unread.
- *
- * Nothing about a poster now crosses the wire that the server does not already
- * know: the key is `posters/<kind>/<id>`, derivable from the row itself, so the
- * client's only job is to say it finished uploading — and even that is checked.
- */
 @Injectable()
 export class PosterService {
-  constructor(private readonly s3Service: S3Service) {}
+  private readonly logger = new Logger(PosterService.name);
 
-  getPosterKey(kind: PosterEntityKind, id: string): string {
-    return `posters/${kind}/${id}`;
+  constructor(
+    private readonly s3Service: S3Service,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  buildProcessedKey(kind: PosterEntityKind, ownerId: string, version: string): string {
+    return `posters/${kind}/${ownerId}/${version}.webp`;
   }
 
-  async createUploadUrl(kind: PosterEntityKind, id: string): Promise<{ uploadUrl: string }> {
+  async createUploadUrl(kind: PosterEntityKind, id: string): Promise<UploadUrlResponseDto> {
+    const target = POSTER_TARGETS[kind];
+
+    const rawKey = buildRawKey({ kind: target.rawKind, ownerId: id, name: randomUUID() });
+
     const uploadUrl = await this.s3Service.getUploadPresignedUrl(
-      this.getPosterKey(kind, id),
-      BucketType.PROCESSED,
+      rawKey,
+      BucketType.RAW,
       UPLOAD_URL_TTL_SECONDS,
     );
 
-    return { uploadUrl };
+    return { uploadUrl, rawKey, maxBytes: imageProfile(target.imageKind).maxUploadBytes };
   }
 
-  /**
-   * The key to store, once the object is actually there.
-   *
-   * Checked rather than taken on trust: "I uploaded it" is a claim by the
-   * client, and accepting it unverified would point the row at nothing and
-   * render a broken image for everyone.
-   */
-  async confirmUpload(kind: PosterEntityKind, id: string): Promise<string> {
-    const key = this.getPosterKey(kind, id);
+  async attachProcessed(kind: PosterEntityKind, ownerId: string, newKey: string): Promise<void> {
+    const previous = await this.readStoredKey(kind, ownerId);
 
-    if (!(await this.s3Service.objectExists(key, BucketType.PROCESSED))) {
-      throw new BadRequestException("No uploaded image found — upload it before saving");
+    if (!previous) {
+      await this.s3Service.deleteObject(newKey, BucketType.PROCESSED).catch(() => undefined);
+      throw new NotFoundException(`${POSTER_TARGETS[kind].label} with id ${ownerId} not found`);
     }
 
-    return key;
+    await this.writeStoredKey(kind, ownerId, newKey);
+
+    if (previous.key && previous.key !== newKey) {
+      await this.deleteStoredImage(previous.key);
+    }
   }
 
-  /** The public URL for a stored key, or null where there is no poster. */
+  async removeStoredImage(kind: PosterEntityKind, ownerId: string): Promise<void> {
+    const stored = await this.readStoredKey(kind, ownerId);
+    await this.deleteStoredImage(stored?.key);
+  }
+
+  async deleteStoredImage(key: string | null | undefined): Promise<void> {
+    if (!key) return;
+
+    await this.s3Service
+      .deleteObject(key, BucketType.PROCESSED)
+      .catch((error: unknown) => this.logger.error(`Failed to remove image object ${key}`, error));
+  }
+
   toPublicUrl(key: string | null | undefined): string | null {
     return key ? this.s3Service.getPublicUrl(key, BucketType.PROCESSED) : null;
   }
 
-  async deletePoster(kind: PosterEntityKind, id: string): Promise<void> {
-    await this.s3Service.deleteObject(this.getPosterKey(kind, id), BucketType.PROCESSED);
+  private async readStoredKey(
+    kind: PosterEntityKind,
+    id: string,
+  ): Promise<{ key: string | null } | null> {
+    switch (kind) {
+      case "titles": {
+        const row = await this.prisma.title.findUnique({
+          where: { id },
+          select: { posterKey: true },
+        });
+        return row ? { key: row.posterKey } : null;
+      }
+      case "seasons": {
+        const row = await this.prisma.season.findUnique({
+          where: { id },
+          select: { posterKey: true },
+        });
+        return row ? { key: row.posterKey } : null;
+      }
+      case "artists": {
+        const row = await this.prisma.artist.findUnique({
+          where: { id },
+          select: { photoKey: true },
+        });
+        return row ? { key: row.photoKey } : null;
+      }
+    }
+  }
+
+  private async writeStoredKey(
+    kind: PosterEntityKind,
+    id: string,
+    key: string | null,
+  ): Promise<void> {
+    switch (kind) {
+      case "titles":
+        await this.prisma.title.update({ where: { id }, data: { posterKey: key } });
+        return;
+      case "seasons":
+        await this.prisma.season.update({ where: { id }, data: { posterKey: key } });
+        return;
+      case "artists":
+        await this.prisma.artist.update({ where: { id }, data: { photoKey: key } });
+        return;
+    }
   }
 }

@@ -3,8 +3,9 @@ import { Injectable, Logger } from "@nestjs/common";
 import { TranscodingStatus } from "@prisma/client";
 import { Job } from "bullmq";
 import * as fs from "fs-extra";
-import * as os from "os";
 import * as path from "path";
+import logJobFailure from "../common/utils/log-job-failure.util";
+import withWorkDir from "../common/utils/work-dir.util";
 import { TranscodeVideoDto } from "./dto/request/transcode-video.dto";
 import { VIDEO_TRANSCODE_QUEUE_NAME } from "./video-transcode-queue.options";
 import { TranscodeAbortedError, VideoTranscoderService } from "./video-transcoder.service";
@@ -23,38 +24,30 @@ export class VideoTranscoderProcessor extends WorkerHost {
     const { type, id } = job.data;
     const jobId = job.id;
 
-    const tempDir = path.join(os.tmpdir(), `transcode-${jobId}`);
-    const inputPath = path.join(tempDir, id);
-    const outputDir = path.join(tempDir, "output");
+    return withWorkDir(`transcode-${jobId}`, async (workDir) => {
+      const inputPath = path.join(workDir, id);
+      const outputDir = path.join(workDir, "output");
 
-    try {
-      await this.videoTranscodeService.updateStatus(id, type, TranscodingStatus.PROCESSING);
-      await this.videoTranscodeService.updateProgress(id, type, 0);
-      await fs.ensureDir(outputDir);
-      await this.videoTranscodeService.transcodeVideo(id, inputPath, outputDir, type);
+      try {
+        await this.videoTranscodeService.updateStatus(id, type, TranscodingStatus.PROCESSING);
+        await this.videoTranscodeService.updateProgress(id, type, 0);
+        await fs.ensureDir(outputDir);
+        await this.videoTranscodeService.transcodeVideo(id, inputPath, outputDir, type);
 
-      await this.videoTranscodeService.updateStatus(id, type, TranscodingStatus.COMPLETED);
-      await this.videoTranscodeService.updateProgress(id, type, 100);
-      this.logger.log(`Job ${jobId} finished successfully.`);
-      return { result: "success" };
-    } catch (error) {
-      if (error instanceof TranscodeAbortedError) {
-        this.logger.warn(`Job ${jobId} aborted: ${error.message}`);
-        return { result: "aborted" };
+        await this.videoTranscodeService.updateStatus(id, type, TranscodingStatus.COMPLETED);
+        await this.videoTranscodeService.updateProgress(id, type, 100);
+        this.logger.log(`Job ${jobId} finished successfully.`);
+        return { result: "success" };
+      } catch (error) {
+        if (error instanceof TranscodeAbortedError) {
+          this.logger.warn(`Job ${jobId} aborted: ${error.message}`);
+          return { result: "aborted" };
+        }
+
+        await this.videoTranscodeService.updateStatus(id, type, TranscodingStatus.FAILED);
+        logJobFailure(this.logger, `Job ${jobId}`, error);
+        throw error;
       }
-
-      await this.videoTranscodeService.updateStatus(id, type, TranscodingStatus.FAILED);
-      // The message must carry the error itself: nestjs-pino treats a second
-      // positional argument as the stack *string*, so passing the Error object
-      // there swallows it and the log ends at "failed:".
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(
-        `Job ${jobId} failed: ${message}`,
-        error instanceof Error ? error.stack : undefined,
-      );
-      throw error;
-    } finally {
-      await fs.remove(tempDir);
-    }
+    });
   }
 }

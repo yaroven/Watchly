@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { Artist, Prisma } from "@prisma/client";
 import { paginate } from "../common/pagination/paginate.util";
 import { Filter, Sorting } from "../common/pagination/pagination.types";
@@ -20,8 +20,6 @@ export class ArtistService {
 
   async create(data: CreateArtistDto): Promise<ArtistResponseDto> {
     const { photoUploaded: _photoUploaded, ...rest } = data;
-    // No photo on create: the key is derived from the id, which does not exist
-    // until this row does, so there is nowhere to have uploaded it yet.
     const artist = await this.prisma.artist.create({ data: rest });
     return this.toResponse(artist);
   }
@@ -56,34 +54,20 @@ export class ArtistService {
   }
 
   async update(id: string, data: UpdateArtistDto): Promise<ArtistResponseDto> {
-    const artist = await this.findOne(id);
-    if (!artist) {
-      throw new NotFoundException(`Artist with id ${id} not found`);
-    }
     const { photoUploaded, ...rest } = data;
+
+    if (photoUploaded === false) {
+      await this.posterService.removeStoredImage("artists", id);
+    }
 
     const updated = await this.prisma.artist.update({
       where: { id },
       data: {
         ...rest,
-        ...(photoUploaded === undefined
-          ? {}
-          : {
-              photoKey: photoUploaded
-                ? await this.posterService.confirmUpload("artists", id)
-                : null,
-            }),
+        ...(photoUploaded === false ? { photoKey: null } : {}),
       },
     });
     return this.toResponse(updated);
-  }
-
-  async createPhotoUploadUrl(id: string): Promise<{ uploadUrl: string }> {
-    const artist = await this.findOne(id);
-    if (!artist) {
-      throw new NotFoundException(`Artist with id ${id} not found`);
-    }
-    return this.posterService.createUploadUrl("artists", id);
   }
 
   async getFilmography(id: string): Promise<ArtistFilmographyItemDto[]> {
@@ -102,12 +86,10 @@ export class ArtistService {
   }
 
   async delete(id: string): Promise<ArtistResponseDto> {
-    const artist = await this.findOne(id);
-    if (!artist) {
-      throw new NotFoundException(`Artist with id ${id} not found`);
-    }
-
     const deleted = await this.prisma.artist.delete({ where: { id } });
+
+    await this.posterService.deleteStoredImage(deleted.photoKey);
+
     return new ArtistResponseDto(deleted);
   }
 }

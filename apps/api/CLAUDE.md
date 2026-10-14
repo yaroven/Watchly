@@ -27,12 +27,15 @@ suffix: `.util.ts`, `.query.ts`, `.pipe.ts`, `.decorator.ts`, `.const.ts`, `.enu
 `.types.ts`.
 
 A route whose only domain-specific work is "does this id exist" takes an existence
-pipe on the param (`TitleExistsPipe`, `EpisodeExistsPipe`, `SeasonExistsPipe`, each in
-its domain's `utils/`) instead of a service method that wraps the check, and then
-belongs with the service that owns the mechanics: that is why the movie and episode
-upload/transcode routes live on `media-asset/{title,episode}-media.controller.ts` and
-both poster upload URLs on `poster/title-poster.controller.ts`, each injecting one
-service. The episode's playback URL is the counter-example that stayed behind —
+pipe on the param — one per domain in its `utils/`, for titles, episodes, seasons,
+artists, genres and users — instead of a service method that wraps the check. A route
+that then does nothing but forward belongs with the service that owns the mechanics:
+that is why the movie and episode upload/transcode routes live on
+`media-asset/{title,episode}-media.controller.ts` and all three poster/photo upload
+URLs on `poster/title-poster.controller.ts`, each injecting one service.
+
+Because a pipe does not run on a direct handler call, the 404 it owns is pinned by a
+request-level `*.controller.existence.spec.ts` beside the unit spec, not by it. The episode's playback URL is the counter-example that stayed behind —
 building it needs the episode's season and title, which only `EpisodeService`
 resolves.
 
@@ -47,6 +50,53 @@ it also needs the `P2025` re-read to tell "title gone" (404) from "bad genreId" 
 Nothing closes the window between the pipe and the write — a `findUnique` takes no
 lock, so the in-transaction check never did either. A title deleted mid-request ends
 as a rollback, not a bad row.
+
+Media conversion is split by **kind**, not by feature: `video-transcoder` is
+parameterised by `VideoType`, `image-transcoder` by `ImageKind`. Adding a kind of
+image means a profile in `image-profile.const.ts` and a `ProcessedImageAttacher` in
+the owning feature — the attacher supplies the two things only that feature knows,
+the processed key and the row to point at it. The worker wires the attachers, so
+`image-transcoder` never imports a feature module.
+
+**A queue is registered by the transcoder that owns it, never by a feature.**
+`VideoTranscoderService.scheduleTranscodeVideo` and `ImageTranscodeScheduler.schedule`
+are the only producers; `title`, `season`, `artist`, `poster` and `user-avatar` inject
+neither a `Queue` nor the job name. `UserAvatarService` used to hold an `@InjectQueue`
+of its own, which meant `UserModule` — and `AuthModule` behind it — pulled a Redis
+queue in for a feature that only hands out an upload URL. `s3-event` maps the raw key's
+kind to an `ImageKind` the same way it maps one to a `VideoType`, and calls the
+producer; the `jobId` convention (`image-<rawKey>`) lives with the producer too, rather
+than once per feature.
+
+Both processors run in one worker process — `worker-main.ts` loads
+`VideoTranscoderWorkerModule`, which registers both queues because converting an
+image needs the ffmpeg the API image does not install. They keep **separate queues**
+on purpose: concurrency is per-queue, and one setting cannot serve a twenty-minute
+video transcode and an interactive 256px avatar. One queue for every image is right
+for the opposite reason — an avatar and a poster cost about the same. What both share
+lives in `common/utils/`: `DEFAULT_JOB_OPTIONS`, `withWorkDir`, `logJobFailure`,
+`streamToFile`.
+
+Every uploaded image goes through it: avatars, title and season posters, and artist
+photos. `PosterService` presigns into the **raw** bucket, `poster-image.attacher.ts`
+contributes one attacher per entity kind — three instances of one class, since only the
+`ImageKind` differs between them, built in a factory because the entity kind is a
+constructor argument rather than something DI resolves. The processed key is versioned
+(`posters/<kind>/<id>/<version>.webp`) for the same reason an avatar's is: a stable key
+would leave the superseded artwork in front of any viewer that cached it. Note that
+`S3Service.uploadStream` sets no `Cache-Control` at all today — the versioned key is
+what would make an `immutable` one safe to add, not evidence that one is set.
+
+A poster is therefore **asynchronous**, and the write path reflects that:
+`posterUploaded` / `photoUploaded` is no longer a claim the server checks. `true` is
+accepted and ignored — the worker records the key off the S3 event — and `false` still
+clears the image. `PosterService.confirmUpload` is gone with it. Cleanup goes **by the
+stored key**, not by one derived from the id (`deleteStoredImage`), because the version
+exists only on the row: a caller that deletes the row hands the key over.
+
+The client has not caught up: it still sends `posterUploaded: true` (harmless) and
+refetches immediately, so an admin can see the previous poster for a moment after
+saving. Showing an upload as still processing is client work that has not been done.
 
 ## Rules
 
