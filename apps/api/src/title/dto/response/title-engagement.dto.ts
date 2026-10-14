@@ -1,5 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { ReactionType } from "@prisma/client";
+import { EngagementRelations } from "../../utils/title.query";
 
 export interface TitleEngagementCounts {
   averageScore: number | null;
@@ -9,14 +10,6 @@ export interface TitleEngagementCounts {
   watchlistCount: number;
 }
 
-/**
- * Everything the viewer themselves did to this title.
- *
- * Score lives in here rather than beside the aggregates on purpose. As a flat
- * `myScore` it had to mean both "has not rated" and "anonymous", which is the
- * difference between a control that shows as not-yet-set and one that shows as
- * unknown — and the client cannot tell those apart from a single null.
- */
 export class ViewerTitleEngagementDto {
   @ApiProperty({
     nullable: true,
@@ -37,13 +30,14 @@ export class ViewerTitleEngagementDto {
   }
 }
 
-/**
- * Score, reactions and watchlist in one block.
- *
- * They are three tables (ADR-0003) and one response: every consumer that wants
- * any of them wants the rest, and splitting them across two blocks meant two
- * aggregate round trips, two densifications and two cache keys for one read.
- */
+const NO_ENGAGEMENT: TitleEngagementCounts = {
+  averageScore: null,
+  ratingCount: 0,
+  likes: 0,
+  dislikes: 0,
+  watchlistCount: 0,
+};
+
 export class TitleEngagementDto {
   @ApiProperty({ nullable: true, description: "Mean of every score, null until someone rates it" })
   averageScore: number | null;
@@ -68,11 +62,7 @@ export class TitleEngagementDto {
   })
   viewer: ViewerTitleEngagementDto | null;
 
-  // Required, not defaulted: "nobody has engaged with this" and "the aggregate was
-  // never fetched" must not be able to serialise identically.
   constructor(counts: TitleEngagementCounts, viewer: ViewerTitleEngagementDto | null) {
-    // Rounded here so every path that builds the block agrees — a mean of
-    // 7.333333333333333 is noise the client would have to trim itself.
     this.averageScore =
       counts.averageScore === null ? null : Math.round(counts.averageScore * 10) / 10;
     this.ratingCount = counts.ratingCount;
@@ -82,15 +72,30 @@ export class TitleEngagementDto {
     this.viewer = viewer;
   }
 
-  /**
-   * For a title that provably has no engagement — one just created, or just
-   * deleted. `viewer` is required: null here means "we did not ask", which the
-   * client renders as unknown, and these callers know the answer.
-   */
   static empty(viewer: ViewerTitleEngagementDto | null): TitleEngagementDto {
+    return new TitleEngagementDto(NO_ENGAGEMENT, viewer);
+  }
+
+  static fromRelations(rows: EngagementRelations, viewerId: string | null): TitleEngagementDto {
+    const counts: TitleEngagementCounts = rows.engagement
+      ? {
+          averageScore: rows.engagement.avgScore,
+          ratingCount: rows.engagement.ratingCount,
+          likes: rows.engagement.likes,
+          dislikes: rows.engagement.dislikes,
+          watchlistCount: rows.engagement.watchlistCount,
+        }
+      : NO_ENGAGEMENT;
+
     return new TitleEngagementDto(
-      { averageScore: null, ratingCount: 0, likes: 0, dislikes: 0, watchlistCount: 0 },
-      viewer,
+      counts,
+      viewerId
+        ? new ViewerTitleEngagementDto(
+            rows.ratings?.[0]?.score ?? null,
+            rows.reactions?.[0]?.type ?? null,
+            (rows.watchlistEntries?.length ?? 0) > 0,
+          )
+        : null,
     );
   }
 }

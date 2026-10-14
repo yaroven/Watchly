@@ -9,7 +9,12 @@ import {
 } from "@prisma/client";
 import { GenreResponseDto } from "../../../genre/dto/response/genre-response.dto";
 import { ExternalRatingResponseDto } from "./external-rating-response.dto";
-import { TitleEngagementDto } from "./title-engagement.dto";
+import { TitleEngagementDto, ViewerTitleEngagementDto } from "./title-engagement.dto";
+
+export type TitleWithCatalogueRelations = Title & {
+  genres: Genre[];
+  externalRatings?: ExternalRatings[];
+};
 
 export class TitleResponseDto {
   @ApiProperty({ format: "uuid" })
@@ -76,11 +81,8 @@ export class TitleResponseDto {
   })
   engagement: TitleEngagementDto;
 
-  // Not defaulted: a title that nobody has rated or liked and a title whose
-  // aggregate was never fetched would serialise identically, and the client
-  // caches whichever it is handed.
   constructor(
-    title: Title & { genres: Genre[]; externalRatings?: ExternalRatings[] },
+    title: TitleWithCatalogueRelations,
     engagement: TitleEngagementDto,
     posterUrl: string | null = null,
   ) {
@@ -90,8 +92,6 @@ export class TitleResponseDto {
     this.name = title.name;
     this.description = title.description;
     this.type = title.type;
-    // Derived from `title.posterKey` by the caller, never stored: a presigned
-    // URL in a row keeps claiming it works after its signature expires.
     this.posterUrl = posterUrl;
     this.ageRating = title.ageRating;
     this.country = title.country;
@@ -107,6 +107,13 @@ export class TitleResponseDto {
     this.engagement = engagement;
     this.externalRatings = (title.externalRatings ?? []).map(
       (rating) => new ExternalRatingResponseDto(rating),
+    );
+  }
+
+  static withoutEngagement(title: TitleWithCatalogueRelations): TitleResponseDto {
+    return new TitleResponseDto(
+      title,
+      TitleEngagementDto.empty(new ViewerTitleEngagementDto(null, null, false)),
     );
   }
 }
