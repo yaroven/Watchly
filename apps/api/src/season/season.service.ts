@@ -50,24 +50,17 @@ export class SeasonService {
   }
 
   async update(id: string, data: UpdateSeasonDto): Promise<SeasonResponseDto> {
-    const season = await this.findOne(id);
-    if (!season) {
-      throw new NotFoundException(`Season with id ${id} not found`);
-    }
-
     const { posterUploaded, ...rest } = data;
+
+    if (posterUploaded === false) {
+      await this.posterService.removeStoredImage("seasons", id);
+    }
 
     const updated = await this.prisma.season.update({
       where: { id },
       data: {
         ...rest,
-        ...(posterUploaded === undefined
-          ? {}
-          : {
-              posterKey: posterUploaded
-                ? await this.posterService.confirmUpload("seasons", id)
-                : null,
-            }),
+        ...(posterUploaded === false ? { posterKey: null } : {}),
       },
     });
     return this.toResponse(updated);
@@ -93,11 +86,6 @@ export class SeasonService {
     return this.toResponse(deleted);
   }
 
-  /**
-   * Best-effort storage/queue cleanup for a season whose DB row (and cascaded
-   * episodes) is already deleted. Called both from `delete` and from
-   * TitleService when a whole series is removed.
-   */
   async cleanupAssets(season: Season & { episodes: Episode[] }): Promise<void> {
     await settleAllOrLog(
       season.episodes,
@@ -109,7 +97,7 @@ export class SeasonService {
 
     await settleAllOrLog(
       [
-        { id: "poster", run: () => this.posterService.deletePoster("seasons", season.id) },
+        { id: "poster", run: () => this.posterService.deleteStoredImage(season.posterKey) },
         {
           id: "processed-folder",
           run: () =>

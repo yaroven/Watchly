@@ -14,10 +14,8 @@ import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { CreateTitleDto } from "./dto/request/create-title.dto";
 import { GetAllTitleDto } from "./dto/request/get-all-title.dto";
 import { UpdateTitleDto } from "./dto/request/update-title.dto";
-import { TitleEngagementDto, ViewerTitleEngagementDto } from "./dto/response/title-engagement.dto";
+import { TitleEngagementDto } from "./dto/response/title-engagement.dto";
 import { TitleResponseDto } from "./dto/response/title-response.dto";
-import toTitleDtoResponse from "./dto/to-title-dto-response";
-import toTitleEngagementDto from "./dto/to-title-engagement-dto";
 import assertTitleExists from "./utils/assert-title-exists.util";
 import titleQuery, { EngagementRelations, TitleWithEngagement } from "./utils/title.query";
 
@@ -47,10 +45,7 @@ export class TitleService {
         },
         include: titleQuery.base(),
       });
-      return toTitleDtoResponse(
-        title,
-        TitleEngagementDto.empty(new ViewerTitleEngagementDto(null, null, false)),
-      );
+      return TitleResponseDto.withoutEngagement(title);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
         throw new BadRequestException("One or more genreIds do not exist");
@@ -110,12 +105,10 @@ export class TitleService {
   ): Promise<TitleResponseDto> {
     await assertTitleExists(this.prisma, id);
 
-    const posterKey =
-      posterUploaded === undefined
-        ? undefined
-        : posterUploaded
-          ? await this.posterService.confirmUpload("titles", id)
-          : null;
+    if (posterUploaded === false) {
+      await this.posterService.removeStoredImage("titles", id);
+    }
+    const posterKey = posterUploaded === false ? null : undefined;
 
     try {
       const updated = (await this.prisma.title.update({
@@ -158,11 +151,7 @@ export class TitleService {
     });
 
     await Promise.all([
-      this.posterService
-        .deletePoster("titles", id)
-        .catch((error: unknown) =>
-          this.logger.error(`Failed to clean up poster after deleting title ${id}`, error),
-        ),
+      this.posterService.deleteStoredImage(title.posterKey),
       this.mediaAssetService.cleanupVideoAsset(
         id,
         VideoType.MOVIE,
@@ -178,10 +167,7 @@ export class TitleService {
         ),
     ]);
 
-    return toTitleDtoResponse(
-      deleted,
-      TitleEngagementDto.empty(new ViewerTitleEngagementDto(null, null, false)),
-    );
+    return TitleResponseDto.withoutEngagement(deleted);
   }
 
   async rate(titleId: string, userId: string, score: number): Promise<TitleEngagementDto> {
@@ -262,7 +248,7 @@ export class TitleService {
     })) as EngagementRelations | null;
 
     if (!rows) throw new NotFoundException(`Title with id ${titleId} not found`);
-    return toTitleEngagementDto(rows, viewerId);
+    return TitleEngagementDto.fromRelations(rows, viewerId);
   }
 
   private async writeCounts(
@@ -312,9 +298,9 @@ export class TitleService {
   }
 
   private toResponse(title: TitleWithEngagement, viewerId: string | null): TitleResponseDto {
-    return toTitleDtoResponse(
+    return new TitleResponseDto(
       title,
-      toTitleEngagementDto(title, viewerId),
+      TitleEngagementDto.fromRelations(title, viewerId),
       this.posterService.toPublicUrl(title.posterKey),
     );
   }

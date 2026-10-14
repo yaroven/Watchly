@@ -1,11 +1,10 @@
-import { BadRequestException, NotFoundException } from "@nestjs/common";
+import { NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { AgeRating, Prisma, TitleType } from "@prisma/client";
 import { FilterRule } from "../common/pagination/filter-rule.enum";
 import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
-import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
 import { SeasonService } from "../season/season.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
@@ -18,7 +17,19 @@ describe("TitleService", () => {
   let mediaAssetServiceMock: jest.Mocked<MediaAssetService>;
   let seasonServiceMock: jest.Mocked<SeasonService>;
 
+  let posterServiceMock: {
+    toPublicUrl: jest.Mock;
+    removeStoredImage: jest.Mock;
+    deleteStoredImage: jest.Mock;
+  };
+
   beforeEach(async () => {
+    posterServiceMock = {
+      toPublicUrl: jest.fn((key: string | null) => (key ? `https://cdn.example.com/${key}` : null)),
+      removeStoredImage: jest.fn(),
+      deleteStoredImage: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TitleService,
@@ -33,9 +44,6 @@ describe("TitleService", () => {
               delete: jest.fn(),
               count: jest.fn(),
             },
-            // The aggregates are no longer a collaborator to stub out — they are
-            // this service's own queries now. Every delegate answers empty by
-            // default, which is the shape a title nobody has touched produces.
             titleRating: {
               aggregate: jest
                 .fn()
@@ -74,7 +82,7 @@ describe("TitleService", () => {
             deleteFolder: jest.fn(),
           },
         },
-        PosterService,
+        { provide: PosterService, useValue: posterServiceMock },
         {
           provide: MediaAssetService,
           useValue: {
@@ -108,8 +116,6 @@ describe("TitleService", () => {
   });
 
   describe("create", () => {
-    // `viewer: null` means "we did not ask", which the client renders as unknown
-    // and disables on. A title created a moment ago has provably known state.
     it("should state the viewer's engagement rather than reporting it unknown", async () => {
       (prismaServiceMock.title.create as jest.Mock).mockResolvedValue({
         id: "title-1",
@@ -348,9 +354,6 @@ describe("TitleService", () => {
   });
 
   describe("the viewer on read paths", () => {
-    // `viewer: null` means "we did not ask", which the client renders as unknown.
-    // Dropping the viewer on the way in makes every signed-in read look anonymous,
-    // and the controls render as not-yet-set rather than as unknown.
     const titleRow = { id: "title-1", genres: [] };
 
     it("should build a viewer block for findOne when there is a viewer", async () => {
@@ -402,8 +405,6 @@ describe("TitleService", () => {
       const result = await service.findOne("title-1");
 
       expect(result?.engagement.viewer).toBeNull();
-      // Nothing viewer-scoped should have been asked for at all. An empty
-      // `where` would read as "no filter" and return every user's rows.
       const { include } = (prismaServiceMock.title.findUnique as jest.Mock).mock.calls[0][0];
       expect(include).not.toHaveProperty("ratings");
       expect(include).not.toHaveProperty("reactions");
@@ -448,24 +449,6 @@ describe("TitleService", () => {
         await expect(action).rejects.toThrow(NotFoundException);
       });
 
-      // The client can only claim it uploaded; it cannot name a URL any more.
-      // An unbacked claim must not reach the row, or the poster renders broken.
-      it("if the client says it uploaded a poster and nothing is there", async () => {
-        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
-          id: "title-1",
-          genres: [],
-        });
-        (s3ServiceMock.objectExists as jest.Mock).mockResolvedValue(false);
-
-        const action = service.update("title-1", { posterUploaded: true } as any);
-
-        await expect(action).rejects.toThrow(BadRequestException);
-        expect(prismaServiceMock.title.update).not.toHaveBeenCalled();
-      });
-
-      // Prisma answers P2025 both for a missing genre in `set` and for a missing
-      // Title row. Mapping it straight to 400 told a client whose title had been
-      // deleted mid-request that its own genreIds were wrong.
       it("if the title is deleted between the check and the write", async () => {
         (prismaServiceMock.title.findUnique as jest.Mock)
           .mockResolvedValueOnce({ id: "title-1" })
@@ -539,10 +522,56 @@ describe("TitleService", () => {
     });
   });
 
+  describe("the poster flag on update", () => {
+    it("should ignore a claimed upload rather than write a key", async () => {
+      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
+        id: "title-1",
+        genres: [],
+      });
+      (prismaServiceMock.title.update as jest.Mock).mockResolvedValue({
+        id: "title-1",
+        genres: [],
+      });
+
+      await service.update("title-1", { posterUploaded: true } as any);
+
+      expect(prismaServiceMock.title.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.not.objectContaining({ posterKey: expect.anything() }),
+        }),
+      );
+      expect(posterServiceMock.removeStoredImage).not.toHaveBeenCalled();
+    });
+
+    it("should drop both the column and the object when the flag clears it", async () => {
+      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
+        id: "title-1",
+        genres: [],
+      });
+      (prismaServiceMock.title.update as jest.Mock).mockResolvedValue({
+        id: "title-1",
+        genres: [],
+      });
+
+      await service.update("title-1", { posterUploaded: false } as any);
+
+      expect(posterServiceMock.removeStoredImage).toHaveBeenCalledWith("titles", "title-1");
+      expect(prismaServiceMock.title.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ posterKey: null }) }),
+      );
+    });
+  });
+
   describe("delete", () => {
     describe("should delete the title and cleanup its resources", () => {
       it("if the title exists as a MOVIE", async () => {
-        const title = { id: "title-1", type: TitleType.MOVIE, seasons: [], genres: [] };
+        const title = {
+          id: "title-1",
+          type: TitleType.MOVIE,
+          posterKey: "posters/titles/title-1/v1.webp",
+          seasons: [],
+          genres: [],
+        };
         (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(title);
         (prismaServiceMock.title.delete as jest.Mock).mockResolvedValue(title);
 
@@ -553,9 +582,8 @@ describe("TitleService", () => {
           VideoType.MOVIE,
           "videos/title-1/",
         );
-        expect(s3ServiceMock.deleteObject).toHaveBeenCalledWith(
-          "posters/titles/title-1",
-          BucketType.PROCESSED,
+        expect(posterServiceMock.deleteStoredImage).toHaveBeenCalledWith(
+          "posters/titles/title-1/v1.webp",
         );
         expect(prismaServiceMock.title.delete).toHaveBeenCalledWith({
           where: { id: "title-1" },
@@ -613,6 +641,7 @@ describe("TitleService", () => {
         const title = {
           id: "title-1",
           type: TitleType.SERIES,
+          posterKey: "posters/titles/title-1/v1.webp",
           seasons: [{ id: "season-1" }, { id: "season-2" }],
           genres: [],
         };
@@ -621,9 +650,8 @@ describe("TitleService", () => {
 
         await service.delete("title-1");
 
-        expect(s3ServiceMock.deleteObject).toHaveBeenCalledWith(
-          "posters/titles/title-1",
-          BucketType.PROCESSED,
+        expect(posterServiceMock.deleteStoredImage).toHaveBeenCalledWith(
+          "posters/titles/title-1/v1.webp",
         );
       });
     });

@@ -9,10 +9,6 @@ import { TitleExistsPipe } from "../title/utils/title-exists.pipe";
 import { PosterService } from "./poster.service";
 import { SeasonPosterController, TitlePosterController } from "./title-poster.controller";
 
-/**
- * Through the HTTP layer rather than by calling the handler: `TitleExistsPipe`
- * is a param pipe, and Nest does not run those on a direct method call.
- */
 describe("TitlePosterController", () => {
   const TITLE_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -23,7 +19,11 @@ describe("TitlePosterController", () => {
   beforeEach(async () => {
     titleExists = true;
     posterService = {
-      createUploadUrl: jest.fn().mockResolvedValue({ uploadUrl: "https://example.test/put" }),
+      createUploadUrl: jest.fn().mockResolvedValue({
+        uploadUrl: "https://example.test/put",
+        rawKey: "title-poster/id/abc",
+        maxBytes: 15 * 1024 * 1024,
+      }),
     };
 
     const moduleRef = await Test.createTestingModule({
@@ -62,17 +62,23 @@ describe("TitlePosterController", () => {
       .expect(200);
 
     expect(posterService.createUploadUrl).toHaveBeenCalledWith("titles", TITLE_ID);
-    expect(response.body).toEqual({ uploadUrl: "https://example.test/put" });
+    expect(response.body).toEqual({
+      uploadUrl: "https://example.test/put",
+      rawKey: "title-poster/id/abc",
+      maxBytes: 15 * 1024 * 1024,
+    });
   });
 
-  // The read URL used to come back here too, go to the client, and return on the
-  // next update to be stored verbatim — signature, expiry and all.
-  it("should answer with the upload url and nothing else", async () => {
+  it("should answer with the upload target and no read url", async () => {
     const response = await request(app.getHttpServer())
       .get(`/titles/${TITLE_ID}/poster-upload-url`)
       .expect(200);
 
-    expect(Object.keys(response.body as object)).toEqual(["uploadUrl"]);
+    expect(Object.keys(response.body as object).sort()).toEqual([
+      "maxBytes",
+      "rawKey",
+      "uploadUrl",
+    ]);
   });
 
   it("should answer 404 for a title that does not exist, without presigning", async () => {
@@ -94,7 +100,11 @@ describe("SeasonPosterController", () => {
   beforeEach(async () => {
     seasonExists = true;
     posterService = {
-      createUploadUrl: jest.fn().mockResolvedValue({ uploadUrl: "https://example.test/put" }),
+      createUploadUrl: jest.fn().mockResolvedValue({
+        uploadUrl: "https://example.test/put",
+        rawKey: "title-poster/id/abc",
+        maxBytes: 15 * 1024 * 1024,
+      }),
     };
 
     const moduleRef = await Test.createTestingModule({
