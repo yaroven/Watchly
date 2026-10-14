@@ -29,6 +29,7 @@ import { GetAllArtistDto } from "./dto/request/get-all-artist.dto";
 import { UpdateArtistDto } from "./dto/request/update-artist.dto";
 import { ArtistFilmographyItemDto } from "./dto/response/artist-filmography-item.dto";
 import { ArtistResponseDto } from "./dto/response/artist-response.dto";
+import { ArtistExistsPipe } from "./utils/artist-exists.pipe";
 
 @ApiTags("artists")
 @Controller("artists")
@@ -79,21 +80,13 @@ export class ArtistController {
     return this.artistService.getFilmography(id);
   }
 
-  @ApiOperation({ summary: "Get a presigned upload URL for an artist's photo" })
-  @ApiParam({ name: "id", format: "uuid" })
-  @AdminOnly()
-  @Get(":id/photo-upload-url")
-  createPhotoUploadUrl(@Param("id", ParseUUIDPipe) id: string) {
-    return this.artistService.createPhotoUploadUrl(id);
-  }
-
   @ApiOperation({ summary: "Update an artist" })
   @ApiParam({ name: "id", format: "uuid" })
   @ApiOkResponse({ type: ArtistResponseDto })
   @ApiNotFoundResponse({ description: "Artist not found" })
   @AdminOnly()
   @Patch(":id")
-  update(@Param("id", ParseUUIDPipe) id: string, @Body() data: UpdateArtistDto) {
+  update(@Param("id", ParseUUIDPipe, ArtistExistsPipe) id: string, @Body() data: UpdateArtistDto) {
     return this.artistService.update(id, data);
   }
 
@@ -103,7 +96,7 @@ export class ArtistController {
   @ApiNotFoundResponse({ description: "Artist not found" })
   @AdminOnly()
   @Delete(":id")
-  delete(@Param("id", ParseUUIDPipe) id: string) {
+  delete(@Param("id", ParseUUIDPipe, ArtistExistsPipe) id: string) {
     return this.artistService.delete(id);
   }
 }

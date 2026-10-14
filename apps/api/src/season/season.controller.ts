@@ -25,6 +25,7 @@ import { CreateSeasonDto } from "./dto/request/create-season.dto";
 import { UpdateSeasonDto } from "./dto/request/update-season.dto";
 import { SeasonResponseDto } from "./dto/response/season-response.dto";
 import { SeasonService } from "./season.service";
+import { SeasonExistsPipe } from "./utils/season-exists.pipe";
 
 @ApiTags("seasons")
 @Controller("seasons")
@@ -76,7 +77,10 @@ export class SeasonController {
   @ApiNotFoundResponse({ description: "Season not found" })
   @AdminOnly()
   @Patch(":id")
-  async update(@Param("id", ParseUUIDPipe) id: string, @Body() updateSeasonDto: UpdateSeasonDto) {
+  async update(
+    @Param("id", ParseUUIDPipe, SeasonExistsPipe) id: string,
+    @Body() updateSeasonDto: UpdateSeasonDto,
+  ) {
     return this.seasonService.update(id, updateSeasonDto);
   }
 
