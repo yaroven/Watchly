@@ -16,8 +16,8 @@ One directory per domain under `src/`, each with `*.module.ts`, `*.controller.ts
 `user` `watchlist`
 
 Infrastructure: `auth`, `prisma`, `s3`, `s3-event`, `media-asset`, `poster`,
-`video-transcoder`, `config` (typed `registerAs` factories), `common` (pagination,
-shared DTOs, `utils/`).
+`video-transcoder`, `metrics`, `config` (typed `registerAs` factories), `common`
+(pagination, shared DTOs, `utils/`).
 
 Anything in a domain that is not a module, controller, service or DTO goes in that
 domain's `utils/` — Prisma query shapes (`*.query.ts`), existence guards
@@ -137,6 +137,30 @@ saving. Showing an upload as still processing is client work that has not been d
   (`rate`, `removeRating`, `readEngagement`, `recomputeWatchlistCounts`), and takes a
   client so the caller's transaction holds. `WatchlistService` injects the second
   directly; it used to reach through the first for a counter, which is why they split.
+
+### Metrics
+
+- `prom-client`, one `Registry` behind the `METRICS_REGISTRY` token from the `@Global()`
+  `MetricsModule`. Inject the token and build the metric in the constructor with
+  `registers: [registry]`; don't reach for `prom-client`'s default global registry.
+- **Served on `METRICS_PORT` (9464), never on `PORT`.** `startMetricsServer` is called
+  from both entrypoints. The worker has no HTTP server of its own
+  (`createApplicationContext`), and the api's port is published through the Ingress —
+  `/metrics` there would put route names and queue depths on the internet. A port that
+  cannot bind is logged and skipped: metrics never take the process down.
+- **No identifier is ever a label.** No `userId`, `titleId`, `rawKey`, `jobId`. Each
+  distinct label combination is a series Prometheus keeps for its own lifetime, so an id
+  in that position is unbounded growth. Ids belong in the logs, which already carry
+  them: a metric says how many and how bad, a log says which one.
+- HTTP timing is `httpMetricsMiddleware`, registered with `app.use` and recording on
+  `res.on("finish")`. Both reasons are load-bearing. `finish` is the first point where
+  the exception filter has written the real status and Express has assigned the matched
+  route — an interceptor reading `statusCode` in `finalize()` labels every thrown error
+  with a status the handler never set. And the label is `req.route.path`, the route
+  _pattern_: `/titles/:id`, never the URL.
+- An outbound call with no timeout records no duration when it hangs — the timer never
+  stops. Pair the histogram with an in-flight gauge where that can happen, as
+  `ExternalRatingsService` does for OMDb, or a stalled request looks like an idle one.
 
 ### Viewer identity
 

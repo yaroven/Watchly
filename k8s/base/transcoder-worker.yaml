@@ -11,6 +11,12 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: transcoder-worker
+      annotations:
+        # Opt-in for the scrape config in prometheus-config.yaml. The port must
+        # match METRICS_PORT in the configMapGenerator in base — the application
+        # reads that one, Prometheus reads this one.
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9464"
     spec:
       # ffmpeg runs for minutes per job. The 30s default would SIGKILL a
       # transcode on every rollout; BullMQ would then see the job stall and
