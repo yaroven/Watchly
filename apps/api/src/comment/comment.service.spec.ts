@@ -1,13 +1,29 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
-import { ReactionType, Role } from "@prisma/client";
+import { Role } from "@prisma/client";
+import { EngagementCountersService } from "../engagement/engagement-counters.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { ReportService } from "../report/report.service";
 import { S3Service } from "../s3/s3.service";
 import { CommentService } from "./comment.service";
+import { replySubject, titleSubject } from "./utils/comment-subject.const";
 
 describe("CommentService", () => {
   let service: CommentService;
   let prismaMock: jest.Mocked<PrismaService>;
+  let txMock: {
+    comment: {
+      findMany: jest.Mock;
+      deleteMany: jest.Mock;
+      delete: jest.Mock;
+      findUnique: jest.Mock;
+      count: jest.Mock;
+      create: jest.Mock;
+    };
+    report: { deleteMany: jest.Mock };
+    reaction: { deleteMany: jest.Mock };
+    engagementCounters: { findMany: jest.Mock; upsert: jest.Mock; deleteMany: jest.Mock };
+  };
 
   const titleId = "11111111-1111-4111-8111-111111111111";
   const userId = "22222222-2222-4222-8222-222222222222";
@@ -26,9 +42,29 @@ describe("CommentService", () => {
   };
 
   beforeEach(async () => {
+    txMock = {
+      comment: {
+        findMany: jest.fn().mockResolvedValue([]),
+        deleteMany: jest.fn(),
+        delete: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue({ titleId, parentId: null }),
+        count: jest.fn().mockResolvedValue(0),
+        create: jest.fn(),
+      },
+      report: { deleteMany: jest.fn() },
+      engagementCounters: {
+        findMany: jest.fn().mockResolvedValue([]),
+        upsert: jest.fn().mockResolvedValue({ likes: 0, dislikes: 0, commentCount: 0 }),
+        deleteMany: jest.fn(),
+      },
+      reaction: { deleteMany: jest.fn() },
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CommentService,
+        ReportService,
+        EngagementCountersService,
         {
           provide: S3Service,
           useValue: { getPublicUrl: jest.fn((key: string) => `https://cdn.test/${key}`) },
@@ -37,23 +73,30 @@ describe("CommentService", () => {
           provide: PrismaService,
           useValue: {
             title: { findUnique: jest.fn() },
-            titleComment: {
+            comment: {
               findMany: jest.fn(),
               findUnique: jest.fn(),
               count: jest.fn(),
               create: jest.fn(),
               delete: jest.fn(),
+              deleteMany: jest.fn(),
               groupBy: jest.fn(),
             },
-            commentReaction: {
+            reaction: {
               findMany: jest.fn(),
               groupBy: jest.fn(),
               deleteMany: jest.fn(),
               upsert: jest.fn(),
             },
-            commentReport: { upsert: jest.fn() },
+            report: { upsert: jest.fn(), deleteMany: jest.fn() },
+            engagementCounters: {
+              findMany: jest.fn().mockResolvedValue([]),
+              upsert: jest.fn().mockResolvedValue({ likes: 0, dislikes: 0, commentCount: 0 }),
+              deleteMany: jest.fn(),
+            },
             titleRating: { findMany: jest.fn() },
             $queryRaw: jest.fn(),
+            $transaction: jest.fn((fn: (tx: unknown) => unknown) => fn(txMock)),
           },
         },
       ],
@@ -63,24 +106,27 @@ describe("CommentService", () => {
     prismaMock = module.get(PrismaService) as jest.Mocked<PrismaService>;
 
     (prismaMock.title.findUnique as jest.Mock).mockResolvedValue({ id: titleId });
-    (prismaMock.titleComment.count as jest.Mock).mockResolvedValue(1);
-    (prismaMock.commentReaction.groupBy as jest.Mock).mockResolvedValue([]);
-    (prismaMock.commentReaction.findMany as jest.Mock).mockResolvedValue([]);
+    (prismaMock.comment.count as jest.Mock).mockResolvedValue(1);
+    (prismaMock.reaction.groupBy as jest.Mock).mockResolvedValue([]);
+    (prismaMock.reaction.findMany as jest.Mock).mockResolvedValue([]);
     (prismaMock.titleRating.findMany as jest.Mock).mockResolvedValue([]);
-    (prismaMock.titleComment.groupBy as jest.Mock).mockResolvedValue([]);
+    (prismaMock.comment.groupBy as jest.Mock).mockResolvedValue([]);
     (prismaMock.$queryRaw as unknown as jest.Mock).mockResolvedValue([]);
   });
 
   afterEach(() => jest.clearAllMocks());
 
-  describe("findForTitle", () => {
-    const mockPage = (roots = [rootComment], replies: { id: string }[] = []) => {
+  describe("findForSubject", () => {
+    const mockPage = (
+      roots: Record<string, unknown>[] = [rootComment],
+      replies: Record<string, unknown>[] = [],
+    ) => {
       (prismaMock.$queryRaw as unknown as jest.Mock).mockResolvedValue(
-        replies.map((reply) => ({ id: reply.id })),
+        replies.map((reply) => ({ id: reply.id as string })),
       );
-      (prismaMock.titleComment.findMany as jest.Mock)
+      (prismaMock.comment.findMany as jest.Mock)
         .mockReset()
-        .mockResolvedValueOnce(roots.map((root) => ({ id: root.id })))
+        .mockResolvedValueOnce(roots.map((root) => ({ id: root.id as string })))
         .mockResolvedValueOnce(roots)
         .mockResolvedValueOnce(replies);
     };
@@ -90,12 +136,17 @@ describe("CommentService", () => {
     describe("should nest replies under their parent", () => {
       it("if the page has any", async () => {
         const reply = { ...rootComment, id: "reply-1", parentId: commentId, text: "Agreed" };
-        mockPage([rootComment], [reply]);
-        (prismaMock.titleComment.groupBy as jest.Mock).mockResolvedValue([
-          { parentId: commentId, _count: { _all: 7 } },
-        ]);
+        // The counters are a relation now, so the reply count arrives on the
+        // root row rather than from a query of its own.
+        mockPage(
+          [{ ...rootComment, counters: { likes: 0, dislikes: 0, commentCount: 7 } }],
+          [reply],
+        );
 
-        const { items } = await service.findForTitle(titleId, { page: 1, limit: 10 });
+        const { items } = await service.findForSubject(titleSubject(titleId), {
+          page: 1,
+          limit: 10,
+        });
 
         expect(items).toHaveLength(1);
         expect(items[0].replies).toHaveLength(1);
@@ -106,28 +157,70 @@ describe("CommentService", () => {
 
     describe("should fall back to the email local part", () => {
       it("if the author never set a display name", async () => {
-        const { items } = await service.findForTitle(titleId, { page: 1, limit: 10 });
+        const { items } = await service.findForSubject(titleSubject(titleId), {
+          page: 1,
+          limit: 10,
+        });
 
         expect(items[0].author.name).toBe("viewer");
       });
     });
 
     describe("should show the author's current score", () => {
+      // It rides along with the comment as a filtered relation on the author,
+      // rather than a lookup of our own keyed by user id.
       it("if they have rated the title", async () => {
-        (prismaMock.titleRating.findMany as jest.Mock).mockResolvedValue([{ userId, score: 8 }]);
+        mockPage([{ ...rootComment, user: { ...author, ratings: [{ score: 8 }] } }]);
 
-        const { items } = await service.findForTitle(titleId, { page: 1, limit: 10 });
+        const { items } = await service.findForSubject(titleSubject(titleId), {
+          page: 1,
+          limit: 10,
+        });
 
         expect(items[0].author.score).toBe(8);
+      });
+
+      it("asking for it in the same read, scoped to this title", async () => {
+        await service.findForSubject(titleSubject(titleId), { page: 1, limit: 10 });
+
+        const [{ include }] = (prismaMock.comment.findMany as jest.Mock).mock.calls[1] as [
+          { include: { user: { select: Record<string, unknown> } } },
+        ];
+        expect(include.user.select.ratings).toEqual({
+          where: { titleId },
+          select: { score: true },
+        });
+      });
+
+      // A thread under something that has no scores must not ask for them.
+      it("and not asking at all for a thread that is not a title's", async () => {
+        // The parent is itself a reply, so the thread hangs off a comment.
+        (prismaMock.comment.findUnique as jest.Mock).mockResolvedValue({
+          titleId: null,
+          parentId: "root-1",
+        });
+        (prismaMock.comment.findMany as jest.Mock).mockReset().mockResolvedValue([]);
+
+        await service.findReplies(commentId, { page: 1, limit: 10 });
+
+        const calls = (prismaMock.comment.findMany as jest.Mock).mock.calls as [
+          { include: { user: { select: Record<string, unknown> } } },
+        ][];
+        for (const [{ include }] of calls) {
+          expect(include.user.select).not.toHaveProperty("ratings");
+        }
       });
     });
 
     describe("should report no reaction of their own", () => {
       it("if the caller is anonymous, without querying for one", async () => {
-        const { items } = await service.findForTitle(titleId, { page: 1, limit: 10 });
+        const { items } = await service.findForSubject(titleSubject(titleId), {
+          page: 1,
+          limit: 10,
+        });
 
         expect(items[0].myReaction).toBeNull();
-        expect(prismaMock.commentReaction.findMany).not.toHaveBeenCalled();
+        expect(prismaMock.reaction.findMany).not.toHaveBeenCalled();
       });
     });
 
@@ -135,10 +228,13 @@ describe("CommentService", () => {
       it("so one busy thread cannot bloat the page", async () => {
         mockPage();
 
-        await service.findForTitle(titleId, { page: 1, limit: 10 });
+        await service.findForSubject(titleSubject(titleId), { page: 1, limit: 10 });
 
-        const [query] = (prismaMock.$queryRaw as unknown as jest.Mock).mock.calls.at(-1)!;
-        expect(query.join("")).toContain("ROW_NUMBER()");
+        const [query] = (prismaMock.$queryRaw as unknown as jest.Mock).mock.calls.at(-1) as [
+          { sql: string; values: unknown[] },
+        ];
+        expect(query.sql).toContain("ROW_NUMBER()");
+        expect(query.values).toContain(3);
       });
     });
 
@@ -147,12 +243,12 @@ describe("CommentService", () => {
         (prismaMock.$queryRaw as unknown as jest.Mock)
           .mockResolvedValueOnce([{ id: commentId }])
           .mockResolvedValue([]);
-        (prismaMock.titleComment.findMany as jest.Mock)
+        (prismaMock.comment.findMany as jest.Mock)
           .mockReset()
           .mockResolvedValueOnce([rootComment])
           .mockResolvedValueOnce([]);
 
-        const { items } = await service.findForTitle(titleId, {
+        const { items } = await service.findForSubject(titleSubject(titleId), {
           page: 1,
           limit: 10,
           sort: "hottest",
@@ -166,39 +262,46 @@ describe("CommentService", () => {
 
   describe("create", () => {
     beforeEach(() => {
-      (prismaMock.titleComment.create as jest.Mock).mockResolvedValue(rootComment);
+      txMock.comment.create.mockResolvedValue(rootComment);
     });
 
     describe("should throw BadRequestException", () => {
       it("if replying to a reply, since threads are one level deep", async () => {
-        (prismaMock.titleComment.findUnique as jest.Mock).mockResolvedValue({
-          titleId,
-          parentId: "some-other-comment",
-        });
+        (prismaMock.comment.findUnique as jest.Mock).mockResolvedValue(
+          replySubject("some-other-comment"),
+        );
 
-        const action = service.create(titleId, userId, { text: "hi", parentId: commentId });
+        const action = service.create(replySubject(commentId), userId, { text: "hi" });
 
         await expect(action).rejects.toThrow(BadRequestException);
-        expect(prismaMock.titleComment.create).not.toHaveBeenCalled();
+        expect(txMock.comment.create).not.toHaveBeenCalled();
       });
 
-      it("if the parent belongs to a different title", async () => {
-        (prismaMock.titleComment.findUnique as jest.Mock).mockResolvedValue({
-          titleId: "44444444-4444-4444-8444-444444444444",
-          parentId: null,
-        });
+      it("if the thread the reply resolves to is not the one the caller named", async () => {
+        (prismaMock.comment.findUnique as jest.Mock).mockResolvedValue(
+          titleSubject("44444444-4444-4444-8444-444444444444"),
+        );
 
-        const action = service.create(titleId, userId, { text: "hi", parentId: commentId });
+        const action = service.create(
+          replySubject(commentId),
+          userId,
+          { text: "hi" },
+          titleSubject(titleId),
+        );
 
         await expect(action).rejects.toThrow(BadRequestException);
+        expect(txMock.comment.create).not.toHaveBeenCalled();
       });
     });
 
     describe("should store the spoiler flag", () => {
       it("instead of leaving the warning to the text", async () => {
-        await service.create(titleId, userId, { text: "the dog dies", hasSpoiler: true });
+        await service.create(titleSubject(titleId), userId, {
+          text: "the dog dies",
+          hasSpoiler: true,
+        });
 
-        expect(prismaMock.titleComment.create).toHaveBeenCalledWith(
+        expect(txMock.comment.create).toHaveBeenCalledWith(
           expect.objectContaining({
             data: expect.objectContaining({ hasSpoiler: true }),
           }),
@@ -207,69 +310,14 @@ describe("CommentService", () => {
     });
   });
 
-  describe("react", () => {
-    beforeEach(() => {
-      (prismaMock.titleComment.findUnique as jest.Mock).mockResolvedValue({ id: commentId });
-      (prismaMock.commentReaction.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
-    });
-
-    describe("should withdraw the vote", () => {
-      it("if the same reaction is sent twice, without writing a row", async () => {
-        (prismaMock.commentReaction.deleteMany as jest.Mock).mockResolvedValue({ count: 1 });
-
-        const result = await service.react(commentId, userId, ReactionType.LIKE);
-
-        expect(prismaMock.commentReaction.deleteMany).toHaveBeenCalledWith({
-          where: { commentId, userId, type: ReactionType.LIKE },
-        });
-        expect(prismaMock.commentReaction.upsert).not.toHaveBeenCalled();
-        expect(result.myReaction).toBeNull();
-      });
-    });
-
-    describe("should record the vote", () => {
-      it("if the viewer had not reacted, or had voted the other way", async () => {
-        const result = await service.react(commentId, userId, ReactionType.DISLIKE);
-
-        expect(prismaMock.commentReaction.upsert).toHaveBeenCalledWith({
-          where: { commentId_userId: { commentId, userId } },
-          create: { commentId, userId, type: ReactionType.DISLIKE },
-          update: { type: ReactionType.DISLIKE },
-        });
-        expect(result.myReaction).toBe(ReactionType.DISLIKE);
-      });
-    });
-
-    describe("should not read the row before writing", () => {
-      it("so two clicks racing cannot both decide the row is missing", async () => {
-        await service.react(commentId, userId, ReactionType.LIKE);
-
-        expect(prismaMock.titleComment.findUnique).toHaveBeenCalledTimes(1);
-      });
-    });
-
-    describe("should split the counts by type", () => {
-      it("so likes and dislikes are reported separately", async () => {
-        (prismaMock.commentReaction.groupBy as jest.Mock).mockResolvedValue([
-          { commentId, type: ReactionType.LIKE, _count: { _all: 3 } },
-          { commentId, type: ReactionType.DISLIKE, _count: { _all: 1 } },
-        ]);
-
-        const result = await service.react(commentId, userId, ReactionType.LIKE);
-
-        expect(result).toEqual({ likes: 3, dislikes: 1, myReaction: ReactionType.LIKE });
-      });
-    });
-  });
-
   describe("report", () => {
     describe("should replace the previous reason", () => {
       it("rather than failing on the second report from the same viewer", async () => {
-        (prismaMock.titleComment.findUnique as jest.Mock).mockResolvedValue({ id: commentId });
+        (prismaMock.comment.findUnique as jest.Mock).mockResolvedValue({ id: commentId });
 
         await service.report(commentId, userId, "spam");
 
-        expect(prismaMock.commentReport.upsert).toHaveBeenCalledWith({
+        expect(prismaMock.report.upsert).toHaveBeenCalledWith({
           where: { commentId_userId: { commentId, userId } },
           create: { commentId, userId, reason: "spam" },
           update: { reason: "spam" },
@@ -279,36 +327,90 @@ describe("CommentService", () => {
 
     describe("should throw NotFoundException", () => {
       it("if the comment is gone", async () => {
-        (prismaMock.titleComment.findUnique as jest.Mock).mockResolvedValue(null);
+        (prismaMock.comment.findUnique as jest.Mock).mockResolvedValue(null);
 
         await expect(service.report(commentId, userId)).rejects.toThrow(NotFoundException);
       });
     });
   });
 
+  describe("the hottest sort", () => {
+    /**
+     * Raw SQL: the compiler cannot see a table name, so the rename that made
+     * reactions polymorphic would have shipped a broken join otherwise.
+     */
+    it("should rank on the cached like counter, joined by the comment arc", async () => {
+      await service.findForSubject(titleSubject(titleId), { sort: "hottest" });
+
+      const [query] = (prismaMock.$queryRaw as unknown as jest.Mock).mock.calls[0] as [
+        { sql: string; values: unknown[] },
+      ];
+
+      expect(query.sql).toContain('"EngagementCounters"');
+      expect(query.sql).toContain('e."commentId" = c."id"');
+      expect(query.sql).toContain('c."titleId"');
+      // The arc is a parameter, not interpolated text.
+      expect(query.values).toContain(titleId);
+    });
+  });
+
   describe("remove", () => {
     describe("should throw ForbiddenException", () => {
       it("if the comment belongs to someone else and the caller is not an admin", async () => {
-        (prismaMock.titleComment.findUnique as jest.Mock).mockResolvedValue({
+        (prismaMock.comment.findUnique as jest.Mock).mockResolvedValue({
           userId: "someone-else",
         });
 
         const action = service.remove(commentId, userId, Role.USER);
 
         await expect(action).rejects.toThrow(ForbiddenException);
-        expect(prismaMock.titleComment.delete).not.toHaveBeenCalled();
+        expect(txMock.comment.deleteMany).not.toHaveBeenCalled();
       });
     });
 
     describe("should delete it anyway", () => {
       it("if the caller is an admin", async () => {
-        (prismaMock.titleComment.findUnique as jest.Mock).mockResolvedValue({
+        (prismaMock.comment.findUnique as jest.Mock).mockResolvedValue({
           userId: "someone-else",
         });
 
         await service.remove(commentId, userId, Role.ADMIN);
 
-        expect(prismaMock.titleComment.delete).toHaveBeenCalledWith({ where: { id: commentId } });
+        expect(txMock.comment.delete).toHaveBeenCalledWith({ where: { id: commentId } });
+      });
+    });
+
+    describe("should let the database take the rest", () => {
+      /**
+       * Replies, reactions, reports and the counter rows hang off the comment
+       * by a foreign key, so deleting the row takes them. What does not follow
+       * is the parent's own comment count — a number, not a row.
+       */
+      it("deleting the row and recomputing the parent's count", async () => {
+        (prismaMock.comment.findUnique as jest.Mock).mockResolvedValue({
+          userId,
+          titleId,
+          parentId: null,
+        });
+
+        await service.remove(commentId, userId, Role.USER);
+
+        expect(txMock.comment.delete).toHaveBeenCalledWith({ where: { id: commentId } });
+        expect(txMock.engagementCounters.upsert).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { titleId } }),
+        );
+      });
+
+      it("in one transaction, not on the base client", async () => {
+        (prismaMock.comment.findUnique as jest.Mock).mockResolvedValue({
+          userId,
+          titleId,
+          parentId: null,
+        });
+
+        await service.remove(commentId, userId, Role.USER);
+
+        expect(prismaMock.comment.delete).not.toHaveBeenCalled();
       });
     });
   });

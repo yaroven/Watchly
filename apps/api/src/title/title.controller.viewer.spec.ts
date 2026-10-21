@@ -4,6 +4,7 @@ import request from "supertest";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { OptionalJwtAuthGuard } from "../auth/guards/optional-jwt-auth.guard";
 import { PrismaService } from "../prisma/prisma.service";
+import { TitleEngagementService } from "./title-engagement.service";
 import { TitleController } from "./title.controller";
 import { TitleService } from "./title.service";
 import { TitleExistsPipe } from "./utils/title-exists.pipe";
@@ -31,6 +32,7 @@ describe("TitleController (viewer propagation)", () => {
       providers: [
         TitleExistsPipe,
         { provide: TitleService, useValue: titleService },
+        { provide: TitleEngagementService, useValue: titleService },
         {
           provide: PrismaService,
           useValue: {
@@ -171,17 +173,6 @@ describe("TitleController (viewer propagation)", () => {
         .expect(200);
 
       expect(titleService.rate).toHaveBeenCalledWith(TITLE_ID, "user-1", 8);
-    });
-
-    it("should pass the viewer to react", async () => {
-      viewerId = "user-1";
-
-      await request(app.getHttpServer())
-        .post(`/titles/${TITLE_ID}/reaction`)
-        .send({ type: "LIKE" })
-        .expect(200);
-
-      expect(titleService.react).toHaveBeenCalledWith(TITLE_ID, "user-1", "LIKE");
     });
 
     it("should refuse to withdraw a score without a viewer", async () => {

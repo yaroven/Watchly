@@ -3,14 +3,15 @@ import { MediaAssetModule } from "../media-asset/media-asset.module";
 import { PosterModule } from "../poster/poster.module";
 import { PrismaModule } from "../prisma/prisma.module";
 import { SeasonModule } from "../season/season.module";
+import { TitleEngagementService } from "./title-engagement.service";
 import { TitleController } from "./title.controller";
 import { TitleService } from "./title.service";
 import { TitleExistsPipe } from "./utils/title-exists.pipe";
 
 @Module({
   imports: [PrismaModule, PosterModule, SeasonModule, MediaAssetModule],
-  providers: [TitleService, TitleExistsPipe],
+  providers: [TitleService, TitleEngagementService, TitleExistsPipe],
   controllers: [TitleController],
-  exports: [TitleService],
+  exports: [TitleService, TitleEngagementService],
 })
 export class TitleModule {}

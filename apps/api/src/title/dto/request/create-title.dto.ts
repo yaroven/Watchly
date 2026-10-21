@@ -3,7 +3,6 @@ import { AgeRating, TitleType } from "@prisma/client";
 import {
   IsArray,
   IsBoolean,
-  IsDateString,
   IsEnum,
   IsInt,
   IsOptional,
@@ -12,6 +11,7 @@ import {
   MaxLength,
   Min,
 } from "class-validator";
+import { IsIsoDate } from "../../../common/utils/iso-date.decorator";
 
 export class CreateTitleDto {
   @ApiProperty({ maxLength: 255 })
@@ -37,9 +37,9 @@ export class CreateTitleDto {
   @MaxLength(100)
   country: string;
 
-  @ApiProperty({ description: "ISO 8601 date" })
-  @IsDateString()
-  releaseDate: string;
+  @ApiProperty({ description: "ISO 8601 date", type: String, format: "date-time" })
+  @IsIsoDate()
+  releaseDate: Date;
 
   @ApiProperty({ maxLength: 100 })
   @IsString()

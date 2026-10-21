@@ -93,7 +93,7 @@ export class ExternalRatingsService {
         ? { i: imdbId }
         : {
             t: title.name,
-            y: String(new Date(title.releaseDate).getFullYear()),
+            y: String(title.releaseDate.getFullYear()),
           },
     );
     if (!data) return false;
