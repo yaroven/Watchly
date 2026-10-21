@@ -2,8 +2,6 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { Job } from "bullmq";
 import { writeFile } from "node:fs/promises";
 import { Readable } from "node:stream";
-import { Registry } from "prom-client";
-import { METRICS_REGISTRY } from "../metrics/metrics.const";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
 import { ImageKind } from "./image-profile.const";
@@ -41,7 +39,6 @@ describe("ImageTranscoderProcessor", () => {
         { provide: S3Service, useValue: s3Mock },
         { provide: ImageTranscoderService, useValue: transcoderMock },
         { provide: IMAGE_ATTACHERS, useValue: attachers },
-        { provide: METRICS_REGISTRY, useValue: new Registry() },
       ],
     }).compile();
 

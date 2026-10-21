@@ -1,14 +1,11 @@
-import { Controller, Get, Inject, NotFoundException, Req, Res } from "@nestjs/common";
+import { Controller, Get, NotFoundException, Req, Res } from "@nestjs/common";
 import { ApiExcludeEndpoint } from "@nestjs/swagger";
 import { SkipThrottle } from "@nestjs/throttler";
 import { Request, Response } from "express";
-import { Registry } from "prom-client";
-import { METRICS_REGISTRY } from "./metrics.const";
+import { register } from "prom-client";
 
 @Controller()
 export class MetricsController {
-  constructor(@Inject(METRICS_REGISTRY) private readonly registry: Registry) {}
-
   /**
    * Served on the application port, so it is inside everything the Ingress
    * publishes. Two consequences are handled here rather than left to a rule
@@ -37,8 +34,8 @@ export class MetricsController {
   ): Promise<string> {
     if (request.headers["x-forwarded-for"] !== undefined) throw new NotFoundException();
 
-    response.setHeader("Content-Type", this.registry.contentType);
+    response.setHeader("Content-Type", register.contentType);
 
-    return this.registry.metrics();
+    return register.metrics();
   }
 }

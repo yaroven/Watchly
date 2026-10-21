@@ -31,7 +31,6 @@ import { IMAGE_TRANSCODE_QUEUE_OPTIONS } from "./image-transcoder/image-transcod
 import { ImageTranscoderModule } from "./image-transcoder/image-transcoder.module";
 import { MediaAssetModule } from "./media-asset/media-asset.module";
 import { MetricsController } from "./metrics/metrics.controller";
-import { MetricsModule } from "./metrics/metrics.module";
 import { METRICS_QUEUES, QueueMetricsService } from "./metrics/queue-metrics.service";
 import { PrismaModule } from "./prisma/prisma.module";
 import { S3EventModule } from "./s3-event/s3-event.module";
@@ -84,7 +83,6 @@ import { WatchlistModule } from "./watchlist/watchlist.module";
       isGlobal: true,
     }),
     ScheduleModule.forRoot(),
-    MetricsModule,
     VideoTranscoderModule,
     ImageTranscoderModule,
     TitleModule,

@@ -1,5 +1,18 @@
 import { Request, RequestHandler } from "express";
-import { Histogram, Registry } from "prom-client";
+import { Histogram } from "prom-client";
+
+/**
+ * Declared at module scope, on `prom-client`'s default registry, which is what
+ * `MetricsController` serves. Every metric in this codebase is built this way:
+ * a metric created per instance would throw on the second construction, since
+ * a registry refuses a duplicate name.
+ */
+const duration = new Histogram({
+  name: "http_request_duration_seconds",
+  help: "Duration of HTTP requests served by the api, by route pattern",
+  labelNames: ["method", "route", "status_class"],
+  buckets: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5],
+});
 
 /**
  * The route PATTERN, never the URL. `/titles/<uuid>` as a label value would
@@ -25,15 +38,7 @@ function routeOf(req: Request): string {
  * interceptor reading `response.statusCode` in `finalize()` runs before the
  * filter and reports every thrown error as the status the handler never set.
  */
-export function httpMetricsMiddleware(registry: Registry): RequestHandler {
-  const duration = new Histogram({
-    name: "http_request_duration_seconds",
-    help: "Duration of HTTP requests served by the api, by route pattern",
-    labelNames: ["method", "route", "status_class"],
-    buckets: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5],
-    registers: [registry],
-  });
-
+export function httpMetricsMiddleware(): RequestHandler {
   return (req, res, next) => {
     const stop = duration.startTimer();
 

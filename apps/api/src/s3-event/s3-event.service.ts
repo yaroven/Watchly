@@ -6,13 +6,12 @@ import {
   ReceiveMessageCommand,
   SQSClient,
 } from "@aws-sdk/client-sqs";
-import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { Counter, Gauge, Histogram, Registry } from "prom-client";
+import { Counter, Gauge, Histogram } from "prom-client";
 import { S3Config, S3ConfigName } from "../config/s3.config";
 import { ImageKind } from "../image-transcoder/image-profile.const";
 import { ImageTranscodeScheduler } from "../image-transcoder/image-transcode-scheduler.service";
-import { METRICS_REGISTRY } from "../metrics/metrics.const";
 import { PrismaService } from "../prisma/prisma.service";
 import { isLegacyBareUuidKey, parseRawKey, RawObjectKind } from "../s3/raw-key";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
@@ -27,6 +26,53 @@ interface S3EventBody {
   Records?: S3EventRecord[];
 }
 
+/**
+ * End to end: how long an upload waits between S3 accepting it and a job
+ * existing for it. One number for "is the pipeline keeping up" — queue depth
+ * cannot distinguish a backlog from a poller that stopped reading.
+ */
+const lag = new Histogram({
+  name: "s3_event_lag_seconds",
+  help: "Delay from the S3 event to the transcode job being scheduled",
+  labelNames: ["kind"],
+  buckets: [0.5, 1, 2.5, 5, 10, 30, 60, 300],
+});
+
+const messages = new Counter({
+  name: "sqs_messages_total",
+  help: "SQS messages handled, by what became of them",
+  labelNames: ["outcome"],
+});
+
+/**
+ * Reaching the live service through a holder, because `collect` runs on the
+ * metric and has no instance to read the SQS client from. Set by the
+ * constructor, replaced rather than added to, so building the service twice —
+ * which happens in tests — leaves one sampler.
+ */
+let dlqSampler: (() => Promise<void>) | undefined;
+
+/**
+ * Nothing watched this before. A record that fails five times leaves the main
+ * queue for the dead-letter one (see the RedrivePolicy in
+ * localstack-init/provision.sh) and the upload silently never appears.
+ *
+ * Sampled at scrape time, which costs one GetQueueAttributes call per scrape
+ * rather than a poller of its own.
+ */
+const dlqMessages = new Gauge({
+  name: "sqs_dlq_messages",
+  help: "Approximate messages sitting in the S3 event dead-letter queue",
+  // Labelled so the series does not exist until something is written to it.
+  // An unlabelled gauge reports 0 from the moment it is registered, which
+  // would say "the dead-letter queue is empty" when the truth is "the queue
+  // was never resolved" — and an alert on > 0 would then never fire.
+  labelNames: ["queue"],
+  collect: async () => {
+    await dlqSampler?.();
+  },
+});
+
 @Injectable()
 export class S3EventService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(S3EventService.name);
@@ -34,9 +80,6 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
   private config: S3Config;
   private queueUrl: string;
   private dlqUrl?: string;
-  private readonly lag: Histogram<"kind">;
-  private readonly messages: Counter<"outcome">;
-  private readonly dlqMessages: Gauge<"queue">;
   private isShuttingDown = false;
   private readonly shutdownController = new AbortController();
   private pollLoopFinished: Promise<void> = Promise.resolve();
@@ -46,51 +89,10 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly videoTranscoderService: VideoTranscoderService,
     private readonly imageTranscodeScheduler: ImageTranscodeScheduler,
-    @Inject(METRICS_REGISTRY) registry: Registry,
   ) {
     this.config = this.configService.getOrThrow<S3Config>(S3ConfigName);
+    dlqSampler = () => this.sampleDlq();
 
-    /**
-     * End to end: how long an upload waits between S3 accepting it and a job
-     * existing for it. One number for "is the pipeline keeping up" — the
-     * queue depth that follows cannot distinguish a backlog from a poller
-     * that stopped reading.
-     */
-    this.lag = new Histogram({
-      name: "s3_event_lag_seconds",
-      help: "Delay from the S3 event to the transcode job being scheduled",
-      labelNames: ["kind"],
-      buckets: [0.5, 1, 2.5, 5, 10, 30, 60, 300],
-      registers: [registry],
-    });
-
-    this.messages = new Counter({
-      name: "sqs_messages_total",
-      help: "SQS messages handled, by what became of them",
-      labelNames: ["outcome"],
-      registers: [registry],
-    });
-
-    /**
-     * Nothing watched this before. A record that fails five times leaves the
-     * main queue for the dead-letter one (see the RedrivePolicy in
-     * localstack-init/provision.sh) and the upload silently never appears.
-     *
-     * Sampled at scrape time, which costs one GetQueueAttributes call per
-     * scrape rather than a poller of its own.
-     */
-    this.dlqMessages = new Gauge({
-      name: "sqs_dlq_messages",
-      help: "Approximate messages sitting in the S3 event dead-letter queue",
-      // Labelled so the series does not exist until something is written to
-      // it. An unlabelled gauge reports 0 from the moment it is registered,
-      // which would say "the dead-letter queue is empty" when the truth is
-      // "the queue was never resolved" — and an alert on > 0 would then never
-      // fire.
-      labelNames: ["queue"],
-      registers: [registry],
-      collect: () => this.sampleDlq(),
-    });
     const credentials = {
       accessKeyId: this.config.accessKeyId,
       secretAccessKey: this.config.secretAccessKey,
@@ -151,7 +153,7 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
         }),
       );
 
-      this.dlqMessages.set(
+      dlqMessages.set(
         { queue: this.dlqName() },
         Number(Attributes?.ApproximateNumberOfMessages ?? 0),
       );
@@ -222,13 +224,13 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
         `Discarding unparseable SQS message ${message.MessageId}: ${message.Body}`,
         error,
       );
-      this.messages.inc({ outcome: "unparseable" });
+      messages.inc({ outcome: "unparseable" });
       await this.deleteMessage(message);
       return;
     }
 
     if (!body.Records) {
-      this.messages.inc({ outcome: "no_records" });
+      messages.inc({ outcome: "no_records" });
       await this.deleteMessage(message);
       return;
     }
@@ -247,11 +249,11 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
       }
       // Left on the queue on purpose: SQS redelivers, and after five rounds
       // the RedrivePolicy moves it to the queue sqs_dlq_messages watches.
-      this.messages.inc({ outcome: "failed" });
+      messages.inc({ outcome: "failed" });
       return;
     }
 
-    this.messages.inc({ outcome: "deleted" });
+    messages.inc({ outcome: "deleted" });
     await this.deleteMessage(message);
   }
 
@@ -308,7 +310,7 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
     const eventAt = Date.parse(record.eventTime);
     if (Number.isNaN(eventAt)) return;
 
-    this.lag.observe({ kind }, Math.max(0, (Date.now() - eventAt) / 1000));
+    lag.observe({ kind }, Math.max(0, (Date.now() - eventAt) / 1000));
   }
 
   private async processLegacyRecord(key: string) {
