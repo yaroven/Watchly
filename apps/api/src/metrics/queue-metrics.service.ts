@@ -17,8 +17,10 @@ const STATES = ["waiting", "active", "delayed", "failed"] as const;
  * scrape time rather than tracked on job events — a counter kept in memory
  * would be one process's partial view and would reset on every rollout.
  *
- * Export it from the worker only. Two api replicas would publish two series
- * with the same value, differing solely in the pod label.
+ * Being a property of Redis is also why this lives in the api rather than with
+ * the processors: the numbers are the same from either side, and the api is the
+ * process that serves /metrics. The api runs two replicas in prod, so both
+ * publish these series — aggregate with `max by (queue, state)`, never `sum`.
  */
 @Injectable()
 export class QueueMetricsService {
@@ -42,7 +44,7 @@ export class QueueMetricsService {
    * Swallows its own failure on purpose. `registry.metrics()` rejects as a
    * whole if any collector throws, so an unreachable Redis would blank out
    * every other metric in the process — including the ones that would tell
-   * you the worker is still alive.
+   * you the process is still serving requests.
    */
   private async sample(): Promise<void> {
     await Promise.all(

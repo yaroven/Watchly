@@ -27,9 +27,11 @@ data:
           action: keep
           regex: "true"
 
-        # Metrics live on their own port, never the application port, so the
-        # address has to be rebuilt from the annotation rather than taken from
-        # the discovered container port.
+        # The address is rebuilt from the annotation rather than taken from
+        # whichever container port discovery happened to pick: a pod declaring
+        # several ports would otherwise become several targets, and one
+        # declaring none would get an address with no port at all. The
+        # annotation is the single statement of where metrics are served.
         - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
           action: replace
           regex: ([^:]+)(?::\d+)?;(\d+)

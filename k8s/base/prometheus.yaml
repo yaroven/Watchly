@@ -1,5 +1,6 @@
-# Scrapes pods by annotation; see prometheus-config.yaml. Only the api and the
-# transcoder worker carry the annotation today.
+# Scrapes pods by annotation; see prometheus-config.yaml. Only the api carries
+# the annotation today — it serves /metrics as a route on its application port.
+# The transcoder worker has no HTTP server and exposes nothing.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
