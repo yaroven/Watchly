@@ -56,9 +56,6 @@ services:
     command: sh -c "pnpm install --frozen-lockfile && pnpm --filter api db:prepare && pnpm --filter api dev"
     ports:
       - "3000:3000"
-      # Scrape port. Prometheus reaches it over the compose network either way;
-      # this is published so it can be curled from the host.
-      - "9464:9464"
     environment:
       NODE_ENV: "development"
       DATABASE_URL: "postgresql://root:root@db:5432/watchly?schema=public"

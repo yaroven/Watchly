@@ -39,10 +39,6 @@ configMapGenerator:
       - SQS_QUEUE_NAME=watchly-s3-event-queue
       - LOG_LEVEL=info
       - LOKI_URL=http://loki:3100
-      # Scrape port for both api and worker. Each runs in its own container,
-      # so one value serves both. Keep it in step with the prometheus.io/port
-      # annotation on the two Deployments.
-      - METRICS_PORT=9464
 
   - name: watchly-client-config
     literals:

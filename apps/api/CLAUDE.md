@@ -143,11 +143,25 @@ saving. Showing an upload as still processing is client work that has not been d
 - `prom-client`, one `Registry` behind the `METRICS_REGISTRY` token from the `@Global()`
   `MetricsModule`. Inject the token and build the metric in the constructor with
   `registers: [registry]`; don't reach for `prom-client`'s default global registry.
-- **Served on `METRICS_PORT` (9464), never on `PORT`.** `startMetricsServer` is called
-  from both entrypoints. The worker has no HTTP server of its own
-  (`createApplicationContext`), and the api's port is published through the Ingress —
-  `/metrics` there would put route names and queue depths on the internet. A port that
-  cannot bind is logged and skipped: metrics never take the process down.
+- **`GET /metrics` on the application port**, served by `MetricsController`, excluded
+  from Swagger and `@SkipThrottle()`d because `ThrottlerGuard` is global and a scrape is
+  not user traffic. Two things follow from sharing the port the Ingress publishes:
+  - **The route refuses any request carrying `x-forwarded-for`, with a 404.** That
+    header is what keeps route names, library versions and queue depths off the
+    internet: Prometheus scrapes a pod by its IP and never crosses the proxy, while
+    ingress-nginx always sets it. The alternative was an nginx `server-snippet` denying
+    the path, which ingress-nginx ≥ 1.9 ignores unless `allow-snippet-annotations` is
+    re-enabled — a protection that can silently not apply is worse than none.
+  - Collection is not free (it reads Redis, and SQS), and on this port it competes with
+    user traffic. Keep `collect` callbacks cheap, and never put metrics behind
+    `/health`: the probes read that one, so a Redis blip would make kubelet restart the
+    pod.
+- **The worker exposes nothing.** `worker-main.ts` builds an application context with no
+  HTTP server, and it was left that way deliberately. It still imports `MetricsModule`
+  and still records `video_transcode_duration_seconds`,
+  `image_transcode_duration_seconds` and `image_size_ratio` — those numbers simply have
+  no reader until the worker gets a listener. Nothing else is needed to make them
+  visible.
 - **No identifier is ever a label.** No `userId`, `titleId`, `rawKey`, `jobId`. Each
   distinct label combination is a series Prometheus keeps for its own lifetime, so an id
   in that position is unbounded growth. Ids belong in the logs, which already carry
@@ -165,11 +179,15 @@ saving. Showing an upload as still processing is client work that has not been d
   differs by orders of magnitude is a separate metric, not another label value. That is
   why `video_transcode_duration_seconds` (10s…1h) and `image_transcode_duration_seconds`
   (0.25s…30s) are two names rather than one with a `queue` label.
-- **Queue depth is published from the worker only.** `QueueMetricsService` samples it
-  from Redis at scrape time, taking its queues through the `METRICS_QUEUES` token so it
-  never imports a transcoder's queue name — the same arrangement as the image attachers.
-  The api holds the same producers, and two replicas of it would publish the same
-  numbers twice, differing only in the pod label.
+- **Queue depth is read by the api**, since that is the process with a scrape endpoint.
+  Depth is a property of Redis rather than of a process, so the numbers are the same
+  either way. `QueueMetricsService` samples it at scrape time and takes its queues
+  through the `METRICS_QUEUES` token, so it never imports a transcoder's queue name —
+  the same arrangement as the image attachers; `VideoTranscoderModule` and
+  `ImageTranscoderModule` export `BullModule` to make the tokens resolvable, while
+  registration stays with the transcoder that owns the queue. In prod the api runs two
+  replicas and both publish these series, so **aggregate with `max by (queue, state)`**,
+  never `sum`.
 - **A collector that throws fails the whole scrape.** `registry.metrics()` rejects as a
   unit, so an unreachable Redis or a denied SQS call would blank out every other metric
   in the process, including the ones that say it is alive. Anything sampling an external
