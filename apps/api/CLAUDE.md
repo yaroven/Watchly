@@ -140,9 +140,18 @@ saving. Showing an upload as still processing is client work that has not been d
 
 ### Metrics
 
-- `prom-client`, one `Registry` behind the `METRICS_REGISTRY` token from the `@Global()`
-  `MetricsModule`. Inject the token and build the metric in the constructor with
-  `registers: [registry]`; don't reach for `prom-client`'s default global registry.
+- **Metrics are module-level constants on `prom-client`'s default registry**, declared
+  at the top of the file that measures the thing — beside `OMDB_SOURCE_MAP`, not inside
+  a class. Nothing injects a registry. A metric built per instance throws on the second
+  construction, because a registry refuses a duplicate name and every `beforeEach` that
+  rebuilds a service would hit it.
+  - The cost is shared state: observations carry over from one test to the next, so a
+    spec asserting an exact value calls `register.resetMetrics()` in `beforeEach` (it
+    clears values and keeps registrations). Four specs do.
+  - Metrics with a `collect` callback are the awkward case, since `collect` runs on the
+    metric and has no instance to read from. `QueueMetricsService` and `S3EventService`
+    each set a module-level holder from their constructor, replacing rather than
+    appending so a second construction leaves one sampler.
 - **`GET /metrics` on the application port**, served by `MetricsController`, excluded
   from Swagger and `@SkipThrottle()`d because `ThrottlerGuard` is global and a scrape is
   not user traffic. Two things follow from sharing the port the Ingress publishes:
@@ -157,11 +166,10 @@ saving. Showing an upload as still processing is client work that has not been d
     `/health`: the probes read that one, so a Redis blip would make kubelet restart the
     pod.
 - **The worker exposes nothing.** `worker-main.ts` builds an application context with no
-  HTTP server, and it was left that way deliberately. It still imports `MetricsModule`
-  and still records `video_transcode_duration_seconds`,
-  `image_transcode_duration_seconds` and `image_size_ratio` — those numbers simply have
-  no reader until the worker gets a listener. Nothing else is needed to make them
-  visible.
+  HTTP server, and it was left that way deliberately. Its processors still record
+  `video_transcode_duration_seconds`, `image_transcode_duration_seconds` and
+  `image_size_ratio` — the metrics register themselves on import — but those numbers
+  have no reader until the worker gets a listener of its own.
 - **No identifier is ever a label.** No `userId`, `titleId`, `rawKey`, `jobId`. Each
   distinct label combination is a series Prometheus keeps for its own lifetime, so an id
   in that position is unbounded growth. Ids belong in the logs, which already carry

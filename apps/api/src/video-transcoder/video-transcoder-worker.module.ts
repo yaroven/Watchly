@@ -20,7 +20,6 @@ import {
   IMAGE_ATTACHERS,
   ProcessedImageAttacher,
 } from "../image-transcoder/processed-image-attacher";
-import { MetricsModule } from "../metrics/metrics.module";
 import {
   POSTER_IMAGE_ATTACHERS,
   posterImageAttachersProvider,
@@ -37,11 +36,6 @@ import { VideoTranscoderService } from "./video-transcoder.service";
 @Module({
   imports: [
     ConfigModule.forRoot({ load: [s3Config, redisConfig, loggerConfig], isGlobal: true }),
-    // The worker records job durations but exposes nothing: it has no HTTP
-    // server of its own, and metrics are served from the api's port. The
-    // histograms stay registered so that giving it a listener is the only
-    // work left to make them visible.
-    MetricsModule,
     LoggerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) =>

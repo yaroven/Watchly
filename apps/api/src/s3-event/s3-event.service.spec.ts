@@ -1,10 +1,9 @@
 import { DeleteMessageCommand } from "@aws-sdk/client-sqs";
 import { ConfigService } from "@nestjs/config";
 import { Test, TestingModule } from "@nestjs/testing";
-import { Registry } from "prom-client";
+import { register } from "prom-client";
 import { ImageKind } from "../image-transcoder/image-profile.const";
 import { ImageTranscodeScheduler } from "../image-transcoder/image-transcode-scheduler.service";
-import { METRICS_REGISTRY } from "../metrics/metrics.const";
 import { PrismaService } from "../prisma/prisma.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
@@ -29,11 +28,12 @@ describe("S3EventService", () => {
   let prismaMock: jest.Mocked<PrismaService>;
   let videoTranscoderServiceMock: jest.Mocked<VideoTranscoderService>;
   let imageSchedulerMock: { schedule: jest.Mock };
-  let registry: Registry;
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    registry = new Registry();
+    // Metrics are module-level on the default registry, so values survive from
+    // one test to the next unless they are cleared. Registrations stay.
+    register.resetMetrics();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -61,7 +61,6 @@ describe("S3EventService", () => {
             getOrThrow: jest.fn().mockReturnValue(mockConfig),
           },
         },
-        { provide: METRICS_REGISTRY, useValue: registry },
       ],
     }).compile();
 
@@ -423,7 +422,7 @@ describe("S3EventService", () => {
       Body: JSON.stringify({ Records: [record] }),
     });
 
-    const textOf = () => registry.metrics();
+    const textOf = () => register.metrics();
 
     /**
      * The end-to-end number: how long an upload waited between S3 accepting

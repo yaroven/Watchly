@@ -1,16 +1,33 @@
-import { Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Cron } from "@nestjs/schedule";
 import { ExternalRatingSource } from "@prisma/client";
 import pMap from "p-map";
-import { Gauge, Histogram, Registry } from "prom-client";
+import { Gauge, Histogram } from "prom-client";
 import { OmdbConfig, OmdbConfigName } from "../config/omdb.config";
-import { METRICS_REGISTRY } from "../metrics/metrics.const";
 import { PrismaService } from "../prisma/prisma.service";
 import { ExternalRatingResponseDto } from "../title/dto/response/external-rating-response.dto";
 import { SyncExternalRatingsResponseDto } from "./dto/response/sync-external-ratings-response.dto";
 
 const CONCURRENCY = 5;
+
+const omdbDuration = new Histogram({
+  name: "omdb_request_duration_seconds",
+  help: "Duration of outbound OMDb requests",
+  labelNames: ["outcome"],
+  buckets: [0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
+});
+
+/**
+ * `fetch` here carries no timeout, so a request that hangs never settles and
+ * never records a duration — the histogram would stay silent while a `pMap`
+ * slot is held forever. This gauge is what makes that visible: in-flight
+ * pinned above zero with no new observations is a hang, not idleness.
+ */
+const omdbInFlight = new Gauge({
+  name: "omdb_requests_in_flight",
+  help: "OMDb requests started and not yet settled",
+});
 
 const OMDB_SOURCE_MAP: Record<string, ExternalRatingSource> = {
   "Internet Movie Database": ExternalRatingSource.IMDB,
@@ -30,35 +47,11 @@ interface OmdbTitleResponse {
 export class ExternalRatingsService {
   private readonly logger = new Logger(ExternalRatingsService.name);
   private readonly omdbConfig: OmdbConfig;
-  private readonly omdbDuration: Histogram<"outcome">;
-
-  /**
-   * `fetch` here carries no timeout, so a request that hangs never settles and
-   * never records a duration — the histogram would stay silent while a `pMap`
-   * slot is held forever. This gauge is what makes that visible: in-flight
-   * pinned above zero with no new observations is a hang, not idleness.
-   */
-  private readonly omdbInFlight: Gauge;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
-    @Inject(METRICS_REGISTRY) registry: Registry,
   ) {
-    this.omdbDuration = new Histogram({
-      name: "omdb_request_duration_seconds",
-      help: "Duration of outbound OMDb requests",
-      labelNames: ["outcome"],
-      buckets: [0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
-      registers: [registry],
-    });
-
-    this.omdbInFlight = new Gauge({
-      name: "omdb_requests_in_flight",
-      help: "OMDb requests started and not yet settled",
-      registers: [registry],
-    });
-
     this.omdbConfig = this.configService.getOrThrow<OmdbConfig>(OmdbConfigName);
     const isKeyExist = Boolean(this.omdbConfig.apiKey);
     if (!isKeyExist) {
@@ -161,8 +154,8 @@ export class ExternalRatingsService {
   }
 
   private async fetchOmdb(params: Record<string, string>): Promise<OmdbTitleResponse | undefined> {
-    const stop = this.omdbDuration.startTimer();
-    this.omdbInFlight.inc();
+    const stop = omdbDuration.startTimer();
+    omdbInFlight.inc();
 
     try {
       const url = new URL(this.omdbConfig.baseUrl);
@@ -192,7 +185,7 @@ export class ExternalRatingsService {
       this.logger.error(`Failed to fetch OMDb data for ${JSON.stringify(params)}:`, error);
       return undefined;
     } finally {
-      this.omdbInFlight.dec();
+      omdbInFlight.dec();
     }
   }
 }

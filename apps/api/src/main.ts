@@ -4,18 +4,20 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { Logger } from "nestjs-pino";
-import { Registry } from "prom-client";
+import { collectDefaultMetrics } from "prom-client";
 import { AppModule } from "./app.module";
 import { DEV_DEFAULTS } from "./common/dev-defaults.const";
 import { requireInProduction } from "./common/utils/env.util";
 import { httpMetricsMiddleware } from "./metrics/http-metrics.middleware";
-import { METRICS_REGISTRY } from "./metrics/metrics.const";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   app.enableShutdownHooks();
 
-  app.use(httpMetricsMiddleware(app.get<Registry>(METRICS_REGISTRY)));
+  // Heap, event loop lag, GC. Once per process, on the default registry the
+  // metrics controller serves; a second call would throw on duplicate names.
+  collectDefaultMetrics();
+  app.use(httpMetricsMiddleware());
 
   app.useGlobalPipes(
     new ValidationPipe({

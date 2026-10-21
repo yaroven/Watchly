@@ -3,8 +3,7 @@ import { TranscodingStatus } from "@prisma/client";
 import { Job } from "bullmq";
 import * as fs from "fs-extra";
 import { mkdtemp, rm } from "node:fs/promises";
-import { Registry } from "prom-client";
-import { METRICS_REGISTRY } from "../metrics/metrics.const";
+import { register } from "prom-client";
 import { TranscodeVideoDto } from "./dto/request/transcode-video.dto";
 import { VideoType } from "./enums/video-type.enum";
 import { VideoTranscoderProcessor } from "./video-transcoder-processor";
@@ -16,7 +15,6 @@ jest.mock("node:fs/promises");
 describe("VideoTranscoderProcessor", () => {
   let processor: VideoTranscoderProcessor;
   let videoTranscoderServiceMock: jest.Mocked<VideoTranscoderService>;
-  let registry: Registry;
 
   const mockJob = (data: TranscodeVideoDto): Job<TranscodeVideoDto> =>
     ({
@@ -26,14 +24,15 @@ describe("VideoTranscoderProcessor", () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    registry = new Registry();
+    // Metrics are module-level on the default registry, so values survive from
+    // one test to the next unless they are cleared. Registrations stay.
+    register.resetMetrics();
     (mkdtemp as jest.Mock).mockImplementation((prefix: string) => Promise.resolve(`${prefix}XXXX`));
     (rm as jest.Mock).mockResolvedValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         VideoTranscoderProcessor,
-        { provide: METRICS_REGISTRY, useValue: registry },
         {
           provide: VideoTranscoderService,
           useValue: {
@@ -219,7 +218,7 @@ describe("VideoTranscoderProcessor", () => {
   });
   describe("duration metric", () => {
     const sampleFor = async (outcome: string, kind = "episode") =>
-      (await registry.metrics()).includes(
+      (await register.metrics()).includes(
         `video_transcode_duration_seconds_count{kind="${kind}",outcome="${outcome}"} 1`,
       );
 

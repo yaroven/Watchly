@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { EventEmitter } from "node:events";
-import { Registry } from "prom-client";
+import { register } from "prom-client";
 import { httpMetricsMiddleware } from "./http-metrics.middleware";
 
 /**
@@ -8,12 +8,8 @@ import { httpMetricsMiddleware } from "./http-metrics.middleware";
  * it reads is taken at `finish`, so emitting that event by hand is the whole
  * contract. No express app, no supertest, nothing to get flaky.
  */
-function record(
-  registry: Registry,
-  req: Partial<Request>,
-  statusCode: number,
-): { next: jest.Mock } {
-  const middleware = httpMetricsMiddleware(registry);
+function record(req: Partial<Request>, statusCode: number): { next: jest.Mock } {
+  const middleware = httpMetricsMiddleware();
   const res = new EventEmitter() as EventEmitter & Response;
   res.statusCode = statusCode;
   const next = jest.fn();
@@ -24,8 +20,8 @@ function record(
   return { next };
 }
 
-async function labelsOf(registry: Registry): Promise<Record<string, string>[]> {
-  const [metric] = (await registry.getMetricsAsJSON()).filter(
+async function labelsOf(): Promise<Record<string, string>[]> {
+  const [metric] = (await register.getMetricsAsJSON()).filter(
     (entry) => entry.name === "http_request_duration_seconds",
   );
 
@@ -35,14 +31,12 @@ async function labelsOf(registry: Registry): Promise<Record<string, string>[]> {
 }
 
 describe("httpMetricsMiddleware", () => {
-  let registry: Registry;
-
-  beforeEach(() => {
-    registry = new Registry();
-  });
+  // Metrics live on the default registry, so observations carry over between
+  // tests unless they are cleared. Registrations stay.
+  beforeEach(() => register.resetMetrics());
 
   it("calls next so the request is still handled", () => {
-    const { next } = record(registry, { method: "GET", baseUrl: "", route: { path: "/" } }, 200);
+    const { next } = record({ method: "GET", baseUrl: "", route: { path: "/" } }, 200);
 
     expect(next).toHaveBeenCalled();
   });
@@ -51,20 +45,19 @@ describe("httpMetricsMiddleware", () => {
   // title and keep it for the life of the Prometheus instance.
   it("labels the route with the pattern, not the url", async () => {
     record(
-      registry,
       { method: "GET", baseUrl: "", route: { path: "/titles/:id" }, url: "/titles/abc-123" },
       200,
     );
 
-    const [labels] = await labelsOf(registry);
+    const [labels] = await labelsOf();
     expect(labels.route).toBe("/titles/:id");
   });
 
   // An unmatched path is attacker-controlled, so it must never reach a label.
   it("collapses a request that matched no route into one bucket", async () => {
-    record(registry, { method: "GET", baseUrl: "", url: "/../../etc/passwd" }, 404);
+    record({ method: "GET", baseUrl: "", url: "/../../etc/passwd" }, 404);
 
-    const [labels] = await labelsOf(registry);
+    const [labels] = await labelsOf();
     expect(labels.route).toBe("unmatched");
     expect(labels.status_class).toBe("4xx");
   });
@@ -75,17 +68,17 @@ describe("httpMetricsMiddleware", () => {
    * status the handler never set. Recording on `finish` sees the real one.
    */
   it("records the status the response actually finished with", async () => {
-    record(registry, { method: "PATCH", baseUrl: "", route: { path: "/titles/:id" } }, 500);
+    record({ method: "PATCH", baseUrl: "", route: { path: "/titles/:id" } }, 500);
 
-    const [labels] = await labelsOf(registry);
+    const [labels] = await labelsOf();
     expect(labels.status_class).toBe("5xx");
     expect(labels.method).toBe("PATCH");
   });
 
   it("joins a mounted prefix onto the pattern", async () => {
-    record(registry, { method: "GET", baseUrl: "/api", route: { path: "/titles/:id" } }, 200);
+    record({ method: "GET", baseUrl: "/api", route: { path: "/titles/:id" } }, 200);
 
-    const [labels] = await labelsOf(registry);
+    const [labels] = await labelsOf();
     expect(labels.route).toBe("/api/titles/:id");
   });
 });
