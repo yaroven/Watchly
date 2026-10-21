@@ -2,7 +2,7 @@ import commentKeys from "@/features/comment/api/comment.keys";
 import titleKeys from "@/features/title/api/title.keys";
 import createMutationHook from "@shared/api/createMutationHook";
 import { UseMutationOptions } from "@tanstack/react-query";
-import { ReactionType, TitleEngagement } from "../schemas/title-engagement";
+import { ReactionResult, ReactionType, TitleEngagement } from "../schemas/title-engagement";
 import titleEngagementKeys from "./title-engagement.keys";
 import titleEngagementService from "./title-engagement.service";
 
@@ -29,10 +29,7 @@ const invalidateFor = (titleId: string) => [
   commentKeys.titleListsPrefix(titleId),
 ];
 
-export const useReactToTitle = (
-  titleId: string,
-  options?: Omit<UseMutationOptions<TitleEngagement, Error, ReactionType>, "mutationFn">,
-) => {
+export const useReactToTitle = (titleId: string, options?: Omit<UseMutationOptions<ReactionResult, Error, ReactionType>, "mutationFn">) => {
   const useReact = createMutationHook({
     mutationFn: (type: ReactionType) => titleEngagementService.react(titleId, type),
     getInvalidateKeys: () => invalidateFor(titleId),
