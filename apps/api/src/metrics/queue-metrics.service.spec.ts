@@ -67,7 +67,7 @@ describe("QueueMetricsService", () => {
   /**
    * The one that matters. `registry.metrics()` rejects as a whole if any
    * collector throws, so an unreachable Redis must not blank out every other
-   * metric in the process — including the ones saying the worker is alive.
+   * metric in the process — including the ones saying it is alive.
    */
   it("keeps the rest of the registry readable when a queue cannot be reached", async () => {
     const registry = new Registry();
