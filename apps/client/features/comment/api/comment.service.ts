@@ -39,7 +39,7 @@ const CommentService = {
   },
 
   react: async (commentId: string, type: ReactionType): Promise<CommentReaction> => {
-    const { data } = await api.post<CommentReaction>(`/comments/${commentId}/reactions`, { type });
+    const { data } = await api.post<CommentReaction>(`/reactions/comments/${commentId}`, { type });
     return data;
   },
 

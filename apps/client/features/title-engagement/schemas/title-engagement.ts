@@ -36,6 +36,18 @@ export interface TitleEngagement extends TitleEngagementCounts {
   viewer: ViewerTitleEngagement | null;
 }
 
+/**
+ * What `POST|DELETE /reactions/:kind/:id` answers with — the subject's own
+ * counts, not a title engagement block. One endpoint serves titles and
+ * comments, so the shape cannot carry a score or a watchlist.
+ */
+export interface ReactionResult {
+  likes: number;
+  dislikes: number;
+  commentCount: number;
+  myReaction: ReactionType | null;
+}
+
 export interface SetTitleRatingDto {
   score: number;
 }
