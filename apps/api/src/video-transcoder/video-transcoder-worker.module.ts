@@ -1,6 +1,7 @@
-import { BullModule } from "@nestjs/bullmq";
+import { BullModule, getQueueToken } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
+import { Queue } from "bullmq";
 import { LoggerModule } from "nestjs-pino";
 import loggerConfig, {
   buildLoggerParams,
@@ -22,6 +23,7 @@ import {
   ProcessedImageAttacher,
 } from "../image-transcoder/processed-image-attacher";
 import { MetricsModule } from "../metrics/metrics.module";
+import { METRICS_QUEUES, QueueMetricsService } from "../metrics/queue-metrics.service";
 import {
   POSTER_IMAGE_ATTACHERS,
   posterImageAttachersProvider,
@@ -59,6 +61,17 @@ import { VideoTranscoderService } from "./video-transcoder.service";
     PrismaModule,
   ],
   providers: [
+    // Queue depth is published from the worker alone. The api holds the same
+    // producers, and two replicas of it would publish the same numbers twice.
+    {
+      provide: METRICS_QUEUES,
+      inject: [
+        getQueueToken(VIDEO_TRANSCODE_QUEUE_OPTIONS.name),
+        getQueueToken(IMAGE_TRANSCODE_QUEUE_OPTIONS.name),
+      ],
+      useFactory: (video: Queue, image: Queue): Queue[] => [video, image],
+    },
+    QueueMetricsService,
     VideoTranscoderService,
     VideoTranscoderProcessor,
     ImageTranscoderService,

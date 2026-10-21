@@ -1,8 +1,10 @@
 import { DeleteMessageCommand } from "@aws-sdk/client-sqs";
 import { ConfigService } from "@nestjs/config";
 import { Test, TestingModule } from "@nestjs/testing";
+import { Registry } from "prom-client";
 import { ImageKind } from "../image-transcoder/image-profile.const";
 import { ImageTranscodeScheduler } from "../image-transcoder/image-transcode-scheduler.service";
+import { METRICS_REGISTRY } from "../metrics/metrics.const";
 import { PrismaService } from "../prisma/prisma.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
@@ -20,18 +22,18 @@ const mockConfig = {
 };
 
 const mockQueueUrl = "https://sqs.us-east-1.amazonaws.com/123/watchly-s3-events";
-const mockQueueArn = "arn:aws:sqs:us-east-1:123:watchly-s3-events";
 const mockDlqUrl = "https://sqs.us-east-1.amazonaws.com/123/watchly-s3-events-dlq";
-const mockDlqArn = "arn:aws:sqs:us-east-1:123:watchly-s3-events-dlq";
 
 describe("S3EventService", () => {
   let service: S3EventService;
   let prismaMock: jest.Mocked<PrismaService>;
   let videoTranscoderServiceMock: jest.Mocked<VideoTranscoderService>;
   let imageSchedulerMock: { schedule: jest.Mock };
+  let registry: Registry;
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    registry = new Registry();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -59,6 +61,7 @@ describe("S3EventService", () => {
             getOrThrow: jest.fn().mockReturnValue(mockConfig),
           },
         },
+        { provide: METRICS_REGISTRY, useValue: registry },
       ],
     }).compile();
 
@@ -409,6 +412,119 @@ describe("S3EventService", () => {
       expect(prismaMock.episode.findUnique).not.toHaveBeenCalled();
       expect(prismaMock.title.findUnique).not.toHaveBeenCalled();
       expect(videoTranscoderServiceMock.scheduleTranscodeVideo).not.toHaveBeenCalled();
+    });
+  });
+  describe("metrics", () => {
+    const TITLE = "11111111-1111-4111-8111-111111111111";
+
+    const messageWith = (record: Record<string, unknown>) => ({
+      MessageId: "msg-1",
+      ReceiptHandle: "receipt-a",
+      Body: JSON.stringify({ Records: [record] }),
+    });
+
+    const textOf = () => registry.metrics();
+
+    /**
+     * The end-to-end number: how long an upload waited between S3 accepting
+     * it and a job existing for it. Queue depth alone cannot tell a backlog
+     * from a poller that stopped reading.
+     */
+    it("records the delay from the S3 event to the job, labelled by kind", async () => {
+      const eventTime = new Date(Date.now() - 4000).toISOString();
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (service as any).processMessage(
+        messageWith({ eventTime, s3: { object: { key: `title-video/${TITLE}` } } }),
+      );
+
+      const text = await textOf();
+      expect(text).toContain('s3_event_lag_seconds_count{kind="title-video"} 1');
+      expect(text).toMatch(/s3_event_lag_seconds_sum\{kind="title-video"\} [45](\.\d+)?/);
+    });
+
+    // S3's clock and the pod's are not the same clock; a small negative skew
+    // is not a measurement of anything.
+    it("clamps a future event time at zero rather than recording a negative", async () => {
+      const eventTime = new Date(Date.now() + 60_000).toISOString();
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (service as any).processMessage(
+        messageWith({ eventTime, s3: { object: { key: `title-video/${TITLE}` } } }),
+      );
+
+      expect(await textOf()).toContain('s3_event_lag_seconds_sum{kind="title-video"} 0');
+    });
+
+    it("skips the observation when the record carries no event time", async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (service as any).processMessage(
+        messageWith({ s3: { object: { key: `title-video/${TITLE}` } } }),
+      );
+
+      expect(await textOf()).not.toContain("s3_event_lag_seconds_count");
+      expect(videoTranscoderServiceMock.scheduleTranscodeVideo).toHaveBeenCalled();
+    });
+
+    it("counts a handled message as deleted", async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (service as any).processMessage(
+        messageWith({ s3: { object: { key: `title-video/${TITLE}` } } }),
+      );
+
+      expect(await textOf()).toContain('sqs_messages_total{outcome="deleted"} 1');
+    });
+
+    it("counts a message that is not json as unparseable", async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (service as any).processMessage({
+        MessageId: "msg-2",
+        ReceiptHandle: "receipt-b",
+        Body: "{not json",
+      });
+
+      expect(await textOf()).toContain('sqs_messages_total{outcome="unparseable"} 1');
+    });
+
+    // A failed message is deliberately left on the queue, so this counter and
+    // sqs_dlq_messages are the two ends of the same story.
+    it("counts a message whose record threw as failed, and does not delete it", async () => {
+      videoTranscoderServiceMock.scheduleTranscodeVideo.mockRejectedValueOnce(
+        new Error("redis down"),
+      );
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (service as any).processMessage(
+        messageWith({ s3: { object: { key: `title-video/${TITLE}` } } }),
+      );
+
+      expect(await textOf()).toContain('sqs_messages_total{outcome="failed"} 1');
+      expect(mockSend).not.toHaveBeenCalledWith(expect.any(DeleteMessageCommand));
+    });
+
+    describe("dead-letter depth", () => {
+      beforeEach(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (service as any).dlqUrl = mockDlqUrl;
+      });
+
+      it("reports the approximate depth at scrape time", async () => {
+        mockSend.mockResolvedValueOnce({ Attributes: { ApproximateNumberOfMessages: "3" } });
+
+        expect(await textOf()).toContain('sqs_dlq_messages{queue="watchly-s3-events-dlq"} 3');
+      });
+
+      it("stays silent, rather than failing the scrape, when sqs cannot be read", async () => {
+        mockSend.mockRejectedValueOnce(new Error("AccessDenied"));
+
+        await expect(textOf()).resolves.toContain("sqs_messages_total");
+      });
+    });
+
+    // "Unknown" must not serialise as "empty". Only the HELP and TYPE lines
+    // are present; there is no sample, so nothing reads back as a zero.
+    it("reports no sample when no dead-letter queue was resolved", async () => {
+      expect(await textOf()).not.toMatch(/^sqs_dlq_messages[{ ]/m);
     });
   });
 });

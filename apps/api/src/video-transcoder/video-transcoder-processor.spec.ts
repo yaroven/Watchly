@@ -3,6 +3,8 @@ import { TranscodingStatus } from "@prisma/client";
 import { Job } from "bullmq";
 import * as fs from "fs-extra";
 import { mkdtemp, rm } from "node:fs/promises";
+import { Registry } from "prom-client";
+import { METRICS_REGISTRY } from "../metrics/metrics.const";
 import { TranscodeVideoDto } from "./dto/request/transcode-video.dto";
 import { VideoType } from "./enums/video-type.enum";
 import { VideoTranscoderProcessor } from "./video-transcoder-processor";
@@ -14,6 +16,7 @@ jest.mock("node:fs/promises");
 describe("VideoTranscoderProcessor", () => {
   let processor: VideoTranscoderProcessor;
   let videoTranscoderServiceMock: jest.Mocked<VideoTranscoderService>;
+  let registry: Registry;
 
   const mockJob = (data: TranscodeVideoDto): Job<TranscodeVideoDto> =>
     ({
@@ -23,12 +26,14 @@ describe("VideoTranscoderProcessor", () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    registry = new Registry();
     (mkdtemp as jest.Mock).mockImplementation((prefix: string) => Promise.resolve(`${prefix}XXXX`));
     (rm as jest.Mock).mockResolvedValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         VideoTranscoderProcessor,
+        { provide: METRICS_REGISTRY, useValue: registry },
         {
           provide: VideoTranscoderService,
           useValue: {
@@ -210,6 +215,51 @@ describe("VideoTranscoderProcessor", () => {
 
         expect(rm).toHaveBeenCalled();
       });
+    });
+  });
+  describe("duration metric", () => {
+    const sampleFor = async (outcome: string, kind = "episode") =>
+      (await registry.metrics()).includes(
+        `video_transcode_duration_seconds_count{kind="${kind}",outcome="${outcome}"} 1`,
+      );
+
+    it("records a completed transcode as success, labelled by kind", async () => {
+      (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
+      videoTranscoderServiceMock.transcodeVideo.mockResolvedValue(undefined);
+
+      await processor.process(mockJob({ id: "mv-1", type: VideoType.MOVIE }));
+
+      await expect(sampleFor("success", "movie")).resolves.toBe(true);
+    });
+
+    /**
+     * An abort means the title or episode was deleted mid-transcode. The job
+     * returns rather than throwing, so BullMQ does not retry it — counting it
+     * as failed would make a routine deletion look like a broken pipeline,
+     * and the failure-ratio alert would fire on ordinary admin work.
+     */
+    it("separates an abort from a failure", async () => {
+      (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
+      videoTranscoderServiceMock.transcodeVideo.mockRejectedValue(
+        new TranscodeAbortedError("cancelled"),
+      );
+
+      await processor.process(mockJob({ id: "ep-1", type: VideoType.EPISODE }));
+
+      await expect(sampleFor("aborted")).resolves.toBe(true);
+      await expect(sampleFor("failed")).resolves.toBe(false);
+    });
+
+    it("records a real error as failed", async () => {
+      (fs.ensureDir as jest.Mock).mockResolvedValue(undefined);
+      videoTranscoderServiceMock.transcodeVideo.mockRejectedValue(new Error("ffmpeg died"));
+
+      await expect(
+        processor.process(mockJob({ id: "ep-1", type: VideoType.EPISODE })),
+      ).rejects.toThrow();
+
+      await expect(sampleFor("failed")).resolves.toBe(true);
+      await expect(sampleFor("aborted")).resolves.toBe(false);
     });
   });
 });
