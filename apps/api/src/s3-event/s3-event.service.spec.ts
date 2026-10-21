@@ -6,7 +6,7 @@ import { ImageKind } from "../image-transcoder/image-profile.const";
 import { ImageTranscodeScheduler } from "../image-transcoder/image-transcode-scheduler.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
-import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
+import { VideoTranscodeScheduler } from "../video-transcoder/video-transcode-scheduler.service";
 import { S3EventService } from "./s3-event.service";
 
 const mockSend = jest.fn();
@@ -26,7 +26,7 @@ const mockDlqUrl = "https://sqs.us-east-1.amazonaws.com/123/watchly-s3-events-dl
 describe("S3EventService", () => {
   let service: S3EventService;
   let prismaMock: jest.Mocked<PrismaService>;
-  let videoTranscoderServiceMock: jest.Mocked<VideoTranscoderService>;
+  let videoSchedulerMock: jest.Mocked<VideoTranscodeScheduler>;
   let imageSchedulerMock: { schedule: jest.Mock };
 
   beforeEach(async () => {
@@ -46,9 +46,9 @@ describe("S3EventService", () => {
           },
         },
         {
-          provide: VideoTranscoderService,
+          provide: VideoTranscodeScheduler,
           useValue: {
-            scheduleTranscodeVideo: jest.fn(),
+            schedule: jest.fn(),
           },
         },
         {
@@ -66,9 +66,9 @@ describe("S3EventService", () => {
 
     service = module.get<S3EventService>(S3EventService);
     prismaMock = module.get(PrismaService) as jest.Mocked<PrismaService>;
-    videoTranscoderServiceMock = module.get(
-      VideoTranscoderService,
-    ) as jest.Mocked<VideoTranscoderService>;
+    videoSchedulerMock = module.get(
+      VideoTranscodeScheduler,
+    ) as jest.Mocked<VideoTranscodeScheduler>;
     imageSchedulerMock = module.get(ImageTranscodeScheduler);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -164,7 +164,7 @@ describe("S3EventService", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (service as any).processMessage(messageFor(`title-video/${TITLE_ID}`));
 
-      expect(videoTranscoderServiceMock.scheduleTranscodeVideo).toHaveBeenCalledWith({
+      expect(videoSchedulerMock.schedule).toHaveBeenCalledWith({
         id: TITLE_ID,
         type: VideoType.MOVIE,
       });
@@ -176,7 +176,7 @@ describe("S3EventService", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (service as any).processMessage(messageFor(`episode-video/${TITLE_ID}`));
 
-      expect(videoTranscoderServiceMock.scheduleTranscodeVideo).toHaveBeenCalledWith({
+      expect(videoSchedulerMock.schedule).toHaveBeenCalledWith({
         id: TITLE_ID,
         type: VideoType.EPISODE,
       });
@@ -193,7 +193,7 @@ describe("S3EventService", () => {
         ownerId: USER_ID,
         rawKey: key,
       });
-      expect(videoTranscoderServiceMock.scheduleTranscodeVideo).not.toHaveBeenCalled();
+      expect(videoSchedulerMock.schedule).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -209,14 +209,14 @@ describe("S3EventService", () => {
         ownerId: TITLE_ID,
         rawKey: key,
       });
-      expect(videoTranscoderServiceMock.scheduleTranscodeVideo).not.toHaveBeenCalled();
+      expect(videoSchedulerMock.schedule).not.toHaveBeenCalled();
     });
 
     it("should ignore a prefix it does not recognise, and still delete the message", async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (service as any).processMessage(messageFor("something-else/abc"));
 
-      expect(videoTranscoderServiceMock.scheduleTranscodeVideo).not.toHaveBeenCalled();
+      expect(videoSchedulerMock.schedule).not.toHaveBeenCalled();
       expect(imageSchedulerMock.schedule).not.toHaveBeenCalled();
       expect(mockSend.mock.calls[0][0]).toBeInstanceOf(DeleteMessageCommand);
     });
@@ -227,7 +227,7 @@ describe("S3EventService", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (service as any).processMessage(messageFor(TITLE_ID));
 
-      expect(videoTranscoderServiceMock.scheduleTranscodeVideo).toHaveBeenCalledWith({
+      expect(videoSchedulerMock.schedule).toHaveBeenCalledWith({
         id: TITLE_ID,
         type: VideoType.EPISODE,
       });
@@ -247,12 +247,12 @@ describe("S3EventService", () => {
       (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue({
         id: "11111111-1111-4111-8111-111111111111",
       });
-      videoTranscoderServiceMock.scheduleTranscodeVideo.mockResolvedValue(undefined);
+      videoSchedulerMock.schedule.mockResolvedValue(undefined);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (service as any).processMessage(message);
 
-      expect(videoTranscoderServiceMock.scheduleTranscodeVideo).toHaveBeenCalledWith({
+      expect(videoSchedulerMock.schedule).toHaveBeenCalledWith({
         id: "11111111-1111-4111-8111-111111111111",
         type: VideoType.EPISODE,
       });
@@ -277,12 +277,12 @@ describe("S3EventService", () => {
       (prismaMock.title.findUnique as jest.Mock).mockResolvedValue({
         id: "22222222-2222-4222-8222-222222222222",
       });
-      videoTranscoderServiceMock.scheduleTranscodeVideo.mockResolvedValue(undefined);
+      videoSchedulerMock.schedule.mockResolvedValue(undefined);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (service as any).processMessage(message);
 
-      expect(videoTranscoderServiceMock.scheduleTranscodeVideo).toHaveBeenCalledWith({
+      expect(videoSchedulerMock.schedule).toHaveBeenCalledWith({
         id: "22222222-2222-4222-8222-222222222222",
         type: VideoType.MOVIE,
       });
@@ -298,7 +298,7 @@ describe("S3EventService", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (service as any).processMessage(message);
 
-      expect(videoTranscoderServiceMock.scheduleTranscodeVideo).not.toHaveBeenCalled();
+      expect(videoSchedulerMock.schedule).not.toHaveBeenCalled();
       expect(mockSend.mock.calls[0][0]).toBeInstanceOf(DeleteMessageCommand);
     });
 
@@ -317,7 +317,7 @@ describe("S3EventService", () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (service as any).processMessage(message);
 
-      expect(videoTranscoderServiceMock.scheduleTranscodeVideo).not.toHaveBeenCalled();
+      expect(videoSchedulerMock.schedule).not.toHaveBeenCalled();
     });
 
     it("should delete message only after successful processing", async () => {
@@ -332,7 +332,7 @@ describe("S3EventService", () => {
       (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue({
         id: "11111111-1111-4111-8111-111111111111",
       });
-      videoTranscoderServiceMock.scheduleTranscodeVideo.mockResolvedValue(undefined);
+      videoSchedulerMock.schedule.mockResolvedValue(undefined);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (service as any).processMessage(message);
@@ -386,7 +386,7 @@ describe("S3EventService", () => {
       (prismaMock.title.findUnique as jest.Mock).mockResolvedValue({
         id: "22222222-2222-4222-8222-222222222222",
       });
-      videoTranscoderServiceMock.scheduleTranscodeVideo.mockResolvedValue(undefined);
+      videoSchedulerMock.schedule.mockResolvedValue(undefined);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (service as any).processMessage(message);
@@ -410,7 +410,7 @@ describe("S3EventService", () => {
 
       expect(prismaMock.episode.findUnique).not.toHaveBeenCalled();
       expect(prismaMock.title.findUnique).not.toHaveBeenCalled();
-      expect(videoTranscoderServiceMock.scheduleTranscodeVideo).not.toHaveBeenCalled();
+      expect(videoSchedulerMock.schedule).not.toHaveBeenCalled();
     });
   });
   describe("metrics", () => {
@@ -462,7 +462,7 @@ describe("S3EventService", () => {
       );
 
       expect(await textOf()).not.toContain("s3_event_lag_seconds_count");
-      expect(videoTranscoderServiceMock.scheduleTranscodeVideo).toHaveBeenCalled();
+      expect(videoSchedulerMock.schedule).toHaveBeenCalled();
     });
 
     it("counts a handled message as deleted", async () => {
@@ -488,9 +488,7 @@ describe("S3EventService", () => {
     // A failed message is deliberately left on the queue, so this counter and
     // sqs_dlq_messages are the two ends of the same story.
     it("counts a message whose record threw as failed, and does not delete it", async () => {
-      videoTranscoderServiceMock.scheduleTranscodeVideo.mockRejectedValueOnce(
-        new Error("redis down"),
-      );
+      videoSchedulerMock.schedule.mockRejectedValueOnce(new Error("redis down"));
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (service as any).processMessage(

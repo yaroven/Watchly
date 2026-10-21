@@ -15,7 +15,7 @@ import { ImageTranscodeScheduler } from "../image-transcoder/image-transcode-sch
 import { PrismaService } from "../prisma/prisma.service";
 import { isLegacyBareUuidKey, parseRawKey, RawObjectKind } from "../s3/raw-key";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
-import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
+import { VideoTranscodeScheduler } from "../video-transcoder/video-transcode-scheduler.service";
 
 interface S3EventRecord {
   eventTime?: string;
@@ -87,7 +87,7 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
-    private readonly videoTranscoderService: VideoTranscoderService,
+    private readonly videoScheduler: VideoTranscodeScheduler,
     private readonly imageTranscodeScheduler: ImageTranscodeScheduler,
   ) {
     this.config = this.configService.getOrThrow<S3Config>(S3ConfigName);
@@ -270,13 +270,13 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
 
     switch (parsed.kind) {
       case RawObjectKind.TITLE_VIDEO:
-        await this.videoTranscoderService.scheduleTranscodeVideo({
+        await this.videoScheduler.schedule({
           id: parsed.ownerId,
           type: VideoType.MOVIE,
         });
         return;
       case RawObjectKind.EPISODE_VIDEO:
-        await this.videoTranscoderService.scheduleTranscodeVideo({
+        await this.videoScheduler.schedule({
           id: parsed.ownerId,
           type: VideoType.EPISODE,
         });
@@ -326,7 +326,7 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
     }
 
     this.logger.warn(`Resolved "${key}" by database probe — it predates the raw key scheme`);
-    await this.videoTranscoderService.scheduleTranscodeVideo(task);
+    await this.videoScheduler.schedule(task);
   }
 
   private async deleteMessage(message: Message) {

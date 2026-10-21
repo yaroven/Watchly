@@ -29,9 +29,10 @@ import { PrismaModule } from "../prisma/prisma.module";
 import { S3Module } from "../s3/s3.module";
 import { AvatarImageAttacher } from "../user-avatar/avatar-image.attacher";
 import { UserAvatarService } from "../user-avatar/user-avatar.service";
+import { HlsTranscoder } from "./hls-transcoder.service";
 import { VIDEO_TRANSCODE_QUEUE_OPTIONS } from "./video-transcode-queue.options";
+import { VideoTranscodeStateService } from "./video-transcode-state.service";
 import { VideoTranscoderProcessor } from "./video-transcoder-processor";
-import { VideoTranscoderService } from "./video-transcoder.service";
 
 @Module({
   imports: [
@@ -53,7 +54,9 @@ import { VideoTranscoderService } from "./video-transcoder.service";
     PrismaModule,
   ],
   providers: [
-    VideoTranscoderService,
+    // The conversion half, which only this process has the ffmpeg binary for.
+    HlsTranscoder,
+    VideoTranscodeStateService,
     VideoTranscoderProcessor,
     ImageTranscoderService,
     ImageTranscoderProcessor,
