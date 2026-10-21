@@ -19,7 +19,7 @@ pnpm dev:down
 pnpm lint                   # lint-staged in both apps (prettier + eslint --fix on staged files)
 pnpm test                   # api (jest) + client (vitest)
 pnpm --filter api test      # jest; rootDir=src, *.spec.ts only
-pnpm --filter api test -- --testPathPattern=title-engagement # one suite
+pnpm --filter api test --testPathPattern=title-engagement # one suite (no `--`)
 pnpm --filter client test   # vitest; unit only, no DOM environment
 ```
 
@@ -51,8 +51,13 @@ Worth knowing before trusting a green build:
   pull request *title*, not the code. Code linting happens only in the pre-commit hook,
   on staged files.
 - **There is no typecheck job.** Types are checked as a side effect of `nest build` and
-  `next build`. `apps/api/tsconfig.build.json` excludes `**/*.spec.ts`, so specs are
-  typechecked only by ts-jest.
+  `next build`. For the api that holds only because `nest-cli.json` sets
+  `"typeCheck": true` — the SWC builder does not check types without it, and until that
+  line was added nothing checked `apps/api` types anywhere, in CI or in the hooks. A
+  type error now fails `pnpm --filter api build` with exit 1, which is what the "Build
+  API" job runs. `apps/api/tsconfig.build.json` excludes `**/*.spec.ts`, so specs are
+  typechecked only by ts-jest, with `tsconfig.spec.json` as the project an editor
+  resolves them against.
 - **`apps/api` is not `strict`.** `noImplicitAny` and `strictBindCallApply` are
   explicitly off; `strictNullChecks` is on. `apps/client` is `strict: true`.
 - **CI jobs are wrapped in `dorny/paths-filter`.** A PR touching only `apps/api` still
