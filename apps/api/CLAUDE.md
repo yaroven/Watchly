@@ -24,6 +24,7 @@ domain's `utils/` — Prisma query shapes (`*.query.ts`), existence guards
 (`assert-*.util.ts`) and the pipes over them (`*-exists.pipe.ts`).
 `src/common/utils/` holds the cross-domain versions. Files carry their kind as a
 suffix: `.util.ts`, `.query.ts`, `.pipe.ts`, `.decorator.ts`, `.const.ts`, `.enum.ts`,
+`.error.ts`,
 `.types.ts`.
 
 A route whose only domain-specific work is "does this id exist" takes an existence
@@ -58,9 +59,31 @@ the owning feature — the attacher supplies the two things only that feature kn
 the processed key and the row to point at it. The worker wires the attachers, so
 `image-transcoder` never imports a feature module.
 
+**Each side is split the same four ways**, and the names line up on purpose:
+
+|                   | image                      | video                        |
+| ----------------- | -------------------------- | ---------------------------- |
+| producer          | `ImageTranscodeScheduler`  | `VideoTranscodeScheduler`    |
+| conversion        | `ImageTranscoderService`   | `HlsTranscoder`              |
+| orchestration     | `ImageTranscoderProcessor` | `VideoTranscoderProcessor`   |
+| the row it writes | the attachers              | `VideoTranscodeStateService` |
+
+**Orchestration belongs to the processor**, not to a service beside it: the processor
+owns the order of the stages and each stage's mechanics belong to someone else. That is
+what keeps the conversion classes free of Prisma — `HlsTranscoder` takes `onProgress`
+and `shouldAbort` as callbacks rather than injecting the state service, which makes it
+the one piece of the video pipeline testable with no database mock at all.
+
+**The api must not be able to reach ffmpeg.** `apk add ffmpeg` is in the `worker-base`
+and `worker-runner` Docker targets only, so a module graph that pulls `fluent-ffmpeg`
+into the api is importing a library whose binary is absent — it fails on use, not on
+load, which is the worst way to find out. The api injects `VideoTranscodeScheduler`
+(a `Queue`) and `VideoTranscodeStateService` (Prisma); neither imports ffmpeg, and
+`VideoTranscoderModule` carries no `S3Module` for the same reason.
+
 **A queue is registered by the transcoder that owns it, never by a feature.**
-`VideoTranscoderService.scheduleTranscodeVideo` and `ImageTranscodeScheduler.schedule`
-are the only producers; `title`, `season`, `artist`, `poster` and `user-avatar` inject
+`VideoTranscodeScheduler.schedule` and `ImageTranscodeScheduler.schedule` are the only
+producers; `title`, `season`, `artist`, `poster` and `user-avatar` inject
 neither a `Queue` nor the job name. `UserAvatarService` used to hold an `@InjectQueue`
 of its own, which meant `UserModule` — and `AuthModule` behind it — pulled a Redis
 queue in for a feature that only hands out an upload URL. `s3-event` maps the raw key's

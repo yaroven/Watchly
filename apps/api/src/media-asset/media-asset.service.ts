@@ -6,7 +6,7 @@ import { buildVideoManifestKey, VideoLocation } from "../s3/processed-key";
 import { buildVideoRawKey } from "../s3/raw-key";
 import { S3Service } from "../s3/s3.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
-import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
+import { VideoTranscodeScheduler } from "../video-transcoder/video-transcode-scheduler.service";
 
 @Injectable()
 export class MediaAssetService {
@@ -14,7 +14,7 @@ export class MediaAssetService {
 
   constructor(
     private readonly s3Service: S3Service,
-    private readonly videoTranscoderService: VideoTranscoderService,
+    private readonly scheduler: VideoTranscodeScheduler,
   ) {}
 
   async startUpload(id: string, fileSize: number, type: VideoType) {
@@ -45,7 +45,7 @@ export class MediaAssetService {
   }
 
   async scheduleTranscode(id: string, type: VideoType): Promise<void> {
-    await this.videoTranscoderService.scheduleTranscodeVideo({ id, type });
+    await this.scheduler.schedule({ id, type });
   }
 
   async getPlaybackUrl(location: VideoLocation): Promise<{ url: string }> {
@@ -66,7 +66,7 @@ export class MediaAssetService {
     const tasks: { id: string; run: () => Promise<unknown> }[] = [
       {
         id: "scheduled-transcodes",
-        run: () => this.videoTranscoderService.cancelScheduledTranscodes(id, type),
+        run: () => this.scheduler.cancelScheduled(id, type),
       },
       {
         id: "raw-video",
