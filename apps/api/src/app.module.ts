@@ -16,6 +16,7 @@ import loggerConfig, {
   LoggerConfig,
   LoggerConfigName,
 } from "./config/logger.config";
+import metricsConfig from "./config/metrics.config";
 import omdbConfig from "./config/omdb.config";
 import redisConfig, {
   RedisConfig,
@@ -27,6 +28,7 @@ import { EpisodeModule } from "./episode/episode.module";
 import { ExternalRatingsModule } from "./external-ratings/external-ratings.module";
 import { GenreModule } from "./genre/genre.module";
 import { MediaAssetModule } from "./media-asset/media-asset.module";
+import { MetricsModule } from "./metrics/metrics.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { S3EventModule } from "./s3-event/s3-event.module";
 import { S3Module } from "./s3/s3.module";
@@ -73,10 +75,11 @@ import { WatchlistModule } from "./watchlist/watchlist.module";
     }),
     S3Module,
     ConfigModule.forRoot({
-      load: [s3Config, redisConfig, loggerConfig, jwtConfig, omdbConfig],
+      load: [s3Config, redisConfig, loggerConfig, jwtConfig, omdbConfig, metricsConfig],
       isGlobal: true,
     }),
     ScheduleModule.forRoot(),
+    MetricsModule,
     VideoTranscoderModule,
     TitleModule,
     TitleCastModule,

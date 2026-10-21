@@ -7,6 +7,7 @@ import loggerConfig, {
   LoggerConfig,
   LoggerConfigName,
 } from "../config/logger.config";
+import metricsConfig from "../config/metrics.config";
 import redisConfig, {
   RedisConfig,
   RedisConfigName,
@@ -20,6 +21,7 @@ import {
   IMAGE_ATTACHERS,
   ProcessedImageAttacher,
 } from "../image-transcoder/processed-image-attacher";
+import { MetricsModule } from "../metrics/metrics.module";
 import {
   POSTER_IMAGE_ATTACHERS,
   posterImageAttachersProvider,
@@ -35,7 +37,11 @@ import { VideoTranscoderService } from "./video-transcoder.service";
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ load: [s3Config, redisConfig, loggerConfig], isGlobal: true }),
+    ConfigModule.forRoot({
+      load: [s3Config, redisConfig, loggerConfig, metricsConfig],
+      isGlobal: true,
+    }),
+    MetricsModule,
     LoggerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) =>

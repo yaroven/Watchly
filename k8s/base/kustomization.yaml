@@ -3,10 +3,12 @@ kind: Kustomization
 
 resources:
   - loki-config.yaml
+  - prometheus-config.yaml
   - api.yaml
   - client.yaml
   - transcoder-worker.yaml
   - loki.yaml
+  - prometheus.yaml
   - grafana.yaml
 
 labels:
@@ -37,6 +39,10 @@ configMapGenerator:
       - SQS_QUEUE_NAME=watchly-s3-event-queue
       - LOG_LEVEL=info
       - LOKI_URL=http://loki:3100
+      # Scrape port for both api and worker. Each runs in its own container,
+      # so one value serves both. Keep it in step with the prometheus.io/port
+      # annotation on the two Deployments.
+      - METRICS_PORT=9464
 
   - name: watchly-client-config
     literals:
@@ -45,6 +51,7 @@ configMapGenerator:
   - name: grafana-datasources
     files:
       - grafana/provisioning/datasources/loki.yml
+      - grafana/provisioning/datasources/prometheus.yml
   - name: grafana-dashboards
     files:
       - grafana/provisioning/dashboards/logs.yml
