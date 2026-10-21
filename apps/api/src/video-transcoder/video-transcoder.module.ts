@@ -10,6 +10,9 @@ import { VideoTranscoderService } from "./video-transcoder.service";
   imports: [BullModule.registerQueue(VIDEO_TRANSCODE_QUEUE_OPTIONS), S3Module, PrismaModule],
   controllers: [VideoTranscoderController],
   providers: [VideoTranscoderService],
-  exports: [VideoTranscoderService],
+  // BullModule is exported so the queue token resolves outside this module.
+  // Registration still belongs to the transcoder that owns the queue; what
+  // leaves here is read access, which is all QueueMetricsService wants.
+  exports: [VideoTranscoderService, BullModule],
 })
 export class VideoTranscoderModule {}

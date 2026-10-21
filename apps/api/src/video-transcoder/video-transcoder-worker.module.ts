@@ -1,14 +1,12 @@
-import { BullModule, getQueueToken } from "@nestjs/bullmq";
+import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
-import { Queue } from "bullmq";
 import { LoggerModule } from "nestjs-pino";
 import loggerConfig, {
   buildLoggerParams,
   LoggerConfig,
   LoggerConfigName,
 } from "../config/logger.config";
-import metricsConfig from "../config/metrics.config";
 import redisConfig, {
   RedisConfig,
   RedisConfigName,
@@ -23,7 +21,6 @@ import {
   ProcessedImageAttacher,
 } from "../image-transcoder/processed-image-attacher";
 import { MetricsModule } from "../metrics/metrics.module";
-import { METRICS_QUEUES, QueueMetricsService } from "../metrics/queue-metrics.service";
 import {
   POSTER_IMAGE_ATTACHERS,
   posterImageAttachersProvider,
@@ -39,10 +36,11 @@ import { VideoTranscoderService } from "./video-transcoder.service";
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      load: [s3Config, redisConfig, loggerConfig, metricsConfig],
-      isGlobal: true,
-    }),
+    ConfigModule.forRoot({ load: [s3Config, redisConfig, loggerConfig], isGlobal: true }),
+    // The worker records job durations but exposes nothing: it has no HTTP
+    // server of its own, and metrics are served from the api's port. The
+    // histograms stay registered so that giving it a listener is the only
+    // work left to make them visible.
     MetricsModule,
     LoggerModule.forRootAsync({
       inject: [ConfigService],
@@ -61,17 +59,6 @@ import { VideoTranscoderService } from "./video-transcoder.service";
     PrismaModule,
   ],
   providers: [
-    // Queue depth is published from the worker alone. The api holds the same
-    // producers, and two replicas of it would publish the same numbers twice.
-    {
-      provide: METRICS_QUEUES,
-      inject: [
-        getQueueToken(VIDEO_TRANSCODE_QUEUE_OPTIONS.name),
-        getQueueToken(IMAGE_TRANSCODE_QUEUE_OPTIONS.name),
-      ],
-      useFactory: (video: Queue, image: Queue): Queue[] => [video, image],
-    },
-    QueueMetricsService,
     VideoTranscoderService,
     VideoTranscoderProcessor,
     ImageTranscoderService,
