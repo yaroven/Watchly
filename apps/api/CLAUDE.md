@@ -109,6 +109,34 @@ saving. Showing an upload as still processing is client work that has not been d
 - Controllers carry Swagger decorators — `@ApiOperation`, the response type, **and the
   error responses the route can actually emit**. A route documenting only 200 is wrong.
 - Use the injected pino logger, never `console.log`.
+- **Reactions, comments, reports and engagement counters hang off their subject by a
+  nullable foreign key per kind** — an exclusive arc, with a `CHECK` that exactly one is
+  set (ADR-0015). In TypeScript the subject is a union: `{ titleId }` or `{ commentId }`
+  for reactions and counters, `{ titleId }` or `{ parentId }` for comments. Build one
+  with the helpers (`titleTarget`, `commentTarget`, `titleSubject`, `replySubject`),
+  never by hand.
+- **The database cascades them.** Deleting a title or a comment takes the rows under it,
+  replies included — there is no cleanup to call and none to forget. The one thing that
+  does not follow is a _count_: `CommentService.remove` recomputes the parent's
+  `commentCount`, because that is a number rather than a row.
+- Adding a reactable or commentable kind is a **migration** — a nullable column, a
+  widened CHECK, a backfill — not an enum value. The CHECKs are hand-written SQL that
+  `prisma migrate diff` does not manage; they are listed in `docs/DOMAIN.md` beside the
+  trigram index.
+- **Reacting is one route pair for everything**: `POST|DELETE /reactions/:entityType/:entityId`
+  (`titles`, `comments`). Don't add a per-feature reaction route — the toggle and the
+  recount belong to `ReactionService.vote`/`unvote`.
+- **Likes, dislikes and comment counts are read as a relation, never aggregated.**
+  `EngagementCountersService` is the only writer, and it recomputes on the caller's
+  client so the counters commit with the rows they summarise. A title's score, rating
+  count and watchlist count stay on `TitleEngagement` — only a title has those.
+- A reply is a comment whose parent is a comment. Threads are one level deep because
+  `CommentService` refuses the second, not because the schema does.
+- `title/` holds two services. `TitleService` is the catalogue — CRUD and the read
+  assembly. `TitleEngagementService` owns the score and the title-only counters
+  (`rate`, `removeRating`, `readEngagement`, `recomputeWatchlistCounts`), and takes a
+  client so the caller's transaction holds. `WatchlistService` injects the second
+  directly; it used to reach through the first for a counter, which is why they split.
 
 ### Viewer identity
 

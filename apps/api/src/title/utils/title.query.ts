@@ -1,4 +1,5 @@
 import {
+  EngagementCounters,
   ExternalRatings,
   Genre,
   Prisma,
@@ -9,6 +10,7 @@ import {
 
 export type EngagementRelations = {
   engagement: TitleEngagement | null;
+  counters: EngagementCounters | null;
   ratings?: { score: number }[];
   reactions?: { type: ReactionType }[];
   watchlistEntries?: { id: string }[];
@@ -23,6 +25,7 @@ const titleQuery = {
   engagement: (viewerId: string | null) =>
     ({
       engagement: true,
+      counters: true,
       ...(viewerId
         ? {
             ratings: { where: { userId: viewerId }, select: { score: true } },

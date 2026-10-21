@@ -4,8 +4,10 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { Prisma, ReactionType, Role } from "@prisma/client";
+import { Role } from "@prisma/client";
+import { EngagementCountersService } from "../engagement/engagement-counters.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { ReportService } from "../report/report.service";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
 import assertTitleExists from "../title/utils/assert-title-exists.util";
@@ -15,18 +17,24 @@ import {
   CommentResponseOptions,
   CommentWithAuthor,
 } from "./dto/response/comment-response.dto";
+import {
+  CommentSubject,
+  countersSubjectOf,
+  replySubject,
+  subjectWhere,
+} from "./utils/comment-subject.const";
+import commentQuery from "./utils/comment.query";
 
-const REPLY_PREVIEW_SIZE = 3;
-
-const AUTHOR_SELECT = { id: true, email: true, displayName: true, avatarKey: true } as const;
-
-type ReactionCounts = { likes: number; dislikes: number };
+const titleOf = (subject: CommentSubject): string | undefined =>
+  "titleId" in subject ? subject.titleId : undefined;
 
 @Injectable()
 export class CommentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly s3Service: S3Service,
+    private readonly reportService: ReportService,
+    private readonly counters: EngagementCountersService,
   ) {}
 
   private avatarUrl(user: { avatarKey: string | null }): string | null {
@@ -45,55 +53,32 @@ export class CommentService {
     });
   }
 
-  async findForTitle(
-    titleId: string,
+  async findForSubject(
+    subject: CommentSubject,
     { page = 1, limit = 10, sort = "newest" }: GetCommentsDto,
     viewerId?: string,
   ): Promise<{ items: CommentResponseDto[]; totalCount: number }> {
-    const where: Prisma.TitleCommentWhereInput = { titleId, parentId: null };
+    const where = subjectWhere(subject);
 
     const [rootIds, totalCount] = await Promise.all([
-      this.findRootIds(titleId, sort, page, limit),
-      this.prisma.titleComment.count({ where }),
+      this.findRootIds(subject, sort, page, limit),
+      this.prisma.comment.count({ where }),
     ]);
 
     if (rootIds.length === 0) return { items: [], totalCount };
 
-    const [roots, replies] = await Promise.all([
-      this.prisma.titleComment.findMany({
+    const titleId = titleOf(subject);
+
+    const [roots, replies] = (await Promise.all([
+      this.prisma.comment.findMany({
         where: { id: { in: rootIds } },
-        include: { user: { select: AUTHOR_SELECT } },
+        include: commentQuery.withViewer(viewerId, titleId),
       }),
-      this.findReplyPreviews(rootIds),
-    ]);
+      this.findReplyPreviews(rootIds, viewerId, titleId),
+    ])) as [CommentWithAuthor[], CommentWithAuthor[]];
 
-    const replyCounts = await this.countReplies(rootIds);
-
-    const all = [...roots, ...replies];
-    const [counts, myReactions, authorScores] = await Promise.all([
-      this.countReactions(all.map((comment) => comment.id)),
-      this.findMyReactions(
-        all.map((comment) => comment.id),
-        viewerId,
-      ),
-      this.findAuthorScores(
-        titleId,
-        all.map((comment) => comment.userId),
-      ),
-    ]);
-
-    const toDto = (
-      comment: CommentWithAuthor,
-      replies: CommentResponseDto[] = [],
-      replyCount = 0,
-    ) =>
-      this.toResponse(comment, {
-        counts: counts.get(comment.id),
-        myReaction: myReactions.get(comment.id),
-        authorScore: authorScores.get(comment.userId),
-        replies,
-        replyCount,
-      });
+    const toDto = (comment: CommentWithAuthor, nested: CommentResponseDto[] = []) =>
+      this.toResponse(comment, { replies: nested });
 
     const repliesByParent = new Map<string, CommentResponseDto[]>();
     for (const reply of replies) {
@@ -106,91 +91,55 @@ export class CommentService {
     const items = rootIds
       .map((id) => byId.get(id))
       .filter((root): root is CommentWithAuthor => Boolean(root))
-      .map((root) =>
-        toDto(root, repliesByParent.get(root.id) ?? [], replyCounts.get(root.id) ?? 0),
-      );
+      .map((root) => toDto(root, repliesByParent.get(root.id) ?? []));
 
     return { items, totalCount };
   }
 
   async create(
-    titleId: string,
+    subject: CommentSubject,
     userId: string,
-    {
-      text,
-      hasSpoiler = false,
-      parentId,
-    }: { text: string; hasSpoiler?: boolean; parentId?: string },
+    { text, hasSpoiler = false }: { text: string; hasSpoiler?: boolean },
+    expectedThread?: CommentSubject,
   ): Promise<CommentResponseDto> {
-    await assertTitleExists(this.prisma, titleId);
-    if (parentId) await this.assertRepliable(parentId, titleId);
+    const thread = await this.assertSubjectAcceptsComments(subject);
 
-    const comment = await this.prisma.titleComment.create({
-      data: { titleId, userId, text, hasSpoiler, parentId },
-      include: { user: { select: AUTHOR_SELECT } },
-    });
-
-    const authorScores = await this.findAuthorScores(titleId, [userId]);
-
-    return this.toResponse(comment, { authorScore: authorScores.get(userId) });
-  }
-
-  async react(
-    commentId: string,
-    userId: string,
-    type: ReactionType,
-  ): Promise<{ likes: number; dislikes: number; myReaction: ReactionType | null }> {
-    await this.assertCommentExists(commentId);
-
-    const { count: withdrawn } = await this.prisma.commentReaction.deleteMany({
-      where: { commentId, userId, type },
-    });
-
-    if (withdrawn > 0) {
-      return { ...(await this.countFor(commentId)), myReaction: null };
+    if (expectedThread && JSON.stringify(thread) !== JSON.stringify(expectedThread)) {
+      throw new BadRequestException("That comment belongs to a different thread");
     }
 
-    await this.prisma.commentReaction.upsert({
-      where: { commentId_userId: { commentId, userId } },
-      create: { commentId, userId, type },
-      update: { type },
+    const comment = await this.prisma.$transaction(async (tx) => {
+      const created = (await tx.comment.create({
+        data: { ...subject, userId, text, hasSpoiler },
+        include: commentQuery.withViewer(userId, titleOf(thread)),
+      })) as CommentWithAuthor;
+
+      const counts = await this.counters.recomputeComments(countersSubjectOf(subject), tx);
+
+      return { ...created, counters: counts };
     });
 
-    const counts = await this.countFor(commentId);
-    return { ...counts, myReaction: type };
+    return this.toResponse(comment);
   }
 
-  private async findReplyPreviews(rootIds: string[]): Promise<CommentWithAuthor[]> {
+  private async findReplyPreviews(
+    rootIds: string[],
+    viewerId?: string,
+    titleId?: string,
+  ): Promise<CommentWithAuthor[]> {
     if (rootIds.length === 0) return [];
 
-    const rows = await this.prisma.$queryRaw<{ id: string }[]>`
-      SELECT id FROM (
-        SELECT c."id", ROW_NUMBER() OVER (PARTITION BY c."parentId" ORDER BY c."createdAt" ASC) AS rn
-        FROM "TitleComment" c
-        WHERE c."parentId" IN (${Prisma.join(rootIds)})
-      ) ranked
-      WHERE ranked.rn <= ${REPLY_PREVIEW_SIZE}
-    `;
+    const rows = await this.prisma.$queryRaw<{ id: string }[]>(
+      commentQuery.replyPreviewIds(rootIds),
+    );
 
     if (rows.length === 0) return [];
 
-    return this.prisma.titleComment.findMany({
+    return await this.prisma.comment.findMany({
       where: { id: { in: rows.map((row) => row.id) } },
-      include: { user: { select: AUTHOR_SELECT } },
+      include: commentQuery.withViewer(viewerId, titleId),
       orderBy: { createdAt: "asc" },
     });
-  }
-
-  private async countReplies(rootIds: string[]): Promise<Map<string, number>> {
-    if (rootIds.length === 0) return new Map();
-
-    const grouped = await this.prisma.titleComment.groupBy({
-      by: ["parentId"],
-      where: { parentId: { in: rootIds } },
-      _count: { _all: true },
-    });
-
-    return new Map(grouped.map((row) => [row.parentId!, row._count._all]));
   }
 
   async findReplies(
@@ -198,61 +147,33 @@ export class CommentService {
     { page = 1, limit = 10 }: { page?: number; limit?: number },
     viewerId?: string,
   ): Promise<{ items: CommentResponseDto[]; totalCount: number }> {
-    await this.assertCommentExists(commentId);
+    const parent = await this.readSubjectOf(commentId);
+    const where = subjectWhere(replySubject(commentId));
 
-    const [replies, totalCount] = await Promise.all([
-      this.prisma.titleComment.findMany({
-        where: { parentId: commentId },
-        include: { user: { select: AUTHOR_SELECT } },
+    const [replies, totalCount] = (await Promise.all([
+      this.prisma.comment.findMany({
+        where,
+        include: commentQuery.withViewer(viewerId, titleOf(parent)),
         orderBy: { createdAt: "asc" },
         skip: (page - 1) * limit,
         take: limit,
       }),
-      this.prisma.titleComment.count({ where: { parentId: commentId } }),
-    ]);
+      this.prisma.comment.count({ where }),
+    ])) as [CommentWithAuthor[], number];
 
-    if (replies.length === 0) return { items: [], totalCount };
-
-    const ids = replies.map((reply) => reply.id);
-    const [counts, myReactions, authorScores] = await Promise.all([
-      this.countReactions(ids),
-      this.findMyReactions(ids, viewerId),
-      this.findAuthorScores(
-        replies[0].titleId,
-        replies.map((reply) => reply.userId),
-      ),
-    ]);
-
-    return {
-      items: replies.map((reply) =>
-        this.toResponse(reply, {
-          counts: counts.get(reply.id),
-          myReaction: myReactions.get(reply.id),
-          authorScore: authorScores.get(reply.userId),
-        }),
-      ),
-      totalCount,
-    };
-  }
-
-  private async countFor(commentId: string): Promise<ReactionCounts> {
-    return (await this.countReactions([commentId])).get(commentId) ?? { likes: 0, dislikes: 0 };
+    return { items: replies.map((reply) => this.toResponse(reply)), totalCount };
   }
 
   async report(commentId: string, userId: string, reason?: string): Promise<void> {
     await this.assertCommentExists(commentId);
 
-    await this.prisma.commentReport.upsert({
-      where: { commentId_userId: { commentId, userId } },
-      create: { commentId, userId, reason },
-      update: { reason },
-    });
+    await this.reportService.submit(commentId, userId, reason);
   }
 
   async remove(commentId: string, userId: string, role?: Role): Promise<void> {
-    const comment = await this.prisma.titleComment.findUnique({
+    const comment = await this.prisma.comment.findUnique({
       where: { id: commentId },
-      select: { userId: true },
+      select: { userId: true, titleId: true, parentId: true },
     });
     if (!comment) throw new NotFoundException(`Comment with id ${commentId} not found`);
 
@@ -260,11 +181,18 @@ export class CommentService {
       throw new ForbiddenException("You can only delete your own comments");
     }
 
-    await this.prisma.titleComment.delete({ where: { id: commentId } });
+    const subject: CommentSubject = comment.titleId
+      ? { titleId: comment.titleId }
+      : { parentId: comment.parentId! };
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.comment.delete({ where: { id: commentId } });
+      await this.counters.recomputeComments(countersSubjectOf(subject), tx);
+    });
   }
 
   private async findRootIds(
-    titleId: string,
+    subject: CommentSubject,
     sort: CommentSortMode,
     page: number,
     limit: number,
@@ -272,21 +200,15 @@ export class CommentService {
     const skip = (page - 1) * limit;
 
     if (sort === "hottest") {
-      const rows = await this.prisma.$queryRaw<{ id: string }[]>`
-        SELECT c."id"
-        FROM "TitleComment" c
-        LEFT JOIN "CommentReaction" r ON r."commentId" = c."id" AND r."type" = 'LIKE'
-        WHERE c."titleId" = ${titleId} AND c."parentId" IS NULL
-        GROUP BY c."id", c."createdAt"
-        ORDER BY COUNT(r."id") DESC, c."createdAt" DESC
-        LIMIT ${limit} OFFSET ${skip}
-      `;
+      const rows = await this.prisma.$queryRaw<{ id: string }[]>(
+        commentQuery.hottestRootIds(subject, limit, skip),
+      );
       return rows.map((row) => row.id);
     }
 
-    const roots = await this.prisma.titleComment.findMany({
-      where: { titleId, parentId: null },
-      orderBy: { createdAt: sort === "oldest" ? "asc" : "desc" },
+    const roots = await this.prisma.comment.findMany({
+      where: subjectWhere(subject),
+      orderBy: commentQuery.rootOrder(sort),
       skip,
       take: limit,
       select: { id: true },
@@ -294,66 +216,35 @@ export class CommentService {
     return roots.map((root) => root.id);
   }
 
-  private async countReactions(commentIds: string[]): Promise<Map<string, ReactionCounts>> {
-    if (commentIds.length === 0) return new Map();
-
-    const grouped = await this.prisma.commentReaction.groupBy({
-      by: ["commentId", "type"],
-      where: { commentId: { in: commentIds } },
-      _count: { _all: true },
-    });
-
-    const counts = new Map<string, ReactionCounts>();
-    for (const row of grouped) {
-      const current = counts.get(row.commentId) ?? { likes: 0, dislikes: 0 };
-      if (row.type === ReactionType.LIKE) current.likes = row._count._all;
-      else current.dislikes = row._count._all;
-      counts.set(row.commentId, current);
-    }
-    return counts;
-  }
-
-  private async findMyReactions(
-    commentIds: string[],
-    userId?: string,
-  ): Promise<Map<string, ReactionType>> {
-    if (!userId || commentIds.length === 0) return new Map();
-
-    const reactions = await this.prisma.commentReaction.findMany({
-      where: { userId, commentId: { in: commentIds } },
-      select: { commentId: true, type: true },
-    });
-    return new Map(reactions.map((reaction) => [reaction.commentId, reaction.type]));
-  }
-
-  private async findAuthorScores(titleId: string, userIds: string[]): Promise<Map<string, number>> {
-    if (userIds.length === 0) return new Map();
-
-    const ratings = await this.prisma.titleRating.findMany({
-      where: { titleId, userId: { in: userIds } },
-      select: { userId: true, score: true },
-    });
-    return new Map(ratings.map((rating) => [rating.userId, rating.score]));
-  }
-
   private async assertCommentExists(commentId: string) {
-    const comment = await this.prisma.titleComment.findUnique({
+    const comment = await this.prisma.comment.findUnique({
       where: { id: commentId },
       select: { id: true },
     });
     if (!comment) throw new NotFoundException(`Comment with id ${commentId} not found`);
   }
 
-  private async assertRepliable(parentId: string, titleId: string) {
-    const parent = await this.prisma.titleComment.findUnique({
-      where: { id: parentId },
+  private async readSubjectOf(commentId: string): Promise<CommentSubject> {
+    const comment = await this.prisma.comment.findUnique({
+      where: { id: commentId },
       select: { titleId: true, parentId: true },
     });
+    if (!comment) throw new NotFoundException(`Comment with id ${commentId} not found`);
 
-    if (!parent) throw new NotFoundException(`Comment with id ${parentId} not found`);
-    if (parent.titleId !== titleId)
-      throw new BadRequestException("That comment belongs to a different title");
-    if (parent.parentId)
+    return comment.titleId ? { titleId: comment.titleId } : { parentId: comment.parentId! };
+  }
+
+  private async assertSubjectAcceptsComments(subject: CommentSubject): Promise<CommentSubject> {
+    if ("titleId" in subject) {
+      await assertTitleExists(this.prisma, subject.titleId);
+      return subject;
+    }
+
+    const parent = await this.readSubjectOf(subject.parentId);
+    if (!("titleId" in parent)) {
       throw new BadRequestException("Replies cannot be replied to — reply to the comment instead");
+    }
+
+    return parent;
   }
 }

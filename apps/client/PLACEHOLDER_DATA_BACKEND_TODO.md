@@ -14,10 +14,11 @@ checklist item (and the mock it points to) once the backend piece lands.
       `StreamFilmInfo`, `StreamPhotos`, `TitleReviews`, `EpisodeList`,
       `StreamEpisodesSidebar`.
       Needs on `Title`: `genres: string[]`, `scores: {imdb, rottenTomatoes, metacritic,
-    tmovie}`, `ageRating`, `runtime`, `country`, `releaseDate`, `language`, `network?`,
+  tmovie}`, `ageRating`, `runtime`, `country`, `releaseDate`, `language`, `network?`,
       `director`, `closedCaption`, `cast: {name, avatarUrl}[]`, `trailerUrl?`.
-      Needs new endpoints: `GET /titles/:id/reviews` (paginated), stream engagement stats
-      (`likes`, `dislikes`, `shares`, `watchlistCount`), and a photos gallery
+      Backend ready: `GET /titles/:id/comments` (paginated) and
+      `GET /titles/:id/engagement` (`likes`, `dislikes`, `watchlistCount`, `avgScore`,
+      `ratingCount`). Still missing: `shares`, and a photos gallery
       (`GET /titles/:id/photos`).
 
 - [ ] **`TitleOverview.tsx`** — "Watch Trailer" button has no `onClick`; `Title` has no
@@ -44,19 +45,23 @@ checklist item (and the mock it points to) once the backend piece lands.
 
 - [ ] **`TitleReviews.tsx`** `handleSubmit` — posting a review only appends to local React
       state; nothing is persisted, and author/avatar are hardcoded to `"You"` /
-      a picsum URL. Needs `POST /titles/:id/reviews` + a real signed-in user for
-      author/avatarUrl.
+      a picsum URL. Backend ready: `POST /titles/:id/comments`, which answers with the
+      author and their avatar URL. Still needs a real signed-in user on the client.
 - [ ] **`CommentCard.tsx`** — like/dislike counters and the reply-count toggle are local
-      state only; nothing persists. Needs `POST /reviews/:id/reactions` (or similar).
-- [ ] **`CommentCard.tsx`** — "Report" button has no handler. Needs a report-comment
-      endpoint.
+      state only; nothing persists. Backend ready:
+      `POST|DELETE /reactions/comments/:id` for the vote, `GET /comments/:id/replies`
+      for the toggle.
+- [ ] **`CommentCard.tsx`** — "Report" button has no handler. Backend ready:
+      `POST /comments/:id/report`.
 
 ## Stream page (video player)
 
 - [ ] **`StreamFilmInfo.tsx`** — like/dislike reaction and "Add to Watchlist" toggle are
-      local state only; nothing is persisted or fetched as an initial value. Needs
-      like/dislike + watchlist endpoints, and the component should read the signed-in
-      user's existing reaction/watchlist state on load.
+      local state only; nothing is persisted or fetched as an initial value. Backend
+      ready: `POST|DELETE /reactions/titles/:id`, the watchlist routes, and
+      `GET /titles/:id/engagement`, whose `viewer` object carries the caller's own
+      reaction and watchlist state — `null` when nobody is signed in, which is not the
+      same as "has not voted". The component still needs wiring.
 - [ ] **`StreamFilmInfo.tsx`** — score badge falls back to a hardcoded `9` when no
       `rating` prop is passed (only used when the T.Movie score mock is unavailable —
       resolved once real scores exist).

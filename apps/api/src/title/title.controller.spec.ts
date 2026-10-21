@@ -2,6 +2,7 @@ import { NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { FilterRule } from "../common/pagination/filter-rule.enum";
 import { PrismaService } from "../prisma/prisma.service";
+import { TitleEngagementService } from "./title-engagement.service";
 import { TitleController } from "./title.controller";
 import { TitleService } from "./title.service";
 import { TitleExistsPipe } from "./utils/title-exists.pipe";
@@ -9,6 +10,25 @@ import { TitleExistsPipe } from "./utils/title-exists.pipe";
 describe("TitleController", () => {
   let controller: TitleController;
   let titleServiceMock: jest.Mocked<TitleService>;
+
+  // One mock behind both providers: the controller forwards the catalogue
+  // routes to one service and the engagement routes to the other, and these
+  // tests only care that it forwards.
+  const serviceMock = {
+    create: jest.fn(),
+    getMovieUrl: jest.fn(),
+    findAll: jest.fn(),
+    findOne: jest.fn(),
+    update: jest.fn(),
+    startMovieUpload: jest.fn(),
+    completeMovieUpload: jest.fn(),
+    abortMovieUpload: jest.fn(),
+    createPosterUploadingUrl: jest.fn(),
+    transcode: jest.fn(),
+    delete: jest.fn(),
+    getCast: jest.fn(),
+    setCast: jest.fn(),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -19,24 +39,8 @@ describe("TitleController", () => {
           provide: PrismaService,
           useValue: { title: { findUnique: jest.fn().mockResolvedValue({ id: "title-1" }) } },
         },
-        {
-          provide: TitleService,
-          useValue: {
-            create: jest.fn(),
-            getMovieUrl: jest.fn(),
-            findAll: jest.fn(),
-            findOne: jest.fn(),
-            update: jest.fn(),
-            startMovieUpload: jest.fn(),
-            completeMovieUpload: jest.fn(),
-            abortMovieUpload: jest.fn(),
-            createPosterUploadingUrl: jest.fn(),
-            transcode: jest.fn(),
-            delete: jest.fn(),
-            getCast: jest.fn(),
-            setCast: jest.fn(),
-          },
-        },
+        { provide: TitleService, useValue: serviceMock },
+        { provide: TitleEngagementService, useValue: serviceMock },
       ],
     }).compile();
 
@@ -57,7 +61,7 @@ describe("TitleController", () => {
           description: "Desc",
           ageRating: "AGE_0" as any,
           country: "US",
-          releaseDate: "2026-01-01",
+          releaseDate: new Date("2026-01-01"),
           language: "en",
           trailerUrl: "https://example.com/trailer.mp4",
           runtime: 120,

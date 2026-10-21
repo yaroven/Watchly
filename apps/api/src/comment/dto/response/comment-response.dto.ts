@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { ReactionType, TitleComment, User } from "@prisma/client";
+import { Comment, ReactionType, User } from "@prisma/client";
 
 export class CommentAuthorDto {
   @ApiProperty({ format: "uuid" })
@@ -29,16 +29,21 @@ export class CommentAuthorDto {
   }
 }
 
-export type CommentWithAuthor = TitleComment & {
-  user: Pick<User, "id" | "email" | "displayName" | "avatarKey">;
+/**
+ * A comment as the service loads it: the author, the cached counters, and — for
+ * a signed-in read — the viewer's own reaction. All three are relations now
+ * that the subject is a foreign key, so they arrive with the row.
+ */
+export type CommentWithAuthor = Comment & {
+  user: Pick<User, "id" | "email" | "displayName" | "avatarKey"> & {
+    ratings?: { score: number }[];
+  };
+  counters?: { likes: number; dislikes: number; commentCount: number } | null;
+  reactions?: { type: ReactionType }[];
 };
 
 export interface CommentResponseOptions {
-  counts?: { likes: number; dislikes: number };
-  myReaction?: ReactionType | null;
-  authorScore?: number | null;
   replies?: CommentResponseDto[];
-  replyCount?: number;
   authorAvatarUrl?: string | null;
 }
 
@@ -70,34 +75,35 @@ export class CommentResponseDto {
   })
   myReaction: ReactionType | null;
 
-  @ApiProperty({
-    description: `Up to ${3} replies. Fetch the rest from /comments/:id/replies.`,
-  })
+  @ApiProperty({ description: `Up to ${3} replies. Fetch the rest from /comments/:id/replies.` })
   replies: CommentResponseDto[];
 
   @ApiProperty({ description: "How many replies exist in total, not how many are in `replies`" })
   replyCount: number;
 
+  /**
+   * Counts, the viewer's vote and the author's score all come off the row:
+   * each is a relation the read already carries. What stays an argument is
+   * what the row cannot know — the nested replies, and the avatar URL, which
+   * needs the S3 service to build.
+   */
   constructor(
     comment: CommentWithAuthor,
-    {
-      counts = { likes: 0, dislikes: 0 },
-      myReaction = null,
-      authorScore = null,
-      replies = [],
-      replyCount = 0,
-      authorAvatarUrl = null,
-    }: CommentResponseOptions = {},
+    { replies = [], authorAvatarUrl = null }: CommentResponseOptions = {},
   ) {
     this.id = comment.id;
-    this.author = new CommentAuthorDto(comment.user, authorScore, authorAvatarUrl);
+    this.author = new CommentAuthorDto(
+      comment.user,
+      comment.user.ratings?.[0]?.score ?? null,
+      authorAvatarUrl,
+    );
     this.text = comment.text;
     this.hasSpoiler = comment.hasSpoiler;
     this.createdAt = comment.createdAt;
-    this.likes = counts.likes;
-    this.dislikes = counts.dislikes;
-    this.myReaction = myReaction;
+    this.likes = comment.counters?.likes ?? 0;
+    this.dislikes = comment.counters?.dislikes ?? 0;
+    this.myReaction = comment.reactions?.[0]?.type ?? null;
     this.replies = replies;
-    this.replyCount = replyCount;
+    this.replyCount = comment.counters?.commentCount ?? 0;
   }
 }
