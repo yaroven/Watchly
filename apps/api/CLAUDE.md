@@ -161,6 +161,29 @@ saving. Showing an upload as still processing is client work that has not been d
 - An outbound call with no timeout records no duration when it hangs — the timer never
   stops. Pair the histogram with an in-flight gauge where that can happen, as
   `ExternalRatingsService` does for OMDb, or a stalled request looks like an idle one.
+- **A histogram carries one bucket set for every series it holds**, so a scale that
+  differs by orders of magnitude is a separate metric, not another label value. That is
+  why `video_transcode_duration_seconds` (10s…1h) and `image_transcode_duration_seconds`
+  (0.25s…30s) are two names rather than one with a `queue` label.
+- **Queue depth is published from the worker only.** `QueueMetricsService` samples it
+  from Redis at scrape time, taking its queues through the `METRICS_QUEUES` token so it
+  never imports a transcoder's queue name — the same arrangement as the image attachers.
+  The api holds the same producers, and two replicas of it would publish the same
+  numbers twice, differing only in the pod label.
+- **A collector that throws fails the whole scrape.** `registry.metrics()` rejects as a
+  unit, so an unreachable Redis or a denied SQS call would blank out every other metric
+  in the process, including the ones that say it is alive. Anything sampling an external
+  system in `collect` swallows and logs its own failure — `QueueMetricsService.sample`
+  and `S3EventService.sampleDlq` both do.
+- **"Unknown" must not serialise as a zero**, for the same reason `viewer` is nullable.
+  An unlabelled gauge reports `0` from the moment it is registered, so `sqs_dlq_messages`
+  carries a `queue` label and the series does not exist until a depth has actually been
+  read. Reporting a confident `0` for a dead-letter queue that was never resolved would
+  mean an alert on `> 0` never fires.
+- An abort is not a failure. `video_transcode_duration_seconds` separates
+  `outcome="aborted"` — the entity was deleted mid-transcode, and the job returns rather
+  than throwing, so BullMQ does not retry — from `outcome="failed"`. Collapsing them
+  makes routine admin deletions fire the failure-ratio alert.
 
 ### Viewer identity
 
