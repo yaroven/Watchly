@@ -2,7 +2,7 @@
 
 NestJS 11, Prisma + Postgres, BullMQ on Redis, AWS SDK v3 for S3/SQS. Two entrypoints
 from one codebase and one Dockerfile: `src/main.ts` (HTTP, port 3000) and
-`src/worker-main.ts` (transcoding worker). `README.md` here is `nest new` boilerplate —
+`src/worker-main.ts` (background worker). `README.md` here is `nest new` boilerplate —
 ignore it.
 
 ## Layout
@@ -16,8 +16,9 @@ One directory per domain under `src/`, each with `*.module.ts`, `*.controller.ts
 `user` `watchlist`
 
 Infrastructure: `auth`, `prisma`, `s3`, `s3-event`, `media-asset`, `poster`,
-`video-transcoder`, `metrics`, `config` (typed `registerAs` factories), `common`
-(pagination, shared DTOs, `utils/`).
+`video-transcoder`, `metrics`, `worker` (the worker process's root module, which
+belongs to no domain because it composes all of them), `config` (typed `registerAs`
+factories), `common` (pagination, shared DTOs, `utils/`).
 
 Anything in a domain that is not a module, controller, service or DTO goes in that
 domain's `utils/` — Prisma query shapes (`*.query.ts`), existence guards
@@ -91,13 +92,15 @@ kind to an `ImageKind` the same way it maps one to a `VideoType`, and calls the
 producer; the `jobId` convention (`image-<rawKey>`) lives with the producer too, rather
 than once per feature.
 
-Both processors run in one worker process — `worker-main.ts` loads
-`VideoTranscoderWorkerModule`, which registers both queues because converting an
-image needs the ffmpeg the API image does not install. They keep **separate queues**
-on purpose: concurrency is per-queue, and one setting cannot serve a twenty-minute
-video transcode and an interactive 256px avatar. One queue for every image is right
-for the opposite reason — an avatar and a poster cost about the same. What both share
-lives in `common/utils/`: `DEFAULT_JOB_OPTIONS`, `withWorkDir`, `logJobFailure`,
+Both processors run in one worker process — `worker-main.ts` loads `WorkerModule`
+(`src/worker/worker.module.ts`), which registers both queues because converting an image
+needs the ffmpeg the API image does not install. That module is the whole of the process
+— anything the worker is to do has to be wired there — which is why it is named after
+the process rather than after the video transcoder it started as. They keep **separate
+queues** on purpose: concurrency is per-queue, and one setting cannot serve a
+twenty-minute video transcode and an interactive 256px avatar. One queue for every image
+is right for the opposite reason — an avatar and a poster cost about the same. What both
+share lives in `common/utils/`: `DEFAULT_JOB_OPTIONS`, `withWorkDir`, `logJobFailure`,
 `streamToFile`.
 
 Every uploaded image goes through it: avatars, title and season posters, and artist

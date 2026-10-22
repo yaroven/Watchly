@@ -29,11 +29,19 @@ import { PrismaModule } from "../prisma/prisma.module";
 import { S3Module } from "../s3/s3.module";
 import { AvatarImageAttacher } from "../user-avatar/avatar-image.attacher";
 import { UserAvatarService } from "../user-avatar/user-avatar.service";
-import { HlsTranscoder } from "./hls-transcoder.service";
-import { VIDEO_TRANSCODE_QUEUE_OPTIONS } from "./video-transcode-queue.options";
-import { VideoTranscodeStateService } from "./video-transcode-state.service";
-import { VideoTranscoderProcessor } from "./video-transcoder-processor";
+import { HlsTranscoder } from "../video-transcoder/hls-transcoder.service";
+import { VIDEO_TRANSCODE_QUEUE_OPTIONS } from "../video-transcoder/video-transcode-queue.options";
+import { VideoTranscodeStateService } from "../video-transcoder/video-transcode-state.service";
+import { VideoTranscoderProcessor } from "../video-transcoder/video-transcoder-processor";
 
+/**
+ * The whole of the worker process: `worker-main.ts` builds its context from
+ * this module and nothing else, so whatever the worker does has to be wired
+ * here. It was named after the video transcoder while that was all it ran, and
+ * the name stopped being true as soon as the image side moved in beside it.
+ * Composing a process is not a domain, which is why it no longer lives inside
+ * one either.
+ */
 @Module({
   imports: [
     ConfigModule.forRoot({ load: [s3Config, redisConfig, loggerConfig], isGlobal: true }),
@@ -74,4 +82,4 @@ import { VideoTranscoderProcessor } from "./video-transcoder-processor";
     },
   ],
 })
-export class VideoTranscoderWorkerModule {}
+export class WorkerModule {}
