@@ -167,7 +167,7 @@ export class CommentService {
   async report(commentId: string, userId: string, reason?: string): Promise<void> {
     await this.assertCommentExists(commentId);
 
-    await this.reportService.submit(commentId, userId, reason);
+    await this.reportService.submit(this.prisma, commentId, userId, reason);
   }
 
   async remove(commentId: string, userId: string, role?: Role): Promise<void> {

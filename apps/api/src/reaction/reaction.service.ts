@@ -45,7 +45,22 @@ export class ReactionService {
     target: ReactionTarget,
     userId: string,
     type: ReactionType,
-    client: ReactionClient = this.prisma,
+  ): Promise<EngagementCounts & { myReaction: ReactionType | null }> {
+    return this.prisma.$transaction((tx) => this.voteWithin(tx, target, userId, type));
+  }
+
+  async unvote(
+    target: ReactionTarget,
+    userId: string,
+  ): Promise<EngagementCounts & { myReaction: ReactionType | null }> {
+    return this.prisma.$transaction((tx) => this.unvoteWithin(tx, target, userId));
+  }
+
+  async voteWithin(
+    client: ReactionClient,
+    target: ReactionTarget,
+    userId: string,
+    type: ReactionType,
   ): Promise<EngagementCounts & { myReaction: ReactionType | null }> {
     const myReaction = await this.toggle(target, userId, type, client);
     const counts = await this.counters.recomputeReactions(countersSubject(target), client);
@@ -53,10 +68,10 @@ export class ReactionService {
     return { ...counts, myReaction };
   }
 
-  async unvote(
+  async unvoteWithin(
+    client: ReactionClient,
     target: ReactionTarget,
     userId: string,
-    client: ReactionClient = this.prisma,
   ): Promise<EngagementCounts & { myReaction: ReactionType | null }> {
     await client.reaction.deleteMany({ where: { ...target, userId } });
     const counts = await this.counters.recomputeReactions(countersSubject(target), client);

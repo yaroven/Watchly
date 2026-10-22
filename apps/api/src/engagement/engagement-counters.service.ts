@@ -27,21 +27,13 @@ export const commentCounters = (commentId: string): CountersSubject => ({ commen
 export const countsOf = (row: EngagementCounts | null | undefined): EngagementCounts =>
   row ? { likes: row.likes, dislikes: row.dislikes, commentCount: row.commentCount } : NO_COUNTS;
 
-/**
- * The cached half of engagement, for every kind of subject at once.
- *
- * Reads do not come through here: the row is a relation now, so a title or a
- * comment loads its counters with itself. What is left is the writing —
- * recomputing from the tables being summarised, inside the transaction that
- * changed them.
- */
 @Injectable()
 export class EngagementCountersService {
   constructor(private readonly prisma: PrismaService) {}
 
   async recomputeReactions(
     subject: CountersSubject,
-    client: CountersClient = this.prisma,
+    client: CountersClient,
   ): Promise<EngagementCounts> {
     const grouped = await client.reaction.groupBy({
       by: ["type"],
@@ -63,7 +55,7 @@ export class EngagementCountersService {
 
   async recomputeComments(
     subject: CountersSubject,
-    client: CountersClient = this.prisma,
+    client: CountersClient,
   ): Promise<EngagementCounts> {
     const where: Prisma.CommentWhereInput =
       "titleId" in subject ? { titleId: subject.titleId } : { parentId: subject.commentId };
@@ -73,10 +65,7 @@ export class EngagementCountersService {
     return this.write(subject, { commentCount }, client);
   }
 
-  async countsForOne(
-    subject: CountersSubject,
-    client: CountersClient = this.prisma,
-  ): Promise<EngagementCounts> {
+  async countsForOne(subject: CountersSubject, client: CountersClient): Promise<EngagementCounts> {
     const row = await client.engagementCounters.findUnique({ where: subject });
     return countsOf(row);
   }

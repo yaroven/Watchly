@@ -22,7 +22,7 @@ describe("ReportService", () => {
   afterEach(() => jest.clearAllMocks());
 
   it("files one standing report per person per comment", async () => {
-    await service.submit(commentId, userId, "spam");
+    await service.submit(prisma as never, commentId, userId, "spam");
 
     expect(prisma.report.upsert).toHaveBeenCalledWith({
       where: { commentId_userId: { commentId, userId } },
@@ -34,7 +34,7 @@ describe("ReportService", () => {
   // Otherwise one annoyed viewer could inflate a moderation queue by reporting
   // the same comment repeatedly.
   it("replaces the reason rather than filing a second row", async () => {
-    await service.submit(commentId, userId, "abuse");
+    await service.submit(prisma as never, commentId, userId, "abuse");
 
     const [[call]] = prisma.report.upsert.mock.calls as [[{ update: { reason?: string } }]];
     expect(call.update).toEqual({ reason: "abuse" });
@@ -43,7 +43,7 @@ describe("ReportService", () => {
   it("writes on the client it is handed, so a caller's transaction holds", async () => {
     const tx = { report: { upsert: jest.fn() } };
 
-    await service.submit(commentId, userId, undefined, tx as never);
+    await service.submit(tx as never, commentId, userId);
 
     expect(tx.report.upsert).toHaveBeenCalled();
     expect(prisma.report.upsert).not.toHaveBeenCalled();
