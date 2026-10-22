@@ -1,0 +1,44 @@
+# Mounted as a plain ConfigMap rather than through configMapGenerator, the same
+# way loki-config.yaml is: the generator's name hash would be the only thing
+# rolling the pod, and Prometheus rereads this on SIGHUP anyway.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      scrape_timeout: 10s
+
+    scrape_configs:
+      # Pod discovery, not Service discovery. The api runs two replicas behind
+      # one ClusterIP, so scraping the Service would hit a different pod each
+      # time and every counter would appear to jump backwards.
+      - job_name: watchly-pods
+        kubernetes_sd_configs:
+        - role: pod
+          namespaces:
+            own_namespace: true
+
+        relabel_configs:
+        # Opt-in: a pod is scraped only if it says it serves metrics.
+        - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+          action: keep
+          regex: "true"
+
+        # The address is rebuilt from the annotation rather than taken from
+        # whichever container port discovery happened to pick: a pod declaring
+        # several ports would otherwise become several targets, and one
+        # declaring none would get an address with no port at all. The
+        # annotation is the single statement of where metrics are served.
+        - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+          action: replace
+          regex: ([^:]+)(?::\d+)?;(\d+)
+          replacement: $1:$2
+          target_label: __address__
+
+        - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+          target_label: service
+        - source_labels: [__meta_kubernetes_pod_name]
+          target_label: pod

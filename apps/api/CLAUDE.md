@@ -16,14 +16,15 @@ One directory per domain under `src/`, each with `*.module.ts`, `*.controller.ts
 `user` `watchlist`
 
 Infrastructure: `auth`, `prisma`, `s3`, `s3-event`, `media-asset`, `poster`,
-`video-transcoder`, `config` (typed `registerAs` factories), `common` (pagination,
-shared DTOs, `utils/`).
+`video-transcoder`, `metrics`, `config` (typed `registerAs` factories), `common`
+(pagination, shared DTOs, `utils/`).
 
 Anything in a domain that is not a module, controller, service or DTO goes in that
 domain's `utils/` — Prisma query shapes (`*.query.ts`), existence guards
 (`assert-*.util.ts`) and the pipes over them (`*-exists.pipe.ts`).
 `src/common/utils/` holds the cross-domain versions. Files carry their kind as a
 suffix: `.util.ts`, `.query.ts`, `.pipe.ts`, `.decorator.ts`, `.const.ts`, `.enum.ts`,
+`.error.ts`,
 `.types.ts`.
 
 A route whose only domain-specific work is "does this id exist" takes an existence
@@ -58,9 +59,31 @@ the owning feature — the attacher supplies the two things only that feature kn
 the processed key and the row to point at it. The worker wires the attachers, so
 `image-transcoder` never imports a feature module.
 
+**Each side is split the same four ways**, and the names line up on purpose:
+
+|                   | image                      | video                        |
+| ----------------- | -------------------------- | ---------------------------- |
+| producer          | `ImageTranscodeScheduler`  | `VideoTranscodeScheduler`    |
+| conversion        | `ImageTranscoderService`   | `HlsTranscoder`              |
+| orchestration     | `ImageTranscoderProcessor` | `VideoTranscoderProcessor`   |
+| the row it writes | the attachers              | `VideoTranscodeStateService` |
+
+**Orchestration belongs to the processor**, not to a service beside it: the processor
+owns the order of the stages and each stage's mechanics belong to someone else. That is
+what keeps the conversion classes free of Prisma — `HlsTranscoder` takes `onProgress`
+and `shouldAbort` as callbacks rather than injecting the state service, which makes it
+the one piece of the video pipeline testable with no database mock at all.
+
+**The api must not be able to reach ffmpeg.** `apk add ffmpeg` is in the `worker-base`
+and `worker-runner` Docker targets only, so a module graph that pulls `fluent-ffmpeg`
+into the api is importing a library whose binary is absent — it fails on use, not on
+load, which is the worst way to find out. The api injects `VideoTranscodeScheduler`
+(a `Queue`) and `VideoTranscodeStateService` (Prisma); neither imports ffmpeg, and
+`VideoTranscoderModule` carries no `S3Module` for the same reason.
+
 **A queue is registered by the transcoder that owns it, never by a feature.**
-`VideoTranscoderService.scheduleTranscodeVideo` and `ImageTranscodeScheduler.schedule`
-are the only producers; `title`, `season`, `artist`, `poster` and `user-avatar` inject
+`VideoTranscodeScheduler.schedule` and `ImageTranscodeScheduler.schedule` are the only
+producers; `title`, `season`, `artist`, `poster` and `user-avatar` inject
 neither a `Queue` nor the job name. `UserAvatarService` used to hold an `@InjectQueue`
 of its own, which meant `UserModule` — and `AuthModule` behind it — pulled a Redis
 queue in for a feature that only hands out an upload URL. `s3-event` maps the raw key's
@@ -109,6 +132,107 @@ saving. Showing an upload as still processing is client work that has not been d
 - Controllers carry Swagger decorators — `@ApiOperation`, the response type, **and the
   error responses the route can actually emit**. A route documenting only 200 is wrong.
 - Use the injected pino logger, never `console.log`.
+- **Reactions, comments, reports and engagement counters hang off their subject by a
+  nullable foreign key per kind** — an exclusive arc, with a `CHECK` that exactly one is
+  set (ADR-0015). In TypeScript the subject is a union: `{ titleId }` or `{ commentId }`
+  for reactions and counters, `{ titleId }` or `{ parentId }` for comments. Build one
+  with the helpers (`titleTarget`, `commentTarget`, `titleSubject`, `replySubject`),
+  never by hand.
+- **The database cascades them.** Deleting a title or a comment takes the rows under it,
+  replies included — there is no cleanup to call and none to forget. The one thing that
+  does not follow is a _count_: `CommentService.remove` recomputes the parent's
+  `commentCount`, because that is a number rather than a row.
+- Adding a reactable or commentable kind is a **migration** — a nullable column, a
+  widened CHECK, a backfill — not an enum value. The CHECKs are hand-written SQL that
+  `prisma migrate diff` does not manage; they are listed in `docs/DOMAIN.md` beside the
+  trigram index.
+- **Reacting is one route pair for everything**: `POST|DELETE /reactions/:entityType/:entityId`
+  (`titles`, `comments`). Don't add a per-feature reaction route — the toggle and the
+  recount belong to `ReactionService.vote`/`unvote`.
+- **Likes, dislikes and comment counts are read as a relation, never aggregated.**
+  `EngagementCountersService` is the only writer, and it recomputes on the caller's
+  client so the counters commit with the rows they summarise. A title's score, rating
+  count and watchlist count stay on `TitleEngagement` — only a title has those.
+- A reply is a comment whose parent is a comment. Threads are one level deep because
+  `CommentService` refuses the second, not because the schema does.
+- `title/` holds two services. `TitleService` is the catalogue — CRUD and the read
+  assembly. `TitleEngagementService` owns the score and the title-only counters
+  (`rate`, `removeRating`, `readEngagement`, `recomputeWatchlistCounts`), and takes a
+  client so the caller's transaction holds. `WatchlistService` injects the second
+  directly; it used to reach through the first for a counter, which is why they split.
+
+### Metrics
+
+- **Metrics are module-level constants on `prom-client`'s default registry**, declared
+  at the top of the file that measures the thing — beside `OMDB_SOURCE_MAP`, not inside
+  a class. Nothing injects a registry. A metric built per instance throws on the second
+  construction, because a registry refuses a duplicate name and every `beforeEach` that
+  rebuilds a service would hit it.
+  - The cost is shared state: observations carry over from one test to the next, so a
+    spec asserting an exact value calls `register.resetMetrics()` in `beforeEach` (it
+    clears values and keeps registrations). Four specs do.
+  - Metrics with a `collect` callback are the awkward case, since `collect` runs on the
+    metric and has no instance to read from. `QueueMetricsService` and `S3EventService`
+    each set a module-level holder from their constructor, replacing rather than
+    appending so a second construction leaves one sampler.
+- **`GET /metrics` on the application port**, served by `MetricsController`, excluded
+  from Swagger and `@SkipThrottle()`d because `ThrottlerGuard` is global and a scrape is
+  not user traffic. Two things follow from sharing the port the Ingress publishes:
+  - **The route refuses any request carrying `x-forwarded-for`, with a 404.** That
+    header is what keeps route names, library versions and queue depths off the
+    internet: Prometheus scrapes a pod by its IP and never crosses the proxy, while
+    ingress-nginx always sets it. The alternative was an nginx `server-snippet` denying
+    the path, which ingress-nginx ≥ 1.9 ignores unless `allow-snippet-annotations` is
+    re-enabled — a protection that can silently not apply is worse than none.
+  - Collection is not free (it reads Redis, and SQS), and on this port it competes with
+    user traffic. Keep `collect` callbacks cheap, and never put metrics behind
+    `/health`: the probes read that one, so a Redis blip would make kubelet restart the
+    pod.
+- **The worker exposes nothing.** `worker-main.ts` builds an application context with no
+  HTTP server, and it was left that way deliberately. Its processors still record
+  `video_transcode_duration_seconds`, `image_transcode_duration_seconds` and
+  `image_size_ratio` — the metrics register themselves on import — but those numbers
+  have no reader until the worker gets a listener of its own.
+- **No identifier is ever a label.** No `userId`, `titleId`, `rawKey`, `jobId`. Each
+  distinct label combination is a series Prometheus keeps for its own lifetime, so an id
+  in that position is unbounded growth. Ids belong in the logs, which already carry
+  them: a metric says how many and how bad, a log says which one.
+- HTTP timing is `httpMetricsMiddleware`, registered with `app.use` and recording on
+  `res.on("finish")`. Both reasons are load-bearing. `finish` is the first point where
+  the exception filter has written the real status and Express has assigned the matched
+  route — an interceptor reading `statusCode` in `finalize()` labels every thrown error
+  with a status the handler never set. And the label is `req.route.path`, the route
+  _pattern_: `/titles/:id`, never the URL.
+- An outbound call with no timeout records no duration when it hangs — the timer never
+  stops. Pair the histogram with an in-flight gauge where that can happen, as
+  `ExternalRatingsService` does for OMDb, or a stalled request looks like an idle one.
+- **A histogram carries one bucket set for every series it holds**, so a scale that
+  differs by orders of magnitude is a separate metric, not another label value. That is
+  why `video_transcode_duration_seconds` (10s…1h) and `image_transcode_duration_seconds`
+  (0.25s…30s) are two names rather than one with a `queue` label.
+- **Queue depth is read by the api**, since that is the process with a scrape endpoint.
+  Depth is a property of Redis rather than of a process, so the numbers are the same
+  either way. `QueueMetricsService` samples it at scrape time and takes its queues
+  through the `METRICS_QUEUES` token, so it never imports a transcoder's queue name —
+  the same arrangement as the image attachers; `VideoTranscoderModule` and
+  `ImageTranscoderModule` export `BullModule` to make the tokens resolvable, while
+  registration stays with the transcoder that owns the queue. In prod the api runs two
+  replicas and both publish these series, so **aggregate with `max by (queue, state)`**,
+  never `sum`.
+- **A collector that throws fails the whole scrape.** `registry.metrics()` rejects as a
+  unit, so an unreachable Redis or a denied SQS call would blank out every other metric
+  in the process, including the ones that say it is alive. Anything sampling an external
+  system in `collect` swallows and logs its own failure — `QueueMetricsService.sample`
+  and `S3EventService.sampleDlq` both do.
+- **"Unknown" must not serialise as a zero**, for the same reason `viewer` is nullable.
+  An unlabelled gauge reports `0` from the moment it is registered, so `sqs_dlq_messages`
+  carries a `queue` label and the series does not exist until a depth has actually been
+  read. Reporting a confident `0` for a dead-letter queue that was never resolved would
+  mean an alert on `> 0` never fires.
+- An abort is not a failure. `video_transcode_duration_seconds` separates
+  `outcome="aborted"` — the entity was deleted mid-transcode, and the job returns rather
+  than throwing, so BullMQ does not retry — from `outcome="failed"`. Collapsing them
+  makes routine admin deletions fire the failure-ratio alert.
 
 ### Viewer identity
 

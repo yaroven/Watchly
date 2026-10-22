@@ -1,14 +1,14 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { Cron } from "@nestjs/schedule";
 import { ExternalRatingSource } from "@prisma/client";
 import pMap from "p-map";
-import { OmdbConfig, OmdbConfigName } from "../config/omdb.config";
 import { PrismaService } from "../prisma/prisma.service";
 import { ExternalRatingResponseDto } from "../title/dto/response/external-rating-response.dto";
 import { SyncExternalRatingsResponseDto } from "./dto/response/sync-external-ratings-response.dto";
+import { OmdbClient, OmdbTitle } from "./omdb-client.service";
 
 const CONCURRENCY = 5;
+const BATCH_SIZE = 200;
 
 const OMDB_SOURCE_MAP: Record<string, ExternalRatingSource> = {
   "Internet Movie Database": ExternalRatingSource.IMDB,
@@ -16,60 +16,67 @@ const OMDB_SOURCE_MAP: Record<string, ExternalRatingSource> = {
   Metacritic: ExternalRatingSource.METACRITIC,
 };
 
-interface OmdbTitleResponse {
-  Response: "True" | "False";
-  Error?: string;
-  imdbID?: string;
-  imdbVotes?: string;
-  Ratings?: Array<{ Source: string; Value: string }>;
+interface TitleToSync {
+  id: string;
+  name: string;
+  releaseDate: Date;
+  externalIds: { externalId: string }[];
 }
+
+const TITLE_SELECTION = {
+  id: true,
+  name: true,
+  releaseDate: true,
+  externalIds: {
+    where: { source: ExternalRatingSource.IMDB },
+    select: { externalId: true },
+  },
+} as const;
 
 @Injectable()
 export class ExternalRatingsService {
   private readonly logger = new Logger(ExternalRatingsService.name);
-  private readonly omdbConfig: OmdbConfig;
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly configService: ConfigService,
-  ) {
-    this.omdbConfig = this.configService.getOrThrow<OmdbConfig>(OmdbConfigName);
-    const isKeyExist = Boolean(this.omdbConfig.apiKey);
-    if (!isKeyExist) {
-      this.logger.warn("OMDB_API_KEY is not set — external ratings sync is disabled");
-    }
-  }
+    private readonly omdb: OmdbClient,
+  ) {}
 
   @Cron("0 0 * * *")
   async syncExternalRatings(): Promise<SyncExternalRatingsResponseDto> {
-    const titles = await this.prisma.title.findMany({
-      include: { externalIds: { where: { source: ExternalRatingSource.IMDB } } },
-    });
+    let total = 0;
+    let synced = 0;
 
-    this.logger.log(`[1/2] Fetching OMDb ratings for ${titles.length} titles`);
+    for await (const batch of this.titleBatches()) {
+      total += batch.length;
 
-    let syncedCount = 0;
+      await pMap(
+        batch,
+        async (title) => {
+          try {
+            if (await this.syncTitleRatings(title)) synced++;
+          } catch (error) {
+            this.logger.error(
+              `Failed to sync ratings for title ${title.id} (${title.name}):`,
+              error,
+            );
+          }
+        },
+        { concurrency: CONCURRENCY },
+      );
 
-    await pMap(
-      titles,
-      async (title) => {
-        try {
-          if (await this.syncTitleRatings(title)) syncedCount++;
-        } catch (error) {
-          this.logger.error(`Failed to sync ratings for title ${title.id} (${title.name}):`, error);
-        }
-      },
-      { concurrency: CONCURRENCY },
-    );
+      this.logger.log(`Synced ratings for ${synced}/${total} titles so far`);
+    }
 
-    this.logger.log(`[2/2] Synced ratings for ${syncedCount}/${titles.length} titles`);
-    return new SyncExternalRatingsResponseDto({ total: titles.length, synced: syncedCount });
+    this.logger.log(`Synced ratings for ${synced}/${total} titles`);
+
+    return new SyncExternalRatingsResponseDto({ total, synced });
   }
 
   async syncRatingsForTitle(titleId: string): Promise<ExternalRatingResponseDto[]> {
     const title = await this.prisma.title.findUnique({
       where: { id: titleId },
-      include: { externalIds: { where: { source: ExternalRatingSource.IMDB } } },
+      select: TITLE_SELECTION,
     });
     if (!title) {
       throw new NotFoundException(`Title with id ${titleId} not found`);
@@ -81,32 +88,52 @@ export class ExternalRatingsService {
     return ratings.map((rating) => new ExternalRatingResponseDto(rating));
   }
 
-  private async syncTitleRatings(title: {
-    id: string;
-    name: string;
-    releaseDate: Date;
-    externalIds: { externalId: string }[];
-  }): Promise<boolean> {
+  private async *titleBatches(): AsyncGenerator<TitleToSync[]> {
+    let cursor: string | undefined;
+
+    for (;;) {
+      const batch = await this.prisma.title.findMany({
+        take: BATCH_SIZE,
+        ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+        orderBy: { id: "asc" },
+        select: TITLE_SELECTION,
+      });
+
+      if (batch.length === 0) return;
+
+      yield batch;
+
+      if (batch.length < BATCH_SIZE) return;
+      cursor = batch[batch.length - 1].id;
+    }
+  }
+
+  private async syncTitleRatings(title: TitleToSync): Promise<boolean> {
     const imdbId = title.externalIds[0]?.externalId;
-    const data = await this.fetchOmdb(
-      imdbId
-        ? { i: imdbId }
-        : {
-            t: title.name,
-            y: String(new Date(title.releaseDate).getFullYear()),
-          },
-    );
+
+    const data = imdbId
+      ? await this.omdb.fetchByImdbId(imdbId)
+      : await this.omdb.fetchByNameYear(title.name, title.releaseDate.getFullYear());
+
     if (!data) return false;
 
     if (!imdbId && data.imdbID) {
-      await this.prisma.titleExternalId.upsert({
-        where: { titleId_source: { titleId: title.id, source: ExternalRatingSource.IMDB } },
-        update: { externalId: data.imdbID },
-        create: { titleId: title.id, source: ExternalRatingSource.IMDB, externalId: data.imdbID },
-      });
+      await this.rememberImdbId(title.id, data.imdbID);
     }
 
-    let syncedAny = false;
+    return this.writeRatings(title.id, data);
+  }
+
+  private async rememberImdbId(titleId: string, externalId: string): Promise<void> {
+    await this.prisma.titleExternalId.upsert({
+      where: { titleId_source: { titleId, source: ExternalRatingSource.IMDB } },
+      update: { externalId },
+      create: { titleId, source: ExternalRatingSource.IMDB, externalId },
+    });
+  }
+
+  private async writeRatings(titleId: string, data: OmdbTitle): Promise<boolean> {
+    let wrote = false;
 
     for (const { Source, Value } of data.Ratings ?? []) {
       const source = OMDB_SOURCE_MAP[Source];
@@ -119,45 +146,18 @@ export class ExternalRatingsService {
         source === ExternalRatingSource.IMDB ? this.parseVotes(data.imdbVotes) : null;
 
       await this.prisma.externalRatings.upsert({
-        where: { titleId_source: { titleId: title.id, source } },
+        where: { titleId_source: { titleId, source } },
         update: { rating, votesCount },
-        create: { titleId: title.id, source, rating, votesCount },
+        create: { titleId, source, rating, votesCount },
       });
-      syncedAny = true;
+      wrote = true;
     }
 
-    return syncedAny;
+    return wrote;
   }
 
   private parseVotes(imdbVotes: string | undefined): number | null {
     const votes = parseInt((imdbVotes ?? "").replace(/,/g, ""), 10);
     return Number.isNaN(votes) ? null : votes;
-  }
-
-  private async fetchOmdb(params: Record<string, string>): Promise<OmdbTitleResponse | undefined> {
-    try {
-      const url = new URL(this.omdbConfig.baseUrl);
-      for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
-      url.searchParams.set("apikey", this.omdbConfig.apiKey);
-
-      const response = await fetch(url);
-      if (!response.ok) {
-        this.logger.warn(
-          `OMDb request failed for ${JSON.stringify(params)}: ${response.statusText}`,
-        );
-        return undefined;
-      }
-
-      const data = (await response.json()) as OmdbTitleResponse;
-      if (data.Response === "False") {
-        this.logger.warn(`OMDb error for ${JSON.stringify(params)}: ${data.Error}`);
-        return undefined;
-      }
-
-      return data;
-    } catch (error) {
-      this.logger.error(`Failed to fetch OMDb data for ${JSON.stringify(params)}:`, error);
-      return undefined;
-    }
   }
 }

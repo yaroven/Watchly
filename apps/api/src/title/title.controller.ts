@@ -3,8 +3,6 @@ import {
   Controller,
   Delete,
   Get,
-  HttpCode,
-  HttpStatus,
   NotFoundException,
   Param,
   ParseUUIDPipe,
@@ -32,18 +30,22 @@ import { SortingParams } from "../common/pagination/sorting-params.decorator";
 import { PaginatedResponseOf } from "../common/utils/paginated-response-of.util";
 import { CreateTitleDto } from "./dto/request/create-title.dto";
 import { GetAllTitleDto } from "./dto/request/get-all-title.dto";
-import { ReactToTitleDto } from "./dto/request/react-to-title.dto";
 import { SetTitleRatingDto } from "./dto/request/set-title-rating.dto";
 import { UpdateTitleDto } from "./dto/request/update-title.dto";
 import { TitleEngagementDto } from "./dto/response/title-engagement.dto";
 import { TitleResponseDto } from "./dto/response/title-response.dto";
+import { TitleEngagementService } from "./title-engagement.service";
 import { TitleService } from "./title.service";
 import { TitleExistsPipe } from "./utils/title-exists.pipe";
+import { TITLE_FILTERABLE } from "./utils/title-filter.query";
 
 @ApiTags("titles")
 @Controller("titles")
 export class TitleController {
-  constructor(private readonly titleService: TitleService) {}
+  constructor(
+    private readonly titleService: TitleService,
+    private readonly engagementService: TitleEngagementService,
+  ) {}
 
   @ApiOperation({ summary: "Create a title (movie or series)" })
   @ApiCreatedResponse({ type: TitleResponseDto })
@@ -57,7 +59,7 @@ export class TitleController {
     summary: "List titles with filter, sort, and pagination",
     description:
       "`filter` (repeatable): `property:rule:value`, rule one of eq/neq/gt/gte/lt/lte/like/in/isnull. " +
-      "Filterable: name, type, transcodingStatus, ageRating, country, language, director, network, genres " +
+      `Filterable: ${TITLE_FILTERABLE.join(", ")} ` +
       "(genres: rule eq/in, value is a genre id, or comma-separated ids for `in`). " +
       "`sort`: `property:direction`. Sortable: name, createdAt, releaseDate.",
   })
@@ -67,18 +69,7 @@ export class TitleController {
   async findAll(
     @Query() query: GetAllTitleDto,
     @SortingParams(["name", "createdAt", "releaseDate"]) sort?: Sorting,
-    @FilteringParams([
-      "name",
-      "type",
-      "transcodingStatus",
-      "ageRating",
-      "country",
-      "language",
-      "director",
-      "network",
-      "genres",
-    ])
-    filters?: Filter[],
+    @FilteringParams(TITLE_FILTERABLE) filters?: Filter[],
     @OptionalUserId() userId?: string,
   ) {
     return this.titleService.findAll(query, sort, filters, userId);
@@ -133,7 +124,7 @@ export class TitleController {
   @OptionalAuth()
   @Get(":id/engagement")
   getEngagement(@Param("id", ParseUUIDPipe) id: string, @OptionalUserId() userId?: string) {
-    return this.titleService.getEngagement(id, userId ?? null);
+    return this.engagementService.getEngagement(id, userId ?? null);
   }
 
   @ApiOperation({ summary: "Set or change your score for a title" })
@@ -148,7 +139,7 @@ export class TitleController {
     @Body() data: SetTitleRatingDto,
     @CurrentUserId() userId: string,
   ) {
-    return this.titleService.rate(id, userId, data.score);
+    return this.engagementService.rate(id, userId, data.score);
   }
 
   @ApiOperation({ summary: "Withdraw your score" })
@@ -162,39 +153,6 @@ export class TitleController {
     @Param("id", ParseUUIDPipe, TitleExistsPipe) id: string,
     @CurrentUserId() userId: string,
   ) {
-    return this.titleService.removeRating(id, userId);
-  }
-
-  @ApiOperation({
-    summary: "Like or dislike a title",
-    description: "Sending the vote you already cast withdraws it; the other one switches sides.",
-  })
-  @ApiParam({ name: "id", format: "uuid" })
-  @ApiOkResponse({ type: TitleEngagementDto })
-  @ApiUnauthorizedResponse({ description: "Not signed in" })
-  @ApiNotFoundResponse({ description: "Title not found" })
-  @Auth()
-  @HttpCode(HttpStatus.OK)
-  @Post(":id/reaction")
-  react(
-    @Param("id", ParseUUIDPipe, TitleExistsPipe) id: string,
-    @Body() { type }: ReactToTitleDto,
-    @CurrentUserId() userId: string,
-  ) {
-    return this.titleService.react(id, userId, type);
-  }
-
-  @ApiOperation({ summary: "Withdraw your vote on a title" })
-  @ApiParam({ name: "id", format: "uuid" })
-  @ApiOkResponse({ type: TitleEngagementDto })
-  @ApiUnauthorizedResponse({ description: "Not signed in" })
-  @ApiNotFoundResponse({ description: "Title not found" })
-  @Auth()
-  @Delete(":id/reaction")
-  removeReaction(
-    @Param("id", ParseUUIDPipe, TitleExistsPipe) id: string,
-    @CurrentUserId() userId: string,
-  ) {
-    return this.titleService.removeReaction(id, userId);
+    return this.engagementService.removeRating(id, userId);
   }
 }

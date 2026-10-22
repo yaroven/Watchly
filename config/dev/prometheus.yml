@@ -1,0 +1,20 @@
+# Development scrape config. Not the one the cluster uses: k8s discovers pods
+# through the Kubernetes API (see k8s/base/prometheus-config.yaml), which has
+# no meaning under compose.
+#
+# Lives beside the compose file rather than under volumes/, which is runtime
+# scratch.
+#
+# Only the api is listed. /metrics is a route on the application, and the
+# transcoder worker has no HTTP server — it records job durations that nothing
+# is scraping yet.
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+
+scrape_configs:
+  - job_name: watchly
+    static_configs:
+      - targets: [api:3000]
+        labels:
+          service: api

@@ -29,9 +29,9 @@ import { PaginatedResponseOf } from "../common/utils/paginated-response-of.util"
 import { CommentService } from "./comment.service";
 import { CreateCommentDto } from "./dto/request/create-comment.dto";
 import { GetCommentsDto } from "./dto/request/get-comments.dto";
-import { ReactToCommentDto } from "./dto/request/react-to-comment.dto";
 import { ReportCommentDto } from "./dto/request/report-comment.dto";
 import { CommentResponseDto } from "./dto/response/comment-response.dto";
+import { replySubject, titleSubject } from "./utils/comment-subject.const";
 
 @ApiTags("comments")
 @Controller()
@@ -52,7 +52,7 @@ export class CommentController {
     @Query() query: GetCommentsDto,
     @OptionalUserId() userId?: string,
   ) {
-    return this.commentService.findForTitle(id, query, userId);
+    return this.commentService.findForSubject(titleSubject(id), query, userId);
   }
 
   @ApiOperation({
@@ -79,28 +79,17 @@ export class CommentController {
   @Post("titles/:id/comments")
   create(
     @Param("id", ParseUUIDPipe) id: string,
-    @Body() data: CreateCommentDto,
+    @Body() { parentId, ...data }: CreateCommentDto,
     @CurrentUserId() userId: string,
   ) {
-    return this.commentService.create(id, userId, data);
-  }
+    const thread = titleSubject(id);
 
-  @ApiOperation({
-    summary: "Like or dislike a comment",
-    description:
-      "Sending the reaction you already have withdraws it; sending the other one switches sides.",
-  })
-  @ApiParam({ name: "id", format: "uuid" })
-  @ApiOkResponse({ description: "The comment's counts after the vote, plus your own reaction" })
-  @Auth()
-  @Post("comments/:id/reactions")
-  @HttpCode(HttpStatus.OK)
-  react(
-    @Param("id", ParseUUIDPipe) id: string,
-    @Body() data: ReactToCommentDto,
-    @CurrentUserId() userId: string,
-  ) {
-    return this.commentService.react(id, userId, data.type);
+    return this.commentService.create(
+      parentId ? replySubject(parentId) : thread,
+      userId,
+      data,
+      thread,
+    );
   }
 
   @ApiOperation({ summary: "Report a comment" })

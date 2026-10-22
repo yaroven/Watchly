@@ -1,6 +1,7 @@
 import { NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { PrismaService } from "../prisma/prisma.service";
+import { TitleEngagementService } from "../title/title-engagement.service";
 import { TitleService } from "../title/title.service";
 import { WatchlistService } from "./watchlist.service";
 
@@ -55,6 +56,7 @@ describe("WatchlistService", () => {
         WatchlistService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: TitleService, useValue: titleServiceMock },
+        { provide: TitleEngagementService, useValue: titleServiceMock },
       ],
     }).compile();
 

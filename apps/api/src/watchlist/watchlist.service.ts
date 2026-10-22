@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { TitleEngagementDto } from "../title/dto/response/title-engagement.dto";
 import { TitleResponseDto } from "../title/dto/response/title-response.dto";
+import { TitleEngagementService } from "../title/title-engagement.service";
 import { TitleService } from "../title/title.service";
 import watchlistQuery from "./utils/watchlist.query";
 
@@ -12,6 +13,7 @@ export class WatchlistService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly titleService: TitleService,
+    private readonly engagementService: TitleEngagementService,
   ) {}
 
   async add(titleId: string, userId: string): Promise<TitleEngagementDto> {
@@ -22,16 +24,16 @@ export class WatchlistService {
         update: {},
       });
 
-      await this.titleService.recomputeWatchlistCounts(tx, titleId);
-      return this.titleService.readEngagement(tx, titleId, userId);
+      await this.engagementService.recomputeWatchlistCounts(tx, titleId);
+      return this.engagementService.readEngagement(tx, titleId, userId);
     });
   }
 
   async remove(titleId: string, userId: string): Promise<TitleEngagementDto> {
     return this.prisma.$transaction(async (tx) => {
       await tx.watchlistItem.deleteMany({ where: { userId, titleId } });
-      await this.titleService.recomputeWatchlistCounts(tx, titleId);
-      return this.titleService.readEngagement(tx, titleId, userId);
+      await this.engagementService.recomputeWatchlistCounts(tx, titleId);
+      return this.engagementService.readEngagement(tx, titleId, userId);
     });
   }
 

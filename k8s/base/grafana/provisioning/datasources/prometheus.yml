@@ -1,0 +1,10 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    # Loki keeps isDefault: logs are still the first thing anyone opens.
+    isDefault: false
+    editable: true

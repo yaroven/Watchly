@@ -40,14 +40,14 @@ export class PosterService {
   }
 
   async attachProcessed(kind: PosterEntityKind, ownerId: string, newKey: string): Promise<void> {
-    const previous = await this.readStoredKey(kind, ownerId);
+    const previous = await POSTER_TARGETS[kind].read(this.prisma, ownerId);
 
     if (!previous) {
       await this.s3Service.deleteObject(newKey, BucketType.PROCESSED).catch(() => undefined);
       throw new NotFoundException(`${POSTER_TARGETS[kind].label} with id ${ownerId} not found`);
     }
 
-    await this.writeStoredKey(kind, ownerId, newKey);
+    await POSTER_TARGETS[kind].write(this.prisma, ownerId, newKey);
 
     if (previous.key && previous.key !== newKey) {
       await this.deleteStoredImage(previous.key);
@@ -55,7 +55,7 @@ export class PosterService {
   }
 
   async removeStoredImage(kind: PosterEntityKind, ownerId: string): Promise<void> {
-    const stored = await this.readStoredKey(kind, ownerId);
+    const stored = await POSTER_TARGETS[kind].read(this.prisma, ownerId);
     await this.deleteStoredImage(stored?.key);
   }
 
@@ -69,52 +69,5 @@ export class PosterService {
 
   toPublicUrl(key: string | null | undefined): string | null {
     return key ? this.s3Service.getPublicUrl(key, BucketType.PROCESSED) : null;
-  }
-
-  private async readStoredKey(
-    kind: PosterEntityKind,
-    id: string,
-  ): Promise<{ key: string | null } | null> {
-    switch (kind) {
-      case "titles": {
-        const row = await this.prisma.title.findUnique({
-          where: { id },
-          select: { posterKey: true },
-        });
-        return row ? { key: row.posterKey } : null;
-      }
-      case "seasons": {
-        const row = await this.prisma.season.findUnique({
-          where: { id },
-          select: { posterKey: true },
-        });
-        return row ? { key: row.posterKey } : null;
-      }
-      case "artists": {
-        const row = await this.prisma.artist.findUnique({
-          where: { id },
-          select: { photoKey: true },
-        });
-        return row ? { key: row.photoKey } : null;
-      }
-    }
-  }
-
-  private async writeStoredKey(
-    kind: PosterEntityKind,
-    id: string,
-    key: string | null,
-  ): Promise<void> {
-    switch (kind) {
-      case "titles":
-        await this.prisma.title.update({ where: { id }, data: { posterKey: key } });
-        return;
-      case "seasons":
-        await this.prisma.season.update({ where: { id }, data: { posterKey: key } });
-        return;
-      case "artists":
-        await this.prisma.artist.update({ where: { id }, data: { photoKey: key } });
-        return;
-    }
   }
 }

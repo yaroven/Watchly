@@ -1,10 +1,14 @@
+import { ImageKind } from "../../image-transcoder/image-profile.const";
 import { VideoType } from "../../video-transcoder/enums/video-type.enum";
 import {
   buildRawKey,
   buildVideoRawKey,
+  imageKindOf,
   isLegacyBareUuidKey,
   parseRawKey,
   RawObjectKind,
+  videoKind,
+  videoTypeOf,
 } from "./raw-key";
 
 const OWNER = "773bca63-f8ca-439f-ab2f-d28c333afa13";
@@ -91,6 +95,64 @@ describe("raw key", () => {
       expect(parseRawKey(buildVideoRawKey(OWNER, VideoType.EPISODE))?.kind).toBe(
         RawObjectKind.EPISODE_VIDEO,
       );
+    });
+  });
+
+  describe("videoTypeOf", () => {
+    it.each([
+      [RawObjectKind.TITLE_VIDEO, VideoType.MOVIE],
+      [RawObjectKind.EPISODE_VIDEO, VideoType.EPISODE],
+    ])("answers the type behind %s", (kind, type) => {
+      expect(videoTypeOf(kind)).toBe(type);
+    });
+
+    it("answers MOVIE as a defined zero, not as an absent value", () => {
+      expect(videoTypeOf(RawObjectKind.TITLE_VIDEO)).toBe(0);
+      expect(videoTypeOf(RawObjectKind.TITLE_VIDEO)).not.toBeUndefined();
+    });
+
+    it("round-trips with videoKind", () => {
+      expect(videoTypeOf(videoKind(VideoType.EPISODE))).toBe(VideoType.EPISODE);
+      expect(videoTypeOf(videoKind(VideoType.MOVIE))).toBe(VideoType.MOVIE);
+    });
+
+    it("answers nothing for an image kind", () => {
+      expect(videoTypeOf(RawObjectKind.USER_AVATAR)).toBeUndefined();
+    });
+  });
+
+  describe("imageKindOf", () => {
+    it.each([
+      [RawObjectKind.USER_AVATAR, ImageKind.USER_AVATAR],
+      [RawObjectKind.TITLE_POSTER, ImageKind.TITLE_POSTER],
+      [RawObjectKind.SEASON_POSTER, ImageKind.SEASON_POSTER],
+      [RawObjectKind.ARTIST_PHOTO, ImageKind.ARTIST_PHOTO],
+    ])("answers the image kind behind %s", (kind, imageKind) => {
+      expect(imageKindOf(kind)).toBe(imageKind);
+    });
+
+    it("answers nothing for a video kind", () => {
+      expect(imageKindOf(RawObjectKind.EPISODE_VIDEO)).toBeUndefined();
+    });
+  });
+
+  describe("every kind reaches a pipeline", () => {
+    const kinds = Object.values(RawObjectKind);
+
+    it("leaves none unmapped, so s3-event never has to throw", () => {
+      const unmapped = kinds.filter(
+        (kind) => imageKindOf(kind) === undefined && videoTypeOf(kind) === undefined,
+      );
+
+      expect(unmapped).toEqual([]);
+    });
+
+    it("sends none to both pipelines", () => {
+      const ambiguous = kinds.filter(
+        (kind) => imageKindOf(kind) !== undefined && videoTypeOf(kind) !== undefined,
+      );
+
+      expect(ambiguous).toEqual([]);
     });
   });
 });

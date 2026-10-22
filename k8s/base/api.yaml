@@ -24,6 +24,13 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: api
+      annotations:
+        # Opt-in for the scrape config in prometheus-config.yaml. /metrics is
+        # served from the application port, so Prometheus scrapes a pod
+        # directly on 3000 — the same port the Ingress publishes, which is why
+        # MetricsController refuses a request carrying x-forwarded-for.
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
     spec:
       containers:
       - name: api

@@ -13,6 +13,11 @@ import { TitleService } from "./title.service";
 describe("TitleService", () => {
   let service: TitleService;
   let prismaServiceMock: jest.Mocked<PrismaService>;
+  let txMock: {
+    title: { delete: jest.Mock };
+    engagementCounters: { deleteMany: jest.Mock };
+    reaction: { deleteMany: jest.Mock };
+  };
   let s3ServiceMock: jest.Mocked<S3Service>;
   let mediaAssetServiceMock: jest.Mocked<MediaAssetService>;
   let seasonServiceMock: jest.Mocked<SeasonService>;
@@ -24,6 +29,12 @@ describe("TitleService", () => {
   };
 
   beforeEach(async () => {
+    txMock = {
+      title: { delete: jest.fn() },
+      engagementCounters: { deleteMany: jest.fn() },
+      reaction: { deleteMany: jest.fn() },
+    };
+
     posterServiceMock = {
       toPublicUrl: jest.fn((key: string | null) => (key ? `https://cdn.example.com/${key}` : null)),
       removeStoredImage: jest.fn(),
@@ -52,7 +63,7 @@ describe("TitleService", () => {
               upsert: jest.fn(),
               deleteMany: jest.fn(),
             },
-            titleReaction: {
+            reaction: {
               groupBy: jest.fn().mockResolvedValue([]),
               findMany: jest.fn().mockResolvedValue([]),
               upsert: jest.fn(),
@@ -64,11 +75,16 @@ describe("TitleService", () => {
               upsert: jest.fn(),
               deleteMany: jest.fn(),
             },
+            engagementCounters: {
+              findMany: jest.fn().mockResolvedValue([]),
+              upsert: jest.fn().mockResolvedValue({ likes: 0, dislikes: 0, commentCount: 0 }),
+              deleteMany: jest.fn(),
+            },
             titleEngagement: {
               findMany: jest.fn().mockResolvedValue([]),
               upsert: jest.fn(),
             },
-            $transaction: jest.fn(),
+            $transaction: jest.fn((fn: (tx: unknown) => unknown) => fn(txMock)),
           },
         },
         {
@@ -135,7 +151,9 @@ describe("TitleService", () => {
           description: "Desc",
           ageRating: AgeRating.AGE_0,
           country: "US",
-          releaseDate: "2026-01-01",
+          // A Date, not a string: the pipe converts at the HTTP boundary, and a
+          // direct service call does not run it.
+          releaseDate: new Date("2026-01-01"),
           language: "en",
           trailerUrl: "https://example.com/trailer.mp4",
           runtime: 120,
@@ -149,7 +167,7 @@ describe("TitleService", () => {
         const result = await service.create(createData);
 
         expect(prismaServiceMock.title.create).toHaveBeenCalledWith({
-          data: { ...createData, releaseDate: new Date(createData.releaseDate), genres: undefined },
+          data: { ...createData, genres: undefined },
           include: { genres: true, externalRatings: true },
         });
         expect(result).toMatchObject({
@@ -176,7 +194,7 @@ describe("TitleService", () => {
           skip: 0,
           take: 10,
           orderBy: { createdAt: "desc" },
-          include: { genres: true, externalRatings: true, engagement: true },
+          include: { genres: true, externalRatings: true, engagement: true, counters: true },
         });
         expect(result.totalCount).toBe(1);
         expect(result.items).toMatchObject([{ id: "title-1", name: "Title 1", genres: [] }]);
@@ -407,8 +425,52 @@ describe("TitleService", () => {
       expect(result?.engagement.viewer).toBeNull();
       const { include } = (prismaServiceMock.title.findUnique as jest.Mock).mock.calls[0][0];
       expect(include).not.toHaveProperty("ratings");
-      expect(include).not.toHaveProperty("reactions");
       expect(include).not.toHaveProperty("watchlistEntries");
+      // The reaction is a row read now, and an anonymous read must not make it.
+      expect(prismaServiceMock.reaction.findMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("a page answers for every title", () => {
+    /**
+     * Both cached rows are relations, so a page read loads them with the
+     * titles. A title that nothing has touched has neither row, and must read
+     * as zeroes rather than as a gap in the page.
+     */
+    it("should read a title with no cached rows as zeroes, not as a gap", async () => {
+      (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "title-1",
+          genres: [],
+          externalRatings: [],
+          engagement: { avgScore: 6, ratingCount: 2, watchlistCount: 0 },
+          counters: { likes: 3, dislikes: 0, commentCount: 1 },
+        },
+        { id: "title-2", genres: [], externalRatings: [], engagement: null, counters: null },
+      ]);
+      (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(2);
+
+      const { items } = await service.findAll({ page: 1, limit: 10 }, undefined, [], undefined);
+      const byId = new Map(items.map((item) => [item.id, item.engagement]));
+
+      expect(byId.get("title-1")?.averageScore).toBe(6);
+      expect(byId.get("title-1")?.likes).toBe(3);
+      expect(byId.get("title-2")?.averageScore).toBeNull();
+      expect(byId.get("title-2")?.likes).toBe(0);
+      expect(byId.get("title-2")?.commentCount).toBe(0);
+    });
+
+    it("should load both cached rows with the page rather than per title", async () => {
+      (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([]);
+      (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(0);
+
+      await service.findAll({ page: 1, limit: 10 }, undefined, [], undefined);
+
+      expect(prismaServiceMock.title.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: expect.objectContaining({ engagement: true, counters: true }),
+        }),
+      );
     });
   });
 
@@ -422,7 +484,7 @@ describe("TitleService", () => {
 
         expect(prismaServiceMock.title.findUnique).toHaveBeenCalledWith({
           where: { id: "title-1" },
-          include: { genres: true, externalRatings: true, engagement: true },
+          include: { genres: true, externalRatings: true, engagement: true, counters: true },
         });
         expect(result).toMatchObject({ id: "title-1", genres: [] });
       });
@@ -496,7 +558,7 @@ describe("TitleService", () => {
         expect(prismaServiceMock.title.update).toHaveBeenCalledWith({
           where: { id: "title-1" },
           data: { ...updateData, genres: undefined },
-          include: { genres: true, externalRatings: true, engagement: true },
+          include: { genres: true, externalRatings: true, engagement: true, counters: true },
         });
         expect(result).toMatchObject({ id: "title-1", name: "New Name", genres: [] });
       });
@@ -650,6 +712,35 @@ describe("TitleService", () => {
 
         await service.delete("title-1");
 
+        expect(posterServiceMock.deleteStoredImage).toHaveBeenCalledWith(
+          "posters/titles/title-1/v1.webp",
+        );
+      });
+    });
+
+    describe("should let the database take the dependents", () => {
+      /**
+       * Comments, replies, reactions, reports and the counter rows all hang off
+       * the title by a foreign key now, so the row's deletion takes them. The
+       * cleanup this service still owns is the storage a DELETE cannot reach.
+       */
+      it("deleting the row rather than clearing tables by hand", async () => {
+        const title = {
+          id: "title-1",
+          type: TitleType.MOVIE,
+          posterKey: "posters/titles/title-1/v1.webp",
+          seasons: [],
+          genres: [],
+        };
+        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(title);
+        (prismaServiceMock.title.delete as jest.Mock).mockResolvedValue(title);
+
+        await service.delete("title-1");
+
+        expect(prismaServiceMock.title.delete).toHaveBeenCalledWith({
+          where: { id: "title-1" },
+          include: { genres: true },
+        });
         expect(posterServiceMock.deleteStoredImage).toHaveBeenCalledWith(
           "posters/titles/title-1/v1.webp",
         );
