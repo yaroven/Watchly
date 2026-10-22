@@ -1,0 +1,120 @@
+# Scrapes pods by annotation; see prometheus-config.yaml. Only the api carries
+# the annotation today — it serves /metrics as a route on its application port.
+# The transcoder worker has no HTTP server and exposes nothing.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+---
+# Namespaced Role, not a ClusterRole: discovery is restricted to this
+# namespace's own pods (`own_namespace: true` in the scrape config), so
+# nothing cluster-scoped is needed.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prometheus
+rules:
+- apiGroups: [""]
+  resources: [pods]
+  verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prometheus
+subjects:
+- kind: ServiceAccount
+  name: prometheus
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+spec:
+  # ClusterIP and deliberately absent from the Ingress. Prometheus has no
+  # authentication of its own, and the series it holds name every route and
+  # queue in the system.
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: prometheus
+  ports:
+  - name: http
+    port: 9090
+    targetPort: 9090
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: prometheus
+spec:
+  serviceName: prometheus
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prometheus
+    spec:
+      serviceAccountName: prometheus
+      # The image runs as uid 65534; without fsGroup the fresh volume stays
+      # root-owned and the TSDB cannot be created.
+      securityContext:
+        fsGroup: 65534
+      containers:
+      - name: prometheus
+        image: prom/prometheus:v3.1.0
+        args:
+        - --config.file=/etc/prometheus/prometheus.yml
+        - --storage.tsdb.path=/prometheus
+        # Local disk, single replica, no remote write — retention is bounded
+        # by the volume below, so keep the window short enough to fit it.
+        - --storage.tsdb.retention.time=15d
+        - --web.enable-lifecycle
+        ports:
+        - containerPort: 9090
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9090
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: 9090
+          initialDelaySeconds: 60
+          periodSeconds: 20
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: "1"
+            memory: 1Gi
+        volumeMounts:
+        - name: data
+          mountPath: /prometheus
+        - name: config
+          mountPath: /etc/prometheus
+      volumes:
+      - name: config
+        configMap:
+          name: prometheus-config
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      # DigitalOcean CSI block storage, as with the Loki volume. The home
+      # overlay patches this to local-path.
+      storageClassName: do-block-storage
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 10Gi

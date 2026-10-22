@@ -197,6 +197,22 @@ services:
       # ConfigMaps — see k8s/base/kustomization.yaml. One copy, no drift.
       - ../../k8s/base/grafana/provisioning:/etc/grafana/provisioning
 
+  prometheus:
+    image: "prom/prometheus:v3.1.0"
+    container_name: "prometheus"
+    profiles: ["observability"]
+    mem_limit: 512m
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+
   loki:
     image: grafana/loki:3.0.0
     container_name: "loki"
@@ -232,4 +248,6 @@ volumes:
   postgres_data:
   redis_data:
   localstack_data:
+  prometheus_data:
+    driver: local
   loki_data:

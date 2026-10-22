@@ -18,13 +18,13 @@ import {
 import { Auth } from "../auth/decorators/auth.decorator";
 import { VideoTranscodingProgressResponseDto } from "./dto/response/video-transcoding-progress-response.dto";
 import { VideoType } from "./enums/video-type.enum";
-import { VideoTranscoderService } from "./video-transcoder.service";
+import { VideoTranscodeStateService } from "./video-transcode-state.service";
 
 @ApiTags("video-transcoder")
 @Auth()
 @Controller("video-transcoder")
 export class VideoTranscoderController {
-  constructor(private readonly videoTranscoderService: VideoTranscoderService) {}
+  constructor(private readonly state: VideoTranscodeStateService) {}
 
   @ApiOperation({ summary: "Get transcoding progress for a movie or episode" })
   @ApiParam({ name: "id", format: "uuid" })
@@ -36,7 +36,7 @@ export class VideoTranscoderController {
     @Param("id", ParseUUIDPipe) id: string,
     @Query("type", new ParseEnumPipe(VideoType)) type: VideoType,
   ): Promise<VideoTranscodingProgressResponseDto> {
-    const progress = await this.videoTranscoderService.getProgress(id, type);
+    const progress = await this.state.getProgress(id, type);
 
     if (!progress) {
       throw new NotFoundException(`Progress for ${type} ${id} not found`);

@@ -1,11 +1,8 @@
 import { NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { ReactionType } from "@prisma/client";
-import { MediaAssetService } from "../media-asset/media-asset.service";
-import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { SeasonService } from "../season/season.service";
-import { TitleService } from "./title.service";
+import { TitleEngagementService } from "./title-engagement.service";
 
 function createClientMocks() {
   return {
@@ -16,7 +13,7 @@ function createClientMocks() {
       aggregate: jest.fn(),
       findMany: jest.fn(),
     },
-    titleReaction: {
+    reaction: {
       deleteMany: jest.fn(),
       upsert: jest.fn(),
       groupBy: jest.fn(),
@@ -30,6 +27,11 @@ function createClientMocks() {
       count: jest.fn(),
     },
     titleEngagement: { findMany: jest.fn(), upsert: jest.fn() },
+    engagementCounters: {
+      findMany: jest.fn().mockResolvedValue([]),
+      upsert: jest.fn().mockResolvedValue({ likes: 0, dislikes: 0, commentCount: 0 }),
+      deleteMany: jest.fn(),
+    },
   };
 }
 
@@ -40,9 +42,9 @@ function seed(client: ReturnType<typeof createClientMocks>, titleId: string) {
   client.titleRating.deleteMany.mockResolvedValue({ count: 1 });
   client.titleRating.aggregate.mockResolvedValue({ _avg: { score: null }, _count: { _all: 0 } });
   client.titleRating.findMany.mockResolvedValue([]);
-  client.titleReaction.deleteMany.mockResolvedValue({ count: 0 });
-  client.titleReaction.groupBy.mockResolvedValue([]);
-  client.titleReaction.findMany.mockResolvedValue([]);
+  client.reaction.deleteMany.mockResolvedValue({ count: 0 });
+  client.reaction.groupBy.mockResolvedValue([]);
+  client.reaction.findMany.mockResolvedValue([]);
   client.watchlistItem.deleteMany.mockResolvedValue({ count: 0 });
   client.watchlistItem.findMany.mockResolvedValue([]);
   client.watchlistItem.count.mockResolvedValue(0);
@@ -56,8 +58,8 @@ function engagementRows(
   client.title.findUnique.mockResolvedValue({ id: rows.id ?? null, engagement: null, ...rows });
 }
 
-describe("TitleService engagement", () => {
-  let service: TitleService;
+describe("TitleEngagementService", () => {
+  let service: TitleEngagementService;
   let prismaMock: ReturnType<typeof createClientMocks> & { $transaction: jest.Mock };
   let txMock: ReturnType<typeof createClientMocks>;
 
@@ -70,16 +72,10 @@ describe("TitleService engagement", () => {
     prismaMock = { ...createClientMocks(), $transaction: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        TitleService,
-        { provide: PrismaService, useValue: prismaMock },
-        { provide: PosterService, useValue: { toPublicUrl: jest.fn().mockReturnValue(null) } },
-        { provide: SeasonService, useValue: {} },
-        { provide: MediaAssetService, useValue: {} },
-      ],
+      providers: [TitleEngagementService, { provide: PrismaService, useValue: prismaMock }],
     }).compile();
 
-    service = module.get(TitleService);
+    service = module.get(TitleEngagementService);
 
     seed(prismaMock, titleId);
     seed(txMock, titleId);
@@ -137,83 +133,6 @@ describe("TitleService engagement", () => {
     });
   });
 
-  describe("react", () => {
-    it("should scope the withdrawal probe to this viewer and this vote", async () => {
-      await service.react(titleId, userId, ReactionType.LIKE);
-
-      expect(txMock.titleReaction.deleteMany).toHaveBeenCalledWith({
-        where: { titleId, userId, type: ReactionType.LIKE },
-      });
-    });
-
-    it("should cast the vote if the viewer had not voted", async () => {
-      txMock.titleReaction.deleteMany.mockResolvedValue({ count: 0 });
-
-      await service.react(titleId, userId, ReactionType.LIKE);
-
-      expect(txMock.titleReaction.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({ update: { type: ReactionType.LIKE } }),
-      );
-    });
-
-    it("should withdraw the vote if the viewer sent the one they already cast", async () => {
-      txMock.titleReaction.deleteMany.mockResolvedValue({ count: 1 });
-
-      await service.react(titleId, userId, ReactionType.LIKE);
-
-      expect(txMock.titleReaction.upsert).not.toHaveBeenCalled();
-    });
-
-    it("should write inside the transaction, never on the base client", async () => {
-      txMock.titleReaction.deleteMany.mockResolvedValue({ count: 0 });
-
-      await service.react(titleId, userId, ReactionType.LIKE);
-
-      expect(prismaMock.titleReaction.upsert).not.toHaveBeenCalled();
-      expect(prismaMock.titleReaction.deleteMany).not.toHaveBeenCalled();
-    });
-
-    it("should read the summary back from inside the same transaction", async () => {
-      await service.react(titleId, userId, ReactionType.LIKE);
-
-      expect(txMock.title.findUnique).toHaveBeenCalledWith(
-        expect.objectContaining({ select: expect.objectContaining({ engagement: true }) }),
-      );
-      expect(prismaMock.title.findUnique).not.toHaveBeenCalledWith(
-        expect.objectContaining({ select: expect.objectContaining({ engagement: true }) }),
-      );
-    });
-
-    it("should reject, committing nothing, when the write fails", async () => {
-      txMock.titleReaction.deleteMany.mockRejectedValue(new Error("db down"));
-
-      await expect(service.react(titleId, userId, ReactionType.LIKE)).rejects.toThrow("db down");
-      expect(txMock.titleReaction.upsert).not.toHaveBeenCalled();
-    });
-
-    it("should report a missing title as not found", async () => {
-      txMock.title.findUnique.mockResolvedValue(null);
-
-      await expect(service.react(titleId, userId, ReactionType.LIKE)).rejects.toThrow(
-        NotFoundException,
-      );
-    });
-  });
-
-  describe("removeReaction", () => {
-    it("should delete only the viewer's own reaction", async () => {
-      await service.removeReaction(titleId, userId);
-
-      expect(txMock.titleReaction.deleteMany).toHaveBeenCalledWith({ where: { titleId, userId } });
-    });
-
-    it("should report a missing title as not found on the remove path too", async () => {
-      txMock.title.findUnique.mockResolvedValue(null);
-
-      await expect(service.removeReaction(titleId, userId)).rejects.toThrow(NotFoundException);
-    });
-  });
-
   describe("getEngagement", () => {
     it("should answer for a title nobody has touched rather than throwing", async () => {
       const result = await service.getEngagement(titleId, null);
@@ -244,16 +163,20 @@ describe("TitleService engagement", () => {
     it("should split likes from dislikes and carry the viewer's own state", async () => {
       engagementRows(prismaMock, {
         id: titleId,
-        engagement: counterRow({ likes: 4, dislikes: 1 }),
+        engagement: counterRow(),
+        counters: { likes: 4, dislikes: 1, commentCount: 2 },
         ratings: [{ score: 8 }],
         reactions: [{ type: ReactionType.LIKE }],
         watchlistEntries: [{ id: "w1" }],
       });
+      // Both cached rows are relations: the counters carry the likes, the
+      // title's own row the score and watchlist.
 
       const result = await service.getEngagement(titleId, userId);
 
       expect(result.likes).toBe(4);
       expect(result.dislikes).toBe(1);
+      expect(result.commentCount).toBe(2);
       expect(result.viewer).toEqual({ score: 8, reaction: ReactionType.LIKE, inWatchlist: true });
     });
 
@@ -264,6 +187,9 @@ describe("TitleService engagement", () => {
       for (const relation of ["ratings", "reactions", "watchlistEntries"]) {
         expect(select[relation]).toEqual(expect.objectContaining({ where: { userId } }));
       }
+      // The viewer's reaction is a relation again, so it rides along with the
+      // same read rather than costing a query of its own.
+      expect(select.reactions).toEqual(expect.objectContaining({ where: { userId } }));
     });
 
     it("should report no viewer at all rather than a viewer with no state, when anonymous", async () => {
@@ -284,35 +210,6 @@ describe("TitleService engagement", () => {
   });
 
   describe("counter recompute", () => {
-    it("should recompute the reaction counters inside the write transaction", async () => {
-      txMock.titleReaction.deleteMany.mockResolvedValue({ count: 0 });
-      txMock.titleReaction.groupBy.mockResolvedValue([
-        { type: ReactionType.LIKE, _count: { _all: 4 } },
-        { type: ReactionType.DISLIKE, _count: { _all: 1 } },
-      ]);
-
-      await service.react(titleId, userId, ReactionType.LIKE);
-
-      expect(txMock.titleEngagement.upsert).toHaveBeenCalledWith({
-        where: { titleId },
-        create: { titleId, likes: 4, dislikes: 1 },
-        update: { likes: 4, dislikes: 1 },
-      });
-      expect(prismaMock.titleEngagement.upsert).not.toHaveBeenCalled();
-    });
-
-    it("should write a zero for a reaction type that has no rows left", async () => {
-      txMock.titleReaction.groupBy.mockResolvedValue([
-        { type: ReactionType.DISLIKE, _count: { _all: 2 } },
-      ]);
-
-      await service.removeReaction(titleId, userId);
-
-      expect(txMock.titleEngagement.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({ update: { likes: 0, dislikes: 2 } }),
-      );
-    });
-
     it("should leave the average null once the last rating is gone", async () => {
       txMock.titleRating.aggregate.mockResolvedValue({
         _avg: { score: null },
@@ -352,15 +249,6 @@ describe("TitleService engagement", () => {
       });
     });
 
-    it("should not touch the other metrics when only reactions changed", async () => {
-      txMock.titleReaction.deleteMany.mockResolvedValue({ count: 0 });
-
-      await service.react(titleId, userId, ReactionType.LIKE);
-
-      expect(txMock.titleRating.aggregate).not.toHaveBeenCalled();
-      expect(txMock.watchlistItem.count).not.toHaveBeenCalled();
-    });
-
     it("should recompute before reading the summary back", async () => {
       const calls: string[] = [];
       txMock.titleEngagement.upsert.mockImplementation(() => {
@@ -391,50 +279,13 @@ describe("TitleService engagement", () => {
     });
   });
 
-  describe("a page answers for every title", () => {
-    it("should read a title with no engagement row as zeroes, not as a gap", async () => {
-      const summaries = await pageThrough(service, [
-        { id: titleId, engagement: counterRow({ avgScore: 6, ratingCount: 2 }) },
-        { id: otherTitleId, engagement: null },
-      ]);
-
-      expect([...summaries.keys()].sort()).toEqual([titleId, otherTitleId].sort());
-      expect(summaries.get(titleId)?.averageScore).toBe(6);
-      expect(summaries.get(otherTitleId)?.averageScore).toBeNull();
-      expect(summaries.get(otherTitleId)?.likes).toBe(0);
-    });
-
-    it("should load the engagement relation with the page rather than per title", async () => {
-      await pageThrough(service, [{ id: titleId, engagement: null }]);
-
-      expect(prismaMock.title.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ include: expect.objectContaining({ engagement: true }) }),
-      );
-    });
-  });
-
   function counterRow(overrides: Partial<Record<string, unknown>> = {}) {
     return {
       titleId,
       avgScore: null,
       ratingCount: 0,
-      likes: 0,
-      dislikes: 0,
       watchlistCount: 0,
       ...overrides,
     };
-  }
-
-  async function pageThrough(
-    titleService: TitleService,
-    rows: { id: string; engagement: unknown }[],
-  ) {
-    prismaMock.title.findMany.mockResolvedValue(
-      rows.map((row) => ({ ...row, genres: [], externalRatings: [] })),
-    );
-    prismaMock.title.count.mockResolvedValue(rows.length);
-
-    const page = await titleService.findAll({ page: 1, limit: 10 }, undefined, [], undefined);
-    return new Map(page.items.map((item) => [item.id, item.engagement]));
   }
 });

@@ -3,13 +3,13 @@ import { Test, TestingModule } from "@nestjs/testing";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
-import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
+import { VideoTranscodeScheduler } from "../video-transcoder/video-transcode-scheduler.service";
 import { MediaAssetService } from "./media-asset.service";
 
 describe("MediaAssetService", () => {
   let service: MediaAssetService;
   let s3ServiceMock: jest.Mocked<S3Service>;
-  let videoTranscoderServiceMock: jest.Mocked<VideoTranscoderService>;
+  let schedulerMock: jest.Mocked<VideoTranscodeScheduler>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -28,10 +28,10 @@ describe("MediaAssetService", () => {
           },
         },
         {
-          provide: VideoTranscoderService,
+          provide: VideoTranscodeScheduler,
           useValue: {
-            scheduleTranscodeVideo: jest.fn(),
-            cancelScheduledTranscodes: jest.fn(),
+            schedule: jest.fn(),
+            cancelScheduled: jest.fn(),
           },
         },
       ],
@@ -39,9 +39,7 @@ describe("MediaAssetService", () => {
 
     service = module.get<MediaAssetService>(MediaAssetService);
     s3ServiceMock = module.get(S3Service) as jest.Mocked<S3Service>;
-    videoTranscoderServiceMock = module.get(
-      VideoTranscoderService,
-    ) as jest.Mocked<VideoTranscoderService>;
+    schedulerMock = module.get(VideoTranscodeScheduler) as jest.Mocked<VideoTranscodeScheduler>;
   });
 
   afterEach(() => {
@@ -90,7 +88,7 @@ describe("MediaAssetService", () => {
       it("always", async () => {
         await service.completeUpload("asset-1", "upload-1", [], VideoType.EPISODE);
 
-        expect(videoTranscoderServiceMock.scheduleTranscodeVideo).toHaveBeenCalledWith({
+        expect(schedulerMock.schedule).toHaveBeenCalledWith({
           id: "asset-1",
           type: VideoType.EPISODE,
         });
@@ -113,11 +111,11 @@ describe("MediaAssetService", () => {
   });
 
   describe("scheduleTranscode", () => {
-    describe("should delegate to VideoTranscoderService", () => {
+    describe("should delegate to VideoTranscodeScheduler", () => {
       it("always", async () => {
         await service.scheduleTranscode("asset-1", VideoType.EPISODE);
 
-        expect(videoTranscoderServiceMock.scheduleTranscodeVideo).toHaveBeenCalledWith({
+        expect(schedulerMock.schedule).toHaveBeenCalledWith({
           id: "asset-1",
           type: VideoType.EPISODE,
         });
@@ -196,7 +194,7 @@ describe("MediaAssetService", () => {
 
   describe("cleanupVideoAsset", () => {
     beforeEach(() => {
-      videoTranscoderServiceMock.cancelScheduledTranscodes.mockResolvedValue(undefined as any);
+      schedulerMock.cancelScheduled.mockResolvedValue(undefined as any);
       (s3ServiceMock.deleteObject as jest.Mock).mockResolvedValue(undefined);
       (s3ServiceMock.deleteFolder as jest.Mock).mockResolvedValue(undefined);
     });
@@ -205,10 +203,7 @@ describe("MediaAssetService", () => {
       it("if no processed path is given", async () => {
         await service.cleanupVideoAsset("vid-1", VideoType.MOVIE);
 
-        expect(videoTranscoderServiceMock.cancelScheduledTranscodes).toHaveBeenCalledWith(
-          "vid-1",
-          VideoType.MOVIE,
-        );
+        expect(schedulerMock.cancelScheduled).toHaveBeenCalledWith("vid-1", VideoType.MOVIE);
         expect(s3ServiceMock.deleteObject).toHaveBeenCalledWith("vid-1", BucketType.RAW);
         expect(s3ServiceMock.deleteFolder).not.toHaveBeenCalled();
       });

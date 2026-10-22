@@ -1,7 +1,7 @@
 import { type ApiTitle, mapTitle } from "@/features/title/api/title.service";
 import type { Title } from "@/features/title/schemas/title";
 import api from "@shared/api/axios";
-import { ReactionType, TitleEngagement } from "../schemas/title-engagement";
+import { ReactionResult, ReactionType, TitleEngagement } from "../schemas/title-engagement";
 
 const TitleEngagementService = {
   get: async (titleId: string): Promise<TitleEngagement> => {
@@ -19,13 +19,13 @@ const TitleEngagementService = {
     return data;
   },
 
-  react: async (titleId: string, type: ReactionType): Promise<TitleEngagement> => {
-    const { data } = await api.post<TitleEngagement>(`/titles/${titleId}/reaction`, { type });
+  react: async (titleId: string, type: ReactionType): Promise<ReactionResult> => {
+    const { data } = await api.post<ReactionResult>(`/reactions/titles/${titleId}`, { type });
     return data;
   },
 
-  removeReaction: async (titleId: string): Promise<TitleEngagement> => {
-    const { data } = await api.delete<TitleEngagement>(`/titles/${titleId}/reaction`);
+  removeReaction: async (titleId: string): Promise<ReactionResult> => {
+    const { data } = await api.delete<ReactionResult>(`/reactions/titles/${titleId}`);
     return data;
   },
 

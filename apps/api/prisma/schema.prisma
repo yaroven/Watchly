@@ -37,28 +37,19 @@ enum ExternalRatingSource {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  role      Role     @default(USER)
-  createdAt DateTime @default(now())
-
-  // Shown next to anything the user writes. Nullable because every account
-  // that already exists predates them; the api falls back to the email local
-  // part until the user sets one.
+  id          String   @id @default(uuid())
+  email       String   @unique
+  password    String
+  role        Role     @default(USER)
+  createdAt   DateTime @default(now())
   displayName String?
+  avatarKey   String?
 
-  /// Object key in the processed bucket, not a URL. A URL would bake the host
-  /// and — if it were presigned — an expiry into the row; the API builds one
-  /// when it serialises the user. Null until an avatar finishes processing.
-  avatarKey String?
-
-  ratings        TitleRating[]
-  comments       TitleComment[]
-  reactions      CommentReaction[]
-  reports        CommentReport[]
-  titleReactions TitleReaction[]
-  watchlist      WatchlistItem[]
+  ratings   TitleRating[]
+  comments  Comment[]
+  reactions Reaction[]
+  reports   Report[]
+  watchlist WatchlistItem[]
 }
 
 model Title {
@@ -68,8 +59,6 @@ model Title {
   name              String
   description       String
   type              TitleType
-  /// Object key in the processed bucket, not a URL. A presigned URL stored in a
-  /// row outlives its own expiry; the URL is derived on read.
   posterKey         String?
   ageRating         AgeRating
   country           String
@@ -90,10 +79,11 @@ model Title {
   castCredits      CastCredit[]
   genres           Genre[]
   ratings          TitleRating[]
-  comments         TitleComment[]
-  reactions        TitleReaction[]
   watchlistEntries WatchlistItem[]
   engagement       TitleEngagement?
+  comments         Comment[]
+  reactions        Reaction[]
+  counters         EngagementCounters?
 
   @@index([type, transcodingStatus])
 }
@@ -103,25 +93,39 @@ model TitleEngagement {
   title          Title  @relation(fields: [titleId], references: [id], onDelete: Cascade)
   avgScore       Float?
   ratingCount    Int    @default(0)
-  likes          Int    @default(0)
-  dislikes       Int    @default(0)
   watchlistCount Int    @default(0)
 }
 
-/// A thumbs up or down on the title itself, distinct from TitleRating: the
-/// score says how good it is, this says whether the viewer enjoyed it.
-model TitleReaction {
+model EngagementCounters {
+  id           String @id @default(uuid())
+  likes        Int    @default(0)
+  dislikes     Int    @default(0)
+  commentCount Int    @default(0)
+
+  titleId String? @unique
+  title   Title?  @relation(fields: [titleId], references: [id], onDelete: Cascade)
+
+  commentId String?  @unique
+  comment   Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+}
+
+model Reaction {
   id        String       @id @default(uuid())
-  titleId   String
-  title     Title        @relation(fields: [titleId], references: [id], onDelete: Cascade)
   userId    String
   user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   type      ReactionType
   createdAt DateTime     @default(now())
 
-  // One vote per person; switching sides updates this row rather than adding one.
+  titleId String?
+  title   Title?  @relation(fields: [titleId], references: [id], onDelete: Cascade)
+
+  commentId String?
+  comment   Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
   @@unique([titleId, userId])
+  @@unique([commentId, userId])
   @@index([titleId, type])
+  @@index([commentId, type])
 }
 
 model WatchlistItem {
@@ -133,14 +137,10 @@ model WatchlistItem {
   createdAt DateTime @default(now())
 
   @@unique([userId, titleId])
-  // The watchlist page reads one user's rows newest first.
   @@index([userId, createdAt])
   @@index([titleId])
 }
 
-/// A viewer's score for a title, independent of whether they wrote anything.
-/// Kept apart from TitleComment on purpose: a score is one opinion per person
-/// that changes over time, a comment is many entries that do not.
 model TitleRating {
   id        String   @id @default(uuid())
   titleId   String
@@ -154,41 +154,27 @@ model TitleRating {
   @@unique([titleId, userId])
 }
 
-/// One level of threading: a comment either belongs to a title (parentId null)
-/// or replies to one that does. The service rejects a reply to a reply — the
-/// column allows deeper trees so the rule can be relaxed without a migration.
-model TitleComment {
+model Comment {
   id         String   @id @default(uuid())
-  titleId    String
-  title      Title    @relation(fields: [titleId], references: [id], onDelete: Cascade)
   userId     String
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   text       String
   hasSpoiler Boolean  @default(false)
   createdAt  DateTime @default(now())
 
+  titleId String?
+  title   Title?  @relation(fields: [titleId], references: [id], onDelete: Cascade)
+
   parentId String?
-  parent   TitleComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies  TitleComment[] @relation("CommentReplies")
+  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  Comment[] @relation("CommentReplies")
 
-  reactions CommentReaction[]
-  reports   CommentReport[]
+  reports   Report[]
+  reactions Reaction[]
+  counters  EngagementCounters?
 
-  @@index([titleId, parentId, createdAt])
-}
-
-model CommentReaction {
-  id        String       @id @default(uuid())
-  commentId String
-  comment   TitleComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type      ReactionType
-  createdAt DateTime     @default(now())
-
-  // One vote per person; switching sides updates this row rather than adding one.
-  @@unique([commentId, userId])
-  @@index([commentId, type])
+  @@index([titleId, createdAt])
+  @@index([parentId, createdAt])
 }
 
 enum ReactionType {
@@ -196,16 +182,17 @@ enum ReactionType {
   DISLIKE
 }
 
-model CommentReport {
-  id        String       @id @default(uuid())
+model Report {
+  id        String   @id @default(uuid())
   commentId String
-  comment   TitleComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
   userId    String
-  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   reason    String?
-  createdAt DateTime     @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([commentId, userId])
+  @@index([commentId, createdAt])
 }
 
 model ExternalRatings {
@@ -214,8 +201,6 @@ model ExternalRatings {
   title      Title                @relation(fields: [titleId], references: [id], onDelete: Cascade)
   source     ExternalRatingSource
   rating     Float
-  // Only IMDB exposes a vote count through OMDb; Rotten Tomatoes and
-  // Metacritic ratings are stored with this left null.
   votesCount Int?
   updatedAt  DateTime             @updatedAt
 
@@ -247,7 +232,6 @@ model Artist {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   name      String
-  /// Object key in the processed bucket, not a URL. See Title.posterKey.
   photoKey  String?
 
   castCredits CastCredit[]
@@ -289,7 +273,6 @@ model Season {
   number      Int
   name        String
   description String
-  /// Object key in the processed bucket, not a URL. See Title.posterKey.
   posterKey   String?
   titleId     String
   title       Title     @relation(fields: [titleId], references: [id], onDelete: Cascade)

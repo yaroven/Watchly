@@ -1,12 +1,15 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { ReactionType } from "@prisma/client";
+import {
+  countsOf,
+  EngagementCounts,
+  NO_COUNTS,
+} from "../../../engagement/engagement-counters.service";
 import { EngagementRelations } from "../../utils/title.query";
 
-export interface TitleEngagementCounts {
+export interface TitleEngagementCounts extends EngagementCounts {
   averageScore: number | null;
   ratingCount: number;
-  likes: number;
-  dislikes: number;
   watchlistCount: number;
 }
 
@@ -31,10 +34,9 @@ export class ViewerTitleEngagementDto {
 }
 
 const NO_ENGAGEMENT: TitleEngagementCounts = {
+  ...NO_COUNTS,
   averageScore: null,
   ratingCount: 0,
-  likes: 0,
-  dislikes: 0,
   watchlistCount: 0,
 };
 
@@ -54,6 +56,9 @@ export class TitleEngagementDto {
   @ApiProperty({ description: "How many people have this title on their watchlist" })
   watchlistCount: number;
 
+  @ApiProperty({ description: "Top-level comments on the title, replies not counted" })
+  commentCount: number;
+
   @ApiProperty({
     type: ViewerTitleEngagementDto,
     nullable: true,
@@ -69,6 +74,7 @@ export class TitleEngagementDto {
     this.likes = counts.likes;
     this.dislikes = counts.dislikes;
     this.watchlistCount = counts.watchlistCount;
+    this.commentCount = counts.commentCount;
     this.viewer = viewer;
   }
 
@@ -76,16 +82,24 @@ export class TitleEngagementDto {
     return new TitleEngagementDto(NO_ENGAGEMENT, viewer);
   }
 
+  /**
+   * The block is two cached rows, both relations: the title-only one and the
+   * shared counters every subject has. A title with neither reads as zeroes,
+   * which is the truth — the rows are written the first time something is
+   * counted.
+   */
   static fromRelations(rows: EngagementRelations, viewerId: string | null): TitleEngagementDto {
-    const counts: TitleEngagementCounts = rows.engagement
-      ? {
-          averageScore: rows.engagement.avgScore,
-          ratingCount: rows.engagement.ratingCount,
-          likes: rows.engagement.likes,
-          dislikes: rows.engagement.dislikes,
-          watchlistCount: rows.engagement.watchlistCount,
-        }
-      : NO_ENGAGEMENT;
+    const counts: TitleEngagementCounts = {
+      ...NO_ENGAGEMENT,
+      ...countsOf(rows.counters),
+      ...(rows.engagement
+        ? {
+            averageScore: rows.engagement.avgScore,
+            ratingCount: rows.engagement.ratingCount,
+            watchlistCount: rows.engagement.watchlistCount,
+          }
+        : {}),
+    };
 
     return new TitleEngagementDto(
       counts,

@@ -6,6 +6,6 @@ import { ImageTranscodeScheduler } from "./image-transcode-scheduler.service";
 @Module({
   imports: [BullModule.registerQueue(IMAGE_TRANSCODE_QUEUE_OPTIONS)],
   providers: [ImageTranscodeScheduler],
-  exports: [ImageTranscodeScheduler],
+  exports: [ImageTranscodeScheduler, BullModule],
 })
 export class ImageTranscoderModule {}

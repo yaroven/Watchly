@@ -17,7 +17,9 @@ declare `onDelete: Cascade`.
 - Ids are safe to expose in URLs and don't leak row counts.
 - Deleting a title removes its seasons, episodes, ratings, reactions, comments and
   watchlist entries without application code.
-- Because the database enforces it, an orphan row is an impossible state. Code that
+- Because the database enforces it, an orphan row is an impossible state — with one
+  exception since ADR-0012: `Reaction.entityId` is polymorphic and carries no foreign
+  key, so `ReactionService.removeFor` stands in for the cascade there. Code that
   meets one logs it rather than passing it off as ordinary. Whether it then fails or
   drops the row is a per-call judgement: `TitleService.toResponse` throws, because a
   title with no aggregates would serialise as a plausible-looking zero, while

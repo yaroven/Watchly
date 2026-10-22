@@ -3,10 +3,12 @@ kind: Kustomization
 
 resources:
   - loki-config.yaml
+  - prometheus-config.yaml
   - api.yaml
   - client.yaml
   - transcoder-worker.yaml
   - loki.yaml
+  - prometheus.yaml
   - grafana.yaml
 
 labels:
@@ -45,6 +47,7 @@ configMapGenerator:
   - name: grafana-datasources
     files:
       - grafana/provisioning/datasources/loki.yml
+      - grafana/provisioning/datasources/prometheus.yml
   - name: grafana-dashboards
     files:
       - grafana/provisioning/dashboards/logs.yml

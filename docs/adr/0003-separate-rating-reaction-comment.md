@@ -1,6 +1,6 @@
 # ADR-0003 — Score, reaction and comment are three tables
 
-**Status:** accepted
+**Status:** accepted; the reaction table it names was later made polymorphic — see ADR-0012
 
 ## Context
 
