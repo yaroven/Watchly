@@ -33,6 +33,7 @@ import { MediaAssetModule } from "./media-asset/media-asset.module";
 import { MetricsController } from "./metrics/metrics.controller";
 import { METRICS_QUEUES, QueueMetricsService } from "./metrics/queue-metrics.service";
 import { PrismaModule } from "./prisma/prisma.module";
+import { ReactionModule } from "./reaction/reaction.module";
 import { S3EventModule } from "./s3-event/s3-event.module";
 import { S3Module } from "./s3/s3.module";
 import { SeasonModule } from "./season/season.module";
@@ -100,6 +101,7 @@ import { WatchlistModule } from "./watchlist/watchlist.module";
     MediaAssetModule,
     ExternalRatingsModule,
     CommentModule,
+    ReactionModule,
   ],
   controllers: [AppController, MetricsController],
   providers: [
