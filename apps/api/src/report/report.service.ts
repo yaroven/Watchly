@@ -22,10 +22,10 @@ export class ReportService {
    * The comment's existence is the caller's business — it owns the 404.
    */
   async submit(
+    client: ReportClient,
     commentId: string,
     userId: string,
     reason?: string,
-    client: ReportClient = this.prisma,
   ): Promise<void> {
     await client.report.upsert({
       where: { commentId_userId: { commentId, userId } },

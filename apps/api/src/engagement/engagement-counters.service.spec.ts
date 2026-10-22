@@ -44,7 +44,7 @@ describe("EngagementCountersService", () => {
         { type: ReactionType.DISLIKE, _count: { _all: 1 } },
       ]);
 
-      await service.recomputeReactions(titleCounters(titleId));
+      await service.recomputeReactions(titleCounters(titleId), prisma as never);
 
       expect(prisma.reaction.groupBy).toHaveBeenCalledWith(
         expect.objectContaining({ where: { titleId } }),
@@ -62,7 +62,7 @@ describe("EngagementCountersService", () => {
         { type: ReactionType.DISLIKE, _count: { _all: 2 } },
       ]);
 
-      await service.recomputeReactions(commentCounters(commentId));
+      await service.recomputeReactions(commentCounters(commentId), prisma as never);
 
       expect(prisma.engagementCounters.upsert).toHaveBeenCalledWith(
         expect.objectContaining({ update: { likes: 0, dislikes: 2 } }),
@@ -74,7 +74,7 @@ describe("EngagementCountersService", () => {
     it("counts a title's own comments", async () => {
       prisma.comment.count.mockResolvedValue(9);
 
-      await service.recomputeComments(titleCounters(titleId));
+      await service.recomputeComments(titleCounters(titleId), prisma as never);
 
       expect(prisma.comment.count).toHaveBeenCalledWith({ where: { titleId } });
       expect(prisma.engagementCounters.upsert).toHaveBeenCalledWith(
@@ -88,7 +88,7 @@ describe("EngagementCountersService", () => {
      * are one column.
      */
     it("counts a comment's replies through the parent arc", async () => {
-      await service.recomputeComments(commentCounters(commentId));
+      await service.recomputeComments(commentCounters(commentId), prisma as never);
 
       expect(prisma.comment.count).toHaveBeenCalledWith({ where: { parentId: commentId } });
       expect(prisma.engagementCounters.upsert).toHaveBeenCalledWith(
@@ -97,7 +97,7 @@ describe("EngagementCountersService", () => {
     });
 
     it("touches only its own column, leaving the reaction counts standing", async () => {
-      await service.recomputeComments(titleCounters(titleId));
+      await service.recomputeComments(titleCounters(titleId), prisma as never);
 
       const [[call]] = prisma.engagementCounters.upsert.mock.calls as [
         [{ update: Record<string, unknown> }],
@@ -114,7 +114,7 @@ describe("EngagementCountersService", () => {
         commentCount: 5,
       });
 
-      await expect(service.countsForOne(titleCounters(titleId))).resolves.toEqual({
+      await expect(service.countsForOne(titleCounters(titleId), prisma as never)).resolves.toEqual({
         likes: 2,
         dislikes: 1,
         commentCount: 5,
@@ -124,7 +124,9 @@ describe("EngagementCountersService", () => {
     // A row is written the first time something is counted, so a missing row
     // and an all-zero row are the same answer.
     it("answers zeroes for a subject with no row yet", async () => {
-      await expect(service.countsForOne(commentCounters(commentId))).resolves.toEqual({
+      await expect(
+        service.countsForOne(commentCounters(commentId), prisma as never),
+      ).resolves.toEqual({
         likes: 0,
         dislikes: 0,
         commentCount: 0,
