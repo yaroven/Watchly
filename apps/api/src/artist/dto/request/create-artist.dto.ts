@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsOptional, IsString, MaxLength } from "class-validator";
+import { IsBoolean, IsOptional, IsString, MaxLength } from "class-validator";
 
 export class CreateArtistDto {
   @ApiProperty({ maxLength: 255 })
@@ -7,9 +7,11 @@ export class CreateArtistDto {
   @MaxLength(255)
   name: string;
 
-  @ApiPropertyOptional({ maxLength: 2048 })
+  @ApiPropertyOptional({
+    description:
+      "False clears the photo. True is accepted and ignored: the upload goes to the raw bucket and the transcoding worker records the converted image on the artist once it lands, so a new photo appears on a later read rather than in this response.",
+  })
   @IsOptional()
-  @IsString()
-  @MaxLength(2048)
-  photoUrl?: string;
+  @IsBoolean()
+  photoUploaded?: boolean;
 }

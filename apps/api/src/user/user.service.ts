@@ -1,28 +1,39 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma, Role, User } from "@prisma/client";
 import { paginate } from "../common/pagination/paginate.util";
 import { Filter, Sorting } from "../common/pagination/pagination.types";
 import { buildOrderBy, buildWhere } from "../common/pagination/prisma-query.util";
 import { PrismaService } from "../prisma/prisma.service";
+import BucketType from "../s3/enums/bucket-type.enum";
+import { S3Service } from "../s3/s3.service";
 import { CreateUserDto } from "./dto/request/create-user.dto";
 import { GetAllUserDto } from "./dto/request/get-all-user.dto";
 import { UpdateUserDto } from "./dto/request/update-user.dto";
 import { UserResponseDto } from "./dto/response/user-response.dto";
 import { hashPassword, verifyPassword } from "./user.password.util";
 
-/** Every query goes through this select so `password` never leaves the service. */
 const USER_SAFE_SELECT = {
   id: true,
   email: true,
   role: true,
   createdAt: true,
   displayName: true,
-  avatarUrl: true,
+  avatarKey: true,
 } satisfies Prisma.UserSelect;
 
 @Injectable()
 export class UserService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly s3Service: S3Service,
+  ) {}
+
+  private toResponse(user: Omit<User, "password">): UserResponseDto {
+    const avatarUrl = user.avatarKey
+      ? this.s3Service.getPublicUrl(user.avatarKey, BucketType.PROCESSED)
+      : null;
+    return new UserResponseDto(user, avatarUrl);
+  }
 
   async create(data: CreateUserDto): Promise<UserResponseDto> {
     const password = await hashPassword(data.password);
@@ -32,7 +43,7 @@ export class UserService {
         data: { ...data, password, role: data.role ?? Role.USER },
         select: USER_SAFE_SELECT,
       });
-      return new UserResponseDto(user);
+      return this.toResponse(user);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         throw new BadRequestException(`User with email ${data.email} already exists`);
@@ -59,23 +70,20 @@ export class UserService {
       extra: { select: USER_SAFE_SELECT },
     });
 
-    return { items: items.map((user) => new UserResponseDto(user)), totalCount };
+    return { items: items.map((user) => this.toResponse(user)), totalCount };
   }
 
   async findOne(id: string): Promise<UserResponseDto | null> {
     const user = await this.prisma.user.findUnique({ where: { id }, select: USER_SAFE_SELECT });
-    return user ? new UserResponseDto(user) : null;
+    return user ? this.toResponse(user) : null;
   }
 
   async findByEmail(email: string): Promise<UserResponseDto | null> {
     const user = await this.prisma.user.findUnique({ where: { email }, select: USER_SAFE_SELECT });
-    return user ? new UserResponseDto(user) : null;
+    return user ? this.toResponse(user) : null;
   }
 
   async update(id: string, data: UpdateUserDto): Promise<UserResponseDto> {
-    const user = await this.findOne(id);
-    if (!user) throw new BadRequestException(`User with id ${id} not found`);
-
     const password = data.password ? await hashPassword(data.password) : undefined;
 
     try {
@@ -84,7 +92,7 @@ export class UserService {
         data: { ...data, password },
         select: USER_SAFE_SELECT,
       });
-      return new UserResponseDto(updated);
+      return this.toResponse(updated);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         throw new BadRequestException(`User with email ${data.email} already exists`);
@@ -95,10 +103,10 @@ export class UserService {
 
   async delete(id: string): Promise<UserResponseDto> {
     const user = await this.findOne(id);
-    if (!user) throw new BadRequestException(`User with id ${id} not found`);
+    if (!user) throw new NotFoundException(`User with id ${id} not found`);
 
     const deleted = await this.prisma.user.delete({ where: { id }, select: USER_SAFE_SELECT });
-    return new UserResponseDto(deleted);
+    return this.toResponse(deleted);
   }
 
   async validateUser(email: string, password: string): Promise<UserResponseDto | null> {
@@ -108,6 +116,6 @@ export class UserService {
     const isValid = await verifyPassword(password, user.password);
     if (!isValid) return null;
 
-    return new UserResponseDto(user);
+    return this.toResponse(user);
   }
 }

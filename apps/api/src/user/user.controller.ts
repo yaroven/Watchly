@@ -24,9 +24,10 @@ import { GetAllUserDto } from "./dto/request/get-all-user.dto";
 import { UpdateUserRoleDto } from "./dto/request/update-user-role.dto";
 import { UserResponseDto } from "./dto/response/user-response.dto";
 import { UserService } from "./user.service";
+import { UserExistsPipe } from "./utils/user-exists.pipe";
 
 @ApiTags("users")
-@Controller("user")
+@Controller("users")
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
@@ -64,7 +65,10 @@ export class UserController {
   @ApiNotFoundResponse({ description: "User not found" })
   @AdminOnly()
   @Patch(":id/role")
-  updateRole(@Param("id", ParseUUIDPipe) id: string, @Body() data: UpdateUserRoleDto) {
+  updateRole(
+    @Param("id", ParseUUIDPipe, UserExistsPipe) id: string,
+    @Body() data: UpdateUserRoleDto,
+  ) {
     return this.userService.update(id, data);
   }
 }

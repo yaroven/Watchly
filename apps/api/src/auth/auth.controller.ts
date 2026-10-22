@@ -4,6 +4,7 @@ import type { Request, Response } from "express";
 import { JwtConfig, JwtConfigName } from "../config/jwt.config";
 import { AuthService, AuthTokens } from "./auth.service";
 import { Auth } from "./decorators/auth.decorator";
+import { CurrentUserId } from "./decorators/current-user-id.decorator";
 import { LoginRequestDto } from "./dto/request/login.dto";
 import { RegistrationRequestDto } from "./dto/request/registration.dto";
 import { REFRESH_COOKIE_NAME, setRefreshCookie } from "./refresh-cookie.util";
@@ -29,7 +30,7 @@ export class AuthController {
 
   @Auth()
   @Get("me")
-  async getMe(@Req() { userId }: Request) {
+  async getMe(@CurrentUserId() userId: string) {
     return this.authService.getMe(userId);
   }
 
@@ -43,7 +44,6 @@ export class AuthController {
     return this.respondWithSession(res, tokens);
   }
 
-  /** Refresh token goes in the httpOnly cookie only — the JSON body never carries it. */
   private respondWithSession(res: Response, tokens: AuthTokens) {
     const { refreshExpiresIn } = this.configService.get<JwtConfig>(JwtConfigName)!;
     setRefreshCookie(res, tokens.refreshToken, refreshExpiresIn);

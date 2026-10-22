@@ -6,18 +6,44 @@ import {
 } from "@nestjs/common";
 import { Prisma, ReactionType, Role } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import BucketType from "../s3/enums/bucket-type.enum";
+import { S3Service } from "../s3/s3.service";
+import assertTitleExists from "../title/utils/assert-title-exists.util";
 import { CommentSortMode, GetCommentsDto } from "./dto/request/get-comments.dto";
-import { CommentResponseDto, CommentWithAuthor } from "./dto/response/comment-response.dto";
+import {
+  CommentResponseDto,
+  CommentResponseOptions,
+  CommentWithAuthor,
+} from "./dto/response/comment-response.dto";
 
 const REPLY_PREVIEW_SIZE = 3;
 
-const AUTHOR_SELECT = { id: true, email: true, displayName: true, avatarUrl: true } as const;
+const AUTHOR_SELECT = { id: true, email: true, displayName: true, avatarKey: true } as const;
 
 type ReactionCounts = { likes: number; dislikes: number };
 
 @Injectable()
 export class CommentService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly s3Service: S3Service,
+  ) {}
+
+  private avatarUrl(user: { avatarKey: string | null }): string | null {
+    return user.avatarKey
+      ? this.s3Service.getPublicUrl(user.avatarKey, BucketType.PROCESSED)
+      : null;
+  }
+
+  private toResponse(
+    comment: CommentWithAuthor,
+    options: Omit<CommentResponseOptions, "authorAvatarUrl"> = {},
+  ): CommentResponseDto {
+    return new CommentResponseDto(comment, {
+      ...options,
+      authorAvatarUrl: this.avatarUrl(comment.user),
+    });
+  }
 
   async findForTitle(
     titleId: string,
@@ -58,17 +84,16 @@ export class CommentService {
 
     const toDto = (
       comment: CommentWithAuthor,
-      children: CommentResponseDto[] = [],
+      replies: CommentResponseDto[] = [],
       replyCount = 0,
     ) =>
-      new CommentResponseDto(
-        comment,
-        counts.get(comment.id) ?? { likes: 0, dislikes: 0 },
-        myReactions.get(comment.id) ?? null,
-        authorScores.get(comment.userId) ?? null,
-        children,
+      this.toResponse(comment, {
+        counts: counts.get(comment.id),
+        myReaction: myReactions.get(comment.id),
+        authorScore: authorScores.get(comment.userId),
+        replies,
         replyCount,
-      );
+      });
 
     const repliesByParent = new Map<string, CommentResponseDto[]>();
     for (const reply of replies) {
@@ -97,7 +122,7 @@ export class CommentService {
       parentId,
     }: { text: string; hasSpoiler?: boolean; parentId?: string },
   ): Promise<CommentResponseDto> {
-    await this.assertTitleExists(titleId);
+    await assertTitleExists(this.prisma, titleId);
     if (parentId) await this.assertRepliable(parentId, titleId);
 
     const comment = await this.prisma.titleComment.create({
@@ -106,12 +131,8 @@ export class CommentService {
     });
 
     const authorScores = await this.findAuthorScores(titleId, [userId]);
-    return new CommentResponseDto(
-      comment,
-      { likes: 0, dislikes: 0 },
-      null,
-      authorScores.get(userId) ?? null,
-    );
+
+    return this.toResponse(comment, { authorScore: authorScores.get(userId) });
   }
 
   async react(
@@ -203,14 +224,12 @@ export class CommentService {
     ]);
 
     return {
-      items: replies.map(
-        (reply) =>
-          new CommentResponseDto(
-            reply,
-            counts.get(reply.id) ?? { likes: 0, dislikes: 0 },
-            myReactions.get(reply.id) ?? null,
-            authorScores.get(reply.userId) ?? null,
-          ),
+      items: replies.map((reply) =>
+        this.toResponse(reply, {
+          counts: counts.get(reply.id),
+          myReaction: myReactions.get(reply.id),
+          authorScore: authorScores.get(reply.userId),
+        }),
       ),
       totalCount,
     };
@@ -317,14 +336,6 @@ export class CommentService {
     return new Map(ratings.map((rating) => [rating.userId, rating.score]));
   }
 
-  private async assertTitleExists(titleId: string) {
-    const title = await this.prisma.title.findUnique({
-      where: { id: titleId },
-      select: { id: true },
-    });
-    if (!title) throw new BadRequestException(`Title with id ${titleId} not found`);
-  }
-
   private async assertCommentExists(commentId: string) {
     const comment = await this.prisma.titleComment.findUnique({
       where: { id: commentId },
@@ -339,7 +350,7 @@ export class CommentService {
       select: { titleId: true, parentId: true },
     });
 
-    if (!parent) throw new BadRequestException(`Comment with id ${parentId} not found`);
+    if (!parent) throw new NotFoundException(`Comment with id ${parentId} not found`);
     if (parent.titleId !== titleId)
       throw new BadRequestException("That comment belongs to a different title");
     if (parent.parentId)

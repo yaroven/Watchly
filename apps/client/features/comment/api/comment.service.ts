@@ -20,7 +20,7 @@ const mapComment = (comment: ApiComment): Comment => ({
 
 const CommentService = {
   getForTitle: async (titleId: string, { page = 1, limit = 10, sort = "newest" }: GetCommentsDto = {}): Promise<CommentPage> => {
-    const { data } = await api.get<{ items: ApiComment[]; totalCount: number }>(`/title/${titleId}/comments`, {
+    const { data } = await api.get<{ items: ApiComment[]; totalCount: number }>(`/titles/${titleId}/comments`, {
       params: { page, limit, sort },
     });
     return { ...data, items: data.items.map(mapComment) };
@@ -34,7 +34,7 @@ const CommentService = {
   },
 
   create: async (titleId: string, payload: CreateCommentDto): Promise<Comment> => {
-    const { data } = await api.post<ApiComment>(`/title/${titleId}/comments`, payload);
+    const { data } = await api.post<ApiComment>(`/titles/${titleId}/comments`, payload);
     return mapComment(data);
   },
 

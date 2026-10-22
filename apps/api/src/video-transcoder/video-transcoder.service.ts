@@ -1,5 +1,5 @@
 import { InjectQueue } from "@nestjs/bullmq";
-import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { TranscodingStatus } from "@prisma/client";
 import { Queue } from "bullmq";
 import ffmpeg from "fluent-ffmpeg";
@@ -7,11 +7,13 @@ import * as fs from "fs-extra";
 import pMap from "p-map";
 import * as path from "path";
 import { Readable } from "stream";
-import { getEpisodeTitleAndSeasonId } from "../episode/episode-path.util";
+import { getEpisodeTitleAndSeasonId } from "../episode/utils/episode-path.util";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
+import { VIDEO_ROOT, videoPath } from "../s3/processed-key";
 import { S3Service } from "../s3/s3.service";
 import { TranscodeVideoDto } from "./dto/request/transcode-video.dto";
+import { VideoTranscodingProgressResponseDto } from "./dto/response/video-transcoding-progress-response.dto";
 import { VideoType } from "./enums/video-type.enum";
 import { VIDEO_TRANSCODE_QUEUE_NAME } from "./video-transcode-queue.options";
 
@@ -194,7 +196,7 @@ export class VideoTranscoderService {
         const localFilePath = path.join(outputDir, file);
         if ((await fs.stat(localFilePath)).isDirectory()) return;
 
-        const s3Key = `videos/${key}/${file}`;
+        const s3Key = `${VIDEO_ROOT}/${key}/${file}`;
         const contentType = file.endsWith(".m3u8") ? "application/x-mpegURL" : "video/MP2T";
 
         await this.s3Service.uploadStream(
@@ -218,13 +220,13 @@ export class VideoTranscoderService {
         include: { season: true },
       });
 
-      if (!episode) throw new BadRequestException("Episode not found");
+      if (!episode) throw new NotFoundException(`Episode with id ${id} not found`);
 
       const { seasonId, titleId } = getEpisodeTitleAndSeasonId(episode);
-      return `${titleId}/${seasonId}/${episode.id}`;
+      return videoPath({ type, titleId, seasonId, episodeId: episode.id });
     }
 
-    return id;
+    return videoPath({ type: VideoType.MOVIE, titleId: id });
   }
 
   private readonly entityExistsCheckers: Record<VideoType, (id: string) => Promise<boolean>> = {
@@ -280,10 +282,13 @@ export class VideoTranscoderService {
     });
   }
 
-  async getProgress(id: string, type: VideoType) {
+  async getProgress(
+    id: string,
+    type: VideoType,
+  ): Promise<VideoTranscodingProgressResponseDto | null> {
     const where = type === VideoType.EPISODE ? { episodeId: id } : { titleId: id };
-    return this.prisma.videoTranscodingProgress.findUnique({
-      where,
-    });
+    const progress = await this.prisma.videoTranscodingProgress.findUnique({ where });
+
+    return progress ? new VideoTranscodingProgressResponseDto(progress) : null;
   }
 }

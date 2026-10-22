@@ -1,13 +1,20 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import s3Config from "../config/s3.config";
+import { ImageTranscoderModule } from "../image-transcoder/image-transcoder.module";
 import { PrismaModule } from "../prisma/prisma.module";
 import { S3Module } from "../s3/s3.module";
 import { VideoTranscoderModule } from "../video-transcoder/video-transcoder.module";
 import { S3EventService } from "./s3-event.service";
 
 @Module({
-  imports: [ConfigModule.forFeature(s3Config), VideoTranscoderModule, PrismaModule, S3Module],
+  imports: [
+    ConfigModule.forFeature(s3Config),
+    VideoTranscoderModule,
+    ImageTranscoderModule,
+    PrismaModule,
+    S3Module,
+  ],
   providers: [S3EventService],
   exports: [S3EventService],
 })

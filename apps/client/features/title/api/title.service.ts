@@ -4,7 +4,7 @@ import api from "@shared/api/axios";
 import axios from "axios";
 import { CastCredit, CastCreditInput, CreateTitleDto, ExternalRating, GetAllTitlesDto, Title, UpdateTitleDto } from "../schemas/title";
 
-const prefix = "title";
+const prefix = "titles";
 
 export interface ApiTitle extends Omit<Title, "createdAt" | "updatedAt"> {
   createdAt: string;
@@ -99,7 +99,7 @@ const TitleService = {
     return eTag;
   },
 
-  getPosterUploadUrl: async (id: string): Promise<{ uploadUrl: string; posterUrl: string }> => {
+  getPosterUploadUrl: async (id: string): Promise<{ uploadUrl: string }> => {
     const { data } = await api.get<{ uploadUrl: string; posterUrl: string }>(`/${prefix}/${id}/poster-upload-url`);
     return data;
   },

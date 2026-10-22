@@ -72,8 +72,6 @@ export interface Title {
   transcodingStatus: TranscodingStatus;
   externalRatings: ExternalRating[];
   genres: TitleGenre[];
-  /** Watchly's own score, aggregated from viewer ratings — `average` is null until someone rates it. */
-  rating: { average: number | null; count: number };
   /**
    * Likes, dislikes and watchlist state; the viewer's own included when signed in.
    * Always present — every construction site on the api passes it explicitly.
@@ -189,6 +187,11 @@ export interface UpdateTitleDto {
   network: string;
   director: string;
   closedCaption: boolean;
-  posterUrl: string;
+  /**
+   * Set once the image has been PUT to the upload URL. The key is derived from
+   * the title server-side, so no URL is sent; omit it to leave the existing
+   * poster alone, and send `false` to clear it.
+   */
+  posterUploaded?: boolean;
   genreIds?: string[];
 }

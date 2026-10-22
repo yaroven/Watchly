@@ -1,6 +1,6 @@
 import { registerAs } from "@nestjs/config";
 import { DEV_DEFAULTS } from "../common/dev-defaults.const";
-import { requireInProduction } from "../common/env.util";
+import { requireInProduction } from "../common/utils/env.util";
 
 export const S3ConfigName = "s3";
 
@@ -13,27 +13,10 @@ export interface S3Config {
   internalEndpoint: string;
   publicEndpoint: string;
   queueName: string;
-  /**
-   * Only LocalStack needs this: it serves S3 and SQS from the same port, so
-   * one endpoint covers both. Against real AWS it must stay undefined — SQS
-   * lives at sqs.<region>.amazonaws.com, and aiming its client at the S3
-   * endpoint makes every queue call fail.
-   */
   sqsEndpoint?: string;
-  /**
-   * S3 bucket notifications into SQS are an AWS/LocalStack feature; MinIO and
-   * friends reject the ARN. Turn this off there — uploads still transcode,
-   * because completeUpload schedules the job directly.
-   */
   eventsEnabled: boolean;
 }
 
-/**
- * Policy: every value here goes through requireInProduction — hard-fail if
- * unset in production, fall back to a LocalStack-friendly default otherwise.
- * Nothing is silently defaulted in prod, and nothing needs a `.env` just to
- * run `docker compose up` locally.
- */
 export default registerAs(S3ConfigName, () => ({
   accessKeyId: requireInProduction(
     process.env.S3_ACCESS_KEY_ID,
