@@ -118,11 +118,11 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
           <Box
             component="button"
             type="button"
-            aria-label={viewerEngagement?.myReaction === ReactionType.LIKE ? "Remove like" : "Like"}
-            aria-pressed={viewerEngagement ? viewerEngagement.myReaction === ReactionType.LIKE : undefined}
+            aria-label={viewerEngagement?.reaction === ReactionType.LIKE ? "Remove like" : "Like"}
+            aria-pressed={viewerEngagement ? viewerEngagement.reaction === ReactionType.LIKE : undefined}
             disabled={viewerStateUnknown || viewer.status === "pending" || react.isPending}
             onClick={() => handleReact(ReactionType.LIKE)}
-            sx={{ ...actionButtonSx, color: viewerEngagement?.myReaction === ReactionType.LIKE ? "primary.main" : "#ffffff" }}
+            sx={{ ...actionButtonSx, color: viewerEngagement?.reaction === ReactionType.LIKE ? "primary.main" : "#ffffff" }}
           >
             <ThumbUpIcon sx={{ fontSize: "18px" }} />
             <Typography component="span" sx={{ fontSize: "13px" }}>
@@ -132,11 +132,11 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
           <Box
             component="button"
             type="button"
-            aria-label={viewerEngagement?.myReaction === ReactionType.DISLIKE ? "Remove dislike" : "Dislike"}
-            aria-pressed={viewerEngagement ? viewerEngagement.myReaction === ReactionType.DISLIKE : undefined}
+            aria-label={viewerEngagement?.reaction === ReactionType.DISLIKE ? "Remove dislike" : "Dislike"}
+            aria-pressed={viewerEngagement ? viewerEngagement.reaction === ReactionType.DISLIKE : undefined}
             disabled={viewerStateUnknown || viewer.status === "pending" || react.isPending}
             onClick={() => handleReact(ReactionType.DISLIKE)}
-            sx={{ ...actionButtonSx, color: viewerEngagement?.myReaction === ReactionType.DISLIKE ? "primary.main" : "#ffffff" }}
+            sx={{ ...actionButtonSx, color: viewerEngagement?.reaction === ReactionType.DISLIKE ? "primary.main" : "#ffffff" }}
           >
             <ThumbDownIcon sx={{ fontSize: "18px" }} />
           </Box>
@@ -146,11 +146,11 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
               {shareLabel}
             </Typography>
           </Box>
-          {(rating ?? title.rating?.average) !== null && (rating ?? title.rating?.average) !== undefined && (
+          {(rating ?? title.engagement.averageScore) !== null && (rating ?? title.engagement.averageScore) !== undefined && (
             <Box sx={{ display: "flex", alignItems: "center", gap: "6px", color: "primary.main" }}>
               <StarIcon sx={{ fontSize: "18px" }} />
               <Typography component="span" sx={{ fontSize: "13px", fontWeight: 600 }}>
-                {(rating ?? title.rating!.average!).toFixed(1)}
+                {(rating ?? title.engagement.averageScore!).toFixed(1)}
               </Typography>
             </Box>
           )}

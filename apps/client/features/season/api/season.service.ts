@@ -3,7 +3,7 @@ import api from "@/shared/api/axios";
 import { parseApiDate } from "@/shared/lib/parse-api-date";
 import axios from "axios";
 
-const prefix = "season";
+const prefix = "seasons";
 
 interface ApiSeason extends Omit<Season, "createdAt" | "updatedAt"> {
   createdAt: string;
@@ -44,7 +44,7 @@ const SeasonService = {
     await api.delete(`/${prefix}/${id}`);
   },
 
-  getPosterUploadUrl: async (id: string): Promise<{ uploadUrl: string; posterUrl: string }> => {
+  getPosterUploadUrl: async (id: string): Promise<{ uploadUrl: string }> => {
     const { data } = await api.get<{ uploadUrl: string; posterUrl: string }>(`/${prefix}/${id}/poster-upload-url`);
     return data;
   },

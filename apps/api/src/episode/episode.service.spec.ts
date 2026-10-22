@@ -1,4 +1,4 @@
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { Prisma } from "@prisma/client";
 import { FilterRule } from "../common/pagination/filter-rule.enum";
@@ -36,7 +36,7 @@ describe("EpisodeService", () => {
             completeUpload: jest.fn(),
             abortUpload: jest.fn(),
             scheduleTranscode: jest.fn(),
-            getReadUrl: jest.fn(),
+            getPlaybackUrl: jest.fn(),
             cleanupVideoAsset: jest.fn(),
           },
         },
@@ -164,13 +164,13 @@ describe("EpisodeService", () => {
   describe("update", () => {
     const updateData = { number: 2, name: "New Name", description: "New Desc" };
 
-    describe("should throw BadRequestException", () => {
+    describe("should throw NotFoundException", () => {
       it("if the episode does not exist", async () => {
         (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
 
         const action = service.update("non-existent", updateData);
 
-        await expect(action).rejects.toThrow(BadRequestException);
+        await expect(action).rejects.toThrow(NotFoundException);
       });
 
       it("if the episode exists but the number is already taken by another episode", async () => {
@@ -229,13 +229,13 @@ describe("EpisodeService", () => {
   });
 
   describe("delete", () => {
-    describe("should throw BadRequestException", () => {
+    describe("should throw NotFoundException", () => {
       it("if the episode does not exist", async () => {
         (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
 
         const action = service.delete("non-existent");
 
-        await expect(action).rejects.toThrow(BadRequestException);
+        await expect(action).rejects.toThrow(NotFoundException);
       });
     });
 
@@ -263,105 +263,14 @@ describe("EpisodeService", () => {
     });
   });
 
-  describe("transcode", () => {
-    describe("should throw BadRequestException", () => {
-      it("if the episode does not exist", async () => {
-        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
-
-        const action = service.transcode("non-existent");
-
-        await expect(action).rejects.toThrow(BadRequestException);
-      });
-    });
-
-    describe("should schedule transcode", () => {
-      it("if the episode exists", async () => {
-        const episode = { id: "episode-1" };
-        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(episode);
-        (mediaAssetServiceMock.scheduleTranscode as jest.Mock).mockResolvedValue(undefined);
-
-        await service.transcode("episode-1");
-
-        expect(mediaAssetServiceMock.scheduleTranscode).toHaveBeenCalledWith(
-          "episode-1",
-          VideoType.EPISODE,
-        );
-      });
-    });
-  });
-
-  describe("startUpload", () => {
-    describe("should throw BadRequestException", () => {
-      it("if the episode does not exist", async () => {
-        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
-
-        const action = service.startUpload("non-existent", 1000);
-
-        await expect(action).rejects.toThrow(BadRequestException);
-      });
-    });
-
-    describe("should start a multipart upload", () => {
-      it("if the episode exists", async () => {
-        const episode = { id: "episode-1" };
-        const startResponse = { uploadId: "upload-1", partSize: 8, parts: [] };
-        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(episode);
-        (mediaAssetServiceMock.startUpload as jest.Mock).mockResolvedValue(startResponse);
-
-        const result = await service.startUpload("episode-1", 1000);
-
-        expect(mediaAssetServiceMock.startUpload).toHaveBeenCalledWith("episode-1", 1000);
-        expect(result).toEqual(startResponse);
-      });
-    });
-  });
-
-  describe("completeUpload", () => {
-    describe("should throw BadRequestException", () => {
-      it("if the episode does not exist", async () => {
-        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
-
-        const action = service.completeUpload("non-existent", "upload-1", []);
-
-        await expect(action).rejects.toThrow(BadRequestException);
-      });
-    });
-
-    describe("should complete the multipart upload", () => {
-      it("if the episode exists", async () => {
-        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue({ id: "episode-1" });
-        const parts = [{ partNumber: 1, eTag: "etag-1" }];
-
-        await service.completeUpload("episode-1", "upload-1", parts);
-
-        expect(mediaAssetServiceMock.completeUpload).toHaveBeenCalledWith(
-          "episode-1",
-          "upload-1",
-          parts,
-          VideoType.EPISODE,
-        );
-      });
-    });
-  });
-
-  describe("abortUpload", () => {
-    describe("should abort the multipart upload", () => {
-      it("regardless of episode state", async () => {
-        await service.abortUpload("episode-1", "upload-1");
-
-        expect(mediaAssetServiceMock.abortUpload).toHaveBeenCalledWith("episode-1", "upload-1");
-      });
-    });
-  });
-
   describe("getStreamUrl", () => {
-    describe("should throw BadRequestException", () => {
+    describe("should throw NotFoundException", () => {
       it("if the episode does not exist", async () => {
         (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
 
         const action = service.getStreamUrl("non-existent");
 
-        await expect(action).rejects.toThrow(BadRequestException);
+        await expect(action).rejects.toThrow(NotFoundException);
       });
     });
 
@@ -374,13 +283,16 @@ describe("EpisodeService", () => {
         };
         const url = "stream-url";
         (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(episode);
-        (mediaAssetServiceMock.getReadUrl as jest.Mock).mockResolvedValue({ url });
+        (mediaAssetServiceMock.getPlaybackUrl as jest.Mock).mockResolvedValue({ url });
 
         const result = await service.getStreamUrl("episode-1");
 
-        expect(mediaAssetServiceMock.getReadUrl).toHaveBeenCalledWith(
-          "videos/title-1/season-1/episode-1/master.m3u8",
-        );
+        expect(mediaAssetServiceMock.getPlaybackUrl).toHaveBeenCalledWith({
+          type: VideoType.EPISODE,
+          titleId: "title-1",
+          seasonId: "season-1",
+          episodeId: "episode-1",
+        });
         expect(result).toEqual({ url });
       });
     });

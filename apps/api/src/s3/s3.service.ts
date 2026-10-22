@@ -6,6 +6,7 @@ import {
   DeleteObjectsCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  HeadObjectCommand,
   ListObjectsV2Command,
   NotFound,
   PutObjectCommand,
@@ -64,13 +65,6 @@ export class S3Service implements OnModuleInit {
     ]);
   }
 
-  /**
-   * Buckets belong to the environment, not to this service: the LocalStack
-   * init script creates them locally, the cloud account owns them elsewhere.
-   * Checking at boot turns a missing one into a clear failure here instead of
-   * a confusing 404 on the first upload — and keeps this service's
-   * credentials down to reading and writing objects.
-   */
   private async verifyBucket(bucketName: string, retries = 3) {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
@@ -83,7 +77,6 @@ export class S3Service implements OnModuleInit {
             `Bucket "${bucketName}" does not exist. It is provisioned with the environment, not by this service.`,
           );
         }
-        // Storage may simply not be up yet on a cold start.
         if (attempt === retries) throw error;
         this.logger.warn(`Could not reach bucket "${bucketName}". Retrying in 2 seconds...`);
         await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -121,10 +114,6 @@ export class S3Service implements OnModuleInit {
     return this.mapSignedUrlToPublicEndpoint(signedUrl);
   }
 
-  /**
-   * Starts a multipart upload and presigns every part up front, so the browser can PUT parts
-   * directly to S3 (and retry a single failed part) without another round trip to this API.
-   */
   async startMultipartUpload(
     key: string,
     type: BucketType,
@@ -204,6 +193,23 @@ export class S3Service implements OnModuleInit {
     const command = new GetObjectCommand({ Bucket: this.getBucketName(type), Key: key });
     const signedUrl = await getSignedUrl(this.s3Client, command, { expiresIn });
     return this.mapSignedUrlToPublicEndpoint(signedUrl);
+  }
+
+  getPublicUrl(key: string, type: BucketType): string {
+    const endpoint = this.s3Config.publicEndpoint.replace(/\/$/, "");
+    return `${endpoint}/${this.getBucketName(type)}/${key}`;
+  }
+
+  async objectExists(key: string, type: BucketType): Promise<boolean> {
+    const bucketName = this.getBucketName(type);
+    try {
+      await this.s3Client.send(new HeadObjectCommand({ Bucket: bucketName, Key: key }));
+      return true;
+    } catch (error) {
+      if (error instanceof NotFound) return false;
+      this.logger.error(`Failed to stat object "${key}" in bucket "${bucketName}":`, error);
+      throw error;
+    }
   }
 
   async deleteObject(key: string, type: BucketType) {

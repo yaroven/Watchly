@@ -1,7 +1,9 @@
-import { Injectable, Logger } from "@nestjs/common";
-import { settleAllOrLog } from "../common/settle-all-or-throw.util";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { settleAllOrLog } from "../common/utils/settle-all-or-throw.util";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { MultipartUploadPart } from "../s3/multipart.constants";
+import { buildVideoManifestKey, VideoLocation } from "../s3/processed-key";
+import { buildVideoRawKey } from "../s3/raw-key";
 import { S3Service } from "../s3/s3.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { VideoTranscoderService } from "../video-transcoder/video-transcoder.service";
@@ -15,38 +17,45 @@ export class MediaAssetService {
     private readonly videoTranscoderService: VideoTranscoderService,
   ) {}
 
-  async startUpload(id: string, fileSize: number) {
-    return this.s3Service.startMultipartUpload(id, BucketType.RAW, fileSize);
+  async startUpload(id: string, fileSize: number, type: VideoType) {
+    return this.s3Service.startMultipartUpload(
+      buildVideoRawKey(id, type),
+      BucketType.RAW,
+      fileSize,
+    );
   }
 
-  /**
-   * Schedules the transcode itself rather than waiting for the S3 event to come
-   * back through SQS. The queue job id is derived from (type, id), so when the
-   * event path is also live it dedupes into this same job instead of running a
-   * second one — which is what lets a deployment without S3 notifications
-   * (MinIO, say) still transcode.
-   */
   async completeUpload(
     id: string,
     uploadId: string,
     parts: MultipartUploadPart[],
     type: VideoType,
   ): Promise<void> {
-    await this.s3Service.completeMultipartUpload(id, BucketType.RAW, uploadId, parts);
+    await this.s3Service.completeMultipartUpload(
+      buildVideoRawKey(id, type),
+      BucketType.RAW,
+      uploadId,
+      parts,
+    );
     await this.scheduleTranscode(id, type);
   }
 
-  async abortUpload(id: string, uploadId: string): Promise<void> {
-    await this.s3Service.abortMultipartUpload(id, BucketType.RAW, uploadId);
+  async abortUpload(id: string, uploadId: string, type: VideoType): Promise<void> {
+    await this.s3Service.abortMultipartUpload(buildVideoRawKey(id, type), BucketType.RAW, uploadId);
   }
 
   async scheduleTranscode(id: string, type: VideoType): Promise<void> {
     await this.videoTranscoderService.scheduleTranscodeVideo({ id, type });
   }
 
-  async getReadUrl(key: string): Promise<{ url: string }> {
-    const url = await this.s3Service.getReadPresignedUrl(key, BucketType.PROCESSED);
-    return { url };
+  async getPlaybackUrl(location: VideoLocation): Promise<{ url: string }> {
+    const key = buildVideoManifestKey(location);
+
+    if (!(await this.s3Service.objectExists(key, BucketType.PROCESSED))) {
+      throw new NotFoundException("This title has no playable media yet");
+    }
+
+    return { url: await this.s3Service.getReadPresignedUrl(key, BucketType.PROCESSED) };
   }
 
   async deleteProcessedFolder(prefix: string): Promise<void> {
@@ -59,7 +68,11 @@ export class MediaAssetService {
         id: "scheduled-transcodes",
         run: () => this.videoTranscoderService.cancelScheduledTranscodes(id, type),
       },
-      { id: "raw-video", run: () => this.s3Service.deleteObject(id, BucketType.RAW) },
+      {
+        id: "raw-video",
+        run: () => this.s3Service.deleteObject(buildVideoRawKey(id, type), BucketType.RAW),
+      },
+      { id: "raw-video-legacy", run: () => this.s3Service.deleteObject(id, BucketType.RAW) },
     ];
 
     if (processedPath !== undefined) {

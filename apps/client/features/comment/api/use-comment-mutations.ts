@@ -1,4 +1,6 @@
 import createMutationHook from "@/shared/api/createMutationHook";
+import { forViewer } from "@/shared/api/viewer-cache";
+import { useViewer } from "@/shared/lib/use-viewer";
 import { useMutation, UseMutationOptions, useQueryClient } from "@tanstack/react-query";
 import { Comment, CommentReaction, CreateCommentDto, ReactionType } from "../schemas/comment";
 import commentKeys from "./comment.keys";
@@ -45,12 +47,15 @@ export const useReactToComment = (
   options?: Omit<UseMutationOptions<CommentReaction, Error, { commentId: string; type: ReactionType }>, "mutationFn">,
 ) => {
   const queryClient = useQueryClient();
+  const { viewerKey } = useViewer();
 
   return useMutation({
     ...options,
     mutationFn: ({ commentId, type }: { commentId: string; type: ReactionType }) => commentService.react(commentId, type),
     onSuccess: (result, variables, onMutateResult, context) => {
-      queryClient.setQueriesData<InfiniteComments>({ queryKey: commentKeys.listsPrefix() }, (data) =>
+      // Scoped to the acting viewer: `result` carries their own `myReaction`, and a
+      // bare prefix would write it into every other viewer's cached entry as well.
+      queryClient.setQueriesData<InfiniteComments>(forViewer(commentKeys.listsPrefix(), viewerKey), (data) =>
         data
           ? {
               ...data,
@@ -62,7 +67,7 @@ export const useReactToComment = (
           : data,
       );
 
-      queryClient.setQueriesData<CommentPage>({ queryKey: commentKeys.repliesPrefix() }, (data) =>
+      queryClient.setQueriesData<CommentPage>(forViewer(commentKeys.repliesPrefix(), viewerKey), (data) =>
         data ? { ...data, items: data.items.map((item) => applyReaction(item, variables.commentId, result)) } : data,
       );
 

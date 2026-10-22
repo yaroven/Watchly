@@ -1,12 +1,13 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { IsOptional, IsString, MaxLength } from "class-validator";
+import { IsBoolean, IsOptional } from "class-validator";
 import { CreateTitleDto } from "./create-title.dto";
 
-/** Full-object update: every field the client already has (from a prior GET) must be resent. */
 export class UpdateTitleDto extends CreateTitleDto {
-  @ApiPropertyOptional({ maxLength: 2048, description: "Must be a backend-generated poster URL" })
+  @ApiPropertyOptional({
+    description:
+      "False clears the poster. True is accepted and ignored: the upload goes to the raw bucket and the transcoding worker records the converted image on the title once it lands, so a new poster appears on a later read rather than in this response.",
+  })
   @IsOptional()
-  @IsString()
-  @MaxLength(2048)
-  posterUrl?: string;
+  @IsBoolean()
+  posterUploaded?: boolean;
 }

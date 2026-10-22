@@ -3,7 +3,7 @@ import api from "@shared/api/axios";
 import axios from "axios";
 import { Artist, ArtistFilmographyItem, CreateArtistDto, GetAllArtistsDto, UpdateArtistDto } from "../schemas/artist";
 
-const prefix = "artist";
+const prefix = "artists";
 
 interface ApiArtist extends Omit<Artist, "createdAt" | "updatedAt"> {
   createdAt: string;
@@ -58,7 +58,7 @@ const ArtistService = {
     await api.delete(`/${prefix}/${id}`);
   },
 
-  getPhotoUploadUrl: async (id: string): Promise<{ uploadUrl: string; posterUrl: string }> => {
+  getPhotoUploadUrl: async (id: string): Promise<{ uploadUrl: string }> => {
     const { data } = await api.get<{ uploadUrl: string; posterUrl: string }>(`/${prefix}/${id}/photo-upload-url`);
     return data;
   },

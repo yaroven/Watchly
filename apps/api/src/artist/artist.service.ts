@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { Artist, Prisma } from "@prisma/client";
 import { paginate } from "../common/pagination/paginate.util";
 import { Filter, Sorting } from "../common/pagination/pagination.types";
@@ -19,8 +19,13 @@ export class ArtistService {
   ) {}
 
   async create(data: CreateArtistDto): Promise<ArtistResponseDto> {
-    const artist = await this.prisma.artist.create({ data });
-    return new ArtistResponseDto(artist);
+    const { photoUploaded: _photoUploaded, ...rest } = data;
+    const artist = await this.prisma.artist.create({ data: rest });
+    return this.toResponse(artist);
+  }
+
+  private toResponse(artist: Artist): ArtistResponseDto {
+    return new ArtistResponseDto(artist, this.posterService.toPublicUrl(artist.photoKey));
   }
 
   async findAll(
@@ -29,7 +34,9 @@ export class ArtistService {
     filters: Filter[] = [],
   ): Promise<{ items: ArtistResponseDto[]; totalCount: number }> {
     const where = buildWhere(filters) as Prisma.ArtistWhereInput;
-    const orderBy = buildOrderBy(sort) as Prisma.ArtistOrderByWithRelationInput;
+    const orderBy = (buildOrderBy(sort) ?? {
+      createdAt: "desc",
+    }) as Prisma.ArtistOrderByWithRelationInput;
 
     const { items, totalCount } = await paginate<Artist>(this.prisma.artist, {
       where,
@@ -38,33 +45,29 @@ export class ArtistService {
       limit,
     });
 
-    return { items: items.map((artist) => new ArtistResponseDto(artist)), totalCount };
+    return { items: items.map((artist) => this.toResponse(artist)), totalCount };
   }
 
   async findOne(id: string): Promise<ArtistResponseDto | null> {
     const artist = await this.prisma.artist.findUnique({ where: { id } });
-    return artist ? new ArtistResponseDto(artist) : null;
+    return artist ? this.toResponse(artist) : null;
   }
 
   async update(id: string, data: UpdateArtistDto): Promise<ArtistResponseDto> {
-    const artist = await this.findOne(id);
-    if (!artist) {
-      throw new BadRequestException(`Artist with id ${id} not found`);
-    }
-    if (data.photoUrl !== undefined) {
-      await this.posterService.assertManagedPosterUrl("artists", id, data.photoUrl);
+    const { photoUploaded, ...rest } = data;
+
+    if (photoUploaded === false) {
+      await this.posterService.removeStoredImage("artists", id);
     }
 
-    const updated = await this.prisma.artist.update({ where: { id }, data });
-    return new ArtistResponseDto(updated);
-  }
-
-  async createPhotoUploadUrl(id: string): Promise<{ uploadUrl: string; posterUrl: string }> {
-    const artist = await this.findOne(id);
-    if (!artist) {
-      throw new BadRequestException(`Artist with id ${id} not found`);
-    }
-    return this.posterService.createUploadUrl("artists", id);
+    const updated = await this.prisma.artist.update({
+      where: { id },
+      data: {
+        ...rest,
+        ...(photoUploaded === false ? { photoKey: null } : {}),
+      },
+    });
+    return this.toResponse(updated);
   }
 
   async getFilmography(id: string): Promise<ArtistFilmographyItemDto[]> {
@@ -73,16 +76,20 @@ export class ArtistService {
       include: { title: true },
       orderBy: { title: { releaseDate: "desc" } },
     });
-    return credits.map((credit) => new ArtistFilmographyItemDto(credit));
+    return credits.map(
+      (credit) =>
+        new ArtistFilmographyItemDto(
+          credit,
+          this.posterService.toPublicUrl(credit.title.posterKey),
+        ),
+    );
   }
 
   async delete(id: string): Promise<ArtistResponseDto> {
-    const artist = await this.findOne(id);
-    if (!artist) {
-      throw new BadRequestException(`Artist with id ${id} not found`);
-    }
-
     const deleted = await this.prisma.artist.delete({ where: { id } });
+
+    await this.posterService.deleteStoredImage(deleted.photoKey);
+
     return new ArtistResponseDto(deleted);
   }
 }

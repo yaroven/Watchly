@@ -1,11 +1,12 @@
-import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { Episode, Prisma, Season } from "@prisma/client";
 import { Filter, Sorting } from "../common/pagination/pagination.types";
 import { buildOrderBy, buildWhere } from "../common/pagination/prisma-query.util";
-import { settleAllOrLog } from "../common/settle-all-or-throw.util";
+import { settleAllOrLog } from "../common/utils/settle-all-or-throw.util";
 import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { buildSeasonVideoPrefix } from "../s3/processed-key";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { CreateSeasonDto } from "./dto/request/create-season.dto";
 import { UpdateSeasonDto } from "./dto/request/update-season.dto";
@@ -24,10 +25,10 @@ export class SeasonService {
   async create(data: CreateSeasonDto): Promise<SeasonResponseDto> {
     try {
       const season = await this.prisma.season.create({ data });
-      return new SeasonResponseDto(season);
+      return this.toResponse(season);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
-        throw new BadRequestException(`Title with id ${data.titleId} not found`);
+        throw new NotFoundException(`Title with id ${data.titleId} not found`);
       }
       throw error;
     }
@@ -40,35 +41,33 @@ export class SeasonService {
     }) as Prisma.SeasonOrderByWithRelationInput;
 
     const seasons = await this.prisma.season.findMany({ where, orderBy });
-    return seasons.map((season) => new SeasonResponseDto(season));
+    return seasons.map((season) => this.toResponse(season));
   }
 
   async findOne(id: string): Promise<SeasonResponseDto | null> {
     const season = await this.prisma.season.findUnique({ where: { id } });
-    return season ? new SeasonResponseDto(season) : null;
+    return season ? this.toResponse(season) : null;
   }
 
   async update(id: string, data: UpdateSeasonDto): Promise<SeasonResponseDto> {
-    const season = await this.findOne(id);
-    if (!season) {
-      throw new BadRequestException(`Season with id ${id} not found`);
+    const { posterUploaded, ...rest } = data;
+
+    if (posterUploaded === false) {
+      await this.posterService.removeStoredImage("seasons", id);
     }
 
-    if (data.posterUrl !== undefined) {
-      await this.posterService.assertManagedPosterUrl("seasons", id, data.posterUrl);
-    }
-
-    const updated = await this.prisma.season.update({ where: { id }, data });
-    return new SeasonResponseDto(updated);
+    const updated = await this.prisma.season.update({
+      where: { id },
+      data: {
+        ...rest,
+        ...(posterUploaded === false ? { posterKey: null } : {}),
+      },
+    });
+    return this.toResponse(updated);
   }
 
-  async createPosterUploadingUrl(id: string): Promise<{ uploadUrl: string; posterUrl: string }> {
-    const season = await this.findOne(id);
-    if (!season) {
-      throw new BadRequestException(`Season with id ${id} not found`);
-    }
-
-    return this.posterService.createUploadUrl("seasons", id);
+  private toResponse(season: Season): SeasonResponseDto {
+    return new SeasonResponseDto(season, this.posterService.toPublicUrl(season.posterKey));
   }
 
   async delete(id: string): Promise<SeasonResponseDto> {
@@ -78,20 +77,15 @@ export class SeasonService {
     });
 
     if (!season) {
-      throw new BadRequestException(`Season with id ${id} not found`);
+      throw new NotFoundException(`Season with id ${id} not found`);
     }
 
     const deleted = await this.prisma.season.delete({ where: { id } });
     await this.cleanupAssets(season);
 
-    return new SeasonResponseDto(deleted);
+    return this.toResponse(deleted);
   }
 
-  /**
-   * Best-effort storage/queue cleanup for a season whose DB row (and cascaded
-   * episodes) is already deleted. Called both from `delete` and from
-   * TitleService when a whole series is removed.
-   */
   async cleanupAssets(season: Season & { episodes: Episode[] }): Promise<void> {
     await settleAllOrLog(
       season.episodes,
@@ -103,11 +97,13 @@ export class SeasonService {
 
     await settleAllOrLog(
       [
-        { id: "poster", run: () => this.posterService.deletePoster("seasons", season.id) },
+        { id: "poster", run: () => this.posterService.deleteStoredImage(season.posterKey) },
         {
           id: "processed-folder",
           run: () =>
-            this.mediaAssetService.deleteProcessedFolder(`videos/${season.titleId}/${season.id}/`),
+            this.mediaAssetService.deleteProcessedFolder(
+              buildSeasonVideoPrefix(season.titleId, season.id),
+            ),
         },
       ],
       (task) => task.run(),

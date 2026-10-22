@@ -23,10 +23,26 @@ Dockerfile targets (`runner`, `worker-runner`, plus `migrator` for schema jobs).
 
 An upload is written to the raw S3 bucket. S3 emits an event to SQS; `s3-event` consumes
 it with `sqs-consumer` and enqueues a BullMQ job. The **worker process** — not a thread
-in the API — picks it up, runs ffmpeg, writes HLS output to the processed bucket, and
-updates `transcodingStatus` on the `Title` or `Episode` plus the
-`VideoTranscodingProgress` row the client polls. Playback is hls.js against a presigned
-URL.
+in the API — picks it up, runs ffmpeg and writes its output to the processed bucket.
+
+Every raw object carries a kind prefix, and which queue the event lands on is a `switch`
+on that prefix. `src/s3/raw-key/` owns the scheme:
+
+| Prefix | Queue | Output |
+| --- | --- | --- |
+| `title-video/<titleId>` | `video-transcode` | HLS, plus `transcodingStatus` and the `VideoTranscodingProgress` row the client polls |
+| `episode-video/<episodeId>` | `video-transcode` | as above, on the episode |
+| `user-avatar/<userId>/<uploadId>` | `user-avatar` | a 256×256 webp, plus `User.avatarKey` |
+
+Before this, the consumer took a raw key to be a bare entity uuid and probed the database
+for a row that matched — episode first, then title. The type of an upload was a property
+of whichever rows happened to exist rather than of the upload, so a third kind of object
+could not be told apart from a stale one. A key that parses to nothing is now logged and
+skipped rather than guessed at; bare-uuid keys still route through the old probe, for
+objects uploaded before the scheme.
+
+Playback is hls.js against a presigned URL. Avatars are served unsigned, since a public
+avatar gains nothing from an expiring link and loses browser caching.
 
 Ingest is event-driven rather than polled, and the worker is a separate process, so a
 long transcode cannot occupy an API request thread. See ADR-0004 and ADR-0005.

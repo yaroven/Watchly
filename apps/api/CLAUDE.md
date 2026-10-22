@@ -12,12 +12,91 @@ One directory per domain under `src/`, each with `*.module.ts`, `*.controller.ts
 `*.service.spec.ts` (`artist` and `external-ratings` predate that and have none;
 `external-ratings` has no `dto/request` either):
 
-`artist` `comment` `episode` `external-ratings` `genre` `season` `title`
-`title-engagement` `title-rating` `user`
+`artist` `comment` `episode` `external-ratings` `genre` `season` `title` `title-cast`
+`user` `watchlist`
 
 Infrastructure: `auth`, `prisma`, `s3`, `s3-event`, `media-asset`, `poster`,
 `video-transcoder`, `config` (typed `registerAs` factories), `common` (pagination,
-shared DTOs, `env.util.ts`).
+shared DTOs, `utils/`).
+
+Anything in a domain that is not a module, controller, service or DTO goes in that
+domain's `utils/` — Prisma query shapes (`*.query.ts`), existence guards
+(`assert-*.util.ts`) and the pipes over them (`*-exists.pipe.ts`).
+`src/common/utils/` holds the cross-domain versions. Files carry their kind as a
+suffix: `.util.ts`, `.query.ts`, `.pipe.ts`, `.decorator.ts`, `.const.ts`, `.enum.ts`,
+`.types.ts`.
+
+A route whose only domain-specific work is "does this id exist" takes an existence
+pipe on the param — one per domain in its `utils/`, for titles, episodes, seasons,
+artists, genres and users — instead of a service method that wraps the check. A route
+that then does nothing but forward belongs with the service that owns the mechanics:
+that is why the movie and episode upload/transcode routes live on
+`media-asset/{title,episode}-media.controller.ts` and all three poster/photo upload
+URLs on `poster/title-poster.controller.ts`, each injecting one service.
+
+Because a pipe does not run on a direct handler call, the 404 it owns is pinned by a
+request-level `*.controller.existence.spec.ts` beside the unit spec, not by it. The episode's playback URL is the counter-example that stayed behind —
+building it needs the episode's season and title, which only `EpisodeService`
+resolves.
+
+The engagement writes and the watchlist toggles carry it too, and dropped their own
+`assertTitleExists(tx, …)` when they did: a missing title cannot slip past, because
+the summary read that closes each transaction (`readEngagement`) refuses on the same
+row and rolls the write back, and the FK on `titleId` would reject it regardless. The
+leading check only bought failing _before_ the write instead of after it — one query
+per write on the hot path. `update` is the exception that keeps its own check, because
+it also needs the `P2025` re-read to tell "title gone" (404) from "bad genreId" (400).
+
+Nothing closes the window between the pipe and the write — a `findUnique` takes no
+lock, so the in-transaction check never did either. A title deleted mid-request ends
+as a rollback, not a bad row.
+
+Media conversion is split by **kind**, not by feature: `video-transcoder` is
+parameterised by `VideoType`, `image-transcoder` by `ImageKind`. Adding a kind of
+image means a profile in `image-profile.const.ts` and a `ProcessedImageAttacher` in
+the owning feature — the attacher supplies the two things only that feature knows,
+the processed key and the row to point at it. The worker wires the attachers, so
+`image-transcoder` never imports a feature module.
+
+**A queue is registered by the transcoder that owns it, never by a feature.**
+`VideoTranscoderService.scheduleTranscodeVideo` and `ImageTranscodeScheduler.schedule`
+are the only producers; `title`, `season`, `artist`, `poster` and `user-avatar` inject
+neither a `Queue` nor the job name. `UserAvatarService` used to hold an `@InjectQueue`
+of its own, which meant `UserModule` — and `AuthModule` behind it — pulled a Redis
+queue in for a feature that only hands out an upload URL. `s3-event` maps the raw key's
+kind to an `ImageKind` the same way it maps one to a `VideoType`, and calls the
+producer; the `jobId` convention (`image-<rawKey>`) lives with the producer too, rather
+than once per feature.
+
+Both processors run in one worker process — `worker-main.ts` loads
+`VideoTranscoderWorkerModule`, which registers both queues because converting an
+image needs the ffmpeg the API image does not install. They keep **separate queues**
+on purpose: concurrency is per-queue, and one setting cannot serve a twenty-minute
+video transcode and an interactive 256px avatar. One queue for every image is right
+for the opposite reason — an avatar and a poster cost about the same. What both share
+lives in `common/utils/`: `DEFAULT_JOB_OPTIONS`, `withWorkDir`, `logJobFailure`,
+`streamToFile`.
+
+Every uploaded image goes through it: avatars, title and season posters, and artist
+photos. `PosterService` presigns into the **raw** bucket, `poster-image.attacher.ts`
+contributes one attacher per entity kind — three instances of one class, since only the
+`ImageKind` differs between them, built in a factory because the entity kind is a
+constructor argument rather than something DI resolves. The processed key is versioned
+(`posters/<kind>/<id>/<version>.webp`) for the same reason an avatar's is: a stable key
+would leave the superseded artwork in front of any viewer that cached it. Note that
+`S3Service.uploadStream` sets no `Cache-Control` at all today — the versioned key is
+what would make an `immutable` one safe to add, not evidence that one is set.
+
+A poster is therefore **asynchronous**, and the write path reflects that:
+`posterUploaded` / `photoUploaded` is no longer a claim the server checks. `true` is
+accepted and ignored — the worker records the key off the S3 event — and `false` still
+clears the image. `PosterService.confirmUpload` is gone with it. Cleanup goes **by the
+stored key**, not by one derived from the id (`deleteStoredImage`), because the version
+exists only on the row: a caller that deletes the row hands the key over.
+
+The client has not caught up: it still sends `posterUploaded: true` (harmless) and
+refetches immediately, so an admin can see the previous poster for a moment after
+saving. Showing an upload as still processing is client work that has not been done.
 
 ## Rules
 
@@ -39,9 +118,13 @@ shared DTOs, `env.util.ts`).
   `deleteMany({ where: { titleId, userId: undefined } })` deletes every user's row and
   answers 200. The decorator is what keeps `undefined` out of that position.
 - `@CurrentUserId()` on an `@OptionalAuth()` route compiles and 500s every anonymous
-  caller. Four specs pin the pairing through supertest — `title.controller.viewer`,
-  `title-engagement.controller`, `title-rating.controller`, `watchlist.controller`.
-  Every other route, check by hand.
+  caller. **`auth/viewer-pairing.spec.ts` checks this on every route there is** — it
+  walks the route metadata of every `*.controller.ts`, so a route added tomorrow is
+  covered the moment its file lands. Nothing to remember when adding one.
+- That spec checks the pairing, not the value. That the viewer actually _arrives_ is
+  pinned by supertest in `title.controller.viewer`, `watchlist.controller` and
+  `title-watchlist.controller` — including the case that matters most, a withdrawal
+  refusing to run without a viewer filter rather than deleting everyone's row.
 
 ### Responses that depend on who is asking
 
@@ -67,7 +150,10 @@ shared DTOs, `env.util.ts`).
 ## Tests
 
 Jest, `rootDir: src`, `*.spec.ts` beside the unit under test. No coverage floor is
-enforced and specs are excluded from ESLint and from `tsconfig.build.json`.
+enforced and specs are excluded from ESLint and from `tsconfig.build.json` — which is
+why `tsconfig.spec.json` exists: it is the project that covers them, so an editor
+resolving a spec against the build config does not report it as orphaned. `src/jest.d.ts`
+references the jest types explicitly rather than relying on `@types/*` auto-discovery.
 
 Routes that read the viewer need a **request-level** spec (supertest +
 `overrideGuard`), not a handler call — see the four named above. A direct call never runs the param decorator, so it cannot tell

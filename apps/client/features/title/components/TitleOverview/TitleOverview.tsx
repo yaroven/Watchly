@@ -1,6 +1,6 @@
 "use client";
 
-import { useTitleRating } from "@/features/title-rating";
+import { useTitleEngagement } from "@/features/title-engagement";
 import { AgeRating, ExternalRatingSource, type Title, TitleType } from "@/features/title/schemas/title";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import Box from "@mui/material/Box";
@@ -35,9 +35,10 @@ const SCORE_ROWS: { key: "imdb" | "rottenTomatoes" | "metacritic" | "tmovie"; ic
 
 export default function TitleOverview({ title }: TitleOverviewProps) {
   const router = useRouter();
-  // The page is server-rendered, so `title.rating` goes stale the moment the viewer rates — fall back to it only until the live summary arrives.
-  const { data: liveRating } = useTitleRating(title.id);
-  const ratingSummary = liveRating ?? title.rating;
+  // The page is server-rendered, so the embedded block goes stale the moment the
+  // viewer rates — fall back to it only until the live summary arrives.
+  const { data: liveEngagement } = useTitleEngagement(title.id);
+  const ratingSummary = liveEngagement ?? title.engagement;
   const ratingBySource = new Map(title.externalRatings.map((rating) => [rating.source, rating.rating]));
   const isSeries = title.type === TitleType.SERIES;
   const posterSrc = getOptimizedImageSrc(title.posterUrl);
@@ -123,7 +124,7 @@ export default function TitleOverview({ title }: TitleOverviewProps) {
             <Box sx={{ display: "flex", flexDirection: "column", gap: "14px", flexShrink: 0 }}>
               {SCORE_ROWS.map(({ key, icon, source }) => {
                 const isPercent = source === ExternalRatingSource.ROTTEN_TOMATOES || source === ExternalRatingSource.METACRITIC;
-                const value = source ? ratingBySource.get(source) : (ratingSummary?.average ?? undefined);
+                const value = source ? ratingBySource.get(source) : (ratingSummary?.averageScore ?? undefined);
 
                 return (
                   <Box key={key} sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "8px" }}>

@@ -1,8 +1,10 @@
 import { NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { FilterRule } from "../common/pagination/filter-rule.enum";
+import { PrismaService } from "../prisma/prisma.service";
 import { SeasonController } from "./season.controller";
 import { SeasonService } from "./season.service";
+import { SeasonExistsPipe } from "./utils/season-exists.pipe";
 
 describe("SeasonController", () => {
   let controller: SeasonController;
@@ -12,6 +14,11 @@ describe("SeasonController", () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [SeasonController],
       providers: [
+        SeasonExistsPipe,
+        {
+          provide: PrismaService,
+          useValue: { season: { findUnique: jest.fn().mockResolvedValue({ id: "season-1" }) } },
+        },
         {
           provide: SeasonService,
           useValue: {
@@ -120,20 +127,6 @@ describe("SeasonController", () => {
 
         expect(seasonServiceMock.update).toHaveBeenCalledWith("season-1", updateData);
         expect(result).toEqual(updatedSeason);
-      });
-    });
-  });
-
-  describe("getPosterUploadUrl", () => {
-    describe("should return poster upload URLs", () => {
-      it("always", async () => {
-        const urlsResponse = { uploadUrl: "url", posterUrl: "url" };
-        (seasonServiceMock.createPosterUploadingUrl as jest.Mock).mockResolvedValue(urlsResponse);
-
-        const result = await controller.getPosterUploadUrl("season-1");
-
-        expect(seasonServiceMock.createPosterUploadingUrl).toHaveBeenCalledWith("season-1");
-        expect(result).toEqual(urlsResponse);
       });
     });
   });

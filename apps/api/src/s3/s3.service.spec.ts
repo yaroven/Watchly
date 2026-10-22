@@ -4,6 +4,7 @@ import {
   DeleteObjectsCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  HeadObjectCommand,
   ListObjectsV2Command,
   NotFound,
   PutObjectCommand,
@@ -56,7 +57,6 @@ describe("S3Service", () => {
     service = module.get<S3Service>(S3Service);
     configServiceMock = module.get(ConfigService);
 
-    // Override the real S3Client on the service instance
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (service as any).s3Client = { send: mockSend };
   });
@@ -166,6 +166,29 @@ describe("S3Service", () => {
       });
       const mapped = new URL(result);
       expect(mapped.hostname).toBe("cdn.example.com");
+    });
+  });
+
+  describe("objectExists", () => {
+    it("should report an object that is there", async () => {
+      mockSend.mockResolvedValueOnce({});
+
+      await expect(service.objectExists("my-key", BucketType.PROCESSED)).resolves.toBe(true);
+      expect(mockSend).toHaveBeenCalledWith(expect.any(HeadObjectCommand));
+    });
+
+    it("should report a missing object as absent rather than throwing", async () => {
+      mockSend.mockRejectedValueOnce(new NotFound({ $metadata: {}, message: "nope" }));
+
+      await expect(service.objectExists("my-key", BucketType.PROCESSED)).resolves.toBe(false);
+    });
+
+    it("should rethrow anything that is not a 404", async () => {
+      mockSend.mockRejectedValueOnce(new Error("network down"));
+
+      await expect(service.objectExists("my-key", BucketType.PROCESSED)).rejects.toThrow(
+        "network down",
+      );
     });
   });
 

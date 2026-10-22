@@ -26,14 +26,14 @@ export class SeasonResponseDto {
   @ApiProperty({ format: "uuid" })
   titleId: string;
 
-  constructor(season: Season) {
+  constructor(season: Season, posterUrl: string | null = null) {
     this.id = season.id;
     this.createdAt = season.createdAt;
     this.updatedAt = season.updatedAt;
     this.number = season.number;
     this.name = season.name;
     this.description = season.description;
-    this.posterUrl = season.posterUrl;
+    this.posterUrl = posterUrl;
     this.titleId = season.titleId;
   }
 }

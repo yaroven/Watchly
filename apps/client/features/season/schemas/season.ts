@@ -43,5 +43,10 @@ export interface UpdateSeasonDto {
   name: string;
   description: string;
   titleId: string;
-  posterUrl?: string;
+  /**
+   * Set once the image has been PUT to the upload URL. The key is derived from
+   * the entity server-side, so no URL is sent; omit it to leave the existing
+   * image alone, and send `false` to clear it.
+   */
+  posterUploaded?: boolean;
 }

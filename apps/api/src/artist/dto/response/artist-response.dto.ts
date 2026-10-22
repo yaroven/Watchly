@@ -17,11 +17,11 @@ export class ArtistResponseDto {
   @ApiPropertyOptional()
   photoUrl?: string | null;
 
-  constructor(artist: Artist) {
+  constructor(artist: Artist, photoUrl: string | null = null) {
     this.id = artist.id;
     this.createdAt = artist.createdAt;
     this.updatedAt = artist.updatedAt;
     this.name = artist.name;
-    this.photoUrl = artist.photoUrl;
+    this.photoUrl = photoUrl;
   }
 }

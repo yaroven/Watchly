@@ -12,15 +12,24 @@ describe("CurrentUserId", () => {
     expect(readCurrentUserId(contextFor({ userId: "user-1" }))).toBe("user-1");
   });
 
-  // Reaching this means a route is missing its guard. Returning `undefined` would
-  // put it into a Prisma `where`, where it reads as "no filter" rather than "none".
   it("should refuse to hand back an absent viewer, and log where it happened", () => {
     const error = jest.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
 
     expect(() =>
-      readCurrentUserId(contextFor({ method: "DELETE", url: "/title/x/reaction" })),
+      readCurrentUserId(contextFor({ method: "DELETE", url: "/titles/x/reaction" })),
     ).toThrow(InternalServerErrorException);
-    expect(error).toHaveBeenCalledWith(expect.stringContaining("DELETE /title/x/reaction"));
+    expect(error).toHaveBeenCalledWith(expect.stringContaining("DELETE /titles/x/reaction"));
+  });
+
+  it("should name the mispairing when the route turns out to be @OptionalAuth()", () => {
+    const error = jest.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
+
+    expect(() =>
+      readCurrentUserId(
+        contextFor({ method: "GET", url: "/titles/x/rating", viewerScope: "optional" }),
+      ),
+    ).toThrow(InternalServerErrorException);
+    expect(error).toHaveBeenCalledWith(expect.stringContaining("@OptionalUserId()"));
   });
 
   it("should not leak the internal reason to the caller", () => {
