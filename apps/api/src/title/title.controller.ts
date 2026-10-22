@@ -37,6 +37,7 @@ import { TitleResponseDto } from "./dto/response/title-response.dto";
 import { TitleEngagementService } from "./title-engagement.service";
 import { TitleService } from "./title.service";
 import { TitleExistsPipe } from "./utils/title-exists.pipe";
+import { TITLE_FILTERABLE } from "./utils/title-filter.query";
 
 @ApiTags("titles")
 @Controller("titles")
@@ -58,7 +59,7 @@ export class TitleController {
     summary: "List titles with filter, sort, and pagination",
     description:
       "`filter` (repeatable): `property:rule:value`, rule one of eq/neq/gt/gte/lt/lte/like/in/isnull. " +
-      "Filterable: name, type, transcodingStatus, ageRating, country, language, director, network, genres " +
+      `Filterable: ${TITLE_FILTERABLE.join(", ")} ` +
       "(genres: rule eq/in, value is a genre id, or comma-separated ids for `in`). " +
       "`sort`: `property:direction`. Sortable: name, createdAt, releaseDate.",
   })
@@ -68,18 +69,7 @@ export class TitleController {
   async findAll(
     @Query() query: GetAllTitleDto,
     @SortingParams(["name", "createdAt", "releaseDate"]) sort?: Sorting,
-    @FilteringParams([
-      "name",
-      "type",
-      "transcodingStatus",
-      "ageRating",
-      "country",
-      "language",
-      "director",
-      "network",
-      "genres",
-    ])
-    filters?: Filter[],
+    @FilteringParams(TITLE_FILTERABLE) filters?: Filter[],
     @OptionalUserId() userId?: string,
   ) {
     return this.titleService.findAll(query, sort, filters, userId);
