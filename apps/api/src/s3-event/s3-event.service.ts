@@ -10,10 +10,15 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/commo
 import { ConfigService } from "@nestjs/config";
 import { Counter, Gauge, Histogram } from "prom-client";
 import { S3Config, S3ConfigName } from "../config/s3.config";
-import { ImageKind } from "../image-transcoder/image-profile.const";
 import { ImageTranscodeScheduler } from "../image-transcoder/image-transcode-scheduler.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { isLegacyBareUuidKey, parseRawKey, RawObjectKind } from "../s3/raw-key";
+import {
+  imageKindOf,
+  isLegacyBareUuidKey,
+  parseRawKey,
+  RawObjectKind,
+  videoTypeOf,
+} from "../s3/raw-key";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { VideoTranscodeScheduler } from "../video-transcoder/video-transcode-scheduler.service";
 
@@ -268,36 +273,29 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
 
     this.observeLag(record, parsed.kind);
 
-    switch (parsed.kind) {
-      case RawObjectKind.TITLE_VIDEO:
-        await this.videoScheduler.schedule({
-          id: parsed.ownerId,
-          type: VideoType.MOVIE,
-        });
-        return;
-      case RawObjectKind.EPISODE_VIDEO:
-        await this.videoScheduler.schedule({
-          id: parsed.ownerId,
-          type: VideoType.EPISODE,
-        });
-        return;
-      case RawObjectKind.USER_AVATAR:
-        await this.scheduleImage(ImageKind.USER_AVATAR, parsed.ownerId, key);
-        return;
-      case RawObjectKind.TITLE_POSTER:
-        await this.scheduleImage(ImageKind.TITLE_POSTER, parsed.ownerId, key);
-        return;
-      case RawObjectKind.SEASON_POSTER:
-        await this.scheduleImage(ImageKind.SEASON_POSTER, parsed.ownerId, key);
-        return;
-      case RawObjectKind.ARTIST_PHOTO:
-        await this.scheduleImage(ImageKind.ARTIST_PHOTO, parsed.ownerId, key);
-        return;
+    const imageKind = imageKindOf(parsed.kind);
+    if (imageKind !== undefined) {
+      await this.imageTranscodeScheduler.schedule({
+        kind: imageKind,
+        ownerId: parsed.ownerId,
+        rawKey: key,
+      });
+      return;
     }
-  }
 
-  private async scheduleImage(kind: ImageKind, ownerId: string, rawKey: string) {
-    await this.imageTranscodeScheduler.schedule({ kind, ownerId, rawKey });
+    // Compared against undefined, never for truthiness: VideoType is a numeric
+    // enum and VideoType.MOVIE is 0.
+    const videoType = videoTypeOf(parsed.kind);
+    if (videoType !== undefined) {
+      await this.videoScheduler.schedule({ id: parsed.ownerId, type: videoType });
+      return;
+    }
+
+    // Thrown rather than logged so the message is left on the queue: a kind
+    // with no scheduler is a deployment that forgot one, and five redeliveries
+    // later it lands in the dead-letter queue sqs_dlq_messages watches. The
+    // switch this replaced fell through silently and the upload vanished.
+    throw new Error(`No scheduler for raw object kind "${parsed.kind}"`);
   }
 
   /**
