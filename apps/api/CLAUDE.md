@@ -226,6 +226,14 @@ saving. Showing an upload as still processing is client work that has not been d
   `video_transcode_duration_seconds`, `image_transcode_duration_seconds` and
   `image_size_ratio` — the metrics register themselves on import — but those numbers
   have no reader until the worker gets a listener of its own.
+  - So anything the worker learns that the api should publish goes **through Redis**,
+    like queue depth does. `ReactionReconciler` leaves its repair count under
+    `reactions:drift:<arc>` and `VoteDriftMetricsService` samples it at scrape time.
+    That number is the only evidence that "drift is rare and self-healing" — the
+    assumption the whole vote cache rests on — is actually true.
+  - `bullmq_queue_jobs` samples `completed` for the same reason: the flush processor
+    runs in the worker, so the queue's own counts in Redis are how the api can see
+    that votes are landing at all.
 - **No identifier is ever a label.** No `userId`, `titleId`, `rawKey`, `jobId`. Each
   distinct label combination is a series Prometheus keeps for its own lifetime, so an id
   in that position is unbounded growth. Ids belong in the logs, which already carry
@@ -318,6 +326,12 @@ Routes that read the viewer need a **request-level** spec (supertest +
 `overrideGuard`), not a handler call — see the four named above. A direct call never runs the param decorator, so it cannot tell
 `@CurrentUserId()` from a hardcoded value.
 
+**A file that imports `@nestjs/schedule` cannot be unit-tested.** It ships ESM, jest
+runs CJS, and the suite fails to parse before a single test runs — which is why nothing
+carrying a `@Cron` has ever had a spec here. Keep the decorator in a class with no logic
+of its own (`ReactionReconcileSchedule`) and the work it triggers somewhere a spec can
+reach (`ReactionReconciler`).
+
 **Write the test so it can fail.** Before trusting a new test, break the behaviour it
 names and confirm _that_ test goes red. The ones that have slipped through here:
 
@@ -331,3 +345,6 @@ names and confirm _that_ test goes red. The ones that have slipped through here:
   beside it, or nothing notices the controller dropping the viewer on the floor.
 - Param decorators don't execute on a direct method call. Viewer propagation needs a
   request-level test (supertest + `overrideGuard`), not a handler call.
+- Comparing two of something and asserting the agreeing case only. A reconciler test
+  where both counters matched passed with the dislike comparison deleted; it took a
+  case where the likes agreed and the dislikes did not to pin it.

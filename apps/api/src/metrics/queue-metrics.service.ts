@@ -9,7 +9,13 @@ import { Gauge } from "prom-client";
  */
 export const METRICS_QUEUES = Symbol("METRICS_QUEUES");
 
-const STATES = ["waiting", "active", "delayed", "failed"] as const;
+/**
+ * `completed` is here so a queue whose jobs *are* landing says so. For the
+ * reaction flush that is the only signal the api has that votes are reaching
+ * Postgres — the processor runs in the worker, which serves no metrics of its
+ * own, but BullMQ keeps these counts in Redis where either side can read them.
+ */
+const STATES = ["waiting", "active", "delayed", "failed", "completed"] as const;
 
 const logger = new Logger("QueueMetrics");
 
