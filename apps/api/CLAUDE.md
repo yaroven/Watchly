@@ -16,9 +16,9 @@ One directory per domain under `src/`, each with `*.module.ts`, `*.controller.ts
 `user` `watchlist`
 
 Infrastructure: `auth`, `prisma`, `redis`, `s3`, `s3-event`, `media-asset`, `poster`,
-`video-transcoder`, `metrics`, `worker` (the worker process's root module, which
-belongs to no domain because it composes all of them), `config` (typed `registerAs`
-factories), `common` (pagination, shared DTOs, `utils/`).
+`video-transcoder`, `reaction-flush`, `metrics`, `worker` (the worker process's root
+module, which belongs to no domain because it composes all of them), `config` (typed
+`registerAs` factories), `common` (pagination, shared DTOs, `utils/`).
 
 Anything in a domain that is not a module, controller, service or DTO goes in that
 domain's `utils/` — Prisma query shapes (`*.query.ts`), existence guards
@@ -83,16 +83,20 @@ load, which is the worst way to find out. The api injects `VideoTranscodeSchedul
 `VideoTranscoderModule` carries no `S3Module` for the same reason.
 
 **A queue is registered by the transcoder that owns it, never by a feature.**
-`VideoTranscodeScheduler.schedule` and `ImageTranscodeScheduler.schedule` are the only
-producers; `title`, `season`, `artist`, `poster` and `user-avatar` inject
-neither a `Queue` nor the job name. `UserAvatarService` used to hold an `@InjectQueue`
-of its own, which meant `UserModule` — and `AuthModule` behind it — pulled a Redis
-queue in for a feature that only hands out an upload URL. `s3-event` maps the raw key's
-kind to an `ImageKind` the same way it maps one to a `VideoType`, and calls the
-producer; the `jobId` convention (`image-<rawKey>`) lives with the producer too, rather
-than once per feature.
+`VideoTranscodeScheduler.schedule`, `ImageTranscodeScheduler.schedule` and
+`ReactionFlushScheduler.schedule` are the only producers — the third is not a
+transcoder, but it follows the rule for the same reason. A feature injects the scheduler
+and sees neither a `Queue` nor a job name: `reaction`, `title`, `season`, `artist`,
+`poster` and `user-avatar` all do. `UserAvatarService` used to
+hold an `@InjectQueue` of its own, which meant `UserModule` — and `AuthModule` behind it
+— pulled a Redis queue in for a feature that only hands out an upload URL. `s3-event`
+maps the raw key's kind to an `ImageKind` the same way it maps one to a `VideoType`, and
+calls the producer; the `jobId` convention lives with the producer too, rather than
+once per feature — `image-<rawKey>`, and `vote-<arc>-<subjectId>-<userId>` for a flush,
+where it is also the dedup key that collapses a burst of clicks into one write.
 
-Both processors run in one worker process — `worker-main.ts` loads `WorkerModule`
+The transcoding processors run in one worker process, beside
+`ReactionFlushProcessor` — `worker-main.ts` loads `WorkerModule`
 (`src/worker/worker.module.ts`), which registers both queues because converting an image
 needs the ffmpeg the API image does not install. That module is the whole of the process
 — anything the worker is to do has to be wired there — which is why it is named after
@@ -150,12 +154,16 @@ saving. Showing an upload as still processing is client work that has not been d
   `prisma migrate diff` does not manage; they are listed in `docs/DOMAIN.md` beside the
   trigram index.
 - **Reacting is one route pair for everything**: `POST|DELETE /reactions/:entityType/:entityId`
-  (`titles`, `comments`). Don't add a per-feature reaction route — the toggle and the
-  recount belong to `ReactionService.vote`/`unvote`.
+  (`titles`, `comments`). Don't add a per-feature reaction route — casting a vote
+  belongs to `ReactionService.vote`/`unvote`, which still own it end to end. What
+  changed under them (ADR-0016) is that the toggle is decided in the cache and the
+  recount happens in the flush processor, so neither is a job split between services.
 - **Likes, dislikes and comment counts are read as a relation, never aggregated.**
   `EngagementCountersService` is the only writer, and it recomputes on the caller's
-  client so the counters commit with the rows they summarise. A title's score, rating
-  count and watchlist count stay on `TitleEngagement` — only a title has those.
+  client so the counters commit with the rows they summarise — for reactions that
+  caller is now `ReactionFlushProcessor`, which is where the `groupBy` went when it
+  left the request. A title's score, rating count and watchlist count stay on
+  `TitleEngagement` — only a title has those.
 - **A viewer's vote is decided in Redis, counted in Postgres** (ADR-0016).
   `VoteStateService` keeps one key per (subject, viewer) pair —
   `vote:<arc>:<subjectId>:<userId>` = `L`/`D`/`N`, TTL 7d — and `nextVote` is the whole

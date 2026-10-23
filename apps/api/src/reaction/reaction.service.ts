@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import { ReactionType } from "@prisma/client";
 import {
   CountersSubject,
@@ -6,17 +6,27 @@ import {
   EngagementCounts,
 } from "../engagement/engagement-counters.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { ReactionFlushScheduler } from "../reaction-flush/reaction-flush-scheduler.service";
+import { RedisUnavailableError } from "../redis/redis.error";
+import { Vote, voteDelta } from "./utils/next-vote.util";
 import { ReactionTarget, reactionWhereUnique } from "./utils/reaction-target.const";
+import { VoteStateService, VoteTransition } from "./vote-state.service";
 
 export type ReactionClient = Pick<PrismaService, "reaction" | "engagementCounters" | "comment">;
+
+export type ReactionResult = EngagementCounts & { myReaction: Vote };
 
 const countersSubject = (target: ReactionTarget): CountersSubject => target;
 
 @Injectable()
 export class ReactionService {
+  private readonly logger = new Logger(ReactionService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly counters: EngagementCountersService,
+    private readonly voteState: VoteStateService,
+    private readonly flush: ReactionFlushScheduler,
   ) {}
 
   async assertSubjectExists(target: ReactionTarget): Promise<void> {
@@ -36,62 +46,93 @@ export class ReactionService {
     if (!comment) throw new NotFoundException(`Comment with id ${target.commentId} not found`);
   }
 
-  async vote(
-    target: ReactionTarget,
-    userId: string,
-    type: ReactionType,
-  ): Promise<EngagementCounts & { myReaction: ReactionType | null }> {
-    return this.prisma.$transaction((tx) => this.voteWithin(tx, target, userId, type));
+  async vote(target: ReactionTarget, userId: string, type: ReactionType): Promise<ReactionResult> {
+    return this.cast(target, userId, type);
   }
 
-  async unvote(
-    target: ReactionTarget,
-    userId: string,
-  ): Promise<EngagementCounts & { myReaction: ReactionType | null }> {
-    return this.prisma.$transaction((tx) => this.unvoteWithin(tx, target, userId));
+  async unvote(target: ReactionTarget, userId: string): Promise<ReactionResult> {
+    return this.cast(target, userId, null);
   }
 
-  async voteWithin(
+  /**
+   * Writes the vote a pair holds, whatever it holds — the flush's half of the
+   * arrangement, and the reason the processor can work its jobs in any order.
+   * Absolute rather than a toggle: applying it twice is applying it once, and
+   * applying a stale one is impossible because the state is read at flush time
+   * rather than carried in the job.
+   *
+   * Takes a client so the row and the counter that summarises it commit
+   * together, the way `EngagementCountersService` expects to be called.
+   */
+  async applyAbsolute(
     client: ReactionClient,
     target: ReactionTarget,
     userId: string,
-    type: ReactionType,
-  ): Promise<EngagementCounts & { myReaction: ReactionType | null }> {
-    const myReaction = await this.toggle(target, userId, type, client);
-    const counts = await this.counters.recomputeReactions(countersSubject(target), client);
+    vote: Vote,
+  ): Promise<void> {
+    if (vote === null) {
+      await client.reaction.deleteMany({ where: { ...target, userId } });
+    } else {
+      await client.reaction.upsert({
+        where: reactionWhereUnique(target, userId),
+        create: { ...target, userId, type: vote },
+        update: { type: vote },
+      });
+    }
 
-    return { ...counts, myReaction };
+    await this.counters.recomputeReactions(countersSubject(target), client);
   }
 
-  async unvoteWithin(
-    client: ReactionClient,
+  /**
+   * The counts come from the last flush, so the vote just cast is not in them
+   * yet — adding this request's own delta is what keeps `myReaction` and the
+   * number beside it from contradicting each other for the one caller who
+   * already knows what they did. Everyone else sees it after the flush.
+   */
+  private async cast(
     target: ReactionTarget,
     userId: string,
-  ): Promise<EngagementCounts & { myReaction: ReactionType | null }> {
-    await client.reaction.deleteMany({ where: { ...target, userId } });
-    const counts = await this.counters.recomputeReactions(countersSubject(target), client);
+    requested: ReactionType | null,
+  ): Promise<ReactionResult> {
+    const { previous, next } = await this.decide(target, userId, requested);
+    const delta = voteDelta(previous, next);
+    const stored = await this.counters.countsForOne(countersSubject(target), this.prisma);
 
-    return { ...counts, myReaction: null };
+    return {
+      ...stored,
+      // Clamped because the two numbers come from different moments: a
+      // withdrawal whose vote was never flushed would otherwise read as -1.
+      likes: Math.max(0, stored.likes + delta.likes),
+      dislikes: Math.max(0, stored.dislikes + delta.dislikes),
+      myReaction: next,
+    };
   }
 
-  private async toggle(
+  /**
+   * The job is scheduled *before* the vote is written, which is only sound
+   * because the job is a pointer: one that fires against an unwritten vote
+   * mirrors the state already in place and does nothing. The other order would
+   * leave a vote cached, visible on reads and never persisted if the enqueue
+   * failed — and it would revert on its own a week later, when the key expires.
+   *
+   * Redis being down is a 503 rather than a 500: nothing is wrong with the
+   * request, and accepting a vote there is nowhere to put would be worse than
+   * refusing it.
+   */
+  private async decide(
     target: ReactionTarget,
     userId: string,
-    type: ReactionType,
-    client: ReactionClient,
-  ): Promise<ReactionType | null> {
-    const { count: withdrawn } = await client.reaction.deleteMany({
-      where: { ...target, userId, type },
-    });
+    requested: ReactionType | null,
+  ): Promise<VoteTransition> {
+    try {
+      await this.flush.schedule(target, userId);
 
-    if (withdrawn > 0) return null;
+      return await this.voteState.transition(target, userId, requested);
+    } catch (error) {
+      if (!(error instanceof RedisUnavailableError)) throw error;
 
-    await client.reaction.upsert({
-      where: reactionWhereUnique(target, userId),
-      create: { ...target, userId, type },
-      update: { type },
-    });
-
-    return type;
+      this.logger.error(`Refusing a vote: ${error.message}`, error.stack);
+      throw new ServiceUnavailableException("Reacting is temporarily unavailable");
+    }
   }
 }
