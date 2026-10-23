@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, PipeTransform } from "@nestjs/common";
-import { ReactionTarget } from "../reaction.service";
+import { ReactionTarget } from "./reaction-target.const";
 
 /**
  * `/reactions/titles/:id` rather than `/reactions/TITLE/:id`: the URL segment

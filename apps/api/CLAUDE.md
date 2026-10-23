@@ -15,7 +15,7 @@ One directory per domain under `src/`, each with `*.module.ts`, `*.controller.ts
 `artist` `comment` `episode` `external-ratings` `genre` `season` `title` `title-cast`
 `user` `watchlist`
 
-Infrastructure: `auth`, `prisma`, `s3`, `s3-event`, `media-asset`, `poster`,
+Infrastructure: `auth`, `prisma`, `redis`, `s3`, `s3-event`, `media-asset`, `poster`,
 `video-transcoder`, `metrics`, `worker` (the worker process's root module, which
 belongs to no domain because it composes all of them), `config` (typed `registerAs`
 factories), `common` (pagination, shared DTOs, `utils/`).
@@ -156,6 +156,19 @@ saving. Showing an upload as still processing is client work that has not been d
   `EngagementCountersService` is the only writer, and it recomputes on the caller's
   client so the counters commit with the rows they summarise. A title's score, rating
   count and watchlist count stay on `TitleEngagement` — only a title has those.
+- **A viewer's vote is decided in Redis, counted in Postgres** (ADR-0016).
+  `VoteStateService` keeps one key per (subject, viewer) pair —
+  `vote:<arc>:<subjectId>:<userId>` = `L`/`D`/`N`, TTL 7d — and `nextVote` is the whole
+  toggle, pure so a test reaches it without a server. Two things are load-bearing: a
+  stored `N` means "holds no vote" while a **missing** key means "unknown" and re-reads
+  the row (deciding a toggle from a cold cache re-casts the vote the viewer came to
+  withdraw), and **the cache is never asked for a count** — that is what lets it answer
+  about one viewer without being complete. Go through `transition`; don't decide a
+  toggle anywhere else.
+- `RedisService` extends `ioredis` the way `PrismaService` extends `PrismaClient`, and
+  runs with `enableOfflineQueue: false`: a command issued while the socket is down
+  rejects instead of waiting for a reconnect, which is what lets a caller choose
+  between failing and falling back rather than hanging.
 - A reply is a comment whose parent is a comment. Threads are one level deep because
   `CommentService` refuses the second, not because the schema does.
 - `title/` holds two services. `TitleService` is the catalogue — CRUD and the read

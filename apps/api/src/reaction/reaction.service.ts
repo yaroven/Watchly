@@ -1,19 +1,14 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { Prisma, ReactionType } from "@prisma/client";
+import { ReactionType } from "@prisma/client";
 import {
   CountersSubject,
   EngagementCountersService,
   EngagementCounts,
 } from "../engagement/engagement-counters.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { ReactionTarget, reactionWhereUnique } from "./utils/reaction-target.const";
 
 export type ReactionClient = Pick<PrismaService, "reaction" | "engagementCounters" | "comment">;
-
-export type ReactionTarget = { titleId: string } | { commentId: string };
-
-export const titleTarget = (titleId: string): ReactionTarget => ({ titleId });
-
-export const commentTarget = (commentId: string): ReactionTarget => ({ commentId });
 
 const countersSubject = (target: ReactionTarget): CountersSubject => target;
 
@@ -91,14 +86,8 @@ export class ReactionService {
 
     if (withdrawn > 0) return null;
 
-    // The unique index is per arc, so the upsert's target is the arc in play.
-    const where: Prisma.ReactionWhereUniqueInput =
-      "titleId" in target
-        ? { titleId_userId: { titleId: target.titleId, userId } }
-        : { commentId_userId: { commentId: target.commentId, userId } };
-
     await client.reaction.upsert({
-      where,
+      where: reactionWhereUnique(target, userId),
       create: { ...target, userId, type },
       update: { type },
     });
