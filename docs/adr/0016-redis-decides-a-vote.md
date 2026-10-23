@@ -96,6 +96,11 @@ Three properties carry the design:
   tree holds one copy. `RedisService` extends the client the way `PrismaService` extends
   `PrismaClient`, and runs with `enableOfflineQueue: false` so a command issued against
   a down socket rejects instead of hanging.
+- **A nightly sweep repairs the counters and reports what it repaired.** Two aggregate
+  queries per arc, no dirty-subject tracking — that list would have to live in the same
+  Redis whose disagreements it exists to catch. It runs in the worker, which has one
+  replica, so it needs no leader election; the repair count goes through Redis to a
+  gauge in the api, because the worker serves no `/metrics`.
 - The cache is **not** consulted for counts, ever. If that changes, the hydration
   problem a set would have had comes back, and this record should be superseded rather
   than amended.

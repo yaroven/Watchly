@@ -1,6 +1,7 @@
 import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
+import { ScheduleModule } from "@nestjs/schedule";
 import { LoggerModule } from "nestjs-pino";
 import loggerConfig, {
   buildLoggerParams,
@@ -13,6 +14,7 @@ import redisConfig, {
   redisConnectionOptions,
 } from "../config/redis.config";
 import s3Config from "../config/s3.config";
+import { EngagementModule } from "../engagement/engagement.module";
 import { IMAGE_TRANSCODE_QUEUE_OPTIONS } from "../image-transcoder/image-transcode-queue.options";
 import { ImageTranscoderProcessor } from "../image-transcoder/image-transcoder.processor";
 import { ImageTranscoderService } from "../image-transcoder/image-transcoder.service";
@@ -28,6 +30,8 @@ import { PosterService } from "../poster/poster.service";
 import { PrismaModule } from "../prisma/prisma.module";
 import { ReactionFlushModule } from "../reaction-flush/reaction-flush.module";
 import { ReactionFlushProcessor } from "../reaction-flush/reaction-flush.processor";
+import { ReactionReconcileSchedule } from "../reaction-flush/reaction-reconcile-schedule.service";
+import { ReactionReconciler } from "../reaction-flush/reaction-reconciler.service";
 import { ReactionModule } from "../reaction/reaction.module";
 import { S3Module } from "../s3/s3.module";
 import { AvatarImageAttacher } from "../user-avatar/avatar-image.attacher";
@@ -67,11 +71,17 @@ import { VoteCacheModule } from "../vote-cache/vote-cache.module";
     ReactionFlushModule,
     ReactionModule,
     VoteCacheModule,
+    EngagementModule,
+    // The reconciler's cron. The api has its own ScheduleModule; this process
+    // had none, because nothing in it was scheduled before.
+    ScheduleModule.forRoot(),
   ],
   providers: [
     // Mirrors cached votes onto the rows. Nothing to do with ffmpeg; it is
     // here because this is the process that works queues.
     ReactionFlushProcessor,
+    ReactionReconciler,
+    ReactionReconcileSchedule,
     // The conversion half, which only this process has the ffmpeg binary for.
     HlsTranscoder,
     VideoTranscodeStateService,

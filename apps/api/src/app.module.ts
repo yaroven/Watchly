@@ -32,8 +32,12 @@ import { ImageTranscoderModule } from "./image-transcoder/image-transcoder.modul
 import { MediaAssetModule } from "./media-asset/media-asset.module";
 import { MetricsController } from "./metrics/metrics.controller";
 import { METRICS_QUEUES, QueueMetricsService } from "./metrics/queue-metrics.service";
+import { VoteDriftMetricsService } from "./metrics/vote-drift-metrics.service";
 import { PrismaModule } from "./prisma/prisma.module";
+import { REACTION_FLUSH_QUEUE_OPTIONS } from "./reaction-flush/reaction-flush-queue.options";
+import { ReactionFlushModule } from "./reaction-flush/reaction-flush.module";
 import { ReactionModule } from "./reaction/reaction.module";
+import { RedisModule } from "./redis/redis.module";
 import { S3EventModule } from "./s3-event/s3-event.module";
 import { S3Module } from "./s3/s3.module";
 import { SeasonModule } from "./season/season.module";
@@ -102,6 +106,8 @@ import { WatchlistModule } from "./watchlist/watchlist.module";
     ExternalRatingsModule,
     CommentModule,
     ReactionModule,
+    ReactionFlushModule,
+    RedisModule,
   ],
   controllers: [AppController, MetricsController],
   providers: [
@@ -117,10 +123,16 @@ import { WatchlistModule } from "./watchlist/watchlist.module";
       inject: [
         getQueueToken(VIDEO_TRANSCODE_QUEUE_OPTIONS.name),
         getQueueToken(IMAGE_TRANSCODE_QUEUE_OPTIONS.name),
+        getQueueToken(REACTION_FLUSH_QUEUE_OPTIONS.name),
       ],
-      useFactory: (video: Queue, image: Queue): Queue[] => [video, image],
+      useFactory: (video: Queue, image: Queue, reactions: Queue): Queue[] => [
+        video,
+        image,
+        reactions,
+      ],
     },
     QueueMetricsService,
+    VoteDriftMetricsService,
   ],
 })
 export class AppModule {}
