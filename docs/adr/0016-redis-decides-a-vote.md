@@ -86,6 +86,12 @@ Three properties carry the design:
   delta.** `myReaction` is exact. Other viewers see the new count after the flush.
   `ReactionResultDto` did not change shape, but "recomputed by this call" stopped being
   true of it.
+- **Reads take `myReaction` from the cache and the counts from the relation.** One
+  `MGET` per page; a pair the cache has no answer for falls back to the `reactions`
+  relation the read already loaded, which costs nothing and is the same number the
+  endpoint served before. Preferring the relation when the cache *does* have an answer
+  would render a vote that the viewer's next click contradicts — the cold-cache bug
+  again, one layer up.
 - **`ioredis` is a direct dependency**, pinned to the 5.x BullMQ already resolves so the
   tree holds one copy. `RedisService` extends the client the way `PrismaService` extends
   `PrismaClient`, and runs with `enableOfflineQueue: false` so a command issued against

@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Comment, ReactionType, User } from "@prisma/client";
+import { Vote } from "../../../reaction/utils/next-vote.util";
 
 export class CommentAuthorDto {
   @ApiProperty({ format: "uuid" })
@@ -45,6 +46,11 @@ export type CommentWithAuthor = Comment & {
 export interface CommentResponseOptions {
   replies?: CommentResponseDto[];
   authorAvatarUrl?: string | null;
+  /**
+   * The viewer's vote as the cache has it. Absent means the cache had no
+   * answer, and then the `reactions` relation this read already loaded is it.
+   */
+  myReaction?: Vote;
 }
 
 export class CommentResponseDto {
@@ -89,7 +95,7 @@ export class CommentResponseDto {
    */
   constructor(
     comment: CommentWithAuthor,
-    { replies = [], authorAvatarUrl = null }: CommentResponseOptions = {},
+    { replies = [], authorAvatarUrl = null, myReaction }: CommentResponseOptions = {},
   ) {
     this.id = comment.id;
     this.author = new CommentAuthorDto(
@@ -102,7 +108,8 @@ export class CommentResponseDto {
     this.createdAt = comment.createdAt;
     this.likes = comment.counters?.likes ?? 0;
     this.dislikes = comment.counters?.dislikes ?? 0;
-    this.myReaction = comment.reactions?.[0]?.type ?? null;
+    this.myReaction =
+      myReaction === undefined ? (comment.reactions?.[0]?.type ?? null) : myReaction;
     this.replies = replies;
     this.replyCount = comment.counters?.commentCount ?? 0;
   }

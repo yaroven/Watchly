@@ -5,6 +5,7 @@ import {
   EngagementCounts,
   NO_COUNTS,
 } from "../../../engagement/engagement-counters.service";
+import { Vote } from "../../../reaction/utils/next-vote.util";
 import { EngagementRelations } from "../../utils/title.query";
 
 export interface TitleEngagementCounts extends EngagementCounts {
@@ -88,7 +89,11 @@ export class TitleEngagementDto {
    * which is the truth — the rows are written the first time something is
    * counted.
    */
-  static fromRelations(rows: EngagementRelations, viewerId: string | null): TitleEngagementDto {
+  static fromRelations(
+    rows: EngagementRelations,
+    viewerId: string | null,
+    myReaction?: Vote,
+  ): TitleEngagementDto {
     const counts: TitleEngagementCounts = {
       ...NO_ENGAGEMENT,
       ...countsOf(rows.counters),
@@ -106,7 +111,9 @@ export class TitleEngagementDto {
       viewerId
         ? new ViewerTitleEngagementDto(
             rows.ratings?.[0]?.score ?? null,
-            rows.reactions?.[0]?.type ?? null,
+            // The cache is the truth about a vote; `undefined` means it had
+            // no answer, and then the relation this read already loaded is it.
+            myReaction === undefined ? (rows.reactions?.[0]?.type ?? null) : myReaction,
             (rows.watchlistEntries?.length ?? 0) > 0,
           )
         : null,

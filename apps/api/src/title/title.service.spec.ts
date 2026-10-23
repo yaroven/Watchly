@@ -1,6 +1,6 @@
 import { NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
-import { AgeRating, Prisma, TitleType } from "@prisma/client";
+import { AgeRating, Prisma, ReactionType, TitleType } from "@prisma/client";
 import { FilterRule } from "../common/pagination/filter-rule.enum";
 import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PosterService } from "../poster/poster.service";
@@ -8,6 +8,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { S3Service } from "../s3/s3.service";
 import { SeasonService } from "../season/season.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
+import { VoteStateService } from "../vote-cache/vote-state.service";
 import { TitleService } from "./title.service";
 
 describe("TitleService", () => {
@@ -27,6 +28,7 @@ describe("TitleService", () => {
     removeStoredImage: jest.Mock;
     deleteStoredImage: jest.Mock;
   };
+  let voteStateMock: { readMany: jest.Mock };
 
   beforeEach(async () => {
     txMock = {
@@ -41,9 +43,12 @@ describe("TitleService", () => {
       deleteStoredImage: jest.fn(),
     };
 
+    voteStateMock = { readMany: jest.fn().mockResolvedValue(new Map()) };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TitleService,
+        { provide: VoteStateService, useValue: voteStateMock },
         {
           provide: PrismaService,
           useValue: {
@@ -415,6 +420,56 @@ describe("TitleService", () => {
       const result = await service.update("title-1", {} as never, "viewer-1");
 
       expect(result.engagement.viewer).not.toBeNull();
+    });
+
+    /**
+     * The cache is the truth about a vote, and the relation is a fallback for
+     * the pairs it has no answer for. Reading the relation when the cache does
+     * have one would show a vote the next click will contradict.
+     */
+    it("should prefer the cached vote over the relation", async () => {
+      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
+        ...titleRow,
+        reactions: [{ type: ReactionType.LIKE }],
+      });
+      voteStateMock.readMany.mockResolvedValue(new Map([["title-1", ReactionType.DISLIKE]]));
+
+      const result = await service.findOne("title-1", "viewer-1");
+
+      expect(result?.engagement.viewer?.reaction).toBe(ReactionType.DISLIKE);
+      expect(voteStateMock.readMany).toHaveBeenCalledWith([{ titleId: "title-1" }], "viewer-1");
+    });
+
+    /** A cached withdrawal is an answer, so it has to beat a row not yet flushed. */
+    it("should prefer a cached withdrawal over the relation", async () => {
+      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
+        ...titleRow,
+        reactions: [{ type: ReactionType.LIKE }],
+      });
+      voteStateMock.readMany.mockResolvedValue(new Map([["title-1", null]]));
+
+      const result = await service.findOne("title-1", "viewer-1");
+
+      expect(result?.engagement.viewer?.reaction).toBeNull();
+    });
+
+    it("should fall back to the relation for a pair the cache has no answer for", async () => {
+      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
+        ...titleRow,
+        reactions: [{ type: ReactionType.LIKE }],
+      });
+
+      const result = await service.findOne("title-1", "viewer-1");
+
+      expect(result?.engagement.viewer?.reaction).toBe(ReactionType.LIKE);
+    });
+
+    it("should not ask the cache for an anonymous read", async () => {
+      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(titleRow);
+
+      await service.findOne("title-1");
+
+      expect(voteStateMock.readMany).not.toHaveBeenCalled();
     });
 
     it("should answer null, not an empty viewer block, when there is no viewer", async () => {

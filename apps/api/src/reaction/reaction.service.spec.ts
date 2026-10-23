@@ -5,9 +5,9 @@ import { EngagementCountersService } from "../engagement/engagement-counters.ser
 import { PrismaService } from "../prisma/prisma.service";
 import { ReactionFlushScheduler } from "../reaction-flush/reaction-flush-scheduler.service";
 import { RedisUnavailableError } from "../redis/redis.error";
+import { VoteStateService } from "../vote-cache/vote-state.service";
 import { ReactionService } from "./reaction.service";
 import { commentTarget, titleTarget } from "./utils/reaction-target.const";
-import { VoteStateService } from "./vote-state.service";
 
 const { LIKE, DISLIKE } = ReactionType;
 

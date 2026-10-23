@@ -8,9 +8,9 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { ReactionFlushScheduler } from "../reaction-flush/reaction-flush-scheduler.service";
 import { RedisUnavailableError } from "../redis/redis.error";
+import { VoteStateService, VoteTransition } from "../vote-cache/vote-state.service";
 import { Vote, voteDelta } from "./utils/next-vote.util";
 import { ReactionTarget, reactionWhereUnique } from "./utils/reaction-target.const";
-import { VoteStateService, VoteTransition } from "./vote-state.service";
 
 export type ReactionClient = Pick<PrismaService, "reaction" | "engagementCounters" | "comment">;
 
