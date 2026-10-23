@@ -2,6 +2,7 @@ import { NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { ReactionType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { VoteStateService } from "../vote-cache/vote-state.service";
 import { TitleEngagementService } from "./title-engagement.service";
 
 function createClientMocks() {
@@ -72,7 +73,14 @@ describe("TitleEngagementService", () => {
     prismaMock = { ...createClientMocks(), $transaction: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [TitleEngagementService, { provide: PrismaService, useValue: prismaMock }],
+      providers: [
+        TitleEngagementService,
+        { provide: PrismaService, useValue: prismaMock },
+        {
+          provide: VoteStateService,
+          useValue: { readMany: jest.fn().mockResolvedValue(new Map()) },
+        },
+      ],
     }).compile();
 
     service = module.get(TitleEngagementService);

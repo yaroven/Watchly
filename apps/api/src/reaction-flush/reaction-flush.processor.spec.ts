@@ -3,7 +3,7 @@ import { ReactionType } from "@prisma/client";
 import { Job } from "bullmq";
 import { PrismaService } from "../prisma/prisma.service";
 import { ReactionService } from "../reaction/reaction.service";
-import { VoteStateService } from "../reaction/vote-state.service";
+import { VoteStateService } from "../vote-cache/vote-state.service";
 import { FlushVoteJob } from "./reaction-flush-queue.options";
 import { ReactionFlushProcessor } from "./reaction-flush.processor";
 

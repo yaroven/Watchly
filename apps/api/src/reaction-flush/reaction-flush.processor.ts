@@ -5,7 +5,7 @@ import logJobFailure from "../common/utils/log-job-failure.util";
 import { PrismaService } from "../prisma/prisma.service";
 import { ReactionService } from "../reaction/reaction.service";
 import { targetOf } from "../reaction/utils/reaction-target.const";
-import { VoteStateService } from "../reaction/vote-state.service";
+import { VoteStateService } from "../vote-cache/vote-state.service";
 import { FlushVoteJob, REACTION_FLUSH_QUEUE_NAME } from "./reaction-flush-queue.options";
 
 /**

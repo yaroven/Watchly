@@ -7,10 +7,13 @@ import {
 import { Role } from "@prisma/client";
 import { EngagementCountersService } from "../engagement/engagement-counters.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { commentTarget } from "../reaction/utils/reaction-target.const";
 import { ReportService } from "../report/report.service";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
 import assertTitleExists from "../title/utils/assert-title-exists.util";
+import { NO_VOTE_OVERRIDES, VoteOverrides } from "../vote-cache/vote-cache.const";
+import { VoteStateService } from "../vote-cache/vote-state.service";
 import { CommentSortMode, GetCommentsDto } from "./dto/request/get-comments.dto";
 import {
   CommentResponseDto,
@@ -35,6 +38,7 @@ export class CommentService {
     private readonly s3Service: S3Service,
     private readonly reportService: ReportService,
     private readonly counters: EngagementCountersService,
+    private readonly voteState: VoteStateService,
   ) {}
 
   private avatarUrl(user: { avatarKey: string | null }): string | null {
@@ -51,6 +55,20 @@ export class CommentService {
       ...options,
       authorAvatarUrl: this.avatarUrl(comment.user),
     });
+  }
+
+  /**
+   * The viewer's votes for every comment on the page, roots and previewed
+   * replies together, in one round trip. Empty for an anonymous read, which
+   * keeps `myReaction` out of a response that has no viewer to own it.
+   */
+  private votesFor(comments: { id: string }[], viewerId?: string): Promise<VoteOverrides> {
+    if (!viewerId) return Promise.resolve(NO_VOTE_OVERRIDES);
+
+    return this.voteState.readMany(
+      comments.map((comment) => commentTarget(comment.id)),
+      viewerId,
+    );
   }
 
   async findForSubject(
@@ -77,8 +95,10 @@ export class CommentService {
       this.findReplyPreviews(rootIds, viewerId, titleId),
     ])) as [CommentWithAuthor[], CommentWithAuthor[]];
 
+    const votes = await this.votesFor([...roots, ...replies], viewerId);
+
     const toDto = (comment: CommentWithAuthor, nested: CommentResponseDto[] = []) =>
-      this.toResponse(comment, { replies: nested });
+      this.toResponse(comment, { replies: nested, myReaction: votes.get(comment.id) });
 
     const repliesByParent = new Map<string, CommentResponseDto[]>();
     for (const reply of replies) {
@@ -161,7 +181,12 @@ export class CommentService {
       this.prisma.comment.count({ where }),
     ])) as [CommentWithAuthor[], number];
 
-    return { items: replies.map((reply) => this.toResponse(reply)), totalCount };
+    const votes = await this.votesFor(replies, viewerId);
+
+    return {
+      items: replies.map((reply) => this.toResponse(reply, { myReaction: votes.get(reply.id) })),
+      totalCount,
+    };
   }
 
   async report(commentId: string, userId: string, reason?: string): Promise<void> {

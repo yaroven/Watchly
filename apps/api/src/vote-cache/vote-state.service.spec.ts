@@ -1,9 +1,9 @@
 import { Test } from "@nestjs/testing";
 import { ReactionType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { titleTarget } from "../reaction/utils/reaction-target.const";
 import { RedisService } from "../redis/redis.service";
-import { titleTarget } from "./utils/reaction-target.const";
-import { VOTE_TTL_SECONDS } from "./utils/vote-cache.const";
+import { VOTE_TTL_SECONDS } from "./vote-cache.const";
 import { VoteStateService } from "./vote-state.service";
 
 const { LIKE, DISLIKE } = ReactionType;

@@ -1,6 +1,6 @@
 import { ReactionType } from "@prisma/client";
-import { Vote } from "./next-vote.util";
-import { arcOf, ReactionTarget, subjectIdOf } from "./reaction-target.const";
+import { Vote } from "../reaction/utils/next-vote.util";
+import { arcOf, ReactionTarget, subjectIdOf } from "../reaction/utils/reaction-target.const";
 
 /**
  * A week.
@@ -44,3 +44,14 @@ export const decodeVote = (raw: string | null): Vote | undefined => {
       return undefined;
   }
 };
+
+/**
+ * What the cache knows about one viewer across a page of subjects, keyed by
+ * subject id. A pair the cache had no answer for is **absent** rather than
+ * `null`, which is the distinction the whole thing turns on: `Map.get` yields
+ * `undefined` for it, and the caller falls back to the row it already loaded.
+ * A stored `N` lands as a present `null` and wins over that row.
+ */
+export type VoteOverrides = ReadonlyMap<string, Vote>;
+
+export const NO_VOTE_OVERRIDES: VoteOverrides = new Map();

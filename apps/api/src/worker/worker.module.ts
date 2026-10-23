@@ -36,6 +36,7 @@ import { HlsTranscoder } from "../video-transcoder/hls-transcoder.service";
 import { VIDEO_TRANSCODE_QUEUE_OPTIONS } from "../video-transcoder/video-transcode-queue.options";
 import { VideoTranscodeStateService } from "../video-transcoder/video-transcode-state.service";
 import { VideoTranscoderProcessor } from "../video-transcoder/video-transcoder-processor";
+import { VoteCacheModule } from "../vote-cache/vote-cache.module";
 
 /**
  * The whole of the worker process: `worker-main.ts` builds its context from
@@ -65,6 +66,7 @@ import { VideoTranscoderProcessor } from "../video-transcoder/video-transcoder-p
     PrismaModule,
     ReactionFlushModule,
     ReactionModule,
+    VoteCacheModule,
   ],
   providers: [
     // Mirrors cached votes onto the rows. Nothing to do with ffmpeg; it is

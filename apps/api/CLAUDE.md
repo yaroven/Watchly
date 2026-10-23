@@ -16,9 +16,9 @@ One directory per domain under `src/`, each with `*.module.ts`, `*.controller.ts
 `user` `watchlist`
 
 Infrastructure: `auth`, `prisma`, `redis`, `s3`, `s3-event`, `media-asset`, `poster`,
-`video-transcoder`, `reaction-flush`, `metrics`, `worker` (the worker process's root
-module, which belongs to no domain because it composes all of them), `config` (typed
-`registerAs` factories), `common` (pagination, shared DTOs, `utils/`).
+`video-transcoder`, `reaction-flush`, `vote-cache`, `metrics`, `worker` (the worker
+process's root module, which belongs to no domain because it composes all of them),
+`config` (typed `registerAs` factories), `common` (pagination, shared DTOs, `utils/`).
 
 Anything in a domain that is not a module, controller, service or DTO goes in that
 domain's `utils/` — Prisma query shapes (`*.query.ts`), existence guards
@@ -165,7 +165,8 @@ saving. Showing an upload as still processing is client work that has not been d
   left the request. A title's score, rating count and watchlist count stay on
   `TitleEngagement` — only a title has those.
 - **A viewer's vote is decided in Redis, counted in Postgres** (ADR-0016).
-  `VoteStateService` keeps one key per (subject, viewer) pair —
+  `VoteStateService` (in `vote-cache/`, its own module so a reader can depend on the
+  cache without pulling in the flush queue) keeps one key per (subject, viewer) pair —
   `vote:<arc>:<subjectId>:<userId>` = `L`/`D`/`N`, TTL 7d — and `nextVote` is the whole
   toggle, pure so a test reaches it without a server. Two things are load-bearing: a
   stored `N` means "holds no vote" while a **missing** key means "unknown" and re-reads
@@ -173,6 +174,14 @@ saving. Showing an upload as still processing is client work that has not been d
   withdraw), and **the cache is never asked for a count** — that is what lets it answer
   about one viewer without being complete. Go through `transition`; don't decide a
   toggle anywhere else.
+- **`myReaction` on a read comes from the cache; the counts beside it do not.** Reads
+  call `readMany` for the whole page in one `MGET` and pass what comes back into the
+  DTO, where a **present** entry wins over the `reactions` relation and an **absent**
+  one falls back to it. Both halves matter: the relation is what the last flush left
+  behind, so preferring it would render a vote the viewer's next click contradicts,
+  while a cache miss has a free and correct answer already loaded. `readMany` is also
+  the one place a Redis failure is swallowed — reads degrade to the relation, writes
+  refuse with a 503.
 - `RedisService` extends `ioredis` the way `PrismaService` extends `PrismaClient`, and
   runs with `enableOfflineQueue: false`: a command issued while the socket is down
   rejects instead of waiting for a reconnect, which is what lets a caller choose
@@ -280,7 +289,9 @@ saving. Showing an upload as still processing is client work that has not been d
   carries `viewer: { myReaction, inWatchlist } | null`, where `null` means _nobody was
   in scope_ (anonymous caller, or a server-side render). A viewer who simply has not
   voted is a non-null object. Collapsing those two makes the client render a confident
-  falsehood — and, on a toggle endpoint, undo the thing the user meant to keep.
+  falsehood — and, on a toggle endpoint, undo the thing the user meant to keep. The vote
+  cache does not touch this: `viewer` is decided by whether there was a viewer at all,
+  and an anonymous read never asks the cache anything.
 - Aggregate helpers (`summarizeMany` on ratings and engagement) return **one entry per
   requested id**. `groupBy` only answers for rows that exist, so densify before
   returning. Callers treat a map miss as a broken invariant and throw.
