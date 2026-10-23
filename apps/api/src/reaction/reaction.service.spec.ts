@@ -3,7 +3,8 @@ import { Test } from "@nestjs/testing";
 import { ReactionType } from "@prisma/client";
 import { EngagementCountersService } from "../engagement/engagement-counters.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { commentTarget, ReactionService, titleTarget } from "./reaction.service";
+import { ReactionService } from "./reaction.service";
+import { commentTarget, titleTarget } from "./utils/reaction-target.const";
 
 /**
  * The delegates both clients need. Two separate instances, never one shared
