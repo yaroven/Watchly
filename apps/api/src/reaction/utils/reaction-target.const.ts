@@ -11,9 +11,14 @@ export const titleTarget = (titleId: string): ReactionTarget => ({ titleId });
 
 export const commentTarget = (commentId: string): ReactionTarget => ({ commentId });
 
-/** The arc as one word, for a cache key. Nothing else reads it. */
-export const arcOf = (target: ReactionTarget): "title" | "comment" =>
+/** The arc as one word: a cache key, and a job payload that is not a Prisma shape. */
+export type ReactionArc = "title" | "comment";
+
+export const arcOf = (target: ReactionTarget): ReactionArc =>
   "titleId" in target ? "title" : "comment";
+
+export const targetOf = (arc: ReactionArc, subjectId: string): ReactionTarget =>
+  arc === "title" ? titleTarget(subjectId) : commentTarget(subjectId);
 
 export const subjectIdOf = (target: ReactionTarget): string =>
   "titleId" in target ? target.titleId : target.commentId;

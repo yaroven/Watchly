@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { ReactionType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { throughRedis } from "../redis/redis.error";
 import { RedisService } from "../redis/redis.service";
 import { nextVote, Vote } from "./utils/next-vote.util";
 import { ReactionTarget, reactionWhereUnique } from "./utils/reaction-target.const";
@@ -40,7 +41,9 @@ export class VoteStateService {
 
   /** The viewer's vote: from the cache when it has an answer, from the row when it doesn't. */
   async read(target: ReactionTarget, userId: string): Promise<Vote> {
-    const cached = decodeVote(await this.redis.get(voteKey(target, userId)));
+    const cached = decodeVote(
+      await throughRedis("read a vote", () => this.redis.get(voteKey(target, userId))),
+    );
 
     return cached === undefined ? this.hydrate(target, userId) : cached;
   }
@@ -64,7 +67,9 @@ export class VoteStateService {
   }
 
   private async write(target: ReactionTarget, userId: string, vote: Vote): Promise<void> {
-    await this.redis.set(voteKey(target, userId), encodeVote(vote), "EX", VOTE_TTL_SECONDS);
+    await throughRedis("write a vote", () =>
+      this.redis.set(voteKey(target, userId), encodeVote(vote), "EX", VOTE_TTL_SECONDS),
+    );
   }
 
   private async hydrate(target: ReactionTarget, userId: string): Promise<Vote> {

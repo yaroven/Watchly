@@ -26,6 +26,9 @@ import {
 } from "../poster/poster-image.attacher";
 import { PosterService } from "../poster/poster.service";
 import { PrismaModule } from "../prisma/prisma.module";
+import { ReactionFlushModule } from "../reaction-flush/reaction-flush.module";
+import { ReactionFlushProcessor } from "../reaction-flush/reaction-flush.processor";
+import { ReactionModule } from "../reaction/reaction.module";
 import { S3Module } from "../s3/s3.module";
 import { AvatarImageAttacher } from "../user-avatar/avatar-image.attacher";
 import { UserAvatarService } from "../user-avatar/user-avatar.service";
@@ -60,8 +63,13 @@ import { VideoTranscoderProcessor } from "../video-transcoder/video-transcoder-p
     BullModule.registerQueue(VIDEO_TRANSCODE_QUEUE_OPTIONS, IMAGE_TRANSCODE_QUEUE_OPTIONS),
     S3Module,
     PrismaModule,
+    ReactionFlushModule,
+    ReactionModule,
   ],
   providers: [
+    // Mirrors cached votes onto the rows. Nothing to do with ffmpeg; it is
+    // here because this is the process that works queues.
+    ReactionFlushProcessor,
     // The conversion half, which only this process has the ffmpeg binary for.
     HlsTranscoder,
     VideoTranscodeStateService,

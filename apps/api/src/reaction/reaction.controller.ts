@@ -14,6 +14,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiServiceUnavailableResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
@@ -32,7 +33,7 @@ export class ReactionController {
   @ApiOperation({
     summary: "Like or dislike anything that can carry a reaction",
     description:
-      "Sending the vote you already cast withdraws it; the other one switches sides. The counts in the response are the subject's own, recomputed by this call.",
+      "Sending the vote you already cast withdraws it; the other one switches sides. `myReaction` is exact. The counts are the subject's as of the last flush plus this call's own change, so the caller sees their own vote immediately and other viewers see it within a couple of seconds.",
   })
   @ApiParam({ name: "entityType", enum: REACTABLE_SEGMENTS })
   @ApiParam({ name: "entityId", format: "uuid" })
@@ -40,6 +41,7 @@ export class ReactionController {
   @ApiBadRequestResponse({ description: "Not a kind that can carry reactions" })
   @ApiUnauthorizedResponse({ description: "Not signed in" })
   @ApiNotFoundResponse({ description: "Subject not found" })
+  @ApiServiceUnavailableResponse({ description: "The vote cache is unreachable" })
   @Auth()
   @HttpCode(HttpStatus.OK)
   @Post(":entityType/:entityId")
@@ -62,6 +64,7 @@ export class ReactionController {
   @ApiBadRequestResponse({ description: "Not a kind that can carry reactions" })
   @ApiUnauthorizedResponse({ description: "Not signed in" })
   @ApiNotFoundResponse({ description: "Subject not found" })
+  @ApiServiceUnavailableResponse({ description: "The vote cache is unreachable" })
   @Auth()
   @Delete(":entityType/:entityId")
   async removeReaction(
