@@ -4,6 +4,8 @@ import { Queue } from "bullmq";
 import { arcOf, ReactionTarget, subjectIdOf } from "../reaction/utils/reaction-target.const";
 import { throughRedis } from "../redis/redis.error";
 import {
+  FLUSH_DEDUPLICATION,
+  flushDeduplicationId,
   FlushVoteJob,
   REACTION_FLUSH_JOB_NAME,
   REACTION_FLUSH_QUEUE_NAME,
@@ -18,9 +20,9 @@ export class ReactionFlushScheduler {
   /**
    * Says that a pair needs mirroring, without saying what it now holds.
    *
-   * The `jobId` is the pair, so a burst of clicks adds one job and the rest
-   * return it — the dedup window is the job's delay. The convention lives here
-   * rather than at the call site for the same reason `image-<rawKey>` does.
+   * Deduplicated on the pair, so a burst of clicks costs one write and the job
+   * reads the final state when it runs. The convention lives here rather than
+   * at the call site, for the same reason `image-<rawKey>` does.
    */
   async schedule(target: ReactionTarget, userId: string): Promise<void> {
     const arc = arcOf(target);
@@ -30,7 +32,12 @@ export class ReactionFlushScheduler {
       this.queue.add(
         REACTION_FLUSH_JOB_NAME,
         { arc, subjectId, userId },
-        { jobId: `vote-${arc}-${subjectId}-${userId}` },
+        {
+          deduplication: {
+            ...FLUSH_DEDUPLICATION,
+            id: flushDeduplicationId(arc, subjectId, userId),
+          },
+        },
       ),
     );
   }

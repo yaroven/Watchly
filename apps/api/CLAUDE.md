@@ -91,9 +91,12 @@ and sees neither a `Queue` nor a job name: `reaction`, `title`, `season`, `artis
 hold an `@InjectQueue` of its own, which meant `UserModule` — and `AuthModule` behind it
 — pulled a Redis queue in for a feature that only hands out an upload URL. `s3-event`
 maps the raw key's kind to an `ImageKind` the same way it maps one to a `VideoType`, and
-calls the producer; the `jobId` convention lives with the producer too, rather than
-once per feature — `image-<rawKey>`, and `vote-<arc>-<subjectId>-<userId>` for a flush,
-where it is also the dedup key that collapses a burst of clicks into one write.
+calls the producer; the dedup convention lives with the producer too, rather than once
+per feature — `image-<rawKey>` as a `jobId`, and `vote-<arc>-<subjectId>-<userId>` as a
+`deduplication.id` for a flush. **A flush must not set a `jobId`**: an explicit one is
+checked for existence before BullMQ's deduplication runs, so it silently drops a vote
+that arrives while the flush is being processed. `keepLastIfActive` is what makes that
+vote raise a follow-up job instead.
 
 The transcoding processors run in one worker process, beside
 `ReactionFlushProcessor` — `worker-main.ts` loads `WorkerModule`
