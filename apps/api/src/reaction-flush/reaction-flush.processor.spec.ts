@@ -17,15 +17,18 @@ describe("ReactionFlushProcessor", () => {
   const job = (data: FlushVoteJob) => ({ data }) as Job<FlushVoteJob>;
 
   let processor: ReactionFlushProcessor;
-  let prisma: { $transaction: jest.Mock };
+  let prisma: { $transaction: jest.Mock; reaction: { findUnique: jest.Mock } };
   let tx: object;
-  let voteState: { read: jest.Mock };
+  let voteState: { get: jest.Mock };
   let reactions: { applyAbsolute: jest.Mock };
 
   beforeEach(async () => {
     tx = { marker: "the transaction client" };
-    prisma = { $transaction: jest.fn((fn: (c: unknown) => unknown) => fn(tx)) };
-    voteState = { read: jest.fn().mockResolvedValue(LIKE) };
+    prisma = {
+      $transaction: jest.fn((fn: (c: unknown) => unknown) => fn(tx)),
+      reaction: { findUnique: jest.fn().mockResolvedValue(null) },
+    };
+    voteState = { get: jest.fn().mockResolvedValue(LIKE) };
     reactions = { applyAbsolute: jest.fn().mockResolvedValue(undefined) };
 
     const moduleRef = await Test.createTestingModule({
@@ -49,17 +52,42 @@ describe("ReactionFlushProcessor", () => {
   it("mirrors what the cache holds now, on the transaction's client", async () => {
     await processor.process(job({ arc: "title", subjectId: titleId, userId }));
 
-    expect(voteState.read).toHaveBeenCalledWith({ titleId }, userId);
+    expect(voteState.get).toHaveBeenCalledWith({ titleId }, userId);
     expect(prisma.$transaction).toHaveBeenCalled();
     expect(reactions.applyAbsolute).toHaveBeenCalledWith(tx, { titleId }, userId, LIKE);
   });
 
   it("rebuilds the comment arc from the job", async () => {
-    voteState.read.mockResolvedValue(null);
+    voteState.get.mockResolvedValue(null);
 
     await processor.process(job({ arc: "comment", subjectId: commentId, userId }));
 
     expect(reactions.applyAbsolute).toHaveBeenCalledWith(tx, { commentId }, userId, null);
+  });
+
+  /**
+   * The cache not knowing is not the same as the pair holding nothing. The row
+   * is already the answer in that case, so mirroring it onto itself costs a
+   * transaction and changes no rows — reading the cache as "no vote" would
+   * instead delete a vote nobody withdrew.
+   */
+  it("mirrors the row when the cache has no answer", async () => {
+    voteState.get.mockResolvedValue(undefined);
+    prisma.reaction.findUnique.mockResolvedValue({ type: LIKE });
+
+    await processor.process(job({ arc: "title", subjectId: titleId, userId }));
+
+    expect(prisma.reaction.findUnique).toHaveBeenCalledWith({
+      where: { titleId_userId: { titleId, userId } },
+      select: { type: true },
+    });
+    expect(reactions.applyAbsolute).toHaveBeenCalledWith(tx, { titleId }, userId, LIKE);
+  });
+
+  it("does not read a row when the cache answered", async () => {
+    await processor.process(job({ arc: "title", subjectId: titleId, userId }));
+
+    expect(prisma.reaction.findUnique).not.toHaveBeenCalled();
   });
 
   /** Swallowing here would lose the vote and leave the queue's counts looking clean. */
