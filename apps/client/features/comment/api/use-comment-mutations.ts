@@ -43,15 +43,15 @@ export const useReportComment = (options?: Omit<UseMutationOptions<void, Error, 
   });
 };
 
-export const useReactToComment = (
-  options?: Omit<UseMutationOptions<CommentReaction, Error, { commentId: string; type: ReactionType }>, "mutationFn">,
+export const useSetCommentReaction = (
+  options?: Omit<UseMutationOptions<CommentReaction, Error, { commentId: string; type: ReactionType | null }>, "mutationFn">,
 ) => {
   const queryClient = useQueryClient();
   const { viewerKey } = useViewer();
 
   return useMutation({
     ...options,
-    mutationFn: ({ commentId, type }: { commentId: string; type: ReactionType }) => commentService.react(commentId, type),
+    mutationFn: ({ commentId, type }: { commentId: string; type: ReactionType | null }) => commentService.setReaction(commentId, type),
     onSuccess: (result, variables, onMutateResult, context) => {
       // Scoped to the acting viewer: `result` carries their own `myReaction`, and a
       // bare prefix would write it into every other viewer's cached entry as well.

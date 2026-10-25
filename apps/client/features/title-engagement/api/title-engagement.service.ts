@@ -19,13 +19,10 @@ const TitleEngagementService = {
     return data;
   },
 
-  react: async (titleId: string, type: ReactionType): Promise<ReactionResult> => {
-    const { data } = await api.post<ReactionResult>(`/reactions/titles/${titleId}`, { type });
-    return data;
-  },
-
-  removeReaction: async (titleId: string): Promise<ReactionResult> => {
-    const { data } = await api.delete<ReactionResult>(`/reactions/titles/${titleId}`);
+  setReaction: async (titleId: string, vote: ReactionType | null): Promise<ReactionResult> => {
+    const { data } = vote
+      ? await api.put<ReactionResult>(`/reactions/titles/${titleId}`, { type: vote })
+      : await api.delete<ReactionResult>(`/reactions/titles/${titleId}`);
     return data;
   },
 
