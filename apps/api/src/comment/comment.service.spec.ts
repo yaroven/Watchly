@@ -3,15 +3,15 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { ReactionType, Role } from "@prisma/client";
 import { EngagementCountersService } from "../engagement/engagement-counters.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { ViewerVotesService } from "../reaction/viewer-votes.service";
 import { ReportService } from "../report/report.service";
 import { S3Service } from "../s3/s3.service";
+import { VoteStateService } from "../vote-cache/vote-state.service";
 import { CommentService } from "./comment.service";
 import { replySubject, titleSubject } from "./utils/comment-subject.const";
 
 describe("CommentService", () => {
   let service: CommentService;
-  let viewerVotesMock: { forPage: jest.Mock };
+  let voteStateMock: { forComments: jest.Mock };
   let prismaMock: jest.Mocked<PrismaService>;
   let txMock: {
     comment: {
@@ -62,12 +62,12 @@ describe("CommentService", () => {
       reaction: { deleteMany: jest.fn() },
     };
 
-    viewerVotesMock = { forPage: jest.fn().mockResolvedValue(new Map()) };
+    voteStateMock = { forComments: jest.fn().mockResolvedValue(new Map()) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CommentService,
-        { provide: ViewerVotesService, useValue: viewerVotesMock },
+        { provide: VoteStateService, useValue: voteStateMock },
         ReportService,
         EngagementCountersService,
         {
@@ -141,8 +141,7 @@ describe("CommentService", () => {
     describe("should nest replies under their parent", () => {
       it("if the page has any", async () => {
         const reply = { ...rootComment, id: "reply-1", parentId: commentId, text: "Agreed" };
-        // The counters are a relation now, so the reply count arrives on the
-        // root row rather than from a query of its own.
+
         mockPage(
           [{ ...rootComment, counters: { likes: 0, dislikes: 0, commentCount: 7 } }],
           [reply],
@@ -172,8 +171,6 @@ describe("CommentService", () => {
     });
 
     describe("should show the author's current score", () => {
-      // It rides along with the comment as a filtered relation on the author,
-      // rather than a lookup of our own keyed by user id.
       it("if they have rated the title", async () => {
         mockPage([{ ...rootComment, user: { ...author, ratings: [{ score: 8 }] } }]);
 
@@ -197,9 +194,7 @@ describe("CommentService", () => {
         });
       });
 
-      // A thread under something that has no scores must not ask for them.
       it("and not asking at all for a thread that is not a title's", async () => {
-        // The parent is itself a reply, so the thread hangs off a comment.
         (prismaMock.comment.findUnique as jest.Mock).mockResolvedValue({
           titleId: null,
           parentId: "root-1",
@@ -226,24 +221,15 @@ describe("CommentService", () => {
 
         expect(items[0].myReaction).toBeNull();
         expect(prismaMock.reaction.findMany).not.toHaveBeenCalled();
-        // Not reaching Redis for an anonymous read is pinned on
-        // ViewerVotesService; this owns passing the absent viewer on.
-        expect(viewerVotesMock.forPage).toHaveBeenCalledWith(
-          "comment",
-          expect.anything(),
-          undefined,
-        );
+
+        expect(voteStateMock.forComments).toHaveBeenCalledWith(expect.anything(), undefined);
       });
     });
 
     describe("should take the viewer's vote from the cache", () => {
-      /**
-       * The relation is what the last flush left behind, so preferring it would
-       * show a vote the viewer's next click contradicts.
-       */
       it("in preference to the relation the page loaded", async () => {
         mockPage();
-        viewerVotesMock.forPage.mockResolvedValue(new Map([[commentId, ReactionType.DISLIKE]]));
+        voteStateMock.forComments.mockResolvedValue(new Map([[commentId, ReactionType.DISLIKE]]));
 
         const { items } = await service.findForSubject(
           titleSubject(titleId),
@@ -259,7 +245,7 @@ describe("CommentService", () => {
 
         await service.findForSubject(titleSubject(titleId), { page: 1, limit: 10 }, "viewer-1");
 
-        expect(viewerVotesMock.forPage).toHaveBeenCalledTimes(1);
+        expect(voteStateMock.forComments).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -374,10 +360,6 @@ describe("CommentService", () => {
   });
 
   describe("the hottest sort", () => {
-    /**
-     * Raw SQL: the compiler cannot see a table name, so the rename that made
-     * reactions polymorphic would have shipped a broken join otherwise.
-     */
     it("should rank on the cached like counter, joined by the comment arc", async () => {
       await service.findForSubject(titleSubject(titleId), { sort: "hottest" });
 
@@ -388,7 +370,7 @@ describe("CommentService", () => {
       expect(query.sql).toContain('"EngagementCounters"');
       expect(query.sql).toContain('e."commentId" = c."id"');
       expect(query.sql).toContain('c."titleId"');
-      // The arc is a parameter, not interpolated text.
+
       expect(query.values).toContain(titleId);
     });
   });
@@ -420,11 +402,6 @@ describe("CommentService", () => {
     });
 
     describe("should let the database take the rest", () => {
-      /**
-       * Replies, reactions, reports and the counter rows hang off the comment
-       * by a foreign key, so deleting the row takes them. What does not follow
-       * is the parent's own comment count — a number, not a row.
-       */
       it("deleting the row and recomputing the parent's count", async () => {
         (prismaMock.comment.findUnique as jest.Mock).mockResolvedValue({
           userId,

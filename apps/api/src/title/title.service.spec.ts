@@ -5,10 +5,10 @@ import { FilterRule } from "../common/pagination/filter-rule.enum";
 import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { ViewerVotesService } from "../reaction/viewer-votes.service";
 import { S3Service } from "../s3/s3.service";
 import { SeasonService } from "../season/season.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
+import { VoteStateService } from "../vote-cache/vote-state.service";
 import { TitleService } from "./title.service";
 
 describe("TitleService", () => {
@@ -28,7 +28,7 @@ describe("TitleService", () => {
     removeStoredImage: jest.Mock;
     deleteStoredImage: jest.Mock;
   };
-  let viewerVotesMock: { forPage: jest.Mock };
+  let voteStateMock: { forTitles: jest.Mock };
 
   beforeEach(async () => {
     txMock = {
@@ -43,12 +43,12 @@ describe("TitleService", () => {
       deleteStoredImage: jest.fn(),
     };
 
-    viewerVotesMock = { forPage: jest.fn().mockResolvedValue(new Map()) };
+    voteStateMock = { forTitles: jest.fn().mockResolvedValue(new Map()) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TitleService,
-        { provide: ViewerVotesService, useValue: viewerVotesMock },
+        { provide: VoteStateService, useValue: voteStateMock },
         {
           provide: PrismaService,
           useValue: {
@@ -156,8 +156,7 @@ describe("TitleService", () => {
           description: "Desc",
           ageRating: AgeRating.AGE_0,
           country: "US",
-          // A Date, not a string: the pipe converts at the HTTP boundary, and a
-          // direct service call does not run it.
+
           releaseDate: new Date("2026-01-01"),
           language: "en",
           trailerUrl: "https://example.com/trailer.mp4",
@@ -422,35 +421,28 @@ describe("TitleService", () => {
       expect(result.engagement.viewer).not.toBeNull();
     });
 
-    /**
-     * The cache is the truth about a vote, and the relation is a fallback for
-     * the pairs it has no answer for. Reading the relation when the cache does
-     * have one would show a vote the next click will contradict.
-     */
     it("should prefer the cached vote over the relation", async () => {
       (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
         ...titleRow,
         reactions: [{ type: ReactionType.LIKE }],
       });
-      viewerVotesMock.forPage.mockResolvedValue(new Map([["title-1", ReactionType.DISLIKE]]));
+      voteStateMock.forTitles.mockResolvedValue(new Map([["title-1", ReactionType.DISLIKE]]));
 
       const result = await service.findOne("title-1", "viewer-1");
 
       expect(result?.engagement.viewer?.reaction).toBe(ReactionType.DISLIKE);
-      expect(viewerVotesMock.forPage).toHaveBeenCalledWith(
-        "title",
+      expect(voteStateMock.forTitles).toHaveBeenCalledWith(
         expect.arrayContaining([expect.objectContaining({ id: "title-1" })]),
         "viewer-1",
       );
     });
 
-    /** A cached withdrawal is an answer, so it has to beat a row not yet flushed. */
     it("should prefer a cached withdrawal over the relation", async () => {
       (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
         ...titleRow,
         reactions: [{ type: ReactionType.LIKE }],
       });
-      viewerVotesMock.forPage.mockResolvedValue(new Map([["title-1", null]]));
+      voteStateMock.forTitles.mockResolvedValue(new Map([["title-1", null]]));
 
       const result = await service.findOne("title-1", "viewer-1");
 
@@ -468,17 +460,12 @@ describe("TitleService", () => {
       expect(result?.engagement.viewer?.reaction).toBe(ReactionType.LIKE);
     });
 
-    /**
-     * Whether an anonymous read reaches Redis is `ViewerVotesService`'s
-     * business and is pinned there; what this owns is passing the viewer on
-     * honestly rather than defaulting it to something.
-     */
     it("should hand the absent viewer on rather than inventing one", async () => {
       (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(titleRow);
 
       await service.findOne("title-1");
 
-      expect(viewerVotesMock.forPage).toHaveBeenCalledWith("title", expect.anything(), null);
+      expect(voteStateMock.forTitles).toHaveBeenCalledWith(expect.anything(), null);
     });
 
     it("should answer null, not an empty viewer block, when there is no viewer", async () => {
@@ -490,17 +477,12 @@ describe("TitleService", () => {
       const { include } = (prismaServiceMock.title.findUnique as jest.Mock).mock.calls[0][0];
       expect(include).not.toHaveProperty("ratings");
       expect(include).not.toHaveProperty("watchlistEntries");
-      // The reaction is a row read now, and an anonymous read must not make it.
+
       expect(prismaServiceMock.reaction.findMany).not.toHaveBeenCalled();
     });
   });
 
   describe("a page answers for every title", () => {
-    /**
-     * Both cached rows are relations, so a page read loads them with the
-     * titles. A title that nothing has touched has neither row, and must read
-     * as zeroes rather than as a gap in the page.
-     */
     it("should read a title with no cached rows as zeroes, not as a gap", async () => {
       (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([
         {
@@ -783,11 +765,6 @@ describe("TitleService", () => {
     });
 
     describe("should let the database take the dependents", () => {
-      /**
-       * Comments, replies, reactions, reports and the counter rows all hang off
-       * the title by a foreign key now, so the row's deletion takes them. The
-       * cleanup this service still owns is the storage a DELETE cannot reach.
-       */
       it("deleting the row rather than clearing tables by hand", async () => {
         const title = {
           id: "title-1",

@@ -12,8 +12,10 @@ import { Auth } from "../auth/decorators/auth.decorator";
 import { CurrentUserId } from "../auth/decorators/current-user-id.decorator";
 import { ReactDto } from "./dto/request/react.dto";
 import { ReactionResultDto } from "./dto/response/reaction-result.dto";
+import { ReactionArc } from "./enums/reaction-arc.enum";
 import { REACTIONS, Reactions } from "./reaction.types";
-import { REACTABLE_SEGMENTS, ReactableArc, ReactableArcPipe } from "./utils/reactable-arc.pipe";
+import { ReactableArcPipe } from "./utils/reactable-arc.pipe";
+import { REACTABLE_SEGMENTS, targetOf } from "./utils/reaction-target.const";
 
 @ApiTags("reactions")
 @Controller("reactions")
@@ -34,12 +36,12 @@ export class ReactionController {
   @Auth()
   @Put(":entityType/:entityId")
   async setVote(
-    @Param("entityType", ReactableArcPipe) arc: ReactableArc,
+    @Param("entityType", ReactableArcPipe) arc: ReactionArc,
     @Param("entityId", ParseUUIDPipe) entityId: string,
     @Body() { type }: ReactDto,
     @CurrentUserId() userId: string,
   ): Promise<ReactionResultDto> {
-    const target = arc(entityId);
+    const target = targetOf(arc, entityId);
     await this.reactions.assertSubjectExists(target);
 
     return this.reactions.setVote(target, userId, type);
@@ -58,11 +60,11 @@ export class ReactionController {
   @Auth()
   @Delete(":entityType/:entityId")
   async clearVote(
-    @Param("entityType", ReactableArcPipe) arc: ReactableArc,
+    @Param("entityType", ReactableArcPipe) arc: ReactionArc,
     @Param("entityId", ParseUUIDPipe) entityId: string,
     @CurrentUserId() userId: string,
   ): Promise<ReactionResultDto> {
-    const target = arc(entityId);
+    const target = targetOf(arc, entityId);
     await this.reactions.assertSubjectExists(target);
 
     return this.reactions.clearVote(target, userId);

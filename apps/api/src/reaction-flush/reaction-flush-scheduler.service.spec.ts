@@ -1,5 +1,6 @@
 import { getQueueToken } from "@nestjs/bullmq";
 import { Test } from "@nestjs/testing";
+import { ReactionArc } from "../reaction/enums/reaction-arc.enum";
 import { commentTarget, titleTarget } from "../reaction/utils/reaction-target.const";
 import { RedisUnavailableError } from "../redis/redis.error";
 import { REACTION_FLUSH_JOB_NAME, REACTION_FLUSH_QUEUE_NAME } from "./reaction-flush-queue.options";
@@ -35,7 +36,7 @@ describe("ReactionFlushScheduler", () => {
 
     expect(queue.add).toHaveBeenCalledWith(
       REACTION_FLUSH_JOB_NAME,
-      { arc: "title", subjectId: titleId, userId },
+      { arc: ReactionArc.TITLE, subjectId: titleId, userId },
       expect.anything(),
     );
   });
@@ -45,7 +46,7 @@ describe("ReactionFlushScheduler", () => {
 
     expect(queue.add).toHaveBeenCalledWith(
       REACTION_FLUSH_JOB_NAME,
-      { arc: "comment", subjectId: commentId, userId },
+      { arc: ReactionArc.COMMENT, subjectId: commentId, userId },
       expect.anything(),
     );
   });
@@ -56,23 +57,12 @@ describe("ReactionFlushScheduler", () => {
     expect(optionsOf().deduplication.id).toBe(`vote-title-${titleId}-${userId}`);
   });
 
-  /**
-   * The bug this closes: a click that lands while the flush is mid-transaction
-   * has already missed the state read, and plain deduplication would drop it —
-   * the vote would reach Redis, never reach Postgres, and lose to the row a
-   * week later when the key expired. `keepLastIfActive` makes BullMQ raise a
-   * follow-up job instead.
-   */
   it("keeps a vote that arrives while the flush is running", async () => {
     await scheduler.schedule(titleTarget(titleId), userId);
 
     expect(optionsOf().deduplication.keepLastIfActive).toBe(true);
   });
 
-  /**
-   * An explicit `jobId` is checked for existence before deduplication runs, so
-   * setting one would short-circuit the handling above and bring the bug back.
-   */
   it("sets no jobId of its own", async () => {
     await scheduler.schedule(titleTarget(titleId), userId);
 

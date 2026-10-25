@@ -91,11 +91,6 @@ describe("CachedReactionService", () => {
       expect(direct.clearVote).not.toHaveBeenCalled();
     });
 
-    /**
-     * The order is the safety: a job that fires before the write mirrors the
-     * state already in place and does nothing, while a write with no job would
-     * sit in the cache, be read as real, and revert a week later.
-     */
     it("schedules the flush before writing the vote", async () => {
       await service.setVote(target, userId, LIKE);
 
@@ -131,7 +126,6 @@ describe("CachedReactionService", () => {
       });
     });
 
-    /** The same vote again moves nothing, which is what absolute means. */
     it("leaves the counts alone when the vote does not change", async () => {
       flushed(10, 4);
       voteState.set.mockResolvedValue(LIKE);
@@ -142,11 +136,6 @@ describe("CachedReactionService", () => {
       });
     });
 
-    /**
-     * `undefined` from the cache means it held nothing to displace, and by then
-     * it holds the new value — so the row is the only thing that knows what
-     * came before. It is wanted for this number and nothing else.
-     */
     it("reads the row for the previous vote when the cache displaced nothing", async () => {
       flushed(10, 4);
       voteState.set.mockResolvedValue(undefined);
@@ -167,7 +156,6 @@ describe("CachedReactionService", () => {
       expect(prisma.reaction.findUnique).not.toHaveBeenCalled();
     });
 
-    /** The two numbers come from different moments, so the subtraction can underflow. */
     it("never answers a negative count", async () => {
       flushed(0, 0);
       voteState.set.mockResolvedValue(LIKE);
@@ -208,11 +196,6 @@ describe("CachedReactionService", () => {
       expect(voteState.set).not.toHaveBeenCalled();
     });
 
-    /**
-     * Leaving the key absent is what makes the fallback safe: absent means
-     * "unknown", so the next read goes to the row this just wrote. Writing a
-     * guess into the cache is what would make the two disagree.
-     */
     it("does not guess at the cache on the way out", async () => {
       voteState.set.mockRejectedValue(down);
 
@@ -234,7 +217,6 @@ describe("CachedReactionService", () => {
       expect(prisma.engagementCounters.findUnique).not.toHaveBeenCalled();
     });
 
-    /** Only Redis falls back. A broken row read is a bug, and must not be dressed up. */
     it("lets any other failure through untouched", async () => {
       voteState.set.mockRejectedValue(new Error("the database fell over"));
 

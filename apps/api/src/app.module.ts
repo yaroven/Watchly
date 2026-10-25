@@ -112,12 +112,7 @@ import { WatchlistModule } from "./watchlist/watchlist.module";
   controllers: [AppController, MetricsController],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
-    // Queue depth is a property of Redis, not of a process, so the api reads
-    // the same numbers the worker would. It lives here because this is the
-    // process that serves /metrics.
-    //
-    // In prod the api runs two replicas and both publish these series, so
-    // aggregate with `max by (queue, state)` rather than summing.
+
     {
       provide: METRICS_QUEUES,
       inject: [

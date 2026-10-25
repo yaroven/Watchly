@@ -83,12 +83,6 @@ export class TitleEngagementDto {
     return new TitleEngagementDto(NO_ENGAGEMENT, viewer);
   }
 
-  /**
-   * The block is two cached rows, both relations: the title-only one and the
-   * shared counters every subject has. A title with neither reads as zeroes,
-   * which is the truth — the rows are written the first time something is
-   * counted.
-   */
   static fromRelations(
     rows: EngagementRelations,
     viewerId: string | null,

@@ -39,18 +39,12 @@ describe("VoteStateService", () => {
       await expect(service.get(target, userId)).resolves.toBe(LIKE);
     });
 
-    /** `N` is a stored answer, and it has to be distinguishable from a miss. */
     it("reads a stored no-vote as no vote", async () => {
       redis.get.mockResolvedValue("N");
 
       await expect(service.get(target, userId)).resolves.toBeNull();
     });
 
-    /**
-     * The cache says it does not know and stops there. Covering for the miss
-     * by reading a row is the caller's business, because the three callers want
-     * three different things from not knowing.
-     */
     it("answers undefined for a missing key, without reaching for a row", async () => {
       await expect(service.get(target, userId)).resolves.toBeUndefined();
     });
@@ -63,10 +57,6 @@ describe("VoteStateService", () => {
   });
 
   describe("set", () => {
-    /**
-     * The point of an absolute write: the value stored owes nothing to the
-     * value read, so two clicks cannot race over a decision neither makes.
-     */
     it("writes the vote it was given whatever was there before", async () => {
       redis.set.mockResolvedValue("D");
 
@@ -100,39 +90,49 @@ describe("VoteStateService", () => {
     });
   });
 
-  describe("readMany", () => {
+  describe("forTitles", () => {
     it("asks for the whole page in one call", async () => {
       redis.mget.mockResolvedValue(["L", "N"]);
 
-      const votes = await service.readMany([target, titleTarget("other")], userId);
+      const votes = await service.forTitles([{ id: titleId }, { id: "other" }], userId);
 
       expect(redis.mget).toHaveBeenCalledWith([key, `vote:title:other:${userId}`]);
       expect(votes.get(titleId)).toBe(LIKE);
       expect(votes.get("other")).toBeNull();
     });
 
-    /**
-     * A miss is left out rather than stored as null, so `Map.get` yields
-     * undefined for it and the caller falls back to the row it already loaded.
-     */
+    it("keys a comment on its own arc", async () => {
+      redis.mget.mockResolvedValue(["L"]);
+
+      await service.forComments([{ id: "c1" }], userId);
+
+      expect(redis.mget).toHaveBeenCalledWith([`vote:comment:c1:${userId}`]);
+    });
+
     it("leaves a pair the cache cannot answer for out of the map", async () => {
       redis.mget.mockResolvedValue([null]);
 
-      const votes = await service.readMany([target], userId);
+      const votes = await service.forTitles([{ id: titleId }], userId);
 
       expect(votes.has(titleId)).toBe(false);
     });
 
     it("asks nothing for an empty page", async () => {
-      await expect(service.readMany([], userId)).resolves.toEqual(new Map());
+      await expect(service.forTitles([], userId)).resolves.toEqual(new Map());
       expect(redis.mget).not.toHaveBeenCalled();
     });
 
-    /** Reads degrade; only writes are allowed to notice Redis is gone. */
+    it.each([[null], [undefined]])("asks nothing when the viewer is %p", async (viewerId) => {
+      const votes = await service.forTitles([{ id: titleId }], viewerId);
+
+      expect(redis.mget).not.toHaveBeenCalled();
+      expect(votes.size).toBe(0);
+    });
+
     it("falls back to an empty answer when redis is unreachable", async () => {
       redis.mget.mockRejectedValue(new Error("redis is down"));
 
-      await expect(service.readMany([target], userId)).resolves.toEqual(new Map());
+      await expect(service.forTitles([{ id: titleId }], userId)).resolves.toEqual(new Map());
     });
   });
 });
