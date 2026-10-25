@@ -180,7 +180,12 @@ saving. Showing an upload as still processing is client work that has not been d
   `EngagementCountersService` is the only writer, and it recomputes on the caller's
   client so the counters commit with the rows they summarise — for reactions that
   caller is now `ReactionFlushProcessor`, which is where the `groupBy` went when it
-  left the request. A title's score, rating count and watchlist count stay on
+  left the request. The one change that would need an exception to "only writer" is
+  moving the nightly reconciliation into a single
+  `UPDATE … FROM (SELECT … GROUP BY …)`, which ADR-0016 costs out as the answer once
+  the number of **subjects** outgrows a map in the worker. Write the exception down if
+  that day comes; don't let a second writer appear quietly. A title's score, rating
+  count and watchlist count stay on
   `TitleEngagement` — only a title has those.
 - **A viewer's vote is decided in Redis, counted in Postgres** (ADR-0016).
   `VoteStateService` (in `vote-cache/`, its own module so a reader can depend on the
