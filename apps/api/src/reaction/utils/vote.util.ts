@@ -1,19 +1,14 @@
 import { ReactionType } from "@prisma/client";
 
-/** A vote, or its absence. `null` is "holds no vote", never "unknown". */
-export type Vote = ReactionType | null;
-
 /**
- * The whole of the toggle: casting the vote you already hold withdraws it,
- * casting the other one switches sides, casting one you hold neither of sets it.
+ * A vote, or its absence. `null` is "holds no vote", never "unknown".
  *
- * Pure on purpose. Deciding the transition is the only part of reacting that is
- * a decision rather than a write, so it is the part worth pinning with a test
- * that needs neither Redis nor a database — and keeping it here is what lets
- * the cache stay thin enough to have nothing of its own to test.
+ * A request names one of these outright — it does not ask for a toggle — so
+ * nothing in the write path has to work out what the viewer held in order to
+ * know what they want. That is what keeps a stale read from producing the wrong
+ * answer: there is no decision for it to get wrong.
  */
-export const nextVote = (current: Vote, requested: ReactionType): Vote =>
-  current === requested ? null : requested;
+export type Vote = ReactionType | null;
 
 export interface VoteDelta {
   likes: number;

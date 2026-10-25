@@ -153,11 +153,16 @@ saving. Showing an upload as still processing is client work that has not been d
   widened CHECK, a backfill — not an enum value. The CHECKs are hand-written SQL that
   `prisma migrate diff` does not manage; they are listed in `docs/DOMAIN.md` beside the
   trigram index.
-- **Reacting is one route pair for everything**: `POST|DELETE /reactions/:entityType/:entityId`
-  (`titles`, `comments`). Don't add a per-feature reaction route — casting a vote
-  belongs to `ReactionService.vote`/`unvote`, which still own it end to end. What
-  changed under them (ADR-0016) is that the toggle is decided in the cache and the
-  recount happens in the flush processor, so neither is a job split between services.
+- **Reacting is one route pair for everything**:
+  `PUT|DELETE /reactions/:entityType/:entityId` (`titles`, `comments`). Don't add a
+  per-feature reaction route — casting a vote belongs to
+  `ReactionService.setVote`/`clearVote`, which own it end to end.
+- **A reaction is absolute, never a toggle** (ADR-0016). The request names the vote the
+  viewer wants to hold; sending the same one twice changes nothing the second time, and
+  `DELETE` withdraws whether or not there was anything to withdraw. The reason is not
+  REST tidiness: a toggle makes the _server_ decide, which means it has to read what
+  the viewer holds before it can know what they want — and then every stale or missing
+  read turns into a wrong write. Don't reintroduce a route that infers intent.
 - **Likes, dislikes and comment counts are read as a relation, never aggregated.**
   `EngagementCountersService` is the only writer, and it recomputes on the caller's
   client so the counters commit with the rows they summarise — for reactions that
@@ -167,13 +172,12 @@ saving. Showing an upload as still processing is client work that has not been d
 - **A viewer's vote is decided in Redis, counted in Postgres** (ADR-0016).
   `VoteStateService` (in `vote-cache/`, its own module so a reader can depend on the
   cache without pulling in the flush queue) keeps one key per (subject, viewer) pair —
-  `vote:<arc>:<subjectId>:<userId>` = `L`/`D`/`N`, TTL 7d — and `nextVote` is the whole
-  toggle, pure so a test reaches it without a server. Two things are load-bearing: a
-  stored `N` means "holds no vote" while a **missing** key means "unknown" and re-reads
-  the row (deciding a toggle from a cold cache re-casts the vote the viewer came to
-  withdraw), and **the cache is never asked for a count** — that is what lets it answer
-  about one viewer without being complete. Go through `transition`; don't decide a
-  toggle anywhere else.
+  `vote:<arc>:<subjectId>:<userId>` = `L`/`D`/`N`, TTL 7d. `set` writes one with
+  `SET … GET`: unconditional, one round trip, and the displaced value comes back to
+  correct the counts in the response. Two things are load-bearing: a stored `N` means
+  "holds no vote" while a **missing** key means "unknown" and sends the caller to the
+  row, and **the cache is never asked for a count** — that is what lets it answer about
+  one viewer without ever being complete.
 - **`myReaction` on a read comes from the cache; the counts beside it do not.** Reads
   call `readMany` for the whole page in one `MGET` and pass what comes back into the
   DTO, where a **present** entry wins over the `reactions` relation and an **absent**

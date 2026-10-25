@@ -1,6 +1,6 @@
 import { ReactionType } from "@prisma/client";
-import { Vote } from "../reaction/utils/next-vote.util";
 import { arcOf, ReactionTarget, subjectIdOf } from "../reaction/utils/reaction-target.const";
+import { Vote } from "../reaction/utils/vote.util";
 
 /**
  * A week.

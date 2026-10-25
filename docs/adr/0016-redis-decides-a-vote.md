@@ -1,14 +1,23 @@
-# ADR-0016 — Redis decides a vote, Postgres counts it
+# ADR-0016 — Reactions are absolute, Redis holds them, Postgres counts them
 
-**Status:** accepted. Narrows ADR-0014: `ReactionService.vote` / `unvote` keep the
-route pair and the response shape, but the toggle is no longer decided in the
-transaction that writes it.
+**Status:** accepted. Supersedes the toggle half of ADR-0014: the route pair and the
+response shape survive, but reacting is no longer a toggle and no longer resolved in
+the transaction that writes it.
 
 ## Context
 
-Reacting was one synchronous transaction: toggle the `Reaction` row, `groupBy` every
-reaction on the subject, write `EngagementCounters`, answer with the result. It worked,
-and it still would.
+Reacting was one synchronous transaction and a toggle: `POST` with a vote meant "cast
+this, or withdraw it if it is what I already hold", resolved by reading the row,
+followed by a `groupBy` over every reaction on the subject and a write of
+`EngagementCounters`. It worked, and it still would.
+
+The toggle is the part worth dwelling on, because every correctness problem in the
+first draft of this design traced back to it. A toggle makes the server *decide*: it
+has to know what the viewer holds before it can know what they want. That turns every
+stale or missing read into a wrong write — a cold cache withdrawing a vote the viewer
+was casting, a fallback path deciding from a row that a pending flush had not reached
+yet. None of those are bugs in the cache; they are bugs in asking the server a question
+it has to look up the answer to.
 
 What prompted the change was not load. The client has never called
 `POST|DELETE /reactions/:entityType/:entityId` — `StreamFilmInfo.tsx` and
@@ -28,9 +37,10 @@ Two options were rejected on their merits rather than on cost:
 
 - **HyperLogLog for "who liked"**, which was the original sketch. It estimates
   cardinality; it has no membership test and no deletion, so it can answer neither
-  "what do I hold" nor "withdraw it". It would have made the toggle and `myReaction`
-  unimplementable, and the ±0.81% error would have made the count it *can* give unfit
-  for a column. Nothing in the delivered design needs an approximate count.
+  "what do I hold" nor "withdraw it". It would have made `myReaction` unimplementable
+  and, back when reacting was a toggle, the toggle too; the ±0.81% error would have
+  made the count it *can* give unfit for a column. Nothing in the delivered design
+  needs an approximate count.
 - **A set of voters per subject** (`SADD` / `SCARD`), which does answer membership
   exactly and gives the count for free. Rejected once the count stayed in Postgres:
   the question being asked is always about *one* viewer, and a set makes answering it
@@ -55,19 +65,21 @@ controller.
 Three properties carry the design:
 
 - **`N` is a stored answer.** "Holds no vote" and "this cache has not been asked" must
-  not look alike. A missing key sends the caller to the row and writes back what it
-  finds; `N` answers on its own. Without it, the first click after a Redis restart
-  re-casts the vote the viewer meant to withdraw and answers 200 having changed
-  nothing.
+  not look alike: a missing key sends the caller to the row, `N` answers on its own.
+  With a toggle this was load-bearing for correctness — without it the first click
+  after a Redis restart re-cast the vote the viewer meant to withdraw and answered 200
+  having changed nothing. Absolute writes removed that failure, and the distinction
+  still decides what a flush mirrors and what a page renders.
 - **A miss is cheap and a flush is not needed to recover from one.** The pair's row is
   found through the unique index that already exists (`@@unique([titleId, userId])`),
   so the fallback is one `findUnique`, not a repair job.
-- **The transition is a pure function.** `nextVote(current, requested)` is the whole
-  toggle, and it is tested without a server. The read-then-write around it is not
-  atomic: the only racers are one viewer against themselves on one subject, and the
-  flush mirrors whatever Redis ends up holding, so the worst case is that one of two
-  clicks milliseconds apart does not count. A Lua script would close that window at
-  the price of moving the decision somewhere a unit test cannot reach.
+- **Nothing decides anything.** `PUT /reactions/:entityType/:entityId` carries the
+  vote the viewer wants to hold and `DELETE` carries none; the client already knows
+  what it is displaying, so it is the one place where the intended end state is known
+  without a lookup. `set` writes it with `SET … GET` — one round trip, unconditional,
+  and the old value comes back for free to correct the counts in the response. Two
+  concurrent writes mean the later one wins, which is what they should mean, so there
+  is no read-decide-write left to race over and no Lua script needed to protect one.
 
 ## Consequences
 
@@ -82,6 +94,13 @@ Three properties carry the design:
   503 when Redis is unreachable — fail-closed on the write, because accepting a vote
   there is nowhere to put is worse than refusing it. Reads degrade instead: they fall
   back to the viewer's row.
+- **Sending the same vote twice is not an undo.** That is the one behaviour change a
+  client can see, and it is the point: the previous contract made the second of two
+  identical requests — a double click, a retry after a timeout — mean the opposite of
+  the first. `PUT` and `DELETE` are both idempotent now, so a retry is safe.
+- **The client owns the decision, and that is the right place for it.** It renders the
+  heart; it knows whether tapping it means "like" or "stop liking". The server knowing
+  better required it to read state it might not have.
 - **The counts a response carries are the last flushed ones plus this request's own
   delta.** `myReaction` is exact. Other viewers see the new count after the flush.
   `ReactionResultDto` did not change shape, but "recomputed by this call" stopped being

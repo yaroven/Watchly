@@ -5,7 +5,7 @@ import {
   EngagementCounts,
   NO_COUNTS,
 } from "../../../engagement/engagement-counters.service";
-import { Vote } from "../../../reaction/utils/next-vote.util";
+import { Vote } from "../../../reaction/utils/vote.util";
 import { EngagementRelations } from "../../utils/title.query";
 
 export interface TitleEngagementCounts extends EngagementCounts {

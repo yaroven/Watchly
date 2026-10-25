@@ -6,7 +6,7 @@ import {
   HttpStatus,
   Param,
   ParseUUIDPipe,
-  Post,
+  Put,
 } from "@nestjs/common";
 import {
   ApiBadRequestResponse,
@@ -31,9 +31,9 @@ export class ReactionController {
   constructor(private readonly reactionService: ReactionService) {}
 
   @ApiOperation({
-    summary: "Like or dislike anything that can carry a reaction",
+    summary: "Set your vote on anything that can carry a reaction",
     description:
-      "Sending the vote you already cast withdraws it; the other one switches sides. `myReaction` is exact. The counts are the subject's as of the last flush plus this call's own change, so the caller sees their own vote immediately and other viewers see it within a couple of seconds.",
+      "Absolute, not a toggle: the vote you send is the vote you end up holding, and sending the same one twice changes nothing the second time. Withdraw with DELETE. `myReaction` is exact; the counts are the subject's as of the last flush plus this call's own change, so the caller sees their own vote immediately and other viewers see it within a couple of seconds.",
   })
   @ApiParam({ name: "entityType", enum: REACTABLE_SEGMENTS })
   @ApiParam({ name: "entityId", format: "uuid" })
@@ -44,8 +44,8 @@ export class ReactionController {
   @ApiServiceUnavailableResponse({ description: "The vote cache is unreachable" })
   @Auth()
   @HttpCode(HttpStatus.OK)
-  @Post(":entityType/:entityId")
-  async react(
+  @Put(":entityType/:entityId")
+  async setVote(
     @Param("entityType", ReactableArcPipe) arc: ReactableArc,
     @Param("entityId", ParseUUIDPipe) entityId: string,
     @Body() { type }: ReactDto,
@@ -54,10 +54,13 @@ export class ReactionController {
     const target = arc(entityId);
     await this.reactionService.assertSubjectExists(target);
 
-    return this.reactionService.vote(target, userId, type);
+    return this.reactionService.setVote(target, userId, type);
   }
 
-  @ApiOperation({ summary: "Withdraw your vote" })
+  @ApiOperation({
+    summary: "Withdraw your vote",
+    description: "Idempotent: withdrawing a vote you do not hold is not an error.",
+  })
   @ApiParam({ name: "entityType", enum: REACTABLE_SEGMENTS })
   @ApiParam({ name: "entityId", format: "uuid" })
   @ApiOkResponse({ type: ReactionResultDto })
@@ -67,7 +70,7 @@ export class ReactionController {
   @ApiServiceUnavailableResponse({ description: "The vote cache is unreachable" })
   @Auth()
   @Delete(":entityType/:entityId")
-  async removeReaction(
+  async clearVote(
     @Param("entityType", ReactableArcPipe) arc: ReactableArc,
     @Param("entityId", ParseUUIDPipe) entityId: string,
     @CurrentUserId() userId: string,
@@ -75,6 +78,6 @@ export class ReactionController {
     const target = arc(entityId);
     await this.reactionService.assertSubjectExists(target);
 
-    return this.reactionService.unvote(target, userId);
+    return this.reactionService.clearVote(target, userId);
   }
 }

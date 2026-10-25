@@ -1,24 +1,7 @@
 import { ReactionType } from "@prisma/client";
-import { nextVote, voteDelta } from "./next-vote.util";
+import { voteDelta } from "./vote.util";
 
 const { LIKE, DISLIKE } = ReactionType;
-
-describe("nextVote", () => {
-  it("withdraws the vote the viewer already holds", () => {
-    expect(nextVote(LIKE, LIKE)).toBeNull();
-    expect(nextVote(DISLIKE, DISLIKE)).toBeNull();
-  });
-
-  it("switches sides when the other vote is cast", () => {
-    expect(nextVote(LIKE, DISLIKE)).toBe(DISLIKE);
-    expect(nextVote(DISLIKE, LIKE)).toBe(LIKE);
-  });
-
-  it("sets the vote when the viewer holds none", () => {
-    expect(nextVote(null, LIKE)).toBe(LIKE);
-    expect(nextVote(null, DISLIKE)).toBe(DISLIKE);
-  });
-});
 
 describe("voteDelta", () => {
   it("counts a new vote on its own side only", () => {
