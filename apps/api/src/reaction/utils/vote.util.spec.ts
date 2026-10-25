@@ -1,5 +1,5 @@
 import { ReactionType } from "@prisma/client";
-import { voteDelta } from "./vote.util";
+import { resolveVote, voteDelta } from "./vote.util";
 
 const { LIKE, DISLIKE } = ReactionType;
 
@@ -23,5 +23,21 @@ describe("voteDelta", () => {
   it("is zero when nothing moved", () => {
     expect(voteDelta(null, null)).toEqual({ likes: 0, dislikes: 0 });
     expect(voteDelta(LIKE, LIKE)).toEqual({ likes: 0, dislikes: 0 });
+  });
+});
+
+describe("resolveVote", () => {
+  it("takes the cache's answer over the row", () => {
+    expect(resolveVote(DISLIKE, LIKE)).toBe(DISLIKE);
+  });
+
+  /** A stored withdrawal is an answer, and has to beat a row not yet flushed. */
+  it("takes a cached withdrawal over the row", () => {
+    expect(resolveVote(null, LIKE)).toBeNull();
+  });
+
+  it("falls back to the row when the cache has no answer", () => {
+    expect(resolveVote(undefined, LIKE)).toBe(LIKE);
+    expect(resolveVote(undefined, null)).toBeNull();
   });
 });

@@ -1,9 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
-import { titleTarget } from "../reaction/utils/reaction-target.const";
-import { NO_VOTE_OVERRIDES } from "../vote-cache/vote-cache.const";
-import { VoteStateService } from "../vote-cache/vote-state.service";
+import { ViewerVotesService } from "../reaction/viewer-votes.service";
 import { TitleEngagementDto } from "./dto/response/title-engagement.dto";
 import titleQuery, { EngagementRelations } from "./utils/title.query";
 
@@ -16,7 +14,7 @@ export type EngagementClient = Pick<
 export class TitleEngagementService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly voteState: VoteStateService,
+    private readonly viewerVotes: ViewerVotesService,
   ) {}
 
   async rate(titleId: string, userId: string, score: number): Promise<TitleEngagementDto> {
@@ -60,9 +58,7 @@ export class TitleEngagementService {
 
     if (!rows) throw new NotFoundException(`Title with id ${titleId} not found`);
 
-    const votes = viewerId
-      ? await this.voteState.readMany([titleTarget(titleId)], viewerId)
-      : NO_VOTE_OVERRIDES;
+    const votes = await this.viewerVotes.forPage("title", [{ id: titleId }], viewerId);
 
     return TitleEngagementDto.fromRelations(rows, viewerId, votes.get(titleId));
   }

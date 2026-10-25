@@ -7,12 +7,11 @@ import { settleAllOrLog } from "../common/utils/settle-all-or-throw.util";
 import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { titleTarget } from "../reaction/utils/reaction-target.const";
+import { ViewerVotesService } from "../reaction/viewer-votes.service";
 import { buildVideoPrefix } from "../s3/processed-key";
 import { SeasonService } from "../season/season.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
 import { NO_VOTE_OVERRIDES, VoteOverrides } from "../vote-cache/vote-cache.const";
-import { VoteStateService } from "../vote-cache/vote-state.service";
 import { CreateTitleDto } from "./dto/request/create-title.dto";
 import { GetAllTitleDto } from "./dto/request/get-all-title.dto";
 import { UpdateTitleDto } from "./dto/request/update-title.dto";
@@ -31,7 +30,7 @@ export class TitleService {
     private readonly posterService: PosterService,
     private readonly seasonService: SeasonService,
     private readonly mediaAssetService: MediaAssetService,
-    private readonly voteState: VoteStateService,
+    private readonly viewerVotes: ViewerVotesService,
   ) {}
 
   async create({ genreIds, ...rest }: CreateTitleDto): Promise<TitleResponseDto> {
@@ -71,7 +70,7 @@ export class TitleService {
       extra: { include: titleQuery.withEngagement(viewerId ?? null) },
     });
 
-    const votes = await this.votesFor(items, viewerId ?? null);
+    const votes = await this.viewerVotes.forPage("title", items, viewerId ?? null);
 
     return {
       items: items.map((title) => this.toResponse(title, viewerId ?? null, votes)),
@@ -86,7 +85,11 @@ export class TitleService {
     })) as TitleWithEngagement | null;
     if (!title) return null;
 
-    return this.toResponse(title, viewerId ?? null, await this.votesFor([title], viewerId ?? null));
+    return this.toResponse(
+      title,
+      viewerId ?? null,
+      await this.viewerVotes.forPage("title", [title], viewerId ?? null),
+    );
   }
 
   async update(
@@ -118,7 +121,7 @@ export class TitleService {
       return this.toResponse(
         updated,
         viewerId ?? null,
-        await this.votesFor([updated], viewerId ?? null),
+        await this.viewerVotes.forPage("title", [updated], viewerId ?? null),
       );
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
@@ -172,23 +175,9 @@ export class TitleService {
       include: titleQuery.withEngagement(viewerId),
     })) as TitleWithEngagement[];
 
-    const votes = await this.votesFor(titles, viewerId);
+    const votes = await this.viewerVotes.forPage("title", titles, viewerId);
 
     return titles.map((title) => this.toResponse(title, viewerId, votes));
-  }
-
-  /**
-   * The viewer's votes for a page of titles. Empty for an anonymous read, which
-   * keeps `viewer: null` meaning "nobody was in scope" rather than becoming a
-   * thing the cache has an opinion about.
-   */
-  private votesFor(titles: { id: string }[], viewerId: string | null): Promise<VoteOverrides> {
-    if (!viewerId) return Promise.resolve(NO_VOTE_OVERRIDES);
-
-    return this.voteState.readMany(
-      titles.map((title) => titleTarget(title.id)),
-      viewerId,
-    );
   }
 
   private toResponse(

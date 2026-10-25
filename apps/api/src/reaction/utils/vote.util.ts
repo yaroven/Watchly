@@ -29,3 +29,15 @@ export const voteDelta = (previous: Vote, next: Vote): VoteDelta => ({
 });
 
 const held = (vote: Vote, type: ReactionType): number => (vote === type ? 1 : 0);
+
+/**
+ * Which answer about a viewer's vote wins.
+ *
+ * The cache is the truth, and `undefined` is it saying it has none — in which
+ * case the `reactions` relation the read already loaded is the answer, free and
+ * correct as of the last flush. Written out once because getting it backwards
+ * is silent: preferring the relation renders a vote the viewer's next request
+ * contradicts, and no test of a read path would notice.
+ */
+export const resolveVote = (cached: Vote | undefined, fromRow: Vote): Vote =>
+  cached === undefined ? fromRow : cached;

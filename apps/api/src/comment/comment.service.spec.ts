@@ -3,15 +3,15 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { ReactionType, Role } from "@prisma/client";
 import { EngagementCountersService } from "../engagement/engagement-counters.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { ViewerVotesService } from "../reaction/viewer-votes.service";
 import { ReportService } from "../report/report.service";
 import { S3Service } from "../s3/s3.service";
-import { VoteStateService } from "../vote-cache/vote-state.service";
 import { CommentService } from "./comment.service";
 import { replySubject, titleSubject } from "./utils/comment-subject.const";
 
 describe("CommentService", () => {
   let service: CommentService;
-  let voteStateMock: { readMany: jest.Mock };
+  let viewerVotesMock: { forPage: jest.Mock };
   let prismaMock: jest.Mocked<PrismaService>;
   let txMock: {
     comment: {
@@ -62,12 +62,12 @@ describe("CommentService", () => {
       reaction: { deleteMany: jest.fn() },
     };
 
-    voteStateMock = { readMany: jest.fn().mockResolvedValue(new Map()) };
+    viewerVotesMock = { forPage: jest.fn().mockResolvedValue(new Map()) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CommentService,
-        { provide: VoteStateService, useValue: voteStateMock },
+        { provide: ViewerVotesService, useValue: viewerVotesMock },
         ReportService,
         EngagementCountersService,
         {
@@ -226,7 +226,13 @@ describe("CommentService", () => {
 
         expect(items[0].myReaction).toBeNull();
         expect(prismaMock.reaction.findMany).not.toHaveBeenCalled();
-        expect(voteStateMock.readMany).not.toHaveBeenCalled();
+        // Not reaching Redis for an anonymous read is pinned on
+        // ViewerVotesService; this owns passing the absent viewer on.
+        expect(viewerVotesMock.forPage).toHaveBeenCalledWith(
+          "comment",
+          expect.anything(),
+          undefined,
+        );
       });
     });
 
@@ -237,7 +243,7 @@ describe("CommentService", () => {
        */
       it("in preference to the relation the page loaded", async () => {
         mockPage();
-        voteStateMock.readMany.mockResolvedValue(new Map([[commentId, ReactionType.DISLIKE]]));
+        viewerVotesMock.forPage.mockResolvedValue(new Map([[commentId, ReactionType.DISLIKE]]));
 
         const { items } = await service.findForSubject(
           titleSubject(titleId),
@@ -253,7 +259,7 @@ describe("CommentService", () => {
 
         await service.findForSubject(titleSubject(titleId), { page: 1, limit: 10 }, "viewer-1");
 
-        expect(voteStateMock.readMany).toHaveBeenCalledTimes(1);
+        expect(viewerVotesMock.forPage).toHaveBeenCalledTimes(1);
       });
     });
 

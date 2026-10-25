@@ -191,14 +191,22 @@ saving. Showing an upload as still processing is client work that has not been d
   "holds no vote" while a **missing** key means "unknown" and sends the caller to the
   row, and **the cache is never asked for a count** — that is what lets it answer about
   one viewer without ever being complete.
-- **`myReaction` on a read comes from the cache; the counts beside it do not.** Reads
-  call `readMany` for the whole page in one `MGET` and pass what comes back into the
-  DTO, where a **present** entry wins over the `reactions` relation and an **absent**
-  one falls back to it. Both halves matter: the relation is what the last flush left
-  behind, so preferring it would render a vote the viewer's next click contradicts,
-  while a cache miss has a free and correct answer already loaded. `readMany` is also
-  the one place a Redis failure is swallowed — reads degrade to the relation, and
-  writes degrade too (see the decorator below), so an unreachable Redis is not a 503.
+- **`myReaction` on a read comes from the cache; the counts beside it do not.** A read
+  asks `ViewerVotesService.forPage` for the whole page — one `MGET` — and hands each
+  answer to the DTO, which settles it with `resolveVote`: a **present** entry wins over
+  the `reactions` relation and an **absent** one falls back to it. Both halves matter,
+  and the rule lives in one function because getting it backwards is silent: the
+  relation is what the last flush left behind, so preferring it renders a vote the
+  viewer's next request contradicts, while a cache miss has a free and correct answer
+  already loaded. `readMany` under it is also the one place a Redis failure is
+  swallowed — reads degrade to the relation, and writes degrade too (see the decorator
+  below), so an unreachable Redis is not a 503.
+- **A feature reads votes through `ViewerVotesService`, never through the cache.** It is
+  the read half of the reaction domain and lives in `ViewerVotesModule`, apart from
+  `ReactionModule` so that importing it does not bring the flush queue along — the same
+  reason `UserAvatarService` stopped holding an `@InjectQueue`. It owns the id-to-arc
+  mapping and the rule that an absent viewer reads nothing, both of which were written
+  out once per feature before.
 - `RedisService` extends `ioredis` the way `PrismaService` extends `PrismaClient`, and
   runs with `enableOfflineQueue: false`: a command issued while the socket is down
   rejects instead of waiting for a reconnect, which is what lets a caller choose

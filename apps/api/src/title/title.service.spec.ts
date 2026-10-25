@@ -5,10 +5,10 @@ import { FilterRule } from "../common/pagination/filter-rule.enum";
 import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { ViewerVotesService } from "../reaction/viewer-votes.service";
 import { S3Service } from "../s3/s3.service";
 import { SeasonService } from "../season/season.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
-import { VoteStateService } from "../vote-cache/vote-state.service";
 import { TitleService } from "./title.service";
 
 describe("TitleService", () => {
@@ -28,7 +28,7 @@ describe("TitleService", () => {
     removeStoredImage: jest.Mock;
     deleteStoredImage: jest.Mock;
   };
-  let voteStateMock: { readMany: jest.Mock };
+  let viewerVotesMock: { forPage: jest.Mock };
 
   beforeEach(async () => {
     txMock = {
@@ -43,12 +43,12 @@ describe("TitleService", () => {
       deleteStoredImage: jest.fn(),
     };
 
-    voteStateMock = { readMany: jest.fn().mockResolvedValue(new Map()) };
+    viewerVotesMock = { forPage: jest.fn().mockResolvedValue(new Map()) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TitleService,
-        { provide: VoteStateService, useValue: voteStateMock },
+        { provide: ViewerVotesService, useValue: viewerVotesMock },
         {
           provide: PrismaService,
           useValue: {
@@ -432,12 +432,16 @@ describe("TitleService", () => {
         ...titleRow,
         reactions: [{ type: ReactionType.LIKE }],
       });
-      voteStateMock.readMany.mockResolvedValue(new Map([["title-1", ReactionType.DISLIKE]]));
+      viewerVotesMock.forPage.mockResolvedValue(new Map([["title-1", ReactionType.DISLIKE]]));
 
       const result = await service.findOne("title-1", "viewer-1");
 
       expect(result?.engagement.viewer?.reaction).toBe(ReactionType.DISLIKE);
-      expect(voteStateMock.readMany).toHaveBeenCalledWith([{ titleId: "title-1" }], "viewer-1");
+      expect(viewerVotesMock.forPage).toHaveBeenCalledWith(
+        "title",
+        expect.arrayContaining([expect.objectContaining({ id: "title-1" })]),
+        "viewer-1",
+      );
     });
 
     /** A cached withdrawal is an answer, so it has to beat a row not yet flushed. */
@@ -446,7 +450,7 @@ describe("TitleService", () => {
         ...titleRow,
         reactions: [{ type: ReactionType.LIKE }],
       });
-      voteStateMock.readMany.mockResolvedValue(new Map([["title-1", null]]));
+      viewerVotesMock.forPage.mockResolvedValue(new Map([["title-1", null]]));
 
       const result = await service.findOne("title-1", "viewer-1");
 
@@ -464,12 +468,17 @@ describe("TitleService", () => {
       expect(result?.engagement.viewer?.reaction).toBe(ReactionType.LIKE);
     });
 
-    it("should not ask the cache for an anonymous read", async () => {
+    /**
+     * Whether an anonymous read reaches Redis is `ViewerVotesService`'s
+     * business and is pinned there; what this owns is passing the viewer on
+     * honestly rather than defaulting it to something.
+     */
+    it("should hand the absent viewer on rather than inventing one", async () => {
       (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(titleRow);
 
       await service.findOne("title-1");
 
-      expect(voteStateMock.readMany).not.toHaveBeenCalled();
+      expect(viewerVotesMock.forPage).toHaveBeenCalledWith("title", expect.anything(), null);
     });
 
     it("should answer null, not an empty viewer block, when there is no viewer", async () => {
