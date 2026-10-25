@@ -142,6 +142,34 @@ Three properties carry the design:
   Redis whose disagreements it exists to catch. It runs in the worker, which has one
   replica, so it needs no leader election; the repair count goes through Redis to a
   gauge in the api, because the worker serves no `/metrics`.
+- **Two numbers decide when this design stops working, and they are not the same
+  number.**
+
+  *Reactions per subject* bounds the per-vote recount. `recomputeReactions` is
+  `COUNT(*) … GROUP BY type` behind the unique index, so it returns two rows and costs
+  the API nothing — but Postgres still walks every index entry for that subject, and
+  there is no shortcut for a count. A title holding millions of reactions recounts
+  millions of entries per flush, once every flush window. The answer then is a delta
+  (`likes = likes + 1`), which is constant instead of linear.
+
+  *Subjects* bounds the nightly sweep. `ReactionReconciler` builds one map entry per
+  subject in the worker, so twenty thousand comments is megabytes and two million is
+  hundreds of them, in a process that cannot spill. The answer then is to batch by a
+  cursor over subjects, or to push the comparison into one
+  `UPDATE … FROM (SELECT … GROUP BY …)` so nothing reaches Node at all — Postgres
+  degrades to disk at `work_mem`, which is the whole argument: the database spills, the
+  process dies.
+
+  **The two answers are a pair, not alternatives.** A delta is a second truth that
+  drifts from the rows it summarises, and the nightly sweep is what repairs that drift.
+  Adopting the delta turns the reconciliation from a backstop into a requirement.
+
+  And a delta has its own ceiling: every vote on one subject updates one row, which
+  serialises those writes and leaves a dead tuple per update for autovacuum to chase.
+  Past that point the counter does not belong in Postgres at all — it belongs in an
+  `INCR`, which is exactly the design this record rejected at the scale it was written
+  for.
+
 - The cache is **not** consulted for counts, ever. If that changes, the hydration
   problem a set would have had comes back, and this record should be superseded rather
   than amended.
