@@ -1,14 +1,4 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  HttpCode,
-  HttpStatus,
-  Inject,
-  Param,
-  ParseUUIDPipe,
-  Put,
-} from "@nestjs/common";
+import { Body, Controller, Delete, Inject, Param, ParseUUIDPipe, Put } from "@nestjs/common";
 import {
   ApiBadRequestResponse,
   ApiNotFoundResponse,
@@ -42,7 +32,6 @@ export class ReactionController {
   @ApiUnauthorizedResponse({ description: "Not signed in" })
   @ApiNotFoundResponse({ description: "Subject not found" })
   @Auth()
-  @HttpCode(HttpStatus.OK)
   @Put(":entityType/:entityId")
   async setVote(
     @Param("entityType", ReactableArcPipe) arc: ReactableArc,
