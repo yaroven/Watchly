@@ -29,13 +29,29 @@ export interface FlushVoteJob {
 export const FLUSH_DELAY_MS = 2_000;
 
 /**
- * `DEFAULT_JOB_OPTIONS` carries `removeOnComplete: true`, and here that is
- * load-bearing rather than tidiness: `queue.add` with a `jobId` that already
- * exists returns the existing job instead of adding one, so a *kept* completed
- * job would block every later vote by the same viewer on the same subject —
- * silently, since nothing errors. Keeping completed jobs on this queue would
- * mean votes that stop reaching Postgres after the first one.
+ * The dedup key for a pair. Not a `jobId`: an explicit one is checked for
+ * existence *before* BullMQ's deduplication runs (`addStandardJob-9.lua`), so
+ * it short-circuits the handling below and takes the bug with it.
  */
+export const flushDeduplicationId = (arc: ReactionArc, subjectId: string, userId: string): string =>
+  `vote-${arc}-${subjectId}-${userId}`;
+
+/**
+ * `keepLastIfActive` is what makes a click during a flush survive.
+ *
+ * Deduplicating on the pair is an economy — a burst of clicks needs one write,
+ * and the job reads the final state whenever it runs. But a click that lands
+ * while the job is *being processed* has already missed that read, and plain
+ * deduplication would drop it: the key is alive, so no job is added, and the
+ * vote reaches Redis and never reaches Postgres. It would then sit there until
+ * the key expires a week later and the row quietly wins.
+ *
+ * With this set, BullMQ stores the late arrival and raises a follow-up job when
+ * the active one finishes, keeping at most two per pair — one running, one
+ * waiting. It also stops two flushes of the same pair from running at once,
+ * which the pointer payload survives but need not rely on.
+ */
+export const FLUSH_DEDUPLICATION = { keepLastIfActive: true } as const;
 export const REACTION_FLUSH_QUEUE_OPTIONS: RegisterQueueOptions = {
   name: REACTION_FLUSH_QUEUE_NAME,
   defaultJobOptions: { ...DEFAULT_JOB_OPTIONS, delay: FLUSH_DELAY_MS },
