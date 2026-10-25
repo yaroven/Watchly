@@ -2,7 +2,8 @@
 
 **Status:** accepted. Supersedes the toggle half of ADR-0014: the route pair and the
 response shape survive, but reacting is no longer a toggle and no longer resolved in
-the transaction that writes it.
+the transaction that writes it. The cache sits in front of the old synchronous path as
+a decorator rather than replacing it.
 
 ## Context
 
@@ -90,10 +91,31 @@ Three properties carry the design:
 - **Losing Redis loses at most the votes not yet flushed.** It does not corrupt
   anything: every key can be rebuilt from the rows, and a duplicate flush is caught by
   the unique index. The window is the flush delay.
-- **Reacting now depends on Redis.** A route that used to need only Postgres answers
-  503 when Redis is unreachable — fail-closed on the write, because accepting a vote
-  there is nowhere to put is worse than refusing it. Reads degrade instead: they fall
-  back to the viewer's row.
+- **Reacting does not depend on Redis being up.** `CachedReactionService` decorates
+  `ReactionService` and delegates to it when Redis is unreachable, so a vote is written
+  synchronously to Postgres instead of refused. Reads degrade the same way, to the
+  viewer's row.
+
+  An earlier draft of this record argued for answering 503 instead, on the grounds that
+  a fallback would leave the cache lying. It would not: the fallback writes no key, an
+  absent key means "unknown", and the next read goes to the row the fallback just
+  wrote. The real cost of falling back is narrower and worth stating exactly — **the
+  fallback cannot see a vote that is still only in Redis**, so a pair the same viewer
+  touched inside the flush window at the moment Redis died is answered from counts that
+  are a beat behind. When reacting was a toggle that produced a *wrong vote*; with
+  absolute writes it costs only the numbers in one response, and the next request fixes
+  them.
+
+  What it buys, against that: votes keep working for the whole outage rather than for
+  none of it. What it costs in the code is two write paths that have to stay correct —
+  one absolute through the queue, one absolute in a transaction — and a token to choose
+  between them.
+
+- **The cache is removable.** `{ provide: REACTIONS, useExisting: CachedReactionService }`
+  is the only line that puts Redis on the path of a request. Pointed at `ReactionService`
+  it is the pre-cache API again, synchronously correct with nothing running but
+  Postgres. That is deliberate for a layer adopted without a load problem to justify
+  it: the thing it replaced is still there, still tested, and one line away.
 - **Sending the same vote twice is not an undo.** That is the one behaviour change a
   client can see, and it is the point: the previous contract made the second of two
   identical requests — a double click, a retry after a timeout — mean the opposite of

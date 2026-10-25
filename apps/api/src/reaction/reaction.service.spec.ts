@@ -1,11 +1,8 @@
-import { NotFoundException, ServiceUnavailableException } from "@nestjs/common";
+import { NotFoundException } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { ReactionType } from "@prisma/client";
 import { EngagementCountersService } from "../engagement/engagement-counters.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { ReactionFlushScheduler } from "../reaction-flush/reaction-flush-scheduler.service";
-import { RedisUnavailableError } from "../redis/redis.error";
-import { VoteStateService } from "../vote-cache/vote-state.service";
 import { ReactionService } from "./reaction.service";
 import { commentTarget, titleTarget } from "./utils/reaction-target.const";
 
@@ -32,38 +29,23 @@ describe("ReactionService", () => {
   const userId = "22222222-2222-4222-8222-222222222222";
 
   let service: ReactionService;
-  let prisma: ReturnType<typeof client>;
-  let voteState: { set: jest.Mock; read: jest.Mock };
-  let flush: { schedule: jest.Mock };
-  let calls: string[];
+  let prisma: ReturnType<typeof client> & { $transaction: jest.Mock };
+  let tx: ReturnType<typeof client>;
 
   beforeEach(async () => {
-    calls = [];
-    prisma = client();
+    tx = client();
+    prisma = {
+      ...client(),
+      $transaction: jest.fn((fn: (c: unknown) => unknown) => fn(tx)),
+    };
     prisma.title.findUnique.mockResolvedValue({ id: titleId });
     prisma.comment.findUnique.mockResolvedValue({ id: commentId });
-
-    voteState = {
-      read: jest.fn().mockResolvedValue(null),
-      set: jest.fn().mockImplementation(() => {
-        calls.push("set");
-        return Promise.resolve(null);
-      }),
-    };
-    flush = {
-      schedule: jest.fn().mockImplementation(() => {
-        calls.push("schedule");
-        return Promise.resolve();
-      }),
-    };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         ReactionService,
         EngagementCountersService,
         { provide: PrismaService, useValue: prisma },
-        { provide: VoteStateService, useValue: voteState },
-        { provide: ReactionFlushScheduler, useValue: flush },
       ],
     }).compile();
 
@@ -72,140 +54,26 @@ describe("ReactionService", () => {
 
   afterEach(() => jest.clearAllMocks());
 
-  describe("casting a vote", () => {
-    it("records it in the cache, not in a transaction", async () => {
+  /**
+   * The row and the counter that summarises it have to land together: before
+   * the split that introduced a client parameter, a failed recount left the
+   * counter wrong with nothing to retry.
+   */
+  describe("transactionality", () => {
+    it("writes the row and the counter on one transaction client", async () => {
       await service.setVote(titleTarget(titleId), userId, LIKE);
 
-      expect(voteState.set).toHaveBeenCalledWith(titleTarget(titleId), userId, LIKE);
+      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(tx.reaction.upsert).toHaveBeenCalled();
+      expect(tx.reaction.groupBy).toHaveBeenCalled();
       expect(prisma.reaction.upsert).not.toHaveBeenCalled();
-      expect(prisma.reaction.deleteMany).not.toHaveBeenCalled();
-    });
-
-    it("writes a withdrawal as the absence of a vote", async () => {
-      voteState.set.mockResolvedValue(LIKE);
-
-      await service.clearVote(commentTarget(commentId), userId);
-
-      expect(voteState.set).toHaveBeenCalledWith(commentTarget(commentId), userId, null);
-    });
-
-    /**
-     * Absolute, so the second identical call is not a withdrawal. The old
-     * toggle read the same request as "undo", which is the behaviour this
-     * replaced.
-     */
-    it("holds the vote when the same one is sent again", async () => {
-      voteState.set.mockResolvedValue(LIKE);
-
-      await expect(service.setVote(titleTarget(titleId), userId, LIKE)).resolves.toMatchObject({
-        myReaction: LIKE,
-      });
-      expect(voteState.set).toHaveBeenCalledWith(titleTarget(titleId), userId, LIKE);
-    });
-
-    /**
-     * The order is the safety: a job that fires before the write mirrors the
-     * state already in place and does nothing, while a write with no job would
-     * sit in the cache, be read as real, and revert a week later.
-     */
-    it("schedules the flush before writing the vote", async () => {
-      await service.setVote(titleTarget(titleId), userId, LIKE);
-
-      expect(calls).toEqual(["schedule", "set"]);
-    });
-
-    it("answers with the vote that was asked for", async () => {
-      voteState.set.mockResolvedValue(LIKE);
-
-      await expect(service.setVote(titleTarget(titleId), userId, DISLIKE)).resolves.toMatchObject({
-        myReaction: DISLIKE,
-      });
+      expect(prisma.reaction.groupBy).not.toHaveBeenCalled();
     });
   });
 
-  describe("the counts in the response", () => {
-    it("adds this call's own change to the last flushed counts", async () => {
-      prisma.engagementCounters.findUnique.mockResolvedValue({
-        likes: 10,
-        dislikes: 4,
-        commentCount: 7,
-      });
-      voteState.set.mockResolvedValue(null);
-
-      await expect(service.setVote(titleTarget(titleId), userId, LIKE)).resolves.toEqual({
-        likes: 11,
-        dislikes: 4,
-        commentCount: 7,
-        myReaction: LIKE,
-      });
-    });
-
-    it("moves both counters when the vote switches sides", async () => {
-      prisma.engagementCounters.findUnique.mockResolvedValue({
-        likes: 10,
-        dislikes: 4,
-        commentCount: 0,
-      });
-      voteState.set.mockResolvedValue(LIKE);
-
-      await expect(service.setVote(titleTarget(titleId), userId, DISLIKE)).resolves.toMatchObject({
-        likes: 9,
-        dislikes: 5,
-      });
-    });
-
-    /** The two numbers come from different moments, so the subtraction can underflow. */
-    it("never answers a negative count", async () => {
-      prisma.engagementCounters.findUnique.mockResolvedValue({
-        likes: 0,
-        dislikes: 0,
-        commentCount: 0,
-      });
-      voteState.set.mockResolvedValue(LIKE);
-
-      await expect(service.clearVote(titleTarget(titleId), userId)).resolves.toMatchObject({
-        likes: 0,
-        dislikes: 0,
-      });
-    });
-  });
-
-  describe("when redis is unreachable", () => {
-    it("refuses the vote with a 503", async () => {
-      flush.schedule.mockRejectedValue(new RedisUnavailableError("schedule a flush", null));
-
-      await expect(service.setVote(titleTarget(titleId), userId, LIKE)).rejects.toThrow(
-        ServiceUnavailableException,
-      );
-    });
-
-    it("refuses a withdrawal the same way", async () => {
-      voteState.set.mockRejectedValue(new RedisUnavailableError("write a vote", null));
-
-      await expect(service.clearVote(titleTarget(titleId), userId)).rejects.toThrow(
-        ServiceUnavailableException,
-      );
-    });
-
-    /** Only Redis is a 503. A broken row read is a bug, and must not be dressed up as one. */
-    it("lets any other failure through untouched", async () => {
-      voteState.set.mockRejectedValue(new Error("the database fell over"));
-
-      await expect(service.setVote(titleTarget(titleId), userId, LIKE)).rejects.toThrow(
-        "the database fell over",
-      );
-    });
-  });
-
-  describe("applyAbsolute", () => {
-    let tx: ReturnType<typeof client>;
-
-    beforeEach(() => {
-      tx = client();
-    });
-
-    it("writes the vote the pair holds", async () => {
-      await service.applyAbsolute(tx as never, titleTarget(titleId), userId, DISLIKE);
+  describe("setVote", () => {
+    it("writes the vote it was given", async () => {
+      await service.setVote(titleTarget(titleId), userId, DISLIKE);
 
       expect(tx.reaction.upsert).toHaveBeenCalledWith({
         where: { titleId_userId: { titleId, userId } },
@@ -214,11 +82,54 @@ describe("ReactionService", () => {
       });
     });
 
-    it("removes the row when the pair holds nothing", async () => {
-      await service.applyAbsolute(tx as never, titleTarget(titleId), userId, null);
+    /** Absolute: the same vote twice is the same write twice, never an undo. */
+    it("writes the same vote again rather than withdrawing it", async () => {
+      await service.setVote(titleTarget(titleId), userId, LIKE);
+      await service.setVote(titleTarget(titleId), userId, LIKE);
 
-      expect(tx.reaction.deleteMany).toHaveBeenCalledWith({ where: { titleId, userId } });
+      expect(tx.reaction.deleteMany).not.toHaveBeenCalled();
+      expect(tx.reaction.upsert).toHaveBeenCalledTimes(2);
+    });
+
+    it("answers with exact counts, recounted by this call", async () => {
+      tx.engagementCounters.upsert.mockResolvedValue({ likes: 7, dislikes: 2, commentCount: 1 });
+
+      await expect(service.setVote(titleTarget(titleId), userId, LIKE)).resolves.toEqual({
+        likes: 7,
+        dislikes: 2,
+        commentCount: 1,
+        myReaction: LIKE,
+      });
+    });
+  });
+
+  describe("clearVote", () => {
+    it("removes the row", async () => {
+      await service.clearVote(commentTarget(commentId), userId);
+
+      expect(tx.reaction.deleteMany).toHaveBeenCalledWith({ where: { commentId, userId } });
       expect(tx.reaction.upsert).not.toHaveBeenCalled();
+    });
+
+    it("is not an error when there was nothing to withdraw", async () => {
+      tx.reaction.deleteMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.clearVote(titleTarget(titleId), userId)).resolves.toMatchObject({
+        myReaction: null,
+      });
+    });
+  });
+
+  describe("applyAbsolute", () => {
+    it("recomputes the counters on the client it was given", async () => {
+      await service.applyAbsolute(tx as never, commentTarget(commentId), userId, LIKE);
+
+      expect(tx.reaction.groupBy).toHaveBeenCalledWith({
+        by: ["type"],
+        where: { commentId },
+        _count: { _all: true },
+      });
+      expect(prisma.reaction.groupBy).not.toHaveBeenCalled();
     });
 
     /** Applying the same state twice has to land the same rows. */
@@ -233,15 +144,12 @@ describe("ReactionService", () => {
       });
     });
 
-    it("recomputes the counters on the client it was given", async () => {
-      await service.applyAbsolute(tx as never, commentTarget(commentId), userId, LIKE);
+    it("hands back the counts it wrote", async () => {
+      tx.engagementCounters.upsert.mockResolvedValue({ likes: 3, dislikes: 0, commentCount: 0 });
 
-      expect(tx.reaction.groupBy).toHaveBeenCalledWith({
-        by: ["type"],
-        where: { commentId },
-        _count: { _all: true },
-      });
-      expect(prisma.reaction.groupBy).not.toHaveBeenCalled();
+      await expect(
+        service.applyAbsolute(tx as never, titleTarget(titleId), userId, LIKE),
+      ).resolves.toEqual({ likes: 3, dislikes: 0, commentCount: 0 });
     });
   });
 
