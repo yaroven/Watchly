@@ -5,7 +5,7 @@ import {
   EngagementCounts,
   NO_COUNTS,
 } from "../../../engagement/engagement-counters.service";
-import { Vote } from "../../../reaction/utils/vote.util";
+import { resolveVote, Vote } from "../../../reaction/utils/vote.util";
 import { EngagementRelations } from "../../utils/title.query";
 
 export interface TitleEngagementCounts extends EngagementCounts {
@@ -111,9 +111,7 @@ export class TitleEngagementDto {
       viewerId
         ? new ViewerTitleEngagementDto(
             rows.ratings?.[0]?.score ?? null,
-            // The cache is the truth about a vote; `undefined` means it had
-            // no answer, and then the relation this read already loaded is it.
-            myReaction === undefined ? (rows.reactions?.[0]?.type ?? null) : myReaction,
+            resolveVote(myReaction, rows.reactions?.[0]?.type ?? null),
             (rows.watchlistEntries?.length ?? 0) > 0,
           )
         : null,

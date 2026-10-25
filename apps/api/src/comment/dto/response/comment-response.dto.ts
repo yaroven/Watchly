@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Comment, ReactionType, User } from "@prisma/client";
-import { Vote } from "../../../reaction/utils/vote.util";
+import { resolveVote, Vote } from "../../../reaction/utils/vote.util";
 
 export class CommentAuthorDto {
   @ApiProperty({ format: "uuid" })
@@ -108,8 +108,7 @@ export class CommentResponseDto {
     this.createdAt = comment.createdAt;
     this.likes = comment.counters?.likes ?? 0;
     this.dislikes = comment.counters?.dislikes ?? 0;
-    this.myReaction =
-      myReaction === undefined ? (comment.reactions?.[0]?.type ?? null) : myReaction;
+    this.myReaction = resolveVote(myReaction, comment.reactions?.[0]?.type ?? null);
     this.replies = replies;
     this.replyCount = comment.counters?.commentCount ?? 0;
   }
