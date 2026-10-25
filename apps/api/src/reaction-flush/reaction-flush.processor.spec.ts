@@ -2,6 +2,7 @@ import { Test } from "@nestjs/testing";
 import { ReactionType } from "@prisma/client";
 import { Job } from "bullmq";
 import { PrismaService } from "../prisma/prisma.service";
+import { ReactionArc } from "../reaction/enums/reaction-arc.enum";
 import { ReactionService } from "../reaction/reaction.service";
 import { VoteStateService } from "../vote-cache/vote-state.service";
 import { FlushVoteJob } from "./reaction-flush-queue.options";
@@ -45,12 +46,8 @@ describe("ReactionFlushProcessor", () => {
 
   afterEach(() => jest.clearAllMocks());
 
-  /**
-   * The state is read here rather than carried in the job, which is the whole
-   * reason two jobs for one pair can be worked in any order.
-   */
   it("mirrors what the cache holds now, on the transaction's client", async () => {
-    await processor.process(job({ arc: "title", subjectId: titleId, userId }));
+    await processor.process(job({ arc: ReactionArc.TITLE, subjectId: titleId, userId }));
 
     expect(voteState.get).toHaveBeenCalledWith({ titleId }, userId);
     expect(prisma.$transaction).toHaveBeenCalled();
@@ -60,22 +57,16 @@ describe("ReactionFlushProcessor", () => {
   it("rebuilds the comment arc from the job", async () => {
     voteState.get.mockResolvedValue(null);
 
-    await processor.process(job({ arc: "comment", subjectId: commentId, userId }));
+    await processor.process(job({ arc: ReactionArc.COMMENT, subjectId: commentId, userId }));
 
     expect(reactions.applyAbsolute).toHaveBeenCalledWith(tx, { commentId }, userId, null);
   });
 
-  /**
-   * The cache not knowing is not the same as the pair holding nothing. The row
-   * is already the answer in that case, so mirroring it onto itself costs a
-   * transaction and changes no rows — reading the cache as "no vote" would
-   * instead delete a vote nobody withdrew.
-   */
   it("mirrors the row when the cache has no answer", async () => {
     voteState.get.mockResolvedValue(undefined);
     prisma.reaction.findUnique.mockResolvedValue({ type: LIKE });
 
-    await processor.process(job({ arc: "title", subjectId: titleId, userId }));
+    await processor.process(job({ arc: ReactionArc.TITLE, subjectId: titleId, userId }));
 
     expect(prisma.reaction.findUnique).toHaveBeenCalledWith({
       where: { titleId_userId: { titleId, userId } },
@@ -85,17 +76,16 @@ describe("ReactionFlushProcessor", () => {
   });
 
   it("does not read a row when the cache answered", async () => {
-    await processor.process(job({ arc: "title", subjectId: titleId, userId }));
+    await processor.process(job({ arc: ReactionArc.TITLE, subjectId: titleId, userId }));
 
     expect(prisma.reaction.findUnique).not.toHaveBeenCalled();
   });
 
-  /** Swallowing here would lose the vote and leave the queue's counts looking clean. */
   it("rethrows so the job retries", async () => {
     reactions.applyAbsolute.mockRejectedValue(new Error("postgres said no"));
 
     await expect(
-      processor.process(job({ arc: "title", subjectId: titleId, userId })),
+      processor.process(job({ arc: ReactionArc.TITLE, subjectId: titleId, userId })),
     ).rejects.toThrow("postgres said no");
   });
 });

@@ -24,7 +24,6 @@ describe("ReactionReconciler", () => {
   let counters: { recomputeReactions: jest.Mock };
   let redis: { set: jest.Mock };
 
-  /** The sweep asks once per arc; the `by` argument says which one. */
   const sweep = (titles: GroupRow[] = [], comments: GroupRow[] = []) => {
     prisma.reaction.groupBy.mockImplementation(({ by }: { by: string[] }) =>
       Promise.resolve(by.includes("titleId") ? titles : comments),
@@ -78,7 +77,6 @@ describe("ReactionReconciler", () => {
     expect(counters.recomputeReactions).toHaveBeenCalledWith({ titleId: "title-1" }, prisma);
   });
 
-  /** A subject whose votes all arrived while the counter row did not exist. */
   it("repairs a subject with reactions and no counter row at all", async () => {
     sweep([likeRow("titleId", "title-1", 2)]);
 
@@ -87,7 +85,6 @@ describe("ReactionReconciler", () => {
     expect(counters.recomputeReactions).toHaveBeenCalledWith({ titleId: "title-1" }, prisma);
   });
 
-  /** And the other direction: a count left behind by rows that are gone. */
   it("repairs a counter whose reactions have disappeared", async () => {
     counterRows([{ titleId: "title-1", likes: 4, dislikes: 1 }]);
 
@@ -104,11 +101,6 @@ describe("ReactionReconciler", () => {
     expect(counters.recomputeReactions).toHaveBeenCalledWith({ commentId: "comment-1" }, prisma);
   });
 
-  /**
-   * Both counters have to be compared. Checking only the likes would leave a
-   * switched vote — which moves one down and the other up — looking settled on
-   * one side and wrong on the other forever.
-   */
   it("notices a dislike count that drifted while the likes agreed", async () => {
     sweep([
       likeRow("titleId", "title-1", 3),
@@ -133,10 +125,6 @@ describe("ReactionReconciler", () => {
     expect(counters.recomputeReactions).not.toHaveBeenCalled();
   });
 
-  /**
-   * The number is the only evidence that "drift is rare and self-healing" is
-   * true, so a run that repaired nothing has to publish the zero.
-   */
   it("publishes what it repaired, per arc", async () => {
     sweep([likeRow("titleId", "title-1", 3)]);
 

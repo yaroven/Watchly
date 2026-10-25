@@ -42,14 +42,6 @@ import { VideoTranscodeStateService } from "../video-transcoder/video-transcode-
 import { VideoTranscoderProcessor } from "../video-transcoder/video-transcoder-processor";
 import { VoteCacheModule } from "../vote-cache/vote-cache.module";
 
-/**
- * The whole of the worker process: `worker-main.ts` builds its context from
- * this module and nothing else, so whatever the worker does has to be wired
- * here. It was named after the video transcoder while that was all it ran, and
- * the name stopped being true as soon as the image side moved in beside it.
- * Composing a process is not a domain, which is why it no longer lives inside
- * one either.
- */
 @Module({
   imports: [
     ConfigModule.forRoot({ load: [s3Config, redisConfig, loggerConfig], isGlobal: true }),
@@ -72,17 +64,14 @@ import { VoteCacheModule } from "../vote-cache/vote-cache.module";
     ReactionModule,
     VoteCacheModule,
     EngagementModule,
-    // The reconciler's cron. The api has its own ScheduleModule; this process
-    // had none, because nothing in it was scheduled before.
+
     ScheduleModule.forRoot(),
   ],
   providers: [
-    // Mirrors cached votes onto the rows. Nothing to do with ffmpeg; it is
-    // here because this is the process that works queues.
     ReactionFlushProcessor,
     ReactionReconciler,
     ReactionReconcileSchedule,
-    // The conversion half, which only this process has the ffmpeg binary for.
+
     HlsTranscoder,
     VideoTranscodeStateService,
     VideoTranscoderProcessor,

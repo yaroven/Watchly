@@ -8,7 +8,6 @@ import { commentTarget, titleTarget } from "./utils/reaction-target.const";
 
 const { LIKE, DISLIKE } = ReactionType;
 
-/** A Prisma client's delegates. Never shared with a transaction's — see CLAUDE.md. */
 const client = () => ({
   reaction: {
     deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
@@ -54,11 +53,6 @@ describe("ReactionService", () => {
 
   afterEach(() => jest.clearAllMocks());
 
-  /**
-   * The row and the counter that summarises it have to land together: before
-   * the split that introduced a client parameter, a failed recount left the
-   * counter wrong with nothing to retry.
-   */
   describe("transactionality", () => {
     it("writes the row and the counter on one transaction client", async () => {
       await service.setVote(titleTarget(titleId), userId, LIKE);
@@ -82,7 +76,6 @@ describe("ReactionService", () => {
       });
     });
 
-    /** Absolute: the same vote twice is the same write twice, never an undo. */
     it("writes the same vote again rather than withdrawing it", async () => {
       await service.setVote(titleTarget(titleId), userId, LIKE);
       await service.setVote(titleTarget(titleId), userId, LIKE);
@@ -132,7 +125,6 @@ describe("ReactionService", () => {
       expect(prisma.reaction.groupBy).not.toHaveBeenCalled();
     });
 
-    /** Applying the same state twice has to land the same rows. */
     it("is idempotent", async () => {
       await service.applyAbsolute(tx as never, titleTarget(titleId), userId, LIKE);
       await service.applyAbsolute(tx as never, titleTarget(titleId), userId, LIKE);

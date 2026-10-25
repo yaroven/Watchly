@@ -16,7 +16,6 @@ describe("VoteDriftMetricsService", () => {
   let redis: { mget: jest.Mock };
 
   beforeEach(async () => {
-    // The gauge is module-level, so values carry from one test to the next.
     register.resetMetrics();
     redis = { mget: jest.fn().mockResolvedValue([null, null]) };
 
@@ -42,11 +41,6 @@ describe("VoteDriftMetricsService", () => {
     ]);
   });
 
-  /**
-   * A zero here would mean "nothing has drifted", which is a different claim
-   * from "no reconciliation has run yet". An alert on `> 0` has to be able to
-   * tell them apart, so the series must not exist until a run has published.
-   */
   it("reports nothing at all before a reconciliation has run", async () => {
     expect(await scrape()).toEqual([]);
   });
@@ -57,7 +51,6 @@ describe("VoteDriftMetricsService", () => {
     expect(await scrape()).toEqual([{ labels: { arc: "title" }, value: 2 }]);
   });
 
-  /** A throwing collector rejects the whole scrape, taking every other metric with it. */
   it("does not fail the scrape when redis is unreachable", async () => {
     redis.mget.mockRejectedValue(new Error("redis is down"));
 

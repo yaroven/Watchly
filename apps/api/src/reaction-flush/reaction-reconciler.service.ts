@@ -2,7 +2,8 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ReactionType } from "@prisma/client";
 import { EngagementCountersService } from "../engagement/engagement-counters.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { REACTION_ARCS, ReactionArc, targetOf } from "../reaction/utils/reaction-target.const";
+import { ReactionArc } from "../reaction/enums/reaction-arc.enum";
+import { arcKey, REACTION_ARCS, targetOf } from "../reaction/utils/reaction-target.const";
 import { RedisService } from "../redis/redis.service";
 import { driftKey } from "./reaction-drift.const";
 
@@ -54,29 +55,22 @@ export class ReactionReconciler {
   }
 
   private async expectedCounts(arc: ReactionArc): Promise<Map<string, Counts>> {
-    const rows =
-      arc === "title"
-        ? (
-            await this.prisma.reaction.groupBy({
-              by: ["titleId", "type"],
-              where: { titleId: { not: null } },
-              _count: { _all: true },
-            })
-          ).map((row) => ({ subjectId: row.titleId!, type: row.type, count: row._count._all }))
-        : (
-            await this.prisma.reaction.groupBy({
-              by: ["commentId", "type"],
-              where: { commentId: { not: null } },
-              _count: { _all: true },
-            })
-          ).map((row) => ({ subjectId: row.commentId!, type: row.type, count: row._count._all }));
+    const key = arcKey(arc);
+    const grouped = await this.prisma.reaction.groupBy({
+      by: [key, "type"],
+      where: { [key]: { not: null } },
+      _count: { _all: true },
+    });
 
     const counts = new Map<string, Counts>();
 
-    for (const { subjectId, type, count } of rows) {
+    for (const row of grouped) {
+      const subjectId = row[key];
+      if (!subjectId) continue;
+
       const current = counts.get(subjectId) ?? { ...ZERO };
-      if (type === ReactionType.LIKE) current.likes = count;
-      else current.dislikes = count;
+      if (row.type === ReactionType.LIKE) current.likes = row._count._all;
+      else current.dislikes = row._count._all;
       counts.set(subjectId, current);
     }
 
@@ -84,22 +78,21 @@ export class ReactionReconciler {
   }
 
   private async storedCounts(arc: ReactionArc): Promise<Map<string, Counts>> {
-    const rows =
-      arc === "title"
-        ? (
-            await this.prisma.engagementCounters.findMany({
-              where: { titleId: { not: null } },
-              select: { titleId: true, likes: true, dislikes: true },
-            })
-          ).map((row) => ({ subjectId: row.titleId!, likes: row.likes, dislikes: row.dislikes }))
-        : (
-            await this.prisma.engagementCounters.findMany({
-              where: { commentId: { not: null } },
-              select: { commentId: true, likes: true, dislikes: true },
-            })
-          ).map((row) => ({ subjectId: row.commentId!, likes: row.likes, dislikes: row.dislikes }));
+    const key = arcKey(arc);
+    const rows = await this.prisma.engagementCounters.findMany({
+      where: { [key]: { not: null } },
+    });
 
-    return new Map(rows.map(({ subjectId, likes, dislikes }) => [subjectId, { likes, dislikes }]));
+    const counts = new Map<string, Counts>();
+
+    for (const row of rows) {
+      const subjectId = row[key];
+      if (!subjectId) continue;
+
+      counts.set(subjectId, { likes: row.likes, dislikes: row.dislikes });
+    }
+
+    return counts;
   }
 
   private async publish(arc: ReactionArc, drifted: number): Promise<void> {

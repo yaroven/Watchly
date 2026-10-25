@@ -6,7 +6,14 @@ import {
 } from "../engagement/engagement-counters.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { ReactionResult, Reactions } from "./reaction.types";
-import { ReactionTarget, reactionWhereUnique } from "./utils/reaction-target.const";
+import {
+  arcLabel,
+  arcOf,
+  ReactionTarget,
+  reactionWhereUnique,
+  subjectExists,
+  subjectIdOf,
+} from "./utils/reaction-target.const";
 import { Vote } from "./utils/vote.util";
 
 type ReactionClient = Pick<PrismaService, "reaction" | "engagementCounters" | "comment">;
@@ -19,20 +26,11 @@ export class ReactionService implements Reactions {
   ) {}
 
   async assertSubjectExists(target: ReactionTarget): Promise<void> {
-    if ("titleId" in target) {
-      const title = await this.prisma.title.findUnique({
-        where: { id: target.titleId },
-        select: { id: true },
-      });
-      if (!title) throw new NotFoundException(`Title with id ${target.titleId} not found`);
-      return;
-    }
+    if (await subjectExists(this.prisma, target)) return;
 
-    const comment = await this.prisma.comment.findUnique({
-      where: { id: target.commentId },
-      select: { id: true },
-    });
-    if (!comment) throw new NotFoundException(`Comment with id ${target.commentId} not found`);
+    throw new NotFoundException(
+      `${arcLabel(arcOf(target))} with id ${subjectIdOf(target)} not found`,
+    );
   }
 
   async setVote(

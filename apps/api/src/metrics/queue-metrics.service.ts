@@ -2,44 +2,14 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import { Queue } from "bullmq";
 import { Gauge } from "prom-client";
 
-/**
- * The queues to sample. Supplied by the module that registered them, so this
- * service never imports a transcoder's queue name — the same reason the image
- * attachers arrive through a token.
- */
 export const METRICS_QUEUES = Symbol("METRICS_QUEUES");
 
-/**
- * `completed` is here so a queue whose jobs *are* landing says so. For the
- * reaction flush that is the only signal the api has that votes are reaching
- * Postgres — the processor runs in the worker, which serves no metrics of its
- * own, but BullMQ keeps these counts in Redis where either side can read them.
- */
 const STATES = ["waiting", "active", "delayed", "failed", "completed"] as const;
 
 const logger = new Logger("QueueMetrics");
 
-/**
- * Module-level, like every other metric here, which leaves the queues to reach
- * through a holder: `collect` runs on the metric and has no instance to read
- * from. This is the one place the module-level arrangement is clumsier than an
- * injected registry would have been.
- *
- * Replaced rather than appended, so building the service twice — which happens
- * in tests — does not sample the same queue twice.
- */
 let sampled: Queue[] = [];
 
-/**
- * Queue depth is a property of Redis, not of a process, so it is sampled at
- * scrape time rather than tracked on job events — a counter kept in memory
- * would be one process's partial view and would reset on every rollout.
- *
- * Being a property of Redis is also why this lives in the api rather than with
- * the processors: the numbers are the same from either side, and the api is the
- * process that serves /metrics. The api runs two replicas in prod, so both
- * publish these series — aggregate with `max by (queue, state)`, never `sum`.
- */
 const jobs = new Gauge({
   name: "bullmq_queue_jobs",
   help: "Jobs per queue per state, sampled from Redis at scrape time",
@@ -47,12 +17,6 @@ const jobs = new Gauge({
   collect: () => sample(),
 });
 
-/**
- * Swallows its own failure on purpose. `register.metrics()` rejects as a whole
- * if any collector throws, so an unreachable Redis would blank out every other
- * metric in the process — including the ones that would tell you it is still
- * serving requests.
- */
 async function sample(): Promise<void> {
   await Promise.all(
     sampled.map(async (queue) => {

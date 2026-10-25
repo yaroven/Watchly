@@ -14,7 +14,6 @@ describe("voteDelta", () => {
     expect(voteDelta(DISLIKE, null)).toEqual({ likes: 0, dislikes: -1 });
   });
 
-  /** The case a single counter cannot express: switching sides moves both. */
   it("moves both counters when the vote switches sides", () => {
     expect(voteDelta(LIKE, DISLIKE)).toEqual({ likes: -1, dislikes: 1 });
     expect(voteDelta(DISLIKE, LIKE)).toEqual({ likes: 1, dislikes: -1 });
@@ -31,7 +30,6 @@ describe("resolveVote", () => {
     expect(resolveVote(DISLIKE, LIKE)).toBe(DISLIKE);
   });
 
-  /** A stored withdrawal is an answer, and has to beat a row not yet flushed. */
   it("takes a cached withdrawal over the row", () => {
     expect(resolveVote(null, LIKE)).toBeNull();
   });

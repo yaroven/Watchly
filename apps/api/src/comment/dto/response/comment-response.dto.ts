@@ -30,11 +30,6 @@ export class CommentAuthorDto {
   }
 }
 
-/**
- * A comment as the service loads it: the author, the cached counters, and — for
- * a signed-in read — the viewer's own reaction. All three are relations now
- * that the subject is a foreign key, so they arrive with the row.
- */
 export type CommentWithAuthor = Comment & {
   user: Pick<User, "id" | "email" | "displayName" | "avatarKey"> & {
     ratings?: { score: number }[];
@@ -46,10 +41,7 @@ export type CommentWithAuthor = Comment & {
 export interface CommentResponseOptions {
   replies?: CommentResponseDto[];
   authorAvatarUrl?: string | null;
-  /**
-   * The viewer's vote as the cache has it. Absent means the cache had no
-   * answer, and then the `reactions` relation this read already loaded is it.
-   */
+
   myReaction?: Vote;
 }
 
@@ -87,12 +79,6 @@ export class CommentResponseDto {
   @ApiProperty({ description: "How many replies exist in total, not how many are in `replies`" })
   replyCount: number;
 
-  /**
-   * Counts, the viewer's vote and the author's score all come off the row:
-   * each is a relation the read already carries. What stays an argument is
-   * what the row cannot know — the nested replies, and the avatar URL, which
-   * needs the S3 service to build.
-   */
   constructor(
     comment: CommentWithAuthor,
     { replies = [], authorAvatarUrl = null, myReaction }: CommentResponseOptions = {},

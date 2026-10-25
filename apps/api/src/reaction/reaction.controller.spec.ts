@@ -6,13 +6,6 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { ReactionController } from "./reaction.controller";
 import { REACTIONS } from "./reaction.types";
 
-/**
- * Through HTTP rather than by calling the handler: the segment-to-kind pipe is
- * a param pipe, and Nest does not run those on a direct method call.
- *
- * The controller takes the `REACTIONS` token, not a class, so this stands for
- * either implementation behind it.
- */
 describe("ReactionController", () => {
   const TITLE_ID = "11111111-1111-4111-8111-111111111111";
   const COMMENT_ID = "33333333-3333-4333-8333-333333333333";
@@ -89,7 +82,6 @@ describe("ReactionController", () => {
     expect(reactionService.clearVote).toHaveBeenCalledWith({ commentId: COMMENT_ID }, VIEWER_ID);
   });
 
-  // A kind the arcs do not cover is a bad request, not a 404 or a silent write.
   it("should refuse a segment that cannot carry reactions", async () => {
     await request(app.getHttpServer())
       .put(`/reactions/seasons/${TITLE_ID}`)
@@ -108,7 +100,6 @@ describe("ReactionController", () => {
     expect(reactionService.assertSubjectExists).not.toHaveBeenCalled();
   });
 
-  /** Absolute means the second identical call is not a withdrawal. */
   it("should pass the same vote through twice rather than treating it as a toggle", async () => {
     const send = () =>
       request(app.getHttpServer())

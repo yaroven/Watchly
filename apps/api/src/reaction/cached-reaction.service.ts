@@ -64,10 +64,6 @@ export class CachedReactionService implements Reactions {
 
     const displaced = await this.voteState.set(target, userId, vote);
 
-    // `undefined` means the cache held nothing to displace, and by now it holds
-    // the new value — so the row is the only thing left that knows what came
-    // before. Wanted for the counts in the response and nothing else, which is
-    // why a wrong answer here is cosmetic rather than a lost vote.
     return displaced ?? (await rowVote(this.prisma, target, userId));
   }
 

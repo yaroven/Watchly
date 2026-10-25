@@ -7,11 +7,11 @@ import {
 import { Role } from "@prisma/client";
 import { EngagementCountersService } from "../engagement/engagement-counters.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { ViewerVotesService } from "../reaction/viewer-votes.service";
 import { ReportService } from "../report/report.service";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
 import assertTitleExists from "../title/utils/assert-title-exists.util";
+import { VoteStateService } from "../vote-cache/vote-state.service";
 import { CommentSortMode, GetCommentsDto } from "./dto/request/get-comments.dto";
 import {
   CommentResponseDto,
@@ -36,7 +36,7 @@ export class CommentService {
     private readonly s3Service: S3Service,
     private readonly reportService: ReportService,
     private readonly counters: EngagementCountersService,
-    private readonly viewerVotes: ViewerVotesService,
+    private readonly voteState: VoteStateService,
   ) {}
 
   private avatarUrl(user: { avatarKey: string | null }): string | null {
@@ -79,7 +79,7 @@ export class CommentService {
       this.findReplyPreviews(rootIds, viewerId, titleId),
     ])) as [CommentWithAuthor[], CommentWithAuthor[]];
 
-    const votes = await this.viewerVotes.forPage("comment", [...roots, ...replies], viewerId);
+    const votes = await this.voteState.forComments([...roots, ...replies], viewerId);
 
     const toDto = (comment: CommentWithAuthor, nested: CommentResponseDto[] = []) =>
       this.toResponse(comment, { replies: nested, myReaction: votes.get(comment.id) });
@@ -165,7 +165,7 @@ export class CommentService {
       this.prisma.comment.count({ where }),
     ])) as [CommentWithAuthor[], number];
 
-    const votes = await this.viewerVotes.forPage("comment", replies, viewerId);
+    const votes = await this.voteState.forComments(replies, viewerId);
 
     return {
       items: replies.map((reply) => this.toResponse(reply, { myReaction: votes.get(reply.id) })),
