@@ -4,11 +4,14 @@ import { ReactionType } from "@prisma/client";
 import request from "supertest";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { ReactionController } from "./reaction.controller";
-import { ReactionService } from "./reaction.service";
+import { REACTIONS } from "./reaction.types";
 
 /**
  * Through HTTP rather than by calling the handler: the segment-to-kind pipe is
  * a param pipe, and Nest does not run those on a direct method call.
+ *
+ * The controller takes the `REACTIONS` token, not a class, so this stands for
+ * either implementation behind it.
  */
 describe("ReactionController", () => {
   const TITLE_ID = "11111111-1111-4111-8111-111111111111";
@@ -34,7 +37,7 @@ describe("ReactionController", () => {
 
     const moduleRef = await Test.createTestingModule({
       controllers: [ReactionController],
-      providers: [{ provide: ReactionService, useValue: reactionService }],
+      providers: [{ provide: REACTIONS, useValue: reactionService }],
     })
       .overrideGuard(JwtAuthGuard)
       .useValue({

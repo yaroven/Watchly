@@ -157,6 +157,16 @@ saving. Showing an upload as still processing is client work that has not been d
   `PUT|DELETE /reactions/:entityType/:entityId` (`titles`, `comments`). Don't add a
   per-feature reaction route — casting a vote belongs to
   `ReactionService.setVote`/`clearVote`, which own it end to end.
+- **The cache is a decorator over the uncached path, not a replacement for it.**
+  `CachedReactionService` wraps `ReactionService` and delegates to it on
+  `RedisUnavailableError`, so a Redis outage writes the row synchronously instead of
+  refusing the vote. The controller injects the `REACTIONS` token, never a class, and
+  `{ provide: REACTIONS, useExisting: CachedReactionService }` in `ReactionModule` is
+  the single line that decides whether Redis is on the path of a request at all. Two
+  consequences to keep: the fallback writes **no** cache key (absent means "unknown",
+  so the next read goes to the row it just wrote — writing a guess there is what would
+  make the two disagree), and only `RedisUnavailableError` falls back; everything else
+  is a bug and must surface.
 - **A reaction is absolute, never a toggle** (ADR-0016). The request names the vote the
   viewer wants to hold; sending the same one twice changes nothing the second time, and
   `DELETE` withdraws whether or not there was anything to withdraw. The reason is not
@@ -184,8 +194,8 @@ saving. Showing an upload as still processing is client work that has not been d
   one falls back to it. Both halves matter: the relation is what the last flush left
   behind, so preferring it would render a vote the viewer's next click contradicts,
   while a cache miss has a free and correct answer already loaded. `readMany` is also
-  the one place a Redis failure is swallowed — reads degrade to the relation, writes
-  refuse with a 503.
+  the one place a Redis failure is swallowed — reads degrade to the relation, and
+  writes degrade too (see the decorator below), so an unreachable Redis is not a 503.
 - `RedisService` extends `ioredis` the way `PrismaService` extends `PrismaClient`, and
   runs with `enableOfflineQueue: false`: a command issued while the socket is down
   rejects instead of waiting for a reconnect, which is what lets a caller choose

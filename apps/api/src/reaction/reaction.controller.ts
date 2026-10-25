@@ -4,6 +4,7 @@ import {
   Delete,
   HttpCode,
   HttpStatus,
+  Inject,
   Param,
   ParseUUIDPipe,
   Put,
@@ -14,7 +15,6 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
-  ApiServiceUnavailableResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
@@ -22,13 +22,13 @@ import { Auth } from "../auth/decorators/auth.decorator";
 import { CurrentUserId } from "../auth/decorators/current-user-id.decorator";
 import { ReactDto } from "./dto/request/react.dto";
 import { ReactionResultDto } from "./dto/response/reaction-result.dto";
-import { ReactionService } from "./reaction.service";
+import { REACTIONS, Reactions } from "./reaction.types";
 import { REACTABLE_SEGMENTS, ReactableArc, ReactableArcPipe } from "./utils/reactable-arc.pipe";
 
 @ApiTags("reactions")
 @Controller("reactions")
 export class ReactionController {
-  constructor(private readonly reactionService: ReactionService) {}
+  constructor(@Inject(REACTIONS) private readonly reactions: Reactions) {}
 
   @ApiOperation({
     summary: "Set your vote on anything that can carry a reaction",
@@ -41,7 +41,6 @@ export class ReactionController {
   @ApiBadRequestResponse({ description: "Not a kind that can carry reactions" })
   @ApiUnauthorizedResponse({ description: "Not signed in" })
   @ApiNotFoundResponse({ description: "Subject not found" })
-  @ApiServiceUnavailableResponse({ description: "The vote cache is unreachable" })
   @Auth()
   @HttpCode(HttpStatus.OK)
   @Put(":entityType/:entityId")
@@ -52,9 +51,9 @@ export class ReactionController {
     @CurrentUserId() userId: string,
   ): Promise<ReactionResultDto> {
     const target = arc(entityId);
-    await this.reactionService.assertSubjectExists(target);
+    await this.reactions.assertSubjectExists(target);
 
-    return this.reactionService.setVote(target, userId, type);
+    return this.reactions.setVote(target, userId, type);
   }
 
   @ApiOperation({
@@ -67,7 +66,6 @@ export class ReactionController {
   @ApiBadRequestResponse({ description: "Not a kind that can carry reactions" })
   @ApiUnauthorizedResponse({ description: "Not signed in" })
   @ApiNotFoundResponse({ description: "Subject not found" })
-  @ApiServiceUnavailableResponse({ description: "The vote cache is unreachable" })
   @Auth()
   @Delete(":entityType/:entityId")
   async clearVote(
@@ -76,8 +74,8 @@ export class ReactionController {
     @CurrentUserId() userId: string,
   ): Promise<ReactionResultDto> {
     const target = arc(entityId);
-    await this.reactionService.assertSubjectExists(target);
+    await this.reactions.assertSubjectExists(target);
 
-    return this.reactionService.clearVote(target, userId);
+    return this.reactions.clearVote(target, userId);
   }
 }
