@@ -187,10 +187,13 @@ saving. Showing an upload as still processing is client work that has not been d
   cache without pulling in the flush queue) keeps one key per (subject, viewer) pair —
   `vote:<arc>:<subjectId>:<userId>` = `L`/`D`/`N`, TTL 7d. `set` writes one with
   `SET … GET`: unconditional, one round trip, and the displaced value comes back to
-  correct the counts in the response. Two things are load-bearing: a stored `N` means
-  "holds no vote" while a **missing** key means "unknown" and sends the caller to the
-  row, and **the cache is never asked for a count** — that is what lets it answer about
-  one viewer without ever being complete.
+  correct the counts in the response. Three things are load-bearing: a stored `N` means
+  "holds no vote" while a **missing** key means "unknown"; **the cache never touches
+  Postgres**, so not knowing arrives at the caller as `undefined` and each decides what
+  to do with it (a read falls back to the relation, a flush reads the row through
+  `rowVote`, a write wants it only to report a count); and **the cache is never asked
+  for a count** — that is what lets it answer about one viewer without ever being
+  complete.
 - **`myReaction` on a read comes from the cache; the counts beside it do not.** A read
   asks `ViewerVotesService.forPage` for the whole page — one `MGET` — and hands each
   answer to the DTO, which settles it with `resolveVote`: a **present** entry wins over

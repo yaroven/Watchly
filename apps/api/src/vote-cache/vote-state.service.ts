@@ -1,10 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
-import {
-  ReactionTarget,
-  reactionWhereUnique,
-  subjectIdOf,
-} from "../reaction/utils/reaction-target.const";
+import { ReactionTarget, subjectIdOf } from "../reaction/utils/reaction-target.const";
 import { Vote } from "../reaction/utils/vote.util";
 import { throughRedis } from "../redis/redis.error";
 import { RedisService } from "../redis/redis.service";
@@ -24,32 +19,30 @@ import {
  * which is why this cache never has to be complete to be correct: it answers
  * about one viewer, so it can be built one viewer at a time.
  *
- * **A missing key is still not a vote of none.** `N` is a stored answer and an
- * absent key is "never asked"; `read` turns the second into the first by going
- * to the row. That mattered more when a toggle was decided from it, but it
- * still decides what a flush mirrors and what a page renders.
+ * **A missing key is still not a vote of none.** `N` is a stored answer, an
+ * absent key is "never asked", and the two stay distinguishable all the way
+ * out. That mattered more when a toggle was decided from it, but it still
+ * decides what a flush mirrors and what a page renders.
  *
- * Nothing here decides anything. A request names the vote it wants outright,
- * so `set` writes it unconditionally — there is no transition to compute, and
- * therefore no stale read that could compute one wrongly. The hydration below
- * exists for the counts in the response, not for correctness.
+ * Nothing here decides anything, in either direction. A request names the vote
+ * it wants outright, so `set` writes it unconditionally; and no method reaches
+ * into Postgres to cover for a miss, so "the cache does not know" reaches the
+ * caller as `undefined` and stays its business. The three callers want three
+ * different things from not knowing — a read falls back to the relation it
+ * already loaded, a flush reads the row, a write wants it only to report a
+ * count — and none of those belong to a cache.
  */
 @Injectable()
 export class VoteStateService {
   private readonly logger = new Logger(VoteStateService.name);
 
-  constructor(
-    private readonly redis: RedisService,
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly redis: RedisService) {}
 
-  /** The viewer's vote: from the cache when it has an answer, from the row when it doesn't. */
-  async read(target: ReactionTarget, userId: string): Promise<Vote> {
-    const cached = decodeVote(
+  /** What the cache holds for one pair, or `undefined` when it has no answer. */
+  async get(target: ReactionTarget, userId: string): Promise<Vote | undefined> {
+    return decodeVote(
       await throughRedis("read a vote", () => this.redis.get(voteKey(target, userId))),
     );
-
-    return cached === undefined ? this.hydrate(target, userId) : cached;
   }
 
   /**
@@ -106,36 +99,11 @@ export class VoteStateService {
    * write, since by then the key already holds the new value and cannot say
    * what came before it.
    */
-  async set(target: ReactionTarget, userId: string, vote: Vote): Promise<Vote> {
-    const previous = await throughRedis("write a vote", () =>
-      this.redis.set(voteKey(target, userId), encodeVote(vote), "EX", VOTE_TTL_SECONDS, "GET"),
+  async set(target: ReactionTarget, userId: string, vote: Vote): Promise<Vote | undefined> {
+    return decodeVote(
+      await throughRedis("write a vote", () =>
+        this.redis.set(voteKey(target, userId), encodeVote(vote), "EX", VOTE_TTL_SECONDS, "GET"),
+      ),
     );
-    const decoded = decodeVote(previous);
-
-    return decoded === undefined ? this.rowVote(target, userId) : decoded;
-  }
-
-  private async write(target: ReactionTarget, userId: string, vote: Vote): Promise<void> {
-    await throughRedis("write a vote", () =>
-      this.redis.set(voteKey(target, userId), encodeVote(vote), "EX", VOTE_TTL_SECONDS),
-    );
-  }
-
-  /** The last flushed vote. The row is the only place that knows it. */
-  private async rowVote(target: ReactionTarget, userId: string): Promise<Vote> {
-    const row = await this.prisma.reaction.findUnique({
-      where: reactionWhereUnique(target, userId),
-      select: { type: true },
-    });
-
-    return row?.type ?? null;
-  }
-
-  private async hydrate(target: ReactionTarget, userId: string): Promise<Vote> {
-    const vote = await this.rowVote(target, userId);
-
-    await this.write(target, userId, vote);
-
-    return vote;
   }
 }

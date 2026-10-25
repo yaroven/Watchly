@@ -8,6 +8,7 @@ import { VoteStateService } from "../vote-cache/vote-state.service";
 import { ReactionService } from "./reaction.service";
 import { ReactionResult, Reactions } from "./reaction.types";
 import { ReactionTarget } from "./utils/reaction-target.const";
+import { rowVote } from "./utils/vote.query";
 import { Vote, voteDelta } from "./utils/vote.util";
 
 @Injectable()
@@ -61,7 +62,13 @@ export class CachedReactionService implements Reactions {
   private async record(target: ReactionTarget, userId: string, vote: Vote): Promise<Vote> {
     await this.flush.schedule(target, userId);
 
-    return this.voteState.set(target, userId, vote);
+    const displaced = await this.voteState.set(target, userId, vote);
+
+    // `undefined` means the cache held nothing to displace, and by now it holds
+    // the new value — so the row is the only thing left that knows what came
+    // before. Wanted for the counts in the response and nothing else, which is
+    // why a wrong answer here is cosmetic rather than a lost vote.
+    return displaced ?? (await rowVote(this.prisma, target, userId));
   }
 
   private async answer(

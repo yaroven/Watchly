@@ -20,7 +20,10 @@ describe("CachedReactionService", () => {
   let direct: { setVote: jest.Mock; clearVote: jest.Mock; assertSubjectExists: jest.Mock };
   let voteState: { set: jest.Mock };
   let flush: { schedule: jest.Mock };
-  let prisma: { engagementCounters: { findUnique: jest.Mock } };
+  let prisma: {
+    engagementCounters: { findUnique: jest.Mock };
+    reaction: { findUnique: jest.Mock };
+  };
   let calls: string[];
 
   const flushed = (likes: number, dislikes: number, commentCount = 0) =>
@@ -43,7 +46,7 @@ describe("CachedReactionService", () => {
     voteState = {
       set: jest.fn().mockImplementation(() => {
         calls.push("set");
-        return Promise.resolve(null);
+        return Promise.resolve(undefined);
       }),
     };
     flush = {
@@ -52,7 +55,10 @@ describe("CachedReactionService", () => {
         return Promise.resolve();
       }),
     };
-    prisma = { engagementCounters: { findUnique: jest.fn().mockResolvedValue(null) } };
+    prisma = {
+      engagementCounters: { findUnique: jest.fn().mockResolvedValue(null) },
+      reaction: { findUnique: jest.fn().mockResolvedValue(null) },
+    };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -134,6 +140,31 @@ describe("CachedReactionService", () => {
         likes: 10,
         dislikes: 4,
       });
+    });
+
+    /**
+     * `undefined` from the cache means it held nothing to displace, and by then
+     * it holds the new value — so the row is the only thing that knows what
+     * came before. It is wanted for this number and nothing else.
+     */
+    it("reads the row for the previous vote when the cache displaced nothing", async () => {
+      flushed(10, 4);
+      voteState.set.mockResolvedValue(undefined);
+      prisma.reaction.findUnique.mockResolvedValue({ type: LIKE });
+
+      await expect(service.setVote(target, userId, DISLIKE)).resolves.toMatchObject({
+        likes: 9,
+        dislikes: 5,
+      });
+    });
+
+    it("does not read a row when the cache displaced something", async () => {
+      flushed(10, 4);
+      voteState.set.mockResolvedValue(LIKE);
+
+      await service.setVote(target, userId, DISLIKE);
+
+      expect(prisma.reaction.findUnique).not.toHaveBeenCalled();
     });
 
     /** The two numbers come from different moments, so the subtraction can underflow. */
