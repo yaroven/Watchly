@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Comment, ReactionType, User } from "@prisma/client";
-import { Vote } from "../../../reaction/utils/next-vote.util";
+import { Vote } from "../../../reaction/utils/vote.util";
 
 export class CommentAuthorDto {
   @ApiProperty({ format: "uuid" })

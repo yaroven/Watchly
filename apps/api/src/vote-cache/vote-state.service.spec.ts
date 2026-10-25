@@ -19,7 +19,7 @@ describe("VoteStateService", () => {
   let prisma: { reaction: { findUnique: jest.Mock } };
 
   beforeEach(async () => {
-    redis = { get: jest.fn().mockResolvedValue(null), set: jest.fn().mockResolvedValue("OK") };
+    redis = { get: jest.fn().mockResolvedValue(null), set: jest.fn().mockResolvedValue(null) };
     prisma = { reaction: { findUnique: jest.fn().mockResolvedValue(null) } };
 
     const moduleRef = await Test.createTestingModule({
@@ -81,61 +81,65 @@ describe("VoteStateService", () => {
     });
   });
 
-  describe("transition", () => {
-    it("sets the vote the viewer does not hold", async () => {
-      redis.get.mockResolvedValue("N");
+  describe("set", () => {
+    /**
+     * The point of an absolute write: the value stored owes nothing to the
+     * value read, so two clicks cannot race over a decision neither of them
+     * makes.
+     */
+    it("writes the vote it was given whatever was there before", async () => {
+      redis.set.mockResolvedValue("D");
 
-      await expect(service.transition(target, userId, LIKE)).resolves.toEqual({
-        previous: null,
-        next: LIKE,
-      });
-      expect(redis.set).toHaveBeenCalledWith(key, "L", "EX", VOTE_TTL_SECONDS);
+      await service.set(target, userId, LIKE);
+
+      expect(redis.set).toHaveBeenCalledWith(key, "L", "EX", VOTE_TTL_SECONDS, "GET");
     });
 
-    it("withdraws the vote the viewer already holds", async () => {
-      redis.get.mockResolvedValue("L");
+    it("stores a withdrawal as the tombstone, not as a deletion", async () => {
+      redis.set.mockResolvedValue("L");
 
-      await expect(service.transition(target, userId, LIKE)).resolves.toEqual({
-        previous: LIKE,
-        next: null,
-      });
-      expect(redis.set).toHaveBeenCalledWith(key, "N", "EX", VOTE_TTL_SECONDS);
+      await service.set(target, userId, null);
+
+      expect(redis.set).toHaveBeenCalledWith(key, "N", "EX", VOTE_TTL_SECONDS, "GET");
     });
 
-    it("switches sides", async () => {
-      redis.get.mockResolvedValue("L");
+    it("answers with the vote that was displaced", async () => {
+      redis.set.mockResolvedValue("L");
 
-      await expect(service.transition(target, userId, DISLIKE)).resolves.toEqual({
-        previous: LIKE,
-        next: DISLIKE,
-      });
+      await expect(service.set(target, userId, DISLIKE)).resolves.toBe(LIKE);
     });
 
-    /** A withdrawal is not a toggle: it ends in no vote whatever was held. */
-    it("withdraws on a null request regardless of what was held", async () => {
-      redis.get.mockResolvedValue("D");
+    it("reads a displaced tombstone as no previous vote", async () => {
+      redis.set.mockResolvedValue("N");
 
-      await expect(service.transition(target, userId, null)).resolves.toEqual({
-        previous: DISLIKE,
-        next: null,
-      });
-      expect(redis.set).toHaveBeenCalledWith(key, "N", "EX", VOTE_TTL_SECONDS);
+      await expect(service.set(target, userId, LIKE)).resolves.toBeNull();
+      expect(prisma.reaction.findUnique).not.toHaveBeenCalled();
     });
 
     /**
-     * The bug this cache exists to avoid. A cold Redis that answered "no vote"
-     * would re-cast the like the viewer came to withdraw, and the flush would
-     * then mirror that back over a row that already said LIKE — a click that
-     * answers 200 and changes nothing.
+     * `SET … GET` on a key that held nothing cannot say what came before it,
+     * and by then the key holds the new value — so the row is the only place
+     * left that knows. It is wanted for the counts in the response, which is
+     * why getting it wrong is cosmetic now rather than a lost vote.
      */
-    it("withdraws against a cold cache by reading the row first", async () => {
-      redis.get.mockResolvedValue(null);
-      prisma.reaction.findUnique.mockResolvedValue({ type: LIKE });
+    it("falls back to the row when the cache had nothing to displace", async () => {
+      redis.set.mockResolvedValue(null);
+      prisma.reaction.findUnique.mockResolvedValue({ type: DISLIKE });
 
-      await expect(service.transition(target, userId, LIKE)).resolves.toEqual({
-        previous: LIKE,
-        next: null,
+      await expect(service.set(target, userId, LIKE)).resolves.toBe(DISLIKE);
+      expect(prisma.reaction.findUnique).toHaveBeenCalledWith({
+        where: { titleId_userId: { titleId, userId } },
+        select: { type: true },
       });
+    });
+
+    it("does not write the row's value back over the vote it just stored", async () => {
+      redis.set.mockResolvedValue(null);
+      prisma.reaction.findUnique.mockResolvedValue({ type: DISLIKE });
+
+      await service.set(target, userId, LIKE);
+
+      expect(redis.set).toHaveBeenCalledTimes(1);
     });
   });
 });

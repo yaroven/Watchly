@@ -14,7 +14,7 @@ checklist item (and the mock it points to) once the backend piece lands.
       `StreamFilmInfo`, `StreamPhotos`, `TitleReviews`, `EpisodeList`,
       `StreamEpisodesSidebar`.
       Needs on `Title`: `genres: string[]`, `scores: {imdb, rottenTomatoes, metacritic,
-  tmovie}`, `ageRating`, `runtime`, `country`, `releaseDate`, `language`, `network?`,
+tmovie}`, `ageRating`, `runtime`, `country`, `releaseDate`, `language`, `network?`,
       `director`, `closedCaption`, `cast: {name, avatarUrl}[]`, `trailerUrl?`.
       Backend ready: `GET /titles/:id/comments` (paginated) and
       `GET /titles/:id/engagement` (`likes`, `dislikes`, `watchlistCount`, `avgScore`,
@@ -49,8 +49,10 @@ checklist item (and the mock it points to) once the backend piece lands.
       author and their avatar URL. Still needs a real signed-in user on the client.
 - [ ] **`CommentCard.tsx`** — like/dislike counters and the reply-count toggle are local
       state only; nothing persists. Backend ready:
-      `POST|DELETE /reactions/comments/:id` for the vote, `GET /comments/:id/replies`
-      for the toggle.
+      `PUT|DELETE /reactions/comments/:id` for the vote, `GET /comments/:id/replies`
+      for the toggle. The reaction route is absolute, not a toggle: send the vote the
+      button should end up showing, or `DELETE` to withdraw — don't send the same vote
+      again to undo it.
 - [ ] **`CommentCard.tsx`** — "Report" button has no handler. Backend ready:
       `POST /comments/:id/report`.
 
@@ -58,7 +60,8 @@ checklist item (and the mock it points to) once the backend piece lands.
 
 - [ ] **`StreamFilmInfo.tsx`** — like/dislike reaction and "Add to Watchlist" toggle are
       local state only; nothing is persisted or fetched as an initial value. Backend
-      ready: `POST|DELETE /reactions/titles/:id`, the watchlist routes, and
+      ready: `PUT|DELETE /reactions/titles/:id` (absolute — send the vote the button
+      should end up showing, `DELETE` to withdraw), the watchlist routes, and
       `GET /titles/:id/engagement`, whose `viewer` object carries the caller's own
       reaction and watchlist state — `null` when nobody is signed in, which is not the
       same as "has not voted". The component still needs wiring.

@@ -1,12 +1,11 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { ReactionType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
-import { nextVote, Vote } from "../reaction/utils/next-vote.util";
 import {
   ReactionTarget,
   reactionWhereUnique,
   subjectIdOf,
 } from "../reaction/utils/reaction-target.const";
+import { Vote } from "../reaction/utils/vote.util";
 import { throughRedis } from "../redis/redis.error";
 import { RedisService } from "../redis/redis.service";
 import {
@@ -18,11 +17,6 @@ import {
   VoteOverrides,
 } from "./vote-cache.const";
 
-export interface VoteTransition {
-  previous: Vote;
-  next: Vote;
-}
-
 /**
  * Where a viewer's vote is decided. One key per (subject, viewer) pair, holding
  * that pair's vote and nothing else — no set of voters, no count. The count
@@ -30,18 +24,15 @@ export interface VoteTransition {
  * which is why this cache never has to be complete to be correct: it answers
  * about one viewer, so it can be built one viewer at a time.
  *
- * **A missing key is not a vote of none.** Deciding a toggle from "nothing
- * here" would mean that the first click after any Redis restart re-casts the
- * vote the viewer was trying to withdraw, answers 200, and changes nothing. So
- * a miss reads the row, and what it finds — including "no row" — is written
- * back, because `N` is a stored answer rather than an absent one.
+ * **A missing key is still not a vote of none.** `N` is a stored answer and an
+ * absent key is "never asked"; `read` turns the second into the first by going
+ * to the row. That mattered more when a toggle was decided from it, but it
+ * still decides what a flush mirrors and what a page renders.
  *
- * The read-then-write in `transition` is not atomic, and deliberately: the only
- * racers are one viewer against themselves on one subject, the flush mirrors
- * whatever Redis ends up holding, and so the worst outcome is that one of two
- * clicks milliseconds apart does not count. A Lua script would close that at
- * the cost of moving the transition out of `nextVote`, where a test can reach
- * it without a server.
+ * Nothing here decides anything. A request names the vote it wants outright,
+ * so `set` writes it unconditionally — there is no transition to compute, and
+ * therefore no stale read that could compute one wrongly. The hydration below
+ * exists for the counts in the response, not for correctness.
  */
 @Injectable()
 export class VoteStateService {
@@ -102,21 +93,26 @@ export class VoteStateService {
   }
 
   /**
-   * Casts `requested` through the toggle and leaves the result in the cache.
-   * `null` is a withdrawal — the DELETE route, which is not a toggle and does
-   * not care what was held.
+   * Writes the vote the viewer asked for, and answers with the one they held
+   * before it.
+   *
+   * Unconditional: the value written does not depend on the value read, so
+   * there is no read-decide-write for two clicks to race over — two absolute
+   * writes just mean the later one wins, which is what it should mean. The
+   * previous vote is wanted only to correct the counts in the response.
+   *
+   * One round trip in the warm case: `SET … GET` writes and returns the old
+   * value together. A key that held nothing sends the row read after the
+   * write, since by then the key already holds the new value and cannot say
+   * what came before it.
    */
-  async transition(
-    target: ReactionTarget,
-    userId: string,
-    requested: ReactionType | null,
-  ): Promise<VoteTransition> {
-    const previous = await this.read(target, userId);
-    const next = requested === null ? null : nextVote(previous, requested);
+  async set(target: ReactionTarget, userId: string, vote: Vote): Promise<Vote> {
+    const previous = await throughRedis("write a vote", () =>
+      this.redis.set(voteKey(target, userId), encodeVote(vote), "EX", VOTE_TTL_SECONDS, "GET"),
+    );
+    const decoded = decodeVote(previous);
 
-    await this.write(target, userId, next);
-
-    return { previous, next };
+    return decoded === undefined ? this.rowVote(target, userId) : decoded;
   }
 
   private async write(target: ReactionTarget, userId: string, vote: Vote): Promise<void> {
@@ -125,12 +121,18 @@ export class VoteStateService {
     );
   }
 
-  private async hydrate(target: ReactionTarget, userId: string): Promise<Vote> {
+  /** The last flushed vote. The row is the only place that knows it. */
+  private async rowVote(target: ReactionTarget, userId: string): Promise<Vote> {
     const row = await this.prisma.reaction.findUnique({
       where: reactionWhereUnique(target, userId),
       select: { type: true },
     });
-    const vote = row?.type ?? null;
+
+    return row?.type ?? null;
+  }
+
+  private async hydrate(target: ReactionTarget, userId: string): Promise<Vote> {
+    const vote = await this.rowVote(target, userId);
 
     await this.write(target, userId, vote);
 

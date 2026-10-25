@@ -33,7 +33,7 @@ describe("ReactionService", () => {
 
   let service: ReactionService;
   let prisma: ReturnType<typeof client>;
-  let voteState: { transition: jest.Mock; read: jest.Mock };
+  let voteState: { set: jest.Mock; read: jest.Mock };
   let flush: { schedule: jest.Mock };
   let calls: string[];
 
@@ -45,9 +45,9 @@ describe("ReactionService", () => {
 
     voteState = {
       read: jest.fn().mockResolvedValue(null),
-      transition: jest.fn().mockImplementation(() => {
-        calls.push("transition");
-        return Promise.resolve({ previous: null, next: LIKE });
+      set: jest.fn().mockImplementation(() => {
+        calls.push("set");
+        return Promise.resolve(null);
       }),
     };
     flush = {
@@ -73,20 +73,34 @@ describe("ReactionService", () => {
   afterEach(() => jest.clearAllMocks());
 
   describe("casting a vote", () => {
-    it("decides the toggle in the cache, not in a transaction", async () => {
-      await service.vote(titleTarget(titleId), userId, LIKE);
+    it("records it in the cache, not in a transaction", async () => {
+      await service.setVote(titleTarget(titleId), userId, LIKE);
 
-      expect(voteState.transition).toHaveBeenCalledWith(titleTarget(titleId), userId, LIKE);
+      expect(voteState.set).toHaveBeenCalledWith(titleTarget(titleId), userId, LIKE);
       expect(prisma.reaction.upsert).not.toHaveBeenCalled();
       expect(prisma.reaction.deleteMany).not.toHaveBeenCalled();
     });
 
-    it("asks for a withdrawal with no vote to toggle against", async () => {
-      voteState.transition.mockResolvedValue({ previous: LIKE, next: null });
+    it("writes a withdrawal as the absence of a vote", async () => {
+      voteState.set.mockResolvedValue(LIKE);
 
-      await service.unvote(commentTarget(commentId), userId);
+      await service.clearVote(commentTarget(commentId), userId);
 
-      expect(voteState.transition).toHaveBeenCalledWith(commentTarget(commentId), userId, null);
+      expect(voteState.set).toHaveBeenCalledWith(commentTarget(commentId), userId, null);
+    });
+
+    /**
+     * Absolute, so the second identical call is not a withdrawal. The old
+     * toggle read the same request as "undo", which is the behaviour this
+     * replaced.
+     */
+    it("holds the vote when the same one is sent again", async () => {
+      voteState.set.mockResolvedValue(LIKE);
+
+      await expect(service.setVote(titleTarget(titleId), userId, LIKE)).resolves.toMatchObject({
+        myReaction: LIKE,
+      });
+      expect(voteState.set).toHaveBeenCalledWith(titleTarget(titleId), userId, LIKE);
     });
 
     /**
@@ -95,15 +109,15 @@ describe("ReactionService", () => {
      * sit in the cache, be read as real, and revert a week later.
      */
     it("schedules the flush before writing the vote", async () => {
-      await service.vote(titleTarget(titleId), userId, LIKE);
+      await service.setVote(titleTarget(titleId), userId, LIKE);
 
-      expect(calls).toEqual(["schedule", "transition"]);
+      expect(calls).toEqual(["schedule", "set"]);
     });
 
-    it("answers with the vote the toggle landed on", async () => {
-      voteState.transition.mockResolvedValue({ previous: LIKE, next: DISLIKE });
+    it("answers with the vote that was asked for", async () => {
+      voteState.set.mockResolvedValue(LIKE);
 
-      await expect(service.vote(titleTarget(titleId), userId, DISLIKE)).resolves.toMatchObject({
+      await expect(service.setVote(titleTarget(titleId), userId, DISLIKE)).resolves.toMatchObject({
         myReaction: DISLIKE,
       });
     });
@@ -116,9 +130,9 @@ describe("ReactionService", () => {
         dislikes: 4,
         commentCount: 7,
       });
-      voteState.transition.mockResolvedValue({ previous: null, next: LIKE });
+      voteState.set.mockResolvedValue(null);
 
-      await expect(service.vote(titleTarget(titleId), userId, LIKE)).resolves.toEqual({
+      await expect(service.setVote(titleTarget(titleId), userId, LIKE)).resolves.toEqual({
         likes: 11,
         dislikes: 4,
         commentCount: 7,
@@ -132,9 +146,9 @@ describe("ReactionService", () => {
         dislikes: 4,
         commentCount: 0,
       });
-      voteState.transition.mockResolvedValue({ previous: LIKE, next: DISLIKE });
+      voteState.set.mockResolvedValue(LIKE);
 
-      await expect(service.vote(titleTarget(titleId), userId, DISLIKE)).resolves.toMatchObject({
+      await expect(service.setVote(titleTarget(titleId), userId, DISLIKE)).resolves.toMatchObject({
         likes: 9,
         dislikes: 5,
       });
@@ -147,9 +161,9 @@ describe("ReactionService", () => {
         dislikes: 0,
         commentCount: 0,
       });
-      voteState.transition.mockResolvedValue({ previous: LIKE, next: null });
+      voteState.set.mockResolvedValue(LIKE);
 
-      await expect(service.unvote(titleTarget(titleId), userId)).resolves.toMatchObject({
+      await expect(service.clearVote(titleTarget(titleId), userId)).resolves.toMatchObject({
         likes: 0,
         dislikes: 0,
       });
@@ -160,24 +174,24 @@ describe("ReactionService", () => {
     it("refuses the vote with a 503", async () => {
       flush.schedule.mockRejectedValue(new RedisUnavailableError("schedule a flush", null));
 
-      await expect(service.vote(titleTarget(titleId), userId, LIKE)).rejects.toThrow(
+      await expect(service.setVote(titleTarget(titleId), userId, LIKE)).rejects.toThrow(
         ServiceUnavailableException,
       );
     });
 
     it("refuses a withdrawal the same way", async () => {
-      voteState.transition.mockRejectedValue(new RedisUnavailableError("write a vote", null));
+      voteState.set.mockRejectedValue(new RedisUnavailableError("write a vote", null));
 
-      await expect(service.unvote(titleTarget(titleId), userId)).rejects.toThrow(
+      await expect(service.clearVote(titleTarget(titleId), userId)).rejects.toThrow(
         ServiceUnavailableException,
       );
     });
 
     /** Only Redis is a 503. A broken row read is a bug, and must not be dressed up as one. */
     it("lets any other failure through untouched", async () => {
-      voteState.transition.mockRejectedValue(new Error("the database fell over"));
+      voteState.set.mockRejectedValue(new Error("the database fell over"));
 
-      await expect(service.vote(titleTarget(titleId), userId, LIKE)).rejects.toThrow(
+      await expect(service.setVote(titleTarget(titleId), userId, LIKE)).rejects.toThrow(
         "the database fell over",
       );
     });

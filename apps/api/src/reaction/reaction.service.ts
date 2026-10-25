@@ -8,9 +8,9 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { ReactionFlushScheduler } from "../reaction-flush/reaction-flush-scheduler.service";
 import { RedisUnavailableError } from "../redis/redis.error";
-import { VoteStateService, VoteTransition } from "../vote-cache/vote-state.service";
-import { Vote, voteDelta } from "./utils/next-vote.util";
+import { VoteStateService } from "../vote-cache/vote-state.service";
 import { ReactionTarget, reactionWhereUnique } from "./utils/reaction-target.const";
+import { Vote, voteDelta } from "./utils/vote.util";
 
 export type ReactionClient = Pick<PrismaService, "reaction" | "engagementCounters" | "comment">;
 
@@ -46,11 +46,24 @@ export class ReactionService {
     if (!comment) throw new NotFoundException(`Comment with id ${target.commentId} not found`);
   }
 
-  async vote(target: ReactionTarget, userId: string, type: ReactionType): Promise<ReactionResult> {
+  /**
+   * Sets the viewer's vote to `type`, whatever they held before.
+   *
+   * Absolute, not a toggle: the request says what the vote should be, because
+   * the client already knows what it is showing. Sending the same vote twice
+   * is the same as sending it once, and no part of the server has to work out
+   * what was held in order to know what is wanted.
+   */
+  async setVote(
+    target: ReactionTarget,
+    userId: string,
+    type: ReactionType,
+  ): Promise<ReactionResult> {
     return this.cast(target, userId, type);
   }
 
-  async unvote(target: ReactionTarget, userId: string): Promise<ReactionResult> {
+  /** Sets it to no vote at all. The same operation, with a different value. */
+  async clearVote(target: ReactionTarget, userId: string): Promise<ReactionResult> {
     return this.cast(target, userId, null);
   }
 
@@ -89,13 +102,9 @@ export class ReactionService {
    * number beside it from contradicting each other for the one caller who
    * already knows what they did. Everyone else sees it after the flush.
    */
-  private async cast(
-    target: ReactionTarget,
-    userId: string,
-    requested: ReactionType | null,
-  ): Promise<ReactionResult> {
-    const { previous, next } = await this.decide(target, userId, requested);
-    const delta = voteDelta(previous, next);
+  private async cast(target: ReactionTarget, userId: string, vote: Vote): Promise<ReactionResult> {
+    const previous = await this.record(target, userId, vote);
+    const delta = voteDelta(previous, vote);
     const stored = await this.counters.countsForOne(countersSubject(target), this.prisma);
 
     return {
@@ -104,7 +113,7 @@ export class ReactionService {
       // withdrawal whose vote was never flushed would otherwise read as -1.
       likes: Math.max(0, stored.likes + delta.likes),
       dislikes: Math.max(0, stored.dislikes + delta.dislikes),
-      myReaction: next,
+      myReaction: vote,
     };
   }
 
@@ -119,15 +128,11 @@ export class ReactionService {
    * request, and accepting a vote there is nowhere to put would be worse than
    * refusing it.
    */
-  private async decide(
-    target: ReactionTarget,
-    userId: string,
-    requested: ReactionType | null,
-  ): Promise<VoteTransition> {
+  private async record(target: ReactionTarget, userId: string, vote: Vote): Promise<Vote> {
     try {
       await this.flush.schedule(target, userId);
 
-      return await this.voteState.transition(target, userId, requested);
+      return await this.voteState.set(target, userId, vote);
     } catch (error) {
       if (!(error instanceof RedisUnavailableError)) throw error;
 
