@@ -53,8 +53,12 @@ This is where the bugs have been. The rules exist because each was broken:
   someone who is not.
 - **`engagement.viewer === null` means unknown, not "no".** Server-rendered payloads
   carry no bearer token, so they can never know. Don't coerce it with `?? false` — show
-  an indeterminate control and disable the toggle. The server toggles, so acting on a
-  wrong assumption _withdraws_ the like the viewer wanted to keep.
+  an indeterminate control and disable the toggle. Reacting is **absolute** now
+  (`PUT|DELETE /reactions/:entityType/:entityId`, ADR-0016): the request names the vote
+  the viewer should end up holding, so the client has to know what they hold before it
+  can know what a click means. It no longer risks withdrawing a like by accident, as it
+  did while the server inferred the toggle — it simply cannot tell `DELETE` from `PUT`
+  without that state.
 - A failed refetch still sets `isError`: query-core moves the query to `status: "error"`
   whether or not it already holds data (that is what `isRefetchError` is derived from).
   Don't reach for `failureCount` — it is also non-zero mid-retry on a fetch that will

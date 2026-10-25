@@ -6,8 +6,8 @@ import {
   useCommentReplies,
   useCreateComment,
   useDeleteComment,
-  useReactToComment,
   useReportComment,
+  useSetCommentReaction,
 } from "@/features/comment";
 import Role from "@/types/role";
 import { ThumbDown as DislikeIcon, ThumbUp as LikeIcon, ChatBubble as ReplyIcon } from "@mui/icons-material";
@@ -53,7 +53,7 @@ export default function CommentCard({ comment, titleId, depth = 0 }: CommentCard
   const [reported, setReported] = useState(false);
   const [spoilerRevealed, setSpoilerRevealed] = useState(!comment.hasSpoiler);
 
-  const react = useReactToComment();
+  const react = useSetCommentReaction();
   const report = useReportComment({ onSuccess: () => setReported(true) });
   const remove = useDeleteComment(titleId);
   const createReply = useCreateComment(titleId, {
@@ -70,7 +70,7 @@ export default function CommentCard({ comment, titleId, depth = 0 }: CommentCard
 
   const handleReact = (type: ReactionType) => {
     if (!isSignedIn) return;
-    react.mutate({ commentId: comment.id, type });
+    react.mutate({ commentId: comment.id, type: comment.myReaction === type ? null : type });
   };
 
   const isReply = depth > 0;

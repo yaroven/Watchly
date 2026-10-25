@@ -29,12 +29,15 @@ const invalidateFor = (titleId: string) => [
   commentKeys.titleListsPrefix(titleId),
 ];
 
-export const useReactToTitle = (titleId: string, options?: Omit<UseMutationOptions<ReactionResult, Error, ReactionType>, "mutationFn">) => {
-  const useReact = createMutationHook({
-    mutationFn: (type: ReactionType) => titleEngagementService.react(titleId, type),
+export const useSetTitleReaction = (
+  titleId: string,
+  options?: Omit<UseMutationOptions<ReactionResult, Error, ReactionType | null>, "mutationFn">,
+) => {
+  const useSet = createMutationHook<ReactionResult, ReactionType | null>({
+    mutationFn: (vote: ReactionType | null) => titleEngagementService.setReaction(titleId, vote),
     getInvalidateKeys: () => invalidateFor(titleId),
   });
-  return useReact(options);
+  return useSet(options);
 };
 
 export const useSetTitleWatchlist = (
