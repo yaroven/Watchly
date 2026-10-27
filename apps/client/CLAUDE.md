@@ -17,7 +17,7 @@ say so when you do.
   rule rejects any file here that is not a recognised App Router filename.
 - `features/<domain>/` — the real code: `api/` (service + query keys + hooks),
   `components/`, `schemas/` (zod), `index.ts` as the public surface. Slices: `admin`
-  `artist` `auth` `comment` `episodes` `genre` `player` `season` `title`
+  `artist` `auth` `comment` `episodes` `feature-flags` `genre` `player` `season` `title`
   `title-engagement` `transcoding` `user`.
 - `shared/` — `api/` (axios instance and the auth plumbing), `lib/`, `mui/` (theme
   tokens), `ui/`, `assets/`.
@@ -34,6 +34,15 @@ and roughly forty deep cross-feature imports exist today — prefer the other fe
 - MUI: use theme tokens from `shared/mui/theme` (`tokens`, `inputVariants`) rather than
   raw hex. There is a sass dependency but it is not the styling path.
 - New remote image hosts go in `next.config.ts` **and** `.env.example`.
+- **Feature flags come from the api, never from env.** `GET /feature-flags` is the only
+  source; there is no `NEXT_PUBLIC_FF_*` and must not be one, since that is baked at
+  build time and would be a second source of truth against the api's own gate. Read a
+  flag through `useFeatureFlag("reactions")` from `features/feature-flags`, or wrap the
+  control in `<FeatureGate flag="...">`. The hook is `false` until the api has answered
+  `true`: while the snapshot loads, on a failed fetch, and for a key the api did not
+  send. Off until proven on, the same default the api evaluates with, so a gated
+  control never renders before the answer. The snapshot is viewer-keyed like every
+  other viewer-dependent read, because the api resolves flags per caller.
 
 ### Anything that depends on who is viewing
 

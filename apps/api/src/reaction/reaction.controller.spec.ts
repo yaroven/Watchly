@@ -1,10 +1,22 @@
 import { ExecutionContext, INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
+import { OpenFeature, TypedInMemoryProvider } from "@openfeature/server-sdk";
 import { ReactionType } from "@prisma/client";
 import request from "supertest";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { ReactionController } from "./reaction.controller";
 import { REACTIONS } from "./reaction.types";
+
+const reactionsFlag = (on: boolean) =>
+  new TypedInMemoryProvider({
+    reactions: {
+      variants: { on: true, off: false },
+      defaultVariant: on ? ("on" as const) : ("off" as const),
+      disabled: false,
+    },
+  });
+
+afterAll(() => OpenFeature.close());
 
 describe("ReactionController", () => {
   const TITLE_ID = "11111111-1111-4111-8111-111111111111";
@@ -13,6 +25,8 @@ describe("ReactionController", () => {
 
   let app: INestApplication;
   let reactionService: { assertSubjectExists: jest.Mock; setVote: jest.Mock; clearVote: jest.Mock };
+
+  beforeAll(() => OpenFeature.setProviderAndWait(reactionsFlag(true)));
 
   beforeEach(async () => {
     reactionService = {
@@ -125,5 +139,51 @@ describe("ReactionController", () => {
       .expect(200);
 
     expect(reactionService.assertSubjectExists).toHaveBeenCalledWith({ titleId: TITLE_ID });
+  });
+});
+
+describe("ReactionController with reactions off", () => {
+  const TITLE_ID = "11111111-1111-4111-8111-111111111111";
+
+  let app: INestApplication;
+  let reactionService: { assertSubjectExists: jest.Mock; setVote: jest.Mock; clearVote: jest.Mock };
+
+  beforeAll(() => OpenFeature.setProviderAndWait(reactionsFlag(false)));
+
+  beforeEach(async () => {
+    reactionService = {
+      assertSubjectExists: jest.fn(),
+      setVote: jest.fn(),
+      clearVote: jest.fn(),
+    };
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [ReactionController],
+      providers: [{ provide: REACTIONS, useValue: reactionService }],
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
+
+    app = moduleRef.createNestApplication();
+    await app.init();
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  it("should hide both routes behind a 404 that reads like a missing route", async () => {
+    const response = await request(app.getHttpServer())
+      .put(`/reactions/titles/${TITLE_ID}`)
+      .send({ type: ReactionType.LIKE })
+      .expect(404);
+
+    expect(response.body).toMatchObject({ message: `Cannot PUT /reactions/titles/${TITLE_ID}` });
+    await request(app.getHttpServer()).delete(`/reactions/titles/${TITLE_ID}`).expect(404);
+
+    expect(reactionService.assertSubjectExists).not.toHaveBeenCalled();
+    expect(reactionService.setVote).not.toHaveBeenCalled();
+    expect(reactionService.clearVote).not.toHaveBeenCalled();
   });
 });
