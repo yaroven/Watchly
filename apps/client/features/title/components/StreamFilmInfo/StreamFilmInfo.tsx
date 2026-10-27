@@ -1,5 +1,6 @@
 "use client";
 
+import { FeatureGate } from "@/features/feature-flags";
 import { ReactionType, useSetTitleReaction, useSetTitleWatchlist, useTitleEngagement } from "@/features/title-engagement";
 import type { Title } from "@/features/title/schemas/title";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
@@ -110,31 +111,33 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
             py: "8px",
           }}
         >
-          <Box
-            component="button"
-            type="button"
-            aria-label={viewerEngagement?.reaction === ReactionType.LIKE ? "Remove like" : "Like"}
-            aria-pressed={viewerEngagement ? viewerEngagement.reaction === ReactionType.LIKE : undefined}
-            disabled={viewerStateUnknown || viewer.status === "pending" || react.isPending}
-            onClick={() => handleReact(ReactionType.LIKE)}
-            sx={{ ...actionButtonSx, color: viewerEngagement?.reaction === ReactionType.LIKE ? "primary.main" : "#ffffff" }}
-          >
-            <ThumbUpIcon sx={{ fontSize: "18px" }} />
-            <Typography component="span" sx={{ fontSize: "13px" }}>
-              {formatCount(engagement.likes)}
-            </Typography>
-          </Box>
-          <Box
-            component="button"
-            type="button"
-            aria-label={viewerEngagement?.reaction === ReactionType.DISLIKE ? "Remove dislike" : "Dislike"}
-            aria-pressed={viewerEngagement ? viewerEngagement.reaction === ReactionType.DISLIKE : undefined}
-            disabled={viewerStateUnknown || viewer.status === "pending" || react.isPending}
-            onClick={() => handleReact(ReactionType.DISLIKE)}
-            sx={{ ...actionButtonSx, color: viewerEngagement?.reaction === ReactionType.DISLIKE ? "primary.main" : "#ffffff" }}
-          >
-            <ThumbDownIcon sx={{ fontSize: "18px" }} />
-          </Box>
+          <FeatureGate flag="reactions">
+            <Box
+              component="button"
+              type="button"
+              aria-label={viewerEngagement?.reaction === ReactionType.LIKE ? "Remove like" : "Like"}
+              aria-pressed={viewerEngagement ? viewerEngagement.reaction === ReactionType.LIKE : undefined}
+              disabled={viewerStateUnknown || viewer.status === "pending" || react.isPending}
+              onClick={() => handleReact(ReactionType.LIKE)}
+              sx={{ ...actionButtonSx, color: viewerEngagement?.reaction === ReactionType.LIKE ? "primary.main" : "#ffffff" }}
+            >
+              <ThumbUpIcon sx={{ fontSize: "18px" }} />
+              <Typography component="span" sx={{ fontSize: "13px" }}>
+                {formatCount(engagement.likes)}
+              </Typography>
+            </Box>
+            <Box
+              component="button"
+              type="button"
+              aria-label={viewerEngagement?.reaction === ReactionType.DISLIKE ? "Remove dislike" : "Dislike"}
+              aria-pressed={viewerEngagement ? viewerEngagement.reaction === ReactionType.DISLIKE : undefined}
+              disabled={viewerStateUnknown || viewer.status === "pending" || react.isPending}
+              onClick={() => handleReact(ReactionType.DISLIKE)}
+              sx={{ ...actionButtonSx, color: viewerEngagement?.reaction === ReactionType.DISLIKE ? "primary.main" : "#ffffff" }}
+            >
+              <ThumbDownIcon sx={{ fontSize: "18px" }} />
+            </Box>
+          </FeatureGate>
           <Box component="button" type="button" aria-label="Copy link to this title" onClick={handleShare} sx={actionButtonSx}>
             <IosShareIcon sx={{ fontSize: "18px" }} />
             <Typography component="span" sx={{ fontSize: "13px", color: shareState === "failed" ? "error.main" : "inherit" }}>
