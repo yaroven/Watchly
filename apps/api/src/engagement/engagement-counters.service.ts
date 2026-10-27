@@ -19,6 +19,29 @@ export interface EngagementCounts {
 
 export const NO_COUNTS: EngagementCounts = { likes: 0, dislikes: 0, commentCount: 0 };
 
+export type ReactionCounter = Exclude<keyof EngagementCounts, "commentCount">;
+
+export const counterOf = (type: ReactionType): ReactionCounter => {
+  switch (type) {
+    case ReactionType.LIKE:
+      return "likes";
+    case ReactionType.DISLIKE:
+      return "dislikes";
+    default: {
+      const unhandled: never = type;
+      throw new Error(`No counter holds ${String(unhandled)}`);
+    }
+  }
+};
+
+export const REACTION_COUNTERS: ReactionCounter[] = Object.values(ReactionType).map(counterOf);
+
+export const zeroCounters = (): Record<ReactionCounter, number> =>
+  Object.fromEntries(REACTION_COUNTERS.map((counter) => [counter, 0])) as Record<
+    ReactionCounter,
+    number
+  >;
+
 export const titleCounters = (titleId: string): CountersSubject => ({ titleId });
 
 export const commentCounters = (commentId: string): CountersSubject => ({ commentId });
@@ -41,16 +64,13 @@ export class EngagementCountersService {
       _count: { _all: true },
     });
 
-    const byType = new Map(grouped.map((row) => [row.type, row._count._all] as const));
+    const counts = zeroCounters();
 
-    return this.write(
-      subject,
-      {
-        likes: byType.get(ReactionType.LIKE) ?? 0,
-        dislikes: byType.get(ReactionType.DISLIKE) ?? 0,
-      },
-      client,
-    );
+    for (const row of grouped) {
+      counts[counterOf(row.type)] = row._count._all;
+    }
+
+    return this.write(subject, counts, client);
   }
 
   async recomputeComments(

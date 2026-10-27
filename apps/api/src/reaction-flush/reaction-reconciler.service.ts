@@ -1,20 +1,21 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { ReactionType } from "@prisma/client";
-import { EngagementCountersService } from "../engagement/engagement-counters.service";
+import {
+  counterOf,
+  EngagementCountersService,
+  REACTION_COUNTERS,
+  ReactionCounter,
+  zeroCounters,
+} from "../engagement/engagement-counters.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { ReactionArc } from "../reaction/enums/reaction-arc.enum";
 import { arcKey, REACTION_ARCS, targetOf } from "../reaction/utils/reaction-target.const";
 import { RedisService } from "../redis/redis.service";
 import { driftKey } from "./reaction-drift.const";
 
-interface Counts {
-  likes: number;
-  dislikes: number;
-}
+type Counts = Record<ReactionCounter, number>;
 
-const ZERO: Counts = { likes: 0, dislikes: 0 };
-
-const differ = (a: Counts, b: Counts): boolean => a.likes !== b.likes || a.dislikes !== b.dislikes;
+const differ = (a: Counts, b: Counts): boolean =>
+  REACTION_COUNTERS.some((counter) => a[counter] !== b[counter]);
 
 @Injectable()
 export class ReactionReconciler {
@@ -40,7 +41,7 @@ export class ReactionReconciler {
 
     const subjectIds = new Set([...expected.keys(), ...stored.keys()]);
     const drifted = [...subjectIds].filter((subjectId) =>
-      differ(expected.get(subjectId) ?? ZERO, stored.get(subjectId) ?? ZERO),
+      differ(expected.get(subjectId) ?? zeroCounters(), stored.get(subjectId) ?? zeroCounters()),
     );
 
     for (const subjectId of drifted) {
@@ -68,9 +69,8 @@ export class ReactionReconciler {
       const subjectId = row[key];
       if (!subjectId) continue;
 
-      const current = counts.get(subjectId) ?? { ...ZERO };
-      if (row.type === ReactionType.LIKE) current.likes = row._count._all;
-      else current.dislikes = row._count._all;
+      const current = counts.get(subjectId) ?? zeroCounters();
+      current[counterOf(row.type)] = row._count._all;
       counts.set(subjectId, current);
     }
 
@@ -89,7 +89,13 @@ export class ReactionReconciler {
       const subjectId = row[key];
       if (!subjectId) continue;
 
-      counts.set(subjectId, { likes: row.likes, dislikes: row.dislikes });
+      const current = zeroCounters();
+
+      for (const counter of REACTION_COUNTERS) {
+        current[counter] = row[counter];
+      }
+
+      counts.set(subjectId, current);
     }
 
     return counts;

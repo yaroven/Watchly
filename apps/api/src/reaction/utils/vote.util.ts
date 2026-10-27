@@ -1,18 +1,22 @@
 import { ReactionType } from "@prisma/client";
+import {
+  counterOf,
+  ReactionCounter,
+  zeroCounters,
+} from "../../engagement/engagement-counters.service";
 
 export type Vote = ReactionType | null;
 
-export interface VoteDelta {
-  likes: number;
-  dislikes: number;
-}
+export type VoteDelta = Record<ReactionCounter, number>;
 
-export const voteDelta = (previous: Vote, next: Vote): VoteDelta => ({
-  likes: held(next, ReactionType.LIKE) - held(previous, ReactionType.LIKE),
-  dislikes: held(next, ReactionType.DISLIKE) - held(previous, ReactionType.DISLIKE),
-});
+export const voteDelta = (previous: Vote, next: Vote): VoteDelta => {
+  const delta = zeroCounters();
 
-const held = (vote: Vote, type: ReactionType): number => (vote === type ? 1 : 0);
+  if (previous) delta[counterOf(previous)] -= 1;
+  if (next) delta[counterOf(next)] += 1;
+
+  return delta;
+};
 
 export const resolveVote = (cached: Vote | undefined, fromRow: Vote): Vote =>
   cached === undefined ? fromRow : cached;
