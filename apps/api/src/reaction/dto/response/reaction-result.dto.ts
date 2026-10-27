@@ -14,7 +14,7 @@ export class ReactionResultDto {
   @ApiProperty({
     enum: ReactionType,
     nullable: true,
-    description: "The caller's own vote after this call — null once withdrawn",
+    description: "The vote the caller now holds — exactly what they asked for, null after a DELETE",
   })
   myReaction: ReactionType | null;
 }

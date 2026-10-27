@@ -2,6 +2,7 @@ import { NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { ReactionType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { VoteStateService } from "../vote-cache/vote-state.service";
 import { TitleEngagementService } from "./title-engagement.service";
 
 function createClientMocks() {
@@ -72,7 +73,14 @@ describe("TitleEngagementService", () => {
     prismaMock = { ...createClientMocks(), $transaction: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [TitleEngagementService, { provide: PrismaService, useValue: prismaMock }],
+      providers: [
+        TitleEngagementService,
+        { provide: PrismaService, useValue: prismaMock },
+        {
+          provide: VoteStateService,
+          useValue: { forTitles: jest.fn().mockResolvedValue(new Map()) },
+        },
+      ],
     }).compile();
 
     service = module.get(TitleEngagementService);
@@ -169,8 +177,6 @@ describe("TitleEngagementService", () => {
         reactions: [{ type: ReactionType.LIKE }],
         watchlistEntries: [{ id: "w1" }],
       });
-      // Both cached rows are relations: the counters carry the likes, the
-      // title's own row the score and watchlist.
 
       const result = await service.getEngagement(titleId, userId);
 
@@ -187,8 +193,7 @@ describe("TitleEngagementService", () => {
       for (const relation of ["ratings", "reactions", "watchlistEntries"]) {
         expect(select[relation]).toEqual(expect.objectContaining({ where: { userId } }));
       }
-      // The viewer's reaction is a relation again, so it rides along with the
-      // same read rather than costing a query of its own.
+
       expect(select.reactions).toEqual(expect.objectContaining({ where: { userId } }));
     });
 

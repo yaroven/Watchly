@@ -10,6 +10,8 @@ import { PrismaService } from "../prisma/prisma.service";
 import { buildVideoPrefix } from "../s3/processed-key";
 import { SeasonService } from "../season/season.service";
 import { VideoType } from "../video-transcoder/enums/video-type.enum";
+import { NO_VOTE_OVERRIDES, VoteOverrides } from "../vote-cache/vote-cache.const";
+import { VoteStateService } from "../vote-cache/vote-state.service";
 import { CreateTitleDto } from "./dto/request/create-title.dto";
 import { GetAllTitleDto } from "./dto/request/get-all-title.dto";
 import { UpdateTitleDto } from "./dto/request/update-title.dto";
@@ -28,6 +30,7 @@ export class TitleService {
     private readonly posterService: PosterService,
     private readonly seasonService: SeasonService,
     private readonly mediaAssetService: MediaAssetService,
+    private readonly voteState: VoteStateService,
   ) {}
 
   async create({ genreIds, ...rest }: CreateTitleDto): Promise<TitleResponseDto> {
@@ -67,8 +70,10 @@ export class TitleService {
       extra: { include: titleQuery.withEngagement(viewerId ?? null) },
     });
 
+    const votes = await this.voteState.forTitles(items, viewerId ?? null);
+
     return {
-      items: items.map((title) => this.toResponse(title, viewerId ?? null)),
+      items: items.map((title) => this.toResponse(title, viewerId ?? null, votes)),
       totalCount,
     };
   }
@@ -80,7 +85,11 @@ export class TitleService {
     })) as TitleWithEngagement | null;
     if (!title) return null;
 
-    return this.toResponse(title, viewerId ?? null);
+    return this.toResponse(
+      title,
+      viewerId ?? null,
+      await this.voteState.forTitles([title], viewerId ?? null),
+    );
   }
 
   async update(
@@ -109,7 +118,11 @@ export class TitleService {
         include: titleQuery.withEngagement(viewerId ?? null),
       })) as TitleWithEngagement;
 
-      return this.toResponse(updated, viewerId ?? null);
+      return this.toResponse(
+        updated,
+        viewerId ?? null,
+        await this.voteState.forTitles([updated], viewerId ?? null),
+      );
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
         await assertTitleExists(this.prisma, id);
@@ -162,13 +175,19 @@ export class TitleService {
       include: titleQuery.withEngagement(viewerId),
     })) as TitleWithEngagement[];
 
-    return titles.map((title) => this.toResponse(title, viewerId));
+    const votes = await this.voteState.forTitles(titles, viewerId);
+
+    return titles.map((title) => this.toResponse(title, viewerId, votes));
   }
 
-  private toResponse(title: TitleWithEngagement, viewerId: string | null): TitleResponseDto {
+  private toResponse(
+    title: TitleWithEngagement,
+    viewerId: string | null,
+    votes: VoteOverrides = NO_VOTE_OVERRIDES,
+  ): TitleResponseDto {
     return new TitleResponseDto(
       title,
-      TitleEngagementDto.fromRelations(title, viewerId),
+      TitleEngagementDto.fromRelations(title, viewerId, votes.get(title.id)),
       this.posterService.toPublicUrl(title.posterKey),
     );
   }

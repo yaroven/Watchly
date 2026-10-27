@@ -2,7 +2,7 @@
 
 NestJS 11, Prisma + Postgres, BullMQ on Redis, AWS SDK v3 for S3/SQS. Two entrypoints
 from one codebase and one Dockerfile: `src/main.ts` (HTTP, port 3000) and
-`src/worker-main.ts` (transcoding worker). `README.md` here is `nest new` boilerplate —
+`src/worker-main.ts` (background worker). `README.md` here is `nest new` boilerplate —
 ignore it.
 
 ## Layout
@@ -15,9 +15,10 @@ One directory per domain under `src/`, each with `*.module.ts`, `*.controller.ts
 `artist` `comment` `episode` `external-ratings` `genre` `season` `title` `title-cast`
 `user` `watchlist`
 
-Infrastructure: `auth`, `prisma`, `s3`, `s3-event`, `media-asset`, `poster`,
-`video-transcoder`, `metrics`, `config` (typed `registerAs` factories), `common`
-(pagination, shared DTOs, `utils/`).
+Infrastructure: `auth`, `prisma`, `redis`, `s3`, `s3-event`, `media-asset`, `poster`,
+`video-transcoder`, `reaction-flush`, `vote-cache`, `metrics`, `worker` (the worker
+process's root module, which belongs to no domain because it composes all of them),
+`config` (typed `registerAs` factories), `common` (pagination, shared DTOs, `utils/`).
 
 Anything in a domain that is not a module, controller, service or DTO goes in that
 domain's `utils/` — Prisma query shapes (`*.query.ts`), existence guards
@@ -82,22 +83,31 @@ load, which is the worst way to find out. The api injects `VideoTranscodeSchedul
 `VideoTranscoderModule` carries no `S3Module` for the same reason.
 
 **A queue is registered by the transcoder that owns it, never by a feature.**
-`VideoTranscodeScheduler.schedule` and `ImageTranscodeScheduler.schedule` are the only
-producers; `title`, `season`, `artist`, `poster` and `user-avatar` inject
-neither a `Queue` nor the job name. `UserAvatarService` used to hold an `@InjectQueue`
-of its own, which meant `UserModule` — and `AuthModule` behind it — pulled a Redis
-queue in for a feature that only hands out an upload URL. `s3-event` maps the raw key's
-kind to an `ImageKind` the same way it maps one to a `VideoType`, and calls the
-producer; the `jobId` convention (`image-<rawKey>`) lives with the producer too, rather
-than once per feature.
+`VideoTranscodeScheduler.schedule`, `ImageTranscodeScheduler.schedule` and
+`ReactionFlushScheduler.schedule` are the only producers — the third is not a
+transcoder, but it follows the rule for the same reason. A feature injects the scheduler
+and sees neither a `Queue` nor a job name: `reaction`, `title`, `season`, `artist`,
+`poster` and `user-avatar` all do. `UserAvatarService` used to
+hold an `@InjectQueue` of its own, which meant `UserModule` — and `AuthModule` behind it
+— pulled a Redis queue in for a feature that only hands out an upload URL. `s3-event`
+maps the raw key's kind to an `ImageKind` the same way it maps one to a `VideoType`, and
+calls the producer; the dedup convention lives with the producer too, rather than once
+per feature — `image-<rawKey>` as a `jobId`, and `vote-<arc>-<subjectId>-<userId>` as a
+`deduplication.id` for a flush. **A flush must not set a `jobId`**: an explicit one is
+checked for existence before BullMQ's deduplication runs, so it silently drops a vote
+that arrives while the flush is being processed. `keepLastIfActive` is what makes that
+vote raise a follow-up job instead.
 
-Both processors run in one worker process — `worker-main.ts` loads
-`VideoTranscoderWorkerModule`, which registers both queues because converting an
-image needs the ffmpeg the API image does not install. They keep **separate queues**
-on purpose: concurrency is per-queue, and one setting cannot serve a twenty-minute
-video transcode and an interactive 256px avatar. One queue for every image is right
-for the opposite reason — an avatar and a poster cost about the same. What both share
-lives in `common/utils/`: `DEFAULT_JOB_OPTIONS`, `withWorkDir`, `logJobFailure`,
+The transcoding processors run in one worker process, beside
+`ReactionFlushProcessor` — `worker-main.ts` loads `WorkerModule`
+(`src/worker/worker.module.ts`), which registers both queues because converting an image
+needs the ffmpeg the API image does not install. That module is the whole of the process
+— anything the worker is to do has to be wired there — which is why it is named after
+the process rather than after the video transcoder it started as. They keep **separate
+queues** on purpose: concurrency is per-queue, and one setting cannot serve a
+twenty-minute video transcode and an interactive 256px avatar. One queue for every image
+is right for the opposite reason — an avatar and a poster cost about the same. What both
+share lives in `common/utils/`: `DEFAULT_JOB_OPTIONS`, `withWorkDir`, `logJobFailure`,
 `streamToFile`.
 
 Every uploaded image goes through it: avatars, title and season posters, and artist
@@ -146,13 +156,69 @@ saving. Showing an upload as still processing is client work that has not been d
   widened CHECK, a backfill — not an enum value. The CHECKs are hand-written SQL that
   `prisma migrate diff` does not manage; they are listed in `docs/DOMAIN.md` beside the
   trigram index.
-- **Reacting is one route pair for everything**: `POST|DELETE /reactions/:entityType/:entityId`
-  (`titles`, `comments`). Don't add a per-feature reaction route — the toggle and the
-  recount belong to `ReactionService.vote`/`unvote`.
+- **Reacting is one route pair for everything**:
+  `PUT|DELETE /reactions/:entityType/:entityId` (`titles`, `comments`). Don't add a
+  per-feature reaction route — casting a vote belongs to
+  `ReactionService.setVote`/`clearVote`, which own it end to end.
+- **The cache is a decorator over the uncached path, not a replacement for it.**
+  `CachedReactionService` wraps `ReactionService` and delegates to it on
+  `RedisUnavailableError`, so a Redis outage writes the row synchronously instead of
+  refusing the vote. The controller injects the `REACTIONS` token, never a class, and
+  `{ provide: REACTIONS, useExisting: CachedReactionService }` in `ReactionModule` is
+  the single line that decides whether Redis is on the path of a request at all. Two
+  consequences to keep: the fallback writes **no** cache key (absent means "unknown",
+  so the next read goes to the row it just wrote — writing a guess there is what would
+  make the two disagree), and only `RedisUnavailableError` falls back; everything else
+  is a bug and must surface.
+- **A reaction is absolute, never a toggle** (ADR-0016). The request names the vote the
+  viewer wants to hold; sending the same one twice changes nothing the second time, and
+  `DELETE` withdraws whether or not there was anything to withdraw. The reason is not
+  REST tidiness: a toggle makes the _server_ decide, which means it has to read what
+  the viewer holds before it can know what they want — and then every stale or missing
+  read turns into a wrong write. Don't reintroduce a route that infers intent.
 - **Likes, dislikes and comment counts are read as a relation, never aggregated.**
   `EngagementCountersService` is the only writer, and it recomputes on the caller's
-  client so the counters commit with the rows they summarise. A title's score, rating
-  count and watchlist count stay on `TitleEngagement` — only a title has those.
+  client so the counters commit with the rows they summarise — for reactions that
+  caller is now `ReactionFlushProcessor`, which is where the `groupBy` went when it
+  left the request. The one change that would need an exception to "only writer" is
+  moving the nightly reconciliation into a single
+  `UPDATE … FROM (SELECT … GROUP BY …)`, which ADR-0016 costs out as the answer once
+  the number of **subjects** outgrows a map in the worker. Write the exception down if
+  that day comes; don't let a second writer appear quietly. A title's score, rating
+  count and watchlist count stay on
+  `TitleEngagement` — only a title has those.
+- **A viewer's vote is decided in Redis, counted in Postgres** (ADR-0016).
+  `VoteStateService` (in `vote-cache/`, its own module so a reader can depend on the
+  cache without pulling in the flush queue) keeps one key per (subject, viewer) pair —
+  `vote:<arc>:<subjectId>:<userId>` = `L`/`D`/`N`, TTL 7d. `set` writes one with
+  `SET … GET`: unconditional, one round trip, and the displaced value comes back to
+  correct the counts in the response. Three things are load-bearing: a stored `N` means
+  "holds no vote" while a **missing** key means "unknown"; **the cache never touches
+  Postgres**, so not knowing arrives at the caller as `undefined` and each decides what
+  to do with it (a read falls back to the relation, a flush reads the row through
+  `rowVote`, a write wants it only to report a count); and **the cache is never asked
+  for a count** — that is what lets it answer about one viewer without ever being
+  complete.
+- **`myReaction` on a read comes from the cache; the counts beside it do not.** A read
+  asks `ViewerVotesService.forPage` for the whole page — one `MGET` — and hands each
+  answer to the DTO, which settles it with `resolveVote`: a **present** entry wins over
+  the `reactions` relation and an **absent** one falls back to it. Both halves matter,
+  and the rule lives in one function because getting it backwards is silent: the
+  relation is what the last flush left behind, so preferring it renders a vote the
+  viewer's next request contradicts, while a cache miss has a free and correct answer
+  already loaded. `readMany` under it is also the one place a Redis failure is
+  swallowed — reads degrade to the relation, and writes degrade too (see the decorator
+  below), so an unreachable Redis is not a 503.
+- **A feature reads votes through `ViewerVotesService`, never through the cache.** It is
+  the read half of the reaction domain and lives in `ViewerVotesModule`, apart from
+  `ReactionModule` so that importing it does not bring the flush queue along — the same
+  reason `UserAvatarService` stopped holding an `@InjectQueue`. It owns the id-to-arc
+  mapping and the rule that an absent viewer reads nothing, both of which were written
+  out once per feature before.
+- `RedisService` extends `ioredis` the way `PrismaService` extends `PrismaClient`, and
+  runs with `enableOfflineQueue: false`: a command issued while the socket is down
+  rejects instead of waiting for a reconnect, which is what lets a caller choose
+  between failing and falling back rather than hanging.
 - A reply is a comment whose parent is a comment. Threads are one level deep because
   `CommentService` refuses the second, not because the schema does.
 - `title/` holds two services. `TitleService` is the catalogue — CRUD and the read
@@ -193,6 +259,14 @@ saving. Showing an upload as still processing is client work that has not been d
   `video_transcode_duration_seconds`, `image_transcode_duration_seconds` and
   `image_size_ratio` — the metrics register themselves on import — but those numbers
   have no reader until the worker gets a listener of its own.
+  - So anything the worker learns that the api should publish goes **through Redis**,
+    like queue depth does. `ReactionReconciler` leaves its repair count under
+    `reactions:drift:<arc>` and `VoteDriftMetricsService` samples it at scrape time.
+    That number is the only evidence that "drift is rare and self-healing" — the
+    assumption the whole vote cache rests on — is actually true.
+  - `bullmq_queue_jobs` samples `completed` for the same reason: the flush processor
+    runs in the worker, so the queue's own counts in Redis are how the api can see
+    that votes are landing at all.
 - **No identifier is ever a label.** No `userId`, `titleId`, `rawKey`, `jobId`. Each
   distinct label combination is a series Prometheus keeps for its own lifetime, so an id
   in that position is unbounded growth. Ids belong in the logs, which already carry
@@ -256,7 +330,9 @@ saving. Showing an upload as still processing is client work that has not been d
   carries `viewer: { myReaction, inWatchlist } | null`, where `null` means _nobody was
   in scope_ (anonymous caller, or a server-side render). A viewer who simply has not
   voted is a non-null object. Collapsing those two makes the client render a confident
-  falsehood — and, on a toggle endpoint, undo the thing the user meant to keep.
+  falsehood — and, on a toggle endpoint, undo the thing the user meant to keep. The vote
+  cache does not touch this: `viewer` is decided by whether there was a viewer at all,
+  and an anonymous read never asks the cache anything.
 - Aggregate helpers (`summarizeMany` on ratings and engagement) return **one entry per
   requested id**. `groupBy` only answers for rows that exist, so densify before
   returning. Callers treat a map miss as a broken invariant and throw.
@@ -283,6 +359,12 @@ Routes that read the viewer need a **request-level** spec (supertest +
 `overrideGuard`), not a handler call — see the four named above. A direct call never runs the param decorator, so it cannot tell
 `@CurrentUserId()` from a hardcoded value.
 
+**A file that imports `@nestjs/schedule` cannot be unit-tested.** It ships ESM, jest
+runs CJS, and the suite fails to parse before a single test runs — which is why nothing
+carrying a `@Cron` has ever had a spec here. Keep the decorator in a class with no logic
+of its own (`ReactionReconcileSchedule`) and the work it triggers somewhere a spec can
+reach (`ReactionReconciler`).
+
 **Write the test so it can fail.** Before trusting a new test, break the behaviour it
 names and confirm _that_ test goes red. The ones that have slipped through here:
 
@@ -296,3 +378,6 @@ names and confirm _that_ test goes red. The ones that have slipped through here:
   beside it, or nothing notices the controller dropping the viewer on the floor.
 - Param decorators don't execute on a direct method call. Viewer propagation needs a
   request-level test (supertest + `overrideGuard`), not a handler call.
+- Comparing two of something and asserting the agreeing case only. A reconciler test
+  where both counters matched passed with the dislike comparison deleted; it took a
+  case where the likes agreed and the dislikes did not to pin it.

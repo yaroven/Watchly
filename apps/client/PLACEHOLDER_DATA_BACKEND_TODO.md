@@ -14,7 +14,7 @@ checklist item (and the mock it points to) once the backend piece lands.
       `StreamFilmInfo`, `StreamPhotos`, `TitleReviews`, `EpisodeList`,
       `StreamEpisodesSidebar`.
       Needs on `Title`: `genres: string[]`, `scores: {imdb, rottenTomatoes, metacritic,
-  tmovie}`, `ageRating`, `runtime`, `country`, `releaseDate`, `language`, `network?`,
+tmovie}`, `ageRating`, `runtime`, `country`, `releaseDate`, `language`, `network?`,
       `director`, `closedCaption`, `cast: {name, avatarUrl}[]`, `trailerUrl?`.
       Backend ready: `GET /titles/:id/comments` (paginated) and
       `GET /titles/:id/engagement` (`likes`, `dislikes`, `watchlistCount`, `avgScore`,
@@ -47,21 +47,22 @@ checklist item (and the mock it points to) once the backend piece lands.
       state; nothing is persisted, and author/avatar are hardcoded to `"You"` /
       a picsum URL. Backend ready: `POST /titles/:id/comments`, which answers with the
       author and their avatar URL. Still needs a real signed-in user on the client.
-- [ ] **`CommentCard.tsx`** — like/dislike counters and the reply-count toggle are local
-      state only; nothing persists. Backend ready:
-      `POST|DELETE /reactions/comments/:id` for the vote, `GET /comments/:id/replies`
-      for the toggle.
+- [x] **`CommentCard.tsx`** — like/dislike go through
+      `PUT|DELETE /reactions/comments/:id` and the reply-count toggle through
+      `GET /comments/:id/replies`. The reaction route is absolute: the card sends the
+      vote the button should end up showing, or `DELETE` to withdraw.
 - [ ] **`CommentCard.tsx`** — "Report" button has no handler. Backend ready:
       `POST /comments/:id/report`.
 
 ## Stream page (video player)
 
-- [ ] **`StreamFilmInfo.tsx`** — like/dislike reaction and "Add to Watchlist" toggle are
-      local state only; nothing is persisted or fetched as an initial value. Backend
-      ready: `POST|DELETE /reactions/titles/:id`, the watchlist routes, and
-      `GET /titles/:id/engagement`, whose `viewer` object carries the caller's own
-      reaction and watchlist state — `null` when nobody is signed in, which is not the
-      same as "has not voted". The component still needs wiring.
+- [x] **`StreamFilmInfo.tsx`** — like/dislike and "Add to Watchlist" persist and are
+      seeded from the server: `PUT|DELETE /reactions/titles/:id` for the vote, the
+      watchlist routes, and `GET /titles/:id/engagement` for the initial state. Reacting
+      is absolute, so the component sends the vote the button should end up showing and
+      `DELETE` to withdraw. `engagement.viewer === null` means unknown rather than "has
+      not voted", and both toggles stay disabled while it is — without that state there
+      is no way to tell which of the two requests a click means.
 - [ ] **`StreamFilmInfo.tsx`** — score badge falls back to a hardcoded `9` when no
       `rating` prop is passed (only used when the T.Movie score mock is unavailable —
       resolved once real scores exist).

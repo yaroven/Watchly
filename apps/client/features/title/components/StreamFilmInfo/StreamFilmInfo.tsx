@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactionType, useReactToTitle, useSetTitleWatchlist, useTitleEngagement } from "@/features/title-engagement";
+import { ReactionType, useSetTitleReaction, useSetTitleWatchlist, useTitleEngagement } from "@/features/title-engagement";
 import type { Title } from "@/features/title/schemas/title";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import AddIcon from "@mui/icons-material/Add";
@@ -46,13 +46,10 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
   const engagement = liveEngagement ?? title.engagement;
   const viewerEngagement = engagement.viewer;
 
-  const react = useReactToTitle(title.id);
+  const react = useSetTitleReaction(title.id);
   const setWatchlist = useSetTitleWatchlist(title.id);
   const writeError = react.error ?? setWatchlist.error;
 
-  // Without trustworthy viewer state a toggle is a coin flip: the server toggles,
-  // so clicking an un-lit thumb on behalf of someone who has already liked the
-  // title would withdraw the like they meant to keep.
   const viewerStateUnknown = viewer.status === "signed-in" && (viewerEngagement === null || engagementFailed);
   const togglesDisabled = viewer.status !== "signed-in" || viewerStateUnknown;
 
@@ -61,12 +58,10 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
   // sends them to one rather than dimming a control at them.
   const handleToggleWhileAnonymous = () => router.push(APP.LOGIN);
 
-  // The design shows a dislike toggle with no visible counter — only the
-  // like count and the active/inactive colour change.
   const handleReact = (type: ReactionType) => {
     if (viewer.status === "anonymous") return handleToggleWhileAnonymous();
     if (togglesDisabled || react.isPending) return;
-    react.mutate(type);
+    react.mutate(viewerEngagement?.reaction === type ? null : type);
   };
 
   const flashShareState = (next: "copied" | "failed") => {

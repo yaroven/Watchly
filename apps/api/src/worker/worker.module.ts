@@ -1,6 +1,7 @@
 import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
+import { ScheduleModule } from "@nestjs/schedule";
 import { LoggerModule } from "nestjs-pino";
 import loggerConfig, {
   buildLoggerParams,
@@ -13,6 +14,7 @@ import redisConfig, {
   redisConnectionOptions,
 } from "../config/redis.config";
 import s3Config from "../config/s3.config";
+import { EngagementModule } from "../engagement/engagement.module";
 import { IMAGE_TRANSCODE_QUEUE_OPTIONS } from "../image-transcoder/image-transcode-queue.options";
 import { ImageTranscoderProcessor } from "../image-transcoder/image-transcoder.processor";
 import { ImageTranscoderService } from "../image-transcoder/image-transcoder.service";
@@ -26,13 +28,19 @@ import {
 } from "../poster/poster-image.attacher";
 import { PosterService } from "../poster/poster.service";
 import { PrismaModule } from "../prisma/prisma.module";
+import { ReactionFlushModule } from "../reaction-flush/reaction-flush.module";
+import { ReactionFlushProcessor } from "../reaction-flush/reaction-flush.processor";
+import { ReactionReconcileSchedule } from "../reaction-flush/reaction-reconcile-schedule.service";
+import { ReactionReconciler } from "../reaction-flush/reaction-reconciler.service";
+import { ReactionModule } from "../reaction/reaction.module";
 import { S3Module } from "../s3/s3.module";
 import { AvatarImageAttacher } from "../user-avatar/avatar-image.attacher";
 import { UserAvatarService } from "../user-avatar/user-avatar.service";
-import { HlsTranscoder } from "./hls-transcoder.service";
-import { VIDEO_TRANSCODE_QUEUE_OPTIONS } from "./video-transcode-queue.options";
-import { VideoTranscodeStateService } from "./video-transcode-state.service";
-import { VideoTranscoderProcessor } from "./video-transcoder-processor";
+import { HlsTranscoder } from "../video-transcoder/hls-transcoder.service";
+import { VIDEO_TRANSCODE_QUEUE_OPTIONS } from "../video-transcoder/video-transcode-queue.options";
+import { VideoTranscodeStateService } from "../video-transcoder/video-transcode-state.service";
+import { VideoTranscoderProcessor } from "../video-transcoder/video-transcoder-processor";
+import { VoteCacheModule } from "../vote-cache/vote-cache.module";
 
 @Module({
   imports: [
@@ -52,9 +60,18 @@ import { VideoTranscoderProcessor } from "./video-transcoder-processor";
     BullModule.registerQueue(VIDEO_TRANSCODE_QUEUE_OPTIONS, IMAGE_TRANSCODE_QUEUE_OPTIONS),
     S3Module,
     PrismaModule,
+    ReactionFlushModule,
+    ReactionModule,
+    VoteCacheModule,
+    EngagementModule,
+
+    ScheduleModule.forRoot(),
   ],
   providers: [
-    // The conversion half, which only this process has the ffmpeg binary for.
+    ReactionFlushProcessor,
+    ReactionReconciler,
+    ReactionReconcileSchedule,
+
     HlsTranscoder,
     VideoTranscodeStateService,
     VideoTranscoderProcessor,
@@ -74,4 +91,4 @@ import { VideoTranscoderProcessor } from "./video-transcoder-processor";
     },
   ],
 })
-export class VideoTranscoderWorkerModule {}
+export class WorkerModule {}
