@@ -38,8 +38,10 @@ const CommentService = {
     return mapComment(data);
   },
 
-  react: async (commentId: string, type: ReactionType): Promise<CommentReaction> => {
-    const { data } = await api.post<CommentReaction>(`/reactions/comments/${commentId}`, { type });
+  setReaction: async (commentId: string, vote: ReactionType | null): Promise<CommentReaction> => {
+    const { data } = vote
+      ? await api.put<CommentReaction>(`/reactions/comments/${commentId}`, { type: vote })
+      : await api.delete<CommentReaction>(`/reactions/comments/${commentId}`);
     return data;
   },
 

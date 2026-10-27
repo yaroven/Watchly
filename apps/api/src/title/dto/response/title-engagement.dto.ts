@@ -5,6 +5,7 @@ import {
   EngagementCounts,
   NO_COUNTS,
 } from "../../../engagement/engagement-counters.service";
+import { resolveVote, Vote } from "../../../reaction/utils/vote.util";
 import { EngagementRelations } from "../../utils/title.query";
 
 export interface TitleEngagementCounts extends EngagementCounts {
@@ -82,13 +83,11 @@ export class TitleEngagementDto {
     return new TitleEngagementDto(NO_ENGAGEMENT, viewer);
   }
 
-  /**
-   * The block is two cached rows, both relations: the title-only one and the
-   * shared counters every subject has. A title with neither reads as zeroes,
-   * which is the truth — the rows are written the first time something is
-   * counted.
-   */
-  static fromRelations(rows: EngagementRelations, viewerId: string | null): TitleEngagementDto {
+  static fromRelations(
+    rows: EngagementRelations,
+    viewerId: string | null,
+    myReaction?: Vote,
+  ): TitleEngagementDto {
     const counts: TitleEngagementCounts = {
       ...NO_ENGAGEMENT,
       ...countsOf(rows.counters),
@@ -106,7 +105,7 @@ export class TitleEngagementDto {
       viewerId
         ? new ViewerTitleEngagementDto(
             rows.ratings?.[0]?.score ?? null,
-            rows.reactions?.[0]?.type ?? null,
+            resolveVote(myReaction, rows.reactions?.[0]?.type ?? null),
             (rows.watchlistEntries?.length ?? 0) > 0,
           )
         : null,

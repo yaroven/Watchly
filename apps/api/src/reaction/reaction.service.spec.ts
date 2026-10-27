@@ -3,14 +3,11 @@ import { Test } from "@nestjs/testing";
 import { ReactionType } from "@prisma/client";
 import { EngagementCountersService } from "../engagement/engagement-counters.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { commentTarget, ReactionService, titleTarget } from "./reaction.service";
+import { ReactionService } from "./reaction.service";
+import { commentTarget, titleTarget } from "./utils/reaction-target.const";
 
-/**
- * The delegates both clients need. Two separate instances, never one shared
- * object: mocking `$transaction` as `(fn) => fn(prisma)` makes the transaction
- * client and the base client the same thing, and then "it runs in a
- * transaction" asserts nothing at all.
- */
+const { LIKE, DISLIKE } = ReactionType;
+
 const client = () => ({
   reaction: {
     deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
@@ -56,118 +53,100 @@ describe("ReactionService", () => {
 
   afterEach(() => jest.clearAllMocks());
 
-  /**
-   * The reason the split exists. The vote row and the counter that summarises
-   * it have to commit together; before this, `vote` defaulted its client to the
-   * base one, so the only caller ran the toggle and the recount as two
-   * autocommitted statements and a failed recount left the counter wrong with
-   * nothing to retry.
-   */
   describe("transactionality", () => {
-    it("opens a transaction for a vote and writes the row on it", async () => {
-      await service.vote(titleTarget(titleId), userId, ReactionType.LIKE);
+    it("writes the row and the counter on one transaction client", async () => {
+      await service.setVote(titleTarget(titleId), userId, LIKE);
 
       expect(prisma.$transaction).toHaveBeenCalled();
       expect(tx.reaction.upsert).toHaveBeenCalled();
-      expect(prisma.reaction.upsert).not.toHaveBeenCalled();
-    });
-
-    it("recounts on the same transaction the row was written on", async () => {
-      await service.vote(titleTarget(titleId), userId, ReactionType.LIKE);
-
       expect(tx.reaction.groupBy).toHaveBeenCalled();
-      expect(tx.engagementCounters.upsert).toHaveBeenCalled();
-      expect(prisma.engagementCounters.upsert).not.toHaveBeenCalled();
-    });
-
-    it("opens one for a withdrawal too", async () => {
-      await service.unvote(titleTarget(titleId), userId);
-
-      expect(prisma.$transaction).toHaveBeenCalled();
-      expect(tx.reaction.deleteMany).toHaveBeenCalled();
-      expect(prisma.reaction.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.reaction.upsert).not.toHaveBeenCalled();
+      expect(prisma.reaction.groupBy).not.toHaveBeenCalled();
     });
   });
 
-  describe("vote", () => {
-    it("casts the vote on the arc the target names", async () => {
-      await service.vote(titleTarget(titleId), userId, ReactionType.LIKE);
+  describe("setVote", () => {
+    it("writes the vote it was given", async () => {
+      await service.setVote(titleTarget(titleId), userId, DISLIKE);
 
       expect(tx.reaction.upsert).toHaveBeenCalledWith({
         where: { titleId_userId: { titleId, userId } },
-        create: { titleId, userId, type: ReactionType.LIKE },
-        update: { type: ReactionType.LIKE },
+        create: { titleId, userId, type: DISLIKE },
+        update: { type: DISLIKE },
       });
     });
 
-    // The unique index is per arc, so a comment's vote must address the comment
-    // one — naming the title index would write under the wrong constraint.
-    it("uses the comment's own unique index for a comment", async () => {
-      await service.vote(commentTarget(commentId), userId, ReactionType.DISLIKE);
+    it("writes the same vote again rather than withdrawing it", async () => {
+      await service.setVote(titleTarget(titleId), userId, LIKE);
+      await service.setVote(titleTarget(titleId), userId, LIKE);
 
-      expect(tx.reaction.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { commentId_userId: { commentId, userId } } }),
-      );
+      expect(tx.reaction.deleteMany).not.toHaveBeenCalled();
+      expect(tx.reaction.upsert).toHaveBeenCalledTimes(2);
     });
 
-    it("withdraws instead when the viewer sends the vote they already cast", async () => {
-      tx.reaction.deleteMany.mockResolvedValue({ count: 1 });
+    it("answers with exact counts, recounted by this call", async () => {
+      tx.engagementCounters.upsert.mockResolvedValue({ likes: 7, dislikes: 2, commentCount: 1 });
 
-      const result = await service.vote(titleTarget(titleId), userId, ReactionType.LIKE);
-
-      expect(tx.reaction.upsert).not.toHaveBeenCalled();
-      expect(result.myReaction).toBeNull();
-    });
-
-    /**
-     * The point of folding the recount in: no feature service owns part of
-     * casting a vote, so there is no path that writes the row and leaves the
-     * cached counters behind it.
-     */
-    it("recomputes the subject's counters as part of the vote", async () => {
-      tx.reaction.groupBy.mockResolvedValue([{ type: ReactionType.LIKE, _count: { _all: 3 } }]);
-      tx.engagementCounters.upsert.mockResolvedValue({ likes: 3, dislikes: 0, commentCount: 1 });
-
-      const result = await service.vote(titleTarget(titleId), userId, ReactionType.LIKE);
-
-      expect(tx.reaction.groupBy).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { titleId } }),
-      );
-      expect(result).toEqual({ likes: 3, dislikes: 0, commentCount: 1, myReaction: "LIKE" });
+      await expect(service.setVote(titleTarget(titleId), userId, LIKE)).resolves.toEqual({
+        likes: 7,
+        dislikes: 2,
+        commentCount: 1,
+        myReaction: LIKE,
+      });
     });
   });
 
-  describe("voteWithin", () => {
-    // For a caller that already holds a transaction: it must not open another,
-    // since Prisma cannot nest one.
-    it("writes on the client it is handed without opening a transaction", async () => {
-      const caller = client();
-
-      await service.voteWithin(caller as never, titleTarget(titleId), userId, ReactionType.LIKE);
-
-      expect(caller.reaction.upsert).toHaveBeenCalled();
-      expect(prisma.$transaction).not.toHaveBeenCalled();
-      expect(tx.reaction.upsert).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("unvote", () => {
-    it("drops the viewer's vote whatever it was, and recounts", async () => {
-      await service.unvote(commentTarget(commentId), userId);
+  describe("clearVote", () => {
+    it("removes the row", async () => {
+      await service.clearVote(commentTarget(commentId), userId);
 
       expect(tx.reaction.deleteMany).toHaveBeenCalledWith({ where: { commentId, userId } });
-      expect(tx.engagementCounters.upsert).toHaveBeenCalled();
+      expect(tx.reaction.upsert).not.toHaveBeenCalled();
     });
 
-    it("reports no reaction afterwards", async () => {
-      await expect(service.unvote(titleTarget(titleId), userId)).resolves.toMatchObject({
+    it("is not an error when there was nothing to withdraw", async () => {
+      tx.reaction.deleteMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.clearVote(titleTarget(titleId), userId)).resolves.toMatchObject({
         myReaction: null,
       });
     });
   });
 
+  describe("applyAbsolute", () => {
+    it("recomputes the counters on the client it was given", async () => {
+      await service.applyAbsolute(tx as never, commentTarget(commentId), userId, LIKE);
+
+      expect(tx.reaction.groupBy).toHaveBeenCalledWith({
+        by: ["type"],
+        where: { commentId },
+        _count: { _all: true },
+      });
+      expect(prisma.reaction.groupBy).not.toHaveBeenCalled();
+    });
+
+    it("is idempotent", async () => {
+      await service.applyAbsolute(tx as never, titleTarget(titleId), userId, LIKE);
+      await service.applyAbsolute(tx as never, titleTarget(titleId), userId, LIKE);
+
+      expect(tx.reaction.upsert).toHaveBeenNthCalledWith(2, {
+        where: { titleId_userId: { titleId, userId } },
+        create: { titleId, userId, type: LIKE },
+        update: { type: LIKE },
+      });
+    });
+
+    it("hands back the counts it wrote", async () => {
+      tx.engagementCounters.upsert.mockResolvedValue({ likes: 3, dislikes: 0, commentCount: 0 });
+
+      await expect(
+        service.applyAbsolute(tx as never, titleTarget(titleId), userId, LIKE),
+      ).resolves.toEqual({ likes: 3, dislikes: 0, commentCount: 0 });
+    });
+  });
+
   describe("assertSubjectExists", () => {
-    it("refuses a title that is gone", async () => {
+    it("rejects a title that is gone", async () => {
       prisma.title.findUnique.mockResolvedValue(null);
 
       await expect(service.assertSubjectExists(titleTarget(titleId))).rejects.toThrow(
@@ -175,7 +154,7 @@ describe("ReactionService", () => {
       );
     });
 
-    it("refuses a comment that is gone", async () => {
+    it("rejects a comment that is gone", async () => {
       prisma.comment.findUnique.mockResolvedValue(null);
 
       await expect(service.assertSubjectExists(commentTarget(commentId))).rejects.toThrow(

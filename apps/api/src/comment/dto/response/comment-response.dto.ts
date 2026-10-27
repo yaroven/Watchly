@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Comment, ReactionType, User } from "@prisma/client";
+import { resolveVote, Vote } from "../../../reaction/utils/vote.util";
 
 export class CommentAuthorDto {
   @ApiProperty({ format: "uuid" })
@@ -29,11 +30,6 @@ export class CommentAuthorDto {
   }
 }
 
-/**
- * A comment as the service loads it: the author, the cached counters, and — for
- * a signed-in read — the viewer's own reaction. All three are relations now
- * that the subject is a foreign key, so they arrive with the row.
- */
 export type CommentWithAuthor = Comment & {
   user: Pick<User, "id" | "email" | "displayName" | "avatarKey"> & {
     ratings?: { score: number }[];
@@ -45,6 +41,8 @@ export type CommentWithAuthor = Comment & {
 export interface CommentResponseOptions {
   replies?: CommentResponseDto[];
   authorAvatarUrl?: string | null;
+
+  myReaction?: Vote;
 }
 
 export class CommentResponseDto {
@@ -81,15 +79,9 @@ export class CommentResponseDto {
   @ApiProperty({ description: "How many replies exist in total, not how many are in `replies`" })
   replyCount: number;
 
-  /**
-   * Counts, the viewer's vote and the author's score all come off the row:
-   * each is a relation the read already carries. What stays an argument is
-   * what the row cannot know — the nested replies, and the avatar URL, which
-   * needs the S3 service to build.
-   */
   constructor(
     comment: CommentWithAuthor,
-    { replies = [], authorAvatarUrl = null }: CommentResponseOptions = {},
+    { replies = [], authorAvatarUrl = null, myReaction }: CommentResponseOptions = {},
   ) {
     this.id = comment.id;
     this.author = new CommentAuthorDto(
@@ -102,7 +94,7 @@ export class CommentResponseDto {
     this.createdAt = comment.createdAt;
     this.likes = comment.counters?.likes ?? 0;
     this.dislikes = comment.counters?.dislikes ?? 0;
-    this.myReaction = comment.reactions?.[0]?.type ?? null;
+    this.myReaction = resolveVote(myReaction, comment.reactions?.[0]?.type ?? null);
     this.replies = replies;
     this.replyCount = comment.counters?.commentCount ?? 0;
   }
