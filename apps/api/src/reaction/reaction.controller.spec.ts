@@ -7,9 +7,6 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { ReactionController } from "./reaction.controller";
 import { REACTIONS } from "./reaction.types";
 
-// @RequireFeature evaluates against the global OpenFeature singleton, not a
-// DI-provided client, so a provider has to be set before the app is built or
-// every route answers 404 before the controller is reached.
 const reactionsFlag = (on: boolean) =>
   new TypedInMemoryProvider({
     reactions: {
