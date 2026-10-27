@@ -39,8 +39,6 @@ configMapGenerator:
       - SQS_QUEUE_NAME=watchly-s3-event-queue
       - LOG_LEVEL=info
       - LOKI_URL=http://loki:3100
-      # Feature flags, "true" or "false". Flipping one is an edit here plus
-      # `kubectl apply -k`; the api reads them on boot.
       - FF_REACTIONS=true
 
   - name: watchly-client-config
