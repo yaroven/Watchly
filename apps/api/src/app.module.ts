@@ -26,6 +26,8 @@ import redisConfig, {
 import s3Config from "./config/s3.config";
 import { EpisodeModule } from "./episode/episode.module";
 import { ExternalRatingsModule } from "./external-ratings/external-ratings.module";
+import featureFlagConfig from "./feature-flag/feature-flag.config";
+import { FeatureFlagModule } from "./feature-flag/feature-flag.module";
 import { GenreModule } from "./genre/genre.module";
 import { IMAGE_TRANSCODE_QUEUE_OPTIONS } from "./image-transcoder/image-transcode-queue.options";
 import { ImageTranscoderModule } from "./image-transcoder/image-transcoder.module";
@@ -84,7 +86,7 @@ import { WatchlistModule } from "./watchlist/watchlist.module";
     }),
     S3Module,
     ConfigModule.forRoot({
-      load: [s3Config, redisConfig, loggerConfig, jwtConfig, omdbConfig],
+      load: [s3Config, redisConfig, loggerConfig, jwtConfig, omdbConfig, featureFlagConfig],
       isGlobal: true,
     }),
     ScheduleModule.forRoot(),
@@ -105,6 +107,7 @@ import { WatchlistModule } from "./watchlist/watchlist.module";
     MediaAssetModule,
     ExternalRatingsModule,
     CommentModule,
+    FeatureFlagModule,
     ReactionModule,
     ReactionFlushModule,
     RedisModule,
