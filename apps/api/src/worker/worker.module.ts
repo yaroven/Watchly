@@ -37,6 +37,7 @@ import { VIDEO_TRANSCODE_QUEUE_OPTIONS } from "../services/queues/video-transcod
 import { VideoTranscodeStateService } from "../services/queues/video-transcoder/video-transcode-state.service";
 import { VideoTranscoderProcessor } from "../services/queues/video-transcoder/video-transcoder-processor";
 import { ReactionModule } from "../services/reaction/reaction.module";
+import { RedisModule } from "../services/redis/redis.module";
 import { S3Module } from "../services/s3/s3.module";
 import { AvatarImageAttacher } from "../services/user-avatar/avatar-image.attacher";
 import { UserAvatarService } from "../services/user-avatar/user-avatar.service";
@@ -63,6 +64,7 @@ import { VoteCacheModule } from "../services/vote-cache/vote-cache.module";
     ReactionFlushModule,
     ReactionModule,
     VoteCacheModule,
+    RedisModule,
     EngagementModule,
 
     ScheduleModule.forRoot(),
