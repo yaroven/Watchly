@@ -1,44 +1,26 @@
 import { Injectable, Logger } from "@nestjs/common";
-import ffmpeg from "fluent-ffmpeg";
 import { stat } from "node:fs/promises";
+import { FfmpegRunner } from "../../ffmpeg/ffmpeg.runner";
+import { FfmpegJob } from "../../ffmpeg/ffmpeg.types";
 import { ImageProfile } from "./image-profile.const";
 
 @Injectable()
 export class ImageTranscoderService {
   private readonly logger = new Logger(ImageTranscoderService.name);
 
+  constructor(private readonly ffmpeg: FfmpegRunner) {}
+
   async convert(inputPath: string, outputPath: string, profile: ImageProfile): Promise<void> {
-    await new Promise<void>((resolve, reject) => {
-      ffmpeg(inputPath)
-        .videoFilters([
-          `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=increase`,
-          `crop=${profile.width}:${profile.height}`,
-        ])
-        .frames(1)
-        .outputOptions([
-          "-c:v",
-          `lib${profile.format}`,
-          "-quality",
-          String(profile.quality),
-          "-preset",
-          "picture",
-        ])
-        .on("start", (cmd) => this.logger.debug(`ffmpeg: ${cmd}`))
-        .on("error", (error: Error) => reject(error))
-        .on("end", () => resolve())
-        .save(outputPath);
-    });
+    await this.ffmpeg.start(this.imageJob(inputPath, outputPath, profile), {
+      onStart: (commandLine) => this.logger.debug(`ffmpeg: ${commandLine}`),
+    }).done;
   }
 
   async assertDecodable(inputPath: string): Promise<void> {
-    const data = await new Promise<ffmpeg.FfprobeData>((resolve, reject) => {
-      ffmpeg.ffprobe(inputPath, (error: Error | null, metadata) =>
-        error ? reject(error) : resolve(metadata),
-      );
-    });
+    const { streams } = await this.ffmpeg.probe(inputPath);
 
-    const hasImageStream = data.streams.some(
-      (stream) => stream.codec_type === "video" && (stream.width ?? 0) > 0,
+    const hasImageStream = streams.some(
+      (stream) => stream.kind === "video" && (stream.width ?? 0) > 0,
     );
     if (!hasImageStream) throw new Error("Uploaded file is not a decodable image");
   }
@@ -52,5 +34,25 @@ export class ImageTranscoderService {
     if (size > profile.maxUploadBytes) {
       throw new Error(`${rawKey} is ${size} bytes, over the ${profile.maxUploadBytes} limit`);
     }
+  }
+
+  private imageJob(input: string, output: string, profile: ImageProfile): FfmpegJob {
+    return {
+      input,
+      output,
+      videoFilters: [
+        `scale=${profile.width}:${profile.height}:force_original_aspect_ratio=increase`,
+        `crop=${profile.width}:${profile.height}`,
+      ],
+      frames: 1,
+      outputOptions: [
+        "-c:v",
+        `lib${profile.format}`,
+        "-quality",
+        String(profile.quality),
+        "-preset",
+        "picture",
+      ],
+    };
   }
 }

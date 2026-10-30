@@ -15,6 +15,7 @@ import redisConfig, {
 } from "../config/redis.config";
 import s3Config from "../config/s3.config";
 import { EngagementModule } from "../services/engagement/engagement.module";
+import { FfmpegModule } from "../services/ffmpeg/ffmpeg.module";
 import {
   POSTER_IMAGE_ATTACHERS,
   posterImageAttachersProvider,
@@ -66,6 +67,7 @@ import { VoteCacheModule } from "../services/vote-cache/vote-cache.module";
     VoteCacheModule,
     RedisModule,
     EngagementModule,
+    FfmpegModule,
 
     ScheduleModule.forRoot(),
   ],

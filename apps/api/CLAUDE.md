@@ -82,6 +82,14 @@ load, which is the worst way to find out. The api injects `VideoTranscodeSchedul
 (a `Queue`) and `VideoTranscodeStateService` (Prisma); neither imports ffmpeg, and
 `VideoTranscoderModule` carries no `S3Module` for the same reason.
 
+`fluent-ffmpeg` is imported in exactly one file, `services/ffmpeg/ffmpeg.runner.ts`,
+and none of its types leave it: `HlsTranscoder` and `ImageTranscoderService` describe
+a command as an `FfmpegJob` and read files through `probe`'s own `MediaInfo`. The
+package is deprecated upstream, so replacing it means rewriting `FfmpegRunner`
+(for example on `child_process.spawn`) and nothing else. It is an adapter beside
+`redis`, `s3` and `prisma`, not a queue, so it lives in `services/ffmpeg/`; only
+`WorkerModule` imports `FfmpegModule` — never import it from a module the api imports.
+
 **A queue is registered by the transcoder that owns it, never by a feature.**
 `VideoTranscodeScheduler.schedule`, `ImageTranscodeScheduler.schedule` and
 `ReactionFlushScheduler.schedule` are the only producers — the third is not a
