@@ -44,10 +44,7 @@ export class ReactionsController {
     @Body() { type }: ReactDto,
     @CurrentUserId() userId: string,
   ): Promise<ReactionResultDto> {
-    const target = targetOf(arc, entityId);
-    await this.reactions.assertSubjectExists(target);
-
-    return this.reactions.setVote(target, userId, type);
+    return this.reactions.setVote(targetOf(arc, entityId), userId, type);
   }
 
   @ApiOperation({
@@ -67,9 +64,6 @@ export class ReactionsController {
     @Param("entityId", ParseUUIDPipe) entityId: string,
     @CurrentUserId() userId: string,
   ): Promise<ReactionResultDto> {
-    const target = targetOf(arc, entityId);
-    await this.reactions.assertSubjectExists(target);
-
-    return this.reactions.clearVote(target, userId);
+    return this.reactions.clearVote(targetOf(arc, entityId), userId);
   }
 }

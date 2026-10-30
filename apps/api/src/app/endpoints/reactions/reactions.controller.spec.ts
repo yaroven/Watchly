@@ -1,4 +1,4 @@
-import { ExecutionContext, INestApplication } from "@nestjs/common";
+import { ExecutionContext, INestApplication, NotFoundException } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { ReactionType } from "@prisma/client";
 import request from "supertest";
@@ -12,11 +12,10 @@ describe("ReactionsController", () => {
   const VIEWER_ID = "22222222-2222-4222-8222-222222222222";
 
   let app: INestApplication;
-  let reactionService: { assertSubjectExists: jest.Mock; setVote: jest.Mock; clearVote: jest.Mock };
+  let reactionService: { setVote: jest.Mock; clearVote: jest.Mock };
 
   beforeEach(async () => {
     reactionService = {
-      assertSubjectExists: jest.fn().mockResolvedValue(undefined),
       setVote: jest.fn().mockResolvedValue({
         likes: 1,
         dislikes: 0,
@@ -97,7 +96,7 @@ describe("ReactionsController", () => {
       .send({ type: ReactionType.LIKE })
       .expect(400);
 
-    expect(reactionService.assertSubjectExists).not.toHaveBeenCalled();
+    expect(reactionService.setVote).not.toHaveBeenCalled();
   });
 
   it("should pass the same vote through twice rather than treating it as a toggle", async () => {
@@ -118,12 +117,12 @@ describe("ReactionsController", () => {
     );
   });
 
-  it("should check the subject exists before voting on it", async () => {
+  it("should answer 404 when the subject is gone", async () => {
+    reactionService.setVote.mockRejectedValue(new NotFoundException("Title not found"));
+
     await request(app.getHttpServer())
       .put(`/reactions/titles/${TITLE_ID}`)
       .send({ type: ReactionType.LIKE })
-      .expect(200);
-
-    expect(reactionService.assertSubjectExists).toHaveBeenCalledWith({ titleId: TITLE_ID });
+      .expect(404);
   });
 });

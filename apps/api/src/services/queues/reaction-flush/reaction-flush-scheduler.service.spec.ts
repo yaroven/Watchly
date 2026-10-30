@@ -3,7 +3,11 @@ import { Test } from "@nestjs/testing";
 import { ReactionArc } from "../../reaction/enums/reaction-arc.enum";
 import { commentTarget, titleTarget } from "../../reaction/utils/reaction-target.const";
 import { RedisUnavailableError } from "../../redis/redis.error";
-import { REACTION_FLUSH_JOB_NAME, REACTION_FLUSH_QUEUE_NAME } from "./reaction-flush-queue.options";
+import {
+  REACTION_FLUSH_JOB_NAME,
+  REACTION_FLUSH_QUEUE_NAME,
+  REACTION_RECOUNT_JOB_NAME,
+} from "./reaction-flush-queue.options";
 import { ReactionFlushScheduler } from "./reaction-flush-scheduler.service";
 
 describe("ReactionFlushScheduler", () => {
@@ -67,6 +71,31 @@ describe("ReactionFlushScheduler", () => {
     await scheduler.schedule(titleTarget(titleId), userId);
 
     expect(optionsOf()).not.toHaveProperty("jobId");
+  });
+
+  describe("a recount", () => {
+    it("points at the subject alone", async () => {
+      await scheduler.scheduleRecount(titleTarget(titleId));
+
+      expect(queue.add).toHaveBeenCalledWith(
+        REACTION_RECOUNT_JOB_NAME,
+        { arc: ReactionArc.TITLE, subjectId: titleId },
+        expect.anything(),
+      );
+    });
+
+    it("deduplicates on the subject, so every voter in a window shares one", async () => {
+      await scheduler.scheduleRecount(commentTarget(commentId));
+
+      expect(optionsOf().deduplication.id).toBe(`counts-comment-${commentId}`);
+    });
+
+    it("keeps a recount asked for while one is running", async () => {
+      await scheduler.scheduleRecount(titleTarget(titleId));
+
+      expect(optionsOf().deduplication.keepLastIfActive).toBe(true);
+      expect(optionsOf()).not.toHaveProperty("jobId");
+    });
   });
 
   it("names a failure as ours so the caller can fall back", async () => {

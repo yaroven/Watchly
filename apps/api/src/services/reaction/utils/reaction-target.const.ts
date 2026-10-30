@@ -1,8 +1,17 @@
+import { NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { ReactionArc } from "../enums/reaction-arc.enum";
 
 export type SubjectClient = Pick<PrismaService, "title" | "comment">;
+
+const COUNTERS_SELECT = {
+  counters: { select: { likes: true, dislikes: true, commentCount: true } },
+} as const;
+
+export interface SubjectWithCounters {
+  counters: { likes: number; dislikes: number; commentCount: number } | null;
+}
 
 type ArcForeignKey = Extract<Prisma.ReactionScalarFieldEnum, "titleId" | "commentId">;
 
@@ -12,6 +21,12 @@ interface ArcSpec {
   label: string;
   whereUnique: (subjectId: string, userId: string) => Prisma.ReactionWhereUniqueInput;
   exists: (client: SubjectClient, subjectId: string) => Promise<{ id: string } | null>;
+  withCounters: (client: SubjectClient, subjectId: string) => Promise<SubjectWithCounters | null>;
+  idsAfter: (
+    client: SubjectClient,
+    after: string | undefined,
+    take: number,
+  ) => Promise<{ id: string }[]>;
 }
 
 const ARCS = {
@@ -22,6 +37,15 @@ const ARCS = {
     whereUnique: (titleId: string, userId: string) => ({ titleId_userId: { titleId, userId } }),
     exists: (client: SubjectClient, id: string) =>
       client.title.findUnique({ where: { id }, select: { id: true } }),
+    withCounters: (client: SubjectClient, id: string) =>
+      client.title.findUnique({ where: { id }, select: COUNTERS_SELECT }),
+    idsAfter: (client: SubjectClient, after: string | undefined, take: number) =>
+      client.title.findMany({
+        where: after ? { id: { gt: after } } : undefined,
+        orderBy: { id: "asc" },
+        take,
+        select: { id: true },
+      }),
   },
   [ReactionArc.COMMENT]: {
     key: "commentId",
@@ -32,6 +56,15 @@ const ARCS = {
     }),
     exists: (client: SubjectClient, id: string) =>
       client.comment.findUnique({ where: { id }, select: { id: true } }),
+    withCounters: (client: SubjectClient, id: string) =>
+      client.comment.findUnique({ where: { id }, select: COUNTERS_SELECT }),
+    idsAfter: (client: SubjectClient, after: string | undefined, take: number) =>
+      client.comment.findMany({
+        where: after ? { id: { gt: after } } : undefined,
+        orderBy: { id: "asc" },
+        take,
+        select: { id: true },
+      }),
   },
 } as const satisfies Record<ReactionArc, ArcSpec>;
 
@@ -79,3 +112,19 @@ export const subjectExists = (
   client: SubjectClient,
   target: ReactionTarget,
 ): Promise<{ id: string } | null> => ARCS[arcOf(target)].exists(client, subjectIdOf(target));
+
+export const subjectWithCounters = (
+  client: SubjectClient,
+  target: ReactionTarget,
+): Promise<SubjectWithCounters | null> =>
+  ARCS[arcOf(target)].withCounters(client, subjectIdOf(target));
+
+export const subjectNotFound = (target: ReactionTarget): NotFoundException =>
+  new NotFoundException(`${arcLabel(arcOf(target))} with id ${subjectIdOf(target)} not found`);
+
+export const subjectIdsAfter = async (
+  client: SubjectClient,
+  arc: ReactionArc,
+  after: string | undefined,
+  take: number,
+): Promise<string[]> => (await ARCS[arc].idsAfter(client, after, take)).map(({ id }) => id);

@@ -1,6 +1,6 @@
+import { NotFoundException } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { ReactionType } from "@prisma/client";
-import { EngagementCountersService } from "../engagement/engagement-counters.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { ReactionFlushScheduler } from "../queues/reaction-flush/reaction-flush-scheduler.service";
 import { RedisUnavailableError } from "../redis/redis.error";
@@ -17,22 +17,21 @@ describe("CachedReactionService", () => {
   const target = titleTarget(titleId);
 
   let service: CachedReactionService;
-  let direct: { setVote: jest.Mock; clearVote: jest.Mock; assertSubjectExists: jest.Mock };
+  let direct: { setVote: jest.Mock; clearVote: jest.Mock };
   let voteState: { set: jest.Mock };
   let flush: { schedule: jest.Mock };
   let prisma: {
-    engagementCounters: { findUnique: jest.Mock };
+    title: { findUnique: jest.Mock };
     reaction: { findUnique: jest.Mock };
   };
   let calls: string[];
 
   const flushed = (likes: number, dislikes: number, commentCount = 0) =>
-    prisma.engagementCounters.findUnique.mockResolvedValue({ likes, dislikes, commentCount });
+    prisma.title.findUnique.mockResolvedValue({ counters: { likes, dislikes, commentCount } });
 
   beforeEach(async () => {
     calls = [];
     direct = {
-      assertSubjectExists: jest.fn().mockResolvedValue(undefined),
       setVote: jest.fn().mockResolvedValue({
         likes: 1,
         dislikes: 0,
@@ -56,14 +55,13 @@ describe("CachedReactionService", () => {
       }),
     };
     prisma = {
-      engagementCounters: { findUnique: jest.fn().mockResolvedValue(null) },
+      title: { findUnique: jest.fn().mockResolvedValue({ counters: null }) },
       reaction: { findUnique: jest.fn().mockResolvedValue(null) },
     };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         CachedReactionService,
-        EngagementCountersService,
         { provide: ReactionService, useValue: direct },
         { provide: VoteStateService, useValue: voteState },
         { provide: ReactionFlushScheduler, useValue: flush },
@@ -97,10 +95,34 @@ describe("CachedReactionService", () => {
       expect(calls).toEqual(["schedule", "set"]);
     });
 
-    it("delegates the existence check rather than reimplementing it", async () => {
-      await service.assertSubjectExists(target);
+    it("refuses a subject that is gone before touching the cache", async () => {
+      prisma.title.findUnique.mockResolvedValue(null);
 
-      expect(direct.assertSubjectExists).toHaveBeenCalledWith(target);
+      await expect(service.setVote(target, userId, LIKE)).rejects.toThrow(NotFoundException);
+      expect(flush.schedule).not.toHaveBeenCalled();
+      expect(voteState.set).not.toHaveBeenCalled();
+      expect(direct.setVote).not.toHaveBeenCalled();
+    });
+
+    it("finds the subject and its counters in one query", async () => {
+      flushed(10, 4);
+
+      await service.setVote(target, userId, LIKE);
+
+      expect(prisma.title.findUnique).toHaveBeenCalledTimes(1);
+      expect(prisma.title.findUnique).toHaveBeenCalledWith({
+        where: { id: titleId },
+        select: { counters: { select: { likes: true, dislikes: true, commentCount: true } } },
+      });
+    });
+
+    it("answers zero counts for a subject nobody has reacted to", async () => {
+      await expect(service.setVote(target, userId, LIKE)).resolves.toEqual({
+        likes: 1,
+        dislikes: 0,
+        commentCount: 0,
+        myReaction: LIKE,
+      });
     });
   });
 
@@ -214,7 +236,6 @@ describe("CachedReactionService", () => {
       });
 
       await expect(service.setVote(target, userId, LIKE)).resolves.toMatchObject({ likes: 42 });
-      expect(prisma.engagementCounters.findUnique).not.toHaveBeenCalled();
     });
 
     it("lets any other failure through untouched", async () => {

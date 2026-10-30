@@ -145,21 +145,23 @@ describe("ReactionService", () => {
     });
   });
 
-  describe("assertSubjectExists", () => {
-    it("rejects a title that is gone", async () => {
+  describe("a subject that is gone", () => {
+    it("refuses to vote on a title, writing nothing", async () => {
       prisma.title.findUnique.mockResolvedValue(null);
 
-      await expect(service.assertSubjectExists(titleTarget(titleId))).rejects.toThrow(
+      await expect(service.setVote(titleTarget(titleId), userId, LIKE)).rejects.toThrow(
         NotFoundException,
       );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
-    it("rejects a comment that is gone", async () => {
+    it("refuses to withdraw from a comment, writing nothing", async () => {
       prisma.comment.findUnique.mockResolvedValue(null);
 
-      await expect(service.assertSubjectExists(commentTarget(commentId))).rejects.toThrow(
+      await expect(service.clearVote(commentTarget(commentId), userId)).rejects.toThrow(
         NotFoundException,
       );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
     });
   });
 });
