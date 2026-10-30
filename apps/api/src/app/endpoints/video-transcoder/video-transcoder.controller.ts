@@ -1,0 +1,47 @@
+import {
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  ParseEnumPipe,
+  ParseUUIDPipe,
+  Query,
+} from "@nestjs/common";
+import {
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+} from "@nestjs/swagger";
+import { Auth } from "../../../decorators/auth.decorator";
+import { VideoType } from "../../../services/queues/video-transcoder/enums/video-type.enum";
+import { VideoTranscodeStateService } from "../../../services/queues/video-transcoder/video-transcode-state.service";
+import { VideoTranscodingProgressResponseDto } from "./dto/response/video-transcoding-progress-response.dto";
+
+@ApiTags("video-transcoder")
+@Auth()
+@Controller("video-transcoder")
+export class VideoTranscoderController {
+  constructor(private readonly state: VideoTranscodeStateService) {}
+
+  @ApiOperation({ summary: "Get transcoding progress for a movie or episode" })
+  @ApiParam({ name: "id", format: "uuid" })
+  @ApiQuery({ name: "type", enum: VideoType })
+  @ApiOkResponse({ type: VideoTranscodingProgressResponseDto })
+  @ApiNotFoundResponse({ description: "Progress not found" })
+  @Get("progress/:id")
+  async getProgress(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Query("type", new ParseEnumPipe(VideoType)) type: VideoType,
+  ): Promise<VideoTranscodingProgressResponseDto> {
+    const progress = await this.state.getProgress(id, type);
+
+    if (!progress) {
+      throw new NotFoundException(`Progress for ${type} ${id} not found`);
+    }
+
+    return progress;
+  }
+}

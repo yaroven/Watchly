@@ -10,3 +10,8 @@ export interface Filter {
   rule: FilterRule;
   value: string;
 }
+
+export interface PageQuery {
+  page?: number;
+  limit?: number;
+}

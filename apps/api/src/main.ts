@@ -5,10 +5,10 @@ import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { Logger } from "nestjs-pino";
 import { collectDefaultMetrics } from "prom-client";
-import { AppModule } from "./app.module";
+import { AppModule } from "./app/app.module";
 import { DEV_DEFAULTS } from "./common/dev-defaults.const";
 import { requireInProduction } from "./common/utils/env.util";
-import { httpMetricsMiddleware } from "./metrics/http-metrics.middleware";
+import { httpMetricsMiddleware } from "./services/metrics/http-metrics.middleware";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
