@@ -8,9 +8,16 @@ import {
 } from "../../engagement/engagement-counters.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { ReactionArc } from "../../reaction/enums/reaction-arc.enum";
-import { arcKey, REACTION_ARCS, targetOf } from "../../reaction/utils/reaction-target.const";
+import {
+  arcKey,
+  REACTION_ARCS,
+  subjectIdsAfter,
+  targetOf,
+} from "../../reaction/utils/reaction-target.const";
 import { RedisService } from "../../redis/redis.service";
 import { driftKey } from "./reaction-drift.const";
+
+export const RECONCILE_BATCH_SIZE = 1000;
 
 type Counts = Record<ReactionCounter, number>;
 
@@ -34,13 +41,33 @@ export class ReactionReconciler {
   }
 
   private async reconcileArc(arc: ReactionArc): Promise<void> {
+    let drifted = 0;
+    let after: string | undefined;
+
+    for (;;) {
+      const subjectIds = await subjectIdsAfter(this.prisma, arc, after, RECONCILE_BATCH_SIZE);
+      if (subjectIds.length === 0) break;
+
+      drifted += await this.reconcileBatch(arc, subjectIds);
+
+      if (subjectIds.length < RECONCILE_BATCH_SIZE) break;
+      after = subjectIds[subjectIds.length - 1];
+    }
+
+    if (drifted > 0) {
+      this.logger.warn(`Repaired ${drifted} ${arc} counter rows that had drifted`);
+    }
+
+    await this.publish(arc, drifted);
+  }
+
+  private async reconcileBatch(arc: ReactionArc, subjectIds: string[]): Promise<number> {
     const [expected, stored] = await Promise.all([
-      this.expectedCounts(arc),
-      this.storedCounts(arc),
+      this.expectedCounts(arc, subjectIds),
+      this.storedCounts(arc, subjectIds),
     ]);
 
-    const subjectIds = new Set([...expected.keys(), ...stored.keys()]);
-    const drifted = [...subjectIds].filter((subjectId) =>
+    const drifted = subjectIds.filter((subjectId) =>
       differ(expected.get(subjectId) ?? zeroCounters(), stored.get(subjectId) ?? zeroCounters()),
     );
 
@@ -48,18 +75,17 @@ export class ReactionReconciler {
       await this.counters.recomputeReactions(targetOf(arc, subjectId), this.prisma);
     }
 
-    if (drifted.length > 0) {
-      this.logger.warn(`Repaired ${drifted.length} ${arc} counter rows that had drifted`);
-    }
-
-    await this.publish(arc, drifted.length);
+    return drifted.length;
   }
 
-  private async expectedCounts(arc: ReactionArc): Promise<Map<string, Counts>> {
+  private async expectedCounts(
+    arc: ReactionArc,
+    subjectIds: string[],
+  ): Promise<Map<string, Counts>> {
     const key = arcKey(arc);
     const grouped = await this.prisma.reaction.groupBy({
       by: [key, "type"],
-      where: { [key]: { not: null } },
+      where: { [key]: { in: subjectIds } },
       _count: { _all: true },
     });
 
@@ -77,10 +103,10 @@ export class ReactionReconciler {
     return counts;
   }
 
-  private async storedCounts(arc: ReactionArc): Promise<Map<string, Counts>> {
+  private async storedCounts(arc: ReactionArc, subjectIds: string[]): Promise<Map<string, Counts>> {
     const key = arcKey(arc);
     const rows = await this.prisma.engagementCounters.findMany({
-      where: { [key]: { not: null } },
+      where: { [key]: { in: subjectIds } },
     });
 
     const counts = new Map<string, Counts>();

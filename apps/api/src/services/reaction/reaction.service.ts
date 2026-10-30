@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { ReactionType } from "@prisma/client";
 import {
   EngagementCountersService,
@@ -7,14 +7,14 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { ReactionResult, Reactions } from "./reaction.types";
 import {
-  arcLabel,
-  arcOf,
   ReactionTarget,
   reactionWhereUnique,
   subjectExists,
-  subjectIdOf,
+  subjectNotFound,
 } from "./utils/reaction-target.const";
 import { Vote } from "./utils/vote.util";
+
+type VoteClient = Pick<PrismaService, "reaction">;
 
 type ReactionClient = Pick<PrismaService, "reaction" | "engagementCounters" | "comment">;
 
@@ -24,14 +24,6 @@ export class ReactionService implements Reactions {
     private readonly prisma: PrismaService,
     private readonly counters: EngagementCountersService,
   ) {}
-
-  async assertSubjectExists(target: ReactionTarget): Promise<void> {
-    if (await subjectExists(this.prisma, target)) return;
-
-    throw new NotFoundException(
-      `${arcLabel(arcOf(target))} with id ${subjectIdOf(target)} not found`,
-    );
-  }
 
   async setVote(
     target: ReactionTarget,
@@ -45,12 +37,12 @@ export class ReactionService implements Reactions {
     return this.write(target, userId, null);
   }
 
-  async applyAbsolute(
-    client: ReactionClient,
+  async writeVote(
+    client: VoteClient,
     target: ReactionTarget,
     userId: string,
     vote: Vote,
-  ): Promise<EngagementCounts> {
+  ): Promise<void> {
     if (vote === null) {
       await client.reaction.deleteMany({ where: { ...target, userId } });
     } else {
@@ -60,11 +52,22 @@ export class ReactionService implements Reactions {
         update: { type: vote },
       });
     }
+  }
+
+  async applyAbsolute(
+    client: ReactionClient,
+    target: ReactionTarget,
+    userId: string,
+    vote: Vote,
+  ): Promise<EngagementCounts> {
+    await this.writeVote(client, target, userId, vote);
 
     return this.counters.recomputeReactions(target, client);
   }
 
   private async write(target: ReactionTarget, userId: string, vote: Vote): Promise<ReactionResult> {
+    if (!(await subjectExists(this.prisma, target))) throw subjectNotFound(target);
+
     const counts = await this.prisma.$transaction((tx) =>
       this.applyAbsolute(tx, target, userId, vote),
     );

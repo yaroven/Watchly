@@ -177,14 +177,15 @@ saving. Showing an upload as still processing is client work that has not been d
   the viewer holds before it can know what they want — and then every stale or missing
   read turns into a wrong write. Don't reintroduce a route that infers intent.
 - **Likes, dislikes and comment counts are read as a relation, never aggregated.**
-  `EngagementCountersService` is the only writer, and it recomputes on the caller's
-  client so the counters commit with the rows they summarise — for reactions that
-  caller is now `ReactionFlushProcessor`, which is where the `groupBy` went when it
-  left the request. The one change that would need an exception to "only writer" is
-  moving the nightly reconciliation into a single
-  `UPDATE … FROM (SELECT … GROUP BY …)`, which ADR-0016 costs out as the answer once
-  the number of **subjects** outgrows a map in the worker. Write the exception down if
-  that day comes; don't let a second writer appear quietly. A title's score, rating
+  `EngagementCountersService` is the only writer. For reactions it runs in a
+  `recount-subject` job, deduplicated per subject, that every `flush-vote` asks for
+  after writing its row — so the reaction counters trail the rows by a delay window
+  instead of committing with them, and fifty voters in one window cost one recount
+  (ADR-0017). The synchronous fallback still recounts inside its own transaction. The
+  nightly reconciliation walks subjects in pages of `RECONCILE_BATCH_SIZE`; the one
+  change that would need an exception to "only writer" is moving it into a single
+  `UPDATE … FROM (SELECT … GROUP BY …)`. Write the exception down if that day comes;
+  don't let a second writer appear quietly. A title's score, rating
   count and watchlist count stay on
   `TitleEngagement` — only a title has those.
 - **A viewer's vote is decided in Redis, counted in Postgres** (ADR-0016).

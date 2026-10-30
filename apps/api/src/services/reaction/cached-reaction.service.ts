@@ -1,13 +1,17 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ReactionType } from "@prisma/client";
-import { EngagementCountersService } from "../engagement/engagement-counters.service";
+import { countsOf, EngagementCounts } from "../engagement/engagement-counters.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { ReactionFlushScheduler } from "../queues/reaction-flush/reaction-flush-scheduler.service";
 import { RedisUnavailableError } from "../redis/redis.error";
 import { VoteStateService } from "../vote-cache/vote-state.service";
 import { ReactionService } from "./reaction.service";
 import { ReactionResult, Reactions } from "./reaction.types";
-import { ReactionTarget } from "./utils/reaction-target.const";
+import {
+  ReactionTarget,
+  subjectNotFound,
+  subjectWithCounters,
+} from "./utils/reaction-target.const";
 import { rowVote } from "./utils/vote.query";
 import { Vote, voteDelta } from "./utils/vote.util";
 
@@ -19,13 +23,8 @@ export class CachedReactionService implements Reactions {
     private readonly direct: ReactionService,
     private readonly voteState: VoteStateService,
     private readonly flush: ReactionFlushScheduler,
-    private readonly counters: EngagementCountersService,
     private readonly prisma: PrismaService,
   ) {}
-
-  async assertSubjectExists(target: ReactionTarget): Promise<void> {
-    return this.direct.assertSubjectExists(target);
-  }
 
   async setVote(
     target: ReactionTarget,
@@ -45,6 +44,9 @@ export class CachedReactionService implements Reactions {
     vote: Vote,
     withoutCache: () => Promise<ReactionResult>,
   ): Promise<ReactionResult> {
+    const subject = await subjectWithCounters(this.prisma, target);
+    if (!subject) throw subjectNotFound(target);
+
     let previous: Vote;
 
     try {
@@ -56,7 +58,7 @@ export class CachedReactionService implements Reactions {
       return withoutCache();
     }
 
-    return this.answer(target, previous, vote);
+    return this.answer(countsOf(subject.counters), previous, vote);
   }
 
   private async record(target: ReactionTarget, userId: string, vote: Vote): Promise<Vote> {
@@ -67,13 +69,8 @@ export class CachedReactionService implements Reactions {
     return displaced ?? (await rowVote(this.prisma, target, userId));
   }
 
-  private async answer(
-    target: ReactionTarget,
-    previous: Vote,
-    vote: Vote,
-  ): Promise<ReactionResult> {
+  private answer(stored: EngagementCounts, previous: Vote, vote: Vote): ReactionResult {
     const delta = voteDelta(previous, vote);
-    const stored = await this.counters.countsForOne(target, this.prisma);
 
     return {
       ...stored,

@@ -6,7 +6,6 @@ import { Vote } from "./utils/vote.util";
 export type ReactionResult = EngagementCounts & { myReaction: Vote };
 
 export interface Reactions {
-  assertSubjectExists(target: ReactionTarget): Promise<void>;
   setVote(target: ReactionTarget, userId: string, type: ReactionType): Promise<ReactionResult>;
   clearVote(target: ReactionTarget, userId: string): Promise<ReactionResult>;
 }
