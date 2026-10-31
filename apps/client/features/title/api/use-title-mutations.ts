@@ -1,5 +1,5 @@
 import createMutationHook from "@/shared/api/createMutationHook";
-import { updateEntityPoster, uploadMultipartFile, withPosterUploaded } from "@/shared/api/upload-media";
+import { uploadImageFile, uploadMultipartFile } from "@/shared/api/upload-media";
 import { UseMutationOptions } from "@tanstack/react-query";
 import {
   CastCredit,
@@ -68,33 +68,15 @@ export const useCreateTitleWithUpload = (options?: CreateTitleWithUploadOptions)
 
       try {
         createdTitle = await titleService.createTitle(payload);
-        createdTitle = await updateEntityPoster({
-          entity: createdTitle,
+        const titleId = createdTitle.id;
+        await uploadImageFile({
           files: posterFile,
-          getPosterUploadUrl: titleService.getPosterUploadUrl,
+          getUploadUrl: (contentType) => titleService.getPosterUploadUrl(titleId, contentType),
           uploadToUrl: titleService.uploadToS3,
-          buildPayload: (title, posterUploaded): UpdateTitleDto => ({
-            name: title.name,
-            description: title.description,
-            type: title.type,
-            ageRating: title.ageRating,
-            country: title.country,
-            releaseDate: title.releaseDate,
-            language: title.language,
-            trailerUrl: title.trailerUrl,
-            runtime: title.runtime,
-            network: title.network,
-            director: title.director,
-            closedCaption: title.closedCaption,
-            genreIds: title.genres?.map((genre) => genre.id),
-            posterUploaded,
-          }),
-          update: titleService.update,
           onProgress: options?.onUploadProgress,
         });
 
         if (payload.type === TitleType.MOVIE) {
-          const titleId = createdTitle.id;
           await uploadMultipartFile({
             files: videoFile,
             startUpload: (fileSize) => titleService.startUpload(titleId, fileSize),
@@ -127,17 +109,13 @@ export const useCreateTitleWithUpload = (options?: CreateTitleWithUploadOptions)
 export const useUpdateTitle = (options?: Omit<UseMutationOptions<Title, Error, UpdateTitleMutationArgs>, "mutationFn">) => {
   const useUpdateTitle = createMutationHook({
     mutationFn: async ({ id, payload }: UpdateTitleMutationArgs) => {
-      const { posterFile } = payload;
-      // The existing poster no longer has to be resent to survive the update:
-      // the server leaves the stored key alone unless the flag says otherwise.
-      const nextPayload = await withPosterUploaded<UpdateTitleDto>({
-        payload: getTitleUpdatePayload(payload),
-        files: posterFile,
-        getPosterUploadUrl: () => titleService.getPosterUploadUrl(id),
+      await uploadImageFile({
+        files: payload.posterFile,
+        getUploadUrl: (contentType) => titleService.getPosterUploadUrl(id, contentType),
         uploadToUrl: titleService.uploadToS3,
       });
 
-      return titleService.update(id, nextPayload);
+      return titleService.update(id, getTitleUpdatePayload(payload));
     },
     getInvalidateKeys: ({ id }: UpdateTitleMutationArgs) => [titleKeys.all(), titleKeys.detailPrefix(id)],
   });

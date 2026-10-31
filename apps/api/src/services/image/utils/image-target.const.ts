@@ -2,34 +2,21 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { ImageKind } from "../../queues/image-transcoder/image-profile.const";
 import { RawObjectKind } from "../../s3/raw-key";
 
-export type PosterEntityKind = "titles" | "seasons" | "artists";
+export type ImageClient = Pick<PrismaService, "title" | "season" | "artist" | "user">;
 
-/** The three tables a poster or photo can hang off. */
-export type PosterClient = Pick<PrismaService, "title" | "season" | "artist">;
-
-/**
- * Everything that differs between the three entity kinds, in one place. The
- * only variation between them is the Prisma delegate and the column name, so
- * `read` and `write` live here rather than as two parallel `switch` statements
- * in `PosterService` — adding a fourth kind is one entry, not three edits.
- *
- * Closures rather than `{ model, column }` descriptors: indexing a Prisma
- * delegate by string needs an `any` cast, and `no-unsafe-member-access` is an
- * error in this project.
- */
-export interface PosterTarget {
-  imageKind: ImageKind;
+export interface ImageTarget {
   rawKind: RawObjectKind;
   label: string;
-  read(client: PosterClient, id: string): Promise<{ key: string | null } | null>;
-  write(client: PosterClient, id: string, key: string | null): Promise<void>;
+  processedKey(ownerId: string, version: string): string;
+  read(client: ImageClient, ownerId: string): Promise<{ key: string | null } | null>;
+  write(client: ImageClient, ownerId: string, key: string | null): Promise<void>;
 }
 
-export const POSTER_TARGETS: Record<PosterEntityKind, PosterTarget> = {
-  titles: {
-    imageKind: ImageKind.TITLE_POSTER,
+export const IMAGE_TARGETS: Record<ImageKind, ImageTarget> = {
+  [ImageKind.TITLE_POSTER]: {
     rawKind: RawObjectKind.TITLE_POSTER,
     label: "Title",
+    processedKey: (ownerId, version) => `posters/titles/${ownerId}/${version}.webp`,
     read: async (client, id) => {
       const row = await client.title.findUnique({ where: { id }, select: { posterKey: true } });
       return row ? { key: row.posterKey } : null;
@@ -38,10 +25,10 @@ export const POSTER_TARGETS: Record<PosterEntityKind, PosterTarget> = {
       await client.title.update({ where: { id }, data: { posterKey: key } });
     },
   },
-  seasons: {
-    imageKind: ImageKind.SEASON_POSTER,
+  [ImageKind.SEASON_POSTER]: {
     rawKind: RawObjectKind.SEASON_POSTER,
     label: "Season",
+    processedKey: (ownerId, version) => `posters/seasons/${ownerId}/${version}.webp`,
     read: async (client, id) => {
       const row = await client.season.findUnique({ where: { id }, select: { posterKey: true } });
       return row ? { key: row.posterKey } : null;
@@ -50,12 +37,10 @@ export const POSTER_TARGETS: Record<PosterEntityKind, PosterTarget> = {
       await client.season.update({ where: { id }, data: { posterKey: key } });
     },
   },
-  artists: {
-    imageKind: ImageKind.ARTIST_PHOTO,
+  [ImageKind.ARTIST_PHOTO]: {
     rawKind: RawObjectKind.ARTIST_PHOTO,
     label: "Artist",
-    // The column is photoKey here, which is the whole reason this is a table
-    // and not a loop over one name.
+    processedKey: (ownerId, version) => `posters/artists/${ownerId}/${version}.webp`,
     read: async (client, id) => {
       const row = await client.artist.findUnique({ where: { id }, select: { photoKey: true } });
       return row ? { key: row.photoKey } : null;
@@ -64,6 +49,16 @@ export const POSTER_TARGETS: Record<PosterEntityKind, PosterTarget> = {
       await client.artist.update({ where: { id }, data: { photoKey: key } });
     },
   },
+  [ImageKind.USER_AVATAR]: {
+    rawKind: RawObjectKind.USER_AVATAR,
+    label: "User",
+    processedKey: (ownerId, version) => `avatars/${ownerId}/${version}.webp`,
+    read: async (client, id) => {
+      const row = await client.user.findUnique({ where: { id }, select: { avatarKey: true } });
+      return row ? { key: row.avatarKey } : null;
+    },
+    write: async (client, id, key) => {
+      await client.user.update({ where: { id }, data: { avatarKey: key } });
+    },
+  },
 };
-
-export const POSTER_ENTITY_KINDS = Object.keys(POSTER_TARGETS) as PosterEntityKind[];

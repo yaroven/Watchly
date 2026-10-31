@@ -2,9 +2,9 @@ import { BadRequestException, ForbiddenException, NotFoundException } from "@nes
 import { Test, TestingModule } from "@nestjs/testing";
 import { ReactionType, Role } from "@prisma/client";
 import { EngagementCountersService } from "../engagement/engagement-counters.service";
+import { ImageService } from "../image/image.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { ReportService } from "../report/report.service";
-import { S3Service } from "../s3/s3.service";
 import { VoteStateService } from "../vote-cache/vote-state.service";
 import { CommentService } from "./comment.service";
 import { replySubject, titleSubject } from "./utils/comment-subject.const";
@@ -71,8 +71,10 @@ describe("CommentService", () => {
         ReportService,
         EngagementCountersService,
         {
-          provide: S3Service,
-          useValue: { getPublicUrl: jest.fn((key: string) => `https://cdn.test/${key}`) },
+          provide: ImageService,
+          useValue: {
+            toPublicUrl: jest.fn((key: string | null) => (key ? `https://cdn.test/${key}` : null)),
+          },
         },
         {
           provide: PrismaService,

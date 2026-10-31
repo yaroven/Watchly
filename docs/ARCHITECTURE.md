@@ -32,7 +32,10 @@ on that prefix. `src/s3/raw-key/` owns the scheme:
 | --- | --- | --- |
 | `title-video/<titleId>` | `video-transcode` | HLS, plus `transcodingStatus` and the `VideoTranscodingProgress` row the client polls |
 | `episode-video/<episodeId>` | `video-transcode` | as above, on the episode |
-| `user-avatar/<userId>/<uploadId>` | `user-avatar` | a 256×256 webp, plus `User.avatarKey` |
+| `user-avatar/<userId>/<uploadId>` | `image-transcode` | a 256×256 webp, plus `User.avatarKey` |
+| `title-poster/<titleId>/<uploadId>` | `image-transcode` | a 600×900 webp, plus `Title.posterKey` |
+| `season-poster/<seasonId>/<uploadId>` | `image-transcode` | a 600×900 webp, plus `Season.posterKey` |
+| `artist-photo/<artistId>/<uploadId>` | `image-transcode` | a 400×600 webp, plus `Artist.photoKey` |
 
 Before this, the consumer took a raw key to be a bare entity uuid and probed the database
 for a row that matched — episode first, then title. The type of an upload was a property

@@ -1,8 +1,8 @@
 import { NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { FilterRule } from "../../common/pagination/filter-rule.enum";
+import { ImageService } from "../image/image.service";
 import { MediaAssetService } from "../media-asset/media-asset.service";
-import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { VideoType } from "../queues/video-transcoder/enums/video-type.enum";
 import { S3Service } from "../s3/s3.service";
@@ -13,16 +13,16 @@ describe("SeasonService", () => {
   let prismaMock: jest.Mocked<PrismaService>;
   let s3ServiceMock: jest.Mocked<S3Service>;
   let mediaAssetServiceMock: jest.Mocked<MediaAssetService>;
-  let posterServiceMock: {
+  let imageServiceMock: {
     toPublicUrl: jest.Mock;
-    removeStoredImage: jest.Mock;
+    remove: jest.Mock;
     deleteStoredImage: jest.Mock;
   };
 
   beforeEach(async () => {
-    posterServiceMock = {
+    imageServiceMock = {
       toPublicUrl: jest.fn((key: string | null) => (key ? `https://cdn.example.com/${key}` : null)),
-      removeStoredImage: jest.fn(),
+      remove: jest.fn(),
       deleteStoredImage: jest.fn(),
     };
 
@@ -59,7 +59,7 @@ describe("SeasonService", () => {
             deleteProcessedFolder: jest.fn(),
           },
         },
-        { provide: PosterService, useValue: posterServiceMock },
+        { provide: ImageService, useValue: imageServiceMock },
       ],
     }).compile();
 
@@ -155,46 +155,22 @@ describe("SeasonService", () => {
   });
 
   describe("update", () => {
-    describe("should leave the key to the transcoding pipeline", () => {
-      it("ignores the flag when the client says it uploaded", async () => {
-        const season = { id: "season-1" };
-        (prismaMock.season.findUnique as jest.Mock).mockResolvedValue(season);
-        (prismaMock.season.update as jest.Mock).mockResolvedValue({ ...season, name: "New Title" });
+    it("leaves the poster to its own routes", async () => {
+      const season = { id: "season-1" };
+      (prismaMock.season.update as jest.Mock).mockResolvedValue({ ...season, name: "New Title" });
 
-        await service.update("season-1", {
-          number: 1,
-          name: "New Title",
-          description: "Desc",
-          titleId: "title-1",
-          posterUploaded: true,
-        });
-
-        expect(prismaMock.season.update).toHaveBeenCalledWith({
-          where: { id: "season-1" },
-          data: expect.not.objectContaining({ posterKey: expect.anything() }),
-        });
-        expect(posterServiceMock.removeStoredImage).not.toHaveBeenCalled();
+      await service.update("season-1", {
+        number: 1,
+        name: "New Title",
+        description: "Desc",
+        titleId: "title-1",
       });
 
-      it("clears the column and the object when the flag says the poster is gone", async () => {
-        const season = { id: "season-1" };
-        (prismaMock.season.findUnique as jest.Mock).mockResolvedValue(season);
-        (prismaMock.season.update as jest.Mock).mockResolvedValue(season);
-
-        await service.update("season-1", {
-          number: 1,
-          name: "New Title",
-          description: "Desc",
-          titleId: "title-1",
-          posterUploaded: false,
-        });
-
-        expect(posterServiceMock.removeStoredImage).toHaveBeenCalledWith("seasons", "season-1");
-        expect(prismaMock.season.update).toHaveBeenCalledWith({
-          where: { id: "season-1" },
-          data: expect.objectContaining({ posterKey: null }),
-        });
+      expect(prismaMock.season.update).toHaveBeenCalledWith({
+        where: { id: "season-1" },
+        data: { number: 1, name: "New Title", description: "Desc", titleId: "title-1" },
       });
+      expect(imageServiceMock.remove).not.toHaveBeenCalled();
     });
 
     describe("should update the season without checking the poster url", () => {
@@ -265,7 +241,7 @@ describe("SeasonService", () => {
           VideoType.EPISODE,
         );
 
-        expect(posterServiceMock.deleteStoredImage).toHaveBeenCalledWith(
+        expect(imageServiceMock.deleteStoredImage).toHaveBeenCalledWith(
           "posters/seasons/season-1/v1.webp",
         );
         expect(mediaAssetServiceMock.deleteProcessedFolder).toHaveBeenCalledWith(

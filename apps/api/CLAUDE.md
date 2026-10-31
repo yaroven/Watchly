@@ -32,9 +32,8 @@ A route whose only domain-specific work is "does this id exist" takes an existen
 pipe on the param — one per domain in its `utils/`, for titles, episodes, seasons,
 artists, genres and users — instead of a service method that wraps the check. A route
 that then does nothing but forward belongs with the service that owns the mechanics:
-that is why the movie and episode upload/transcode routes live on
-`media-asset/{title,episode}-media.controller.ts` and all three poster/photo upload
-URLs on `poster/title-poster.controller.ts`, each injecting one service.
+that is why all four image route pairs live on `app/endpoints/images/images.controller.ts`,
+each injecting only `ImageService`.
 
 Because a pipe does not run on a direct handler call, the 404 it owns is pinned by a
 request-level `*.controller.existence.spec.ts` beside the unit spec, not by it. The episode's playback URL is the counter-example that stayed behind —
@@ -94,10 +93,9 @@ package is deprecated upstream, so replacing it means rewriting `FfmpegRunner`
 `VideoTranscodeScheduler.schedule`, `ImageTranscodeScheduler.schedule` and
 `ReactionFlushScheduler.schedule` are the only producers — the third is not a
 transcoder, but it follows the rule for the same reason. A feature injects the scheduler
-and sees neither a `Queue` nor a job name: `reaction`, `title`, `season`, `artist`,
-`poster` and `user-avatar` all do. `UserAvatarService` used to
-hold an `@InjectQueue` of its own, which meant `UserModule` — and `AuthModule` behind it
-— pulled a Redis queue in for a feature that only hands out an upload URL. `s3-event`
+and sees neither a `Queue` nor a job name. Handing out an upload URL needs no queue at
+all — `ImageService` only presigns, and the job is raised by the S3 event — so
+`UserModule`, and `AuthModule` behind it, pull in no Redis queue. `s3-event`
 maps the raw key's kind to an `ImageKind` the same way it maps one to a `VideoType`, and
 calls the producer; the dedup convention lives with the producer too, rather than once
 per feature — `image-<rawKey>` as a `jobId`, and `vote-<arc>-<subjectId>-<userId>` as a
@@ -118,26 +116,34 @@ is right for the opposite reason — an avatar and a poster cost about the same.
 share lives in `common/utils/`: `DEFAULT_JOB_OPTIONS`, `withWorkDir`, `logJobFailure`,
 `streamToFile`.
 
-Every uploaded image goes through it: avatars, title and season posters, and artist
-photos. `PosterService` presigns into the **raw** bucket, `poster-image.attacher.ts`
-contributes one attacher per entity kind — three instances of one class, since only the
-`ImageKind` differs between them, built in a factory because the entity kind is a
-constructor argument rather than something DI resolves. The processed key is versioned
-(`posters/<kind>/<id>/<version>.webp`) for the same reason an avatar's is: a stable key
-would leave the superseded artwork in front of any viewer that cached it. Note that
-`S3Service.uploadStream` sets no `Cache-Control` at all today — the versioned key is
-what would make an `immutable` one safe to add, not evidence that one is set.
+Every uploaded image goes through it — avatars, title and season posters, artist photos —
+and all four share one contract and one service in `services/image/`. `IMAGE_TARGETS`,
+keyed by `ImageKind`, says per kind which raw prefix the upload lands on, which column
+holds the key and how the processed key is laid out. `ImageService` presigns, attaches,
+removes and builds public URLs from that table, and `image.attacher.ts` turns it into one
+`ProcessedImageAttacher` per kind for the worker, built in a factory because the kind is a
+constructor argument rather than something DI resolves. A new kind is one profile, one
+`RawObjectKind`, one `IMAGE_TARGETS` entry and its pair of routes. The processed key is
+versioned (`posters/<titles|seasons|artists>/<id>/<version>.webp`,
+`avatars/<id>/<version>.webp`): a stable key would leave the superseded image in front of
+any viewer that cached it. `S3Service.uploadStream` sets no `Cache-Control` at all today —
+the versioned key is what would make an `immutable` one safe to add, not evidence that one
+is set.
 
-A poster is therefore **asynchronous**, and the write path reflects that:
-`posterUploaded` / `photoUploaded` is no longer a claim the server checks. `true` is
-accepted and ignored — the worker records the key off the S3 event — and `false` still
-clears the image. `PosterService.confirmUpload` is gone with it. Cleanup goes **by the
-stored key**, not by one derived from the id (`deleteStoredImage`), because the version
-exists only on the row: a caller that deletes the row hands the key over.
+Over HTTP every kind has the same pair: `POST …/upload-url` with `{ contentType }` and
+`DELETE …`, on `/titles/:id/poster`, `/seasons/:id/poster`, `/artists/:id/photo` and
+`/users/me/avatar`. The PUT URL is signed for that content type, so S3 refuses any other;
+the worker still runs ffprobe, because a header proves nothing about the bytes.
 
-The client has not caught up: it still sends `posterUploaded: true` (harmless) and
-refetches immediately, so an admin can see the previous poster for a moment after
-saving. Showing an upload as still processing is client work that has not been done.
+An upload is **asynchronous**: the worker records the key off the S3 event, so creating or
+updating the owner never mentions its image. `posterUploaded` / `photoUploaded` are gone,
+and `forbidNonWhitelisted` answers 400 to anything still sending them. Removing an image
+clears the column before deleting the object, so a row never points at nothing. Cleanup
+goes **by the stored key** (`deleteStoredImage`), never one derived from the id, because
+the version exists only on the row: a caller that deletes the row hands the key over.
+
+The client refetches right after the PUT, so an admin can see the previous image for a
+moment. Showing an upload as still processing is client work that has not been done.
 
 ## Rules
 
@@ -221,7 +227,7 @@ saving. Showing an upload as still processing is client work that has not been d
 - **A feature reads votes through `ViewerVotesService`, never through the cache.** It is
   the read half of the reaction domain and lives in `ViewerVotesModule`, apart from
   `ReactionModule` so that importing it does not bring the flush queue along — the same
-  reason `UserAvatarService` stopped holding an `@InjectQueue`. It owns the id-to-arc
+  reason no feature holds an `@InjectQueue`. It owns the id-to-arc
   mapping and the rule that an absent viewer reads nothing, both of which were written
   out once per feature before.
 - `RedisService` extends `ioredis` the way `PrismaService` extends `PrismaClient`, and

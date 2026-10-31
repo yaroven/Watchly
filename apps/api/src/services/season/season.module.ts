@@ -1,11 +1,11 @@
 import { Module } from "@nestjs/common";
+import { ImageModule } from "../image/image.module";
 import { MediaAssetModule } from "../media-asset/media-asset.module";
-import { PosterModule } from "../poster/poster.module";
 import { PrismaModule } from "../prisma/prisma.module";
 import { SeasonService } from "./season.service";
 
 @Module({
-  imports: [PrismaModule, PosterModule, MediaAssetModule],
+  imports: [PrismaModule, ImageModule, MediaAssetModule],
   providers: [SeasonService],
   exports: [SeasonService],
 })

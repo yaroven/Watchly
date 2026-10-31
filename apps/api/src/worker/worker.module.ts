@@ -16,19 +16,12 @@ import redisConfig, {
 import s3Config from "../config/s3.config";
 import { EngagementModule } from "../services/engagement/engagement.module";
 import { FfmpegModule } from "../services/ffmpeg/ffmpeg.module";
-import {
-  POSTER_IMAGE_ATTACHERS,
-  posterImageAttachersProvider,
-} from "../services/poster/poster-image.attacher";
-import { PosterService } from "../services/poster/poster.service";
+import { imageAttachersProvider } from "../services/image/image.attacher";
+import { ImageModule } from "../services/image/image.module";
 import { PrismaModule } from "../services/prisma/prisma.module";
 import { IMAGE_TRANSCODE_QUEUE_OPTIONS } from "../services/queues/image-transcoder/image-transcode-queue.options";
 import { ImageTranscoderProcessor } from "../services/queues/image-transcoder/image-transcoder.processor";
 import { ImageTranscoderService } from "../services/queues/image-transcoder/image-transcoder.service";
-import {
-  IMAGE_ATTACHERS,
-  ProcessedImageAttacher,
-} from "../services/queues/image-transcoder/processed-image-attacher";
 import { ReactionFlushModule } from "../services/queues/reaction-flush/reaction-flush.module";
 import { ReactionFlushProcessor } from "../services/queues/reaction-flush/reaction-flush.processor";
 import { ReactionReconcileSchedule } from "../services/queues/reaction-flush/reaction-reconcile-schedule.service";
@@ -40,8 +33,6 @@ import { VideoTranscoderProcessor } from "../services/queues/video-transcoder/vi
 import { ReactionModule } from "../services/reaction/reaction.module";
 import { RedisModule } from "../services/redis/redis.module";
 import { S3Module } from "../services/s3/s3.module";
-import { AvatarImageAttacher } from "../services/user-avatar/avatar-image.attacher";
-import { UserAvatarService } from "../services/user-avatar/user-avatar.service";
 import { VoteCacheModule } from "../services/vote-cache/vote-cache.module";
 
 @Module({
@@ -68,6 +59,7 @@ import { VoteCacheModule } from "../services/vote-cache/vote-cache.module";
     RedisModule,
     EngagementModule,
     FfmpegModule,
+    ImageModule,
 
     ScheduleModule.forRoot(),
   ],
@@ -81,18 +73,7 @@ import { VoteCacheModule } from "../services/vote-cache/vote-cache.module";
     VideoTranscoderProcessor,
     ImageTranscoderService,
     ImageTranscoderProcessor,
-    UserAvatarService,
-    AvatarImageAttacher,
-    PosterService,
-    posterImageAttachersProvider,
-    {
-      provide: IMAGE_ATTACHERS,
-      inject: [AvatarImageAttacher, POSTER_IMAGE_ATTACHERS],
-      useFactory: (
-        avatar: ProcessedImageAttacher,
-        posters: ProcessedImageAttacher[],
-      ): ProcessedImageAttacher[] => [avatar, ...posters],
-    },
+    imageAttachersProvider,
   ],
 })
 export class WorkerModule {}

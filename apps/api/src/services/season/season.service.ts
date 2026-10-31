@@ -3,13 +3,13 @@ import { Episode, Prisma, Season } from "@prisma/client";
 import { Filter, Sorting } from "../../common/pagination/pagination.types";
 import { buildOrderBy, buildWhere } from "../../common/pagination/prisma-query.util";
 import { settleAllOrLog } from "../../common/utils/settle-all-or-throw.util";
+import { ImageService } from "../image/image.service";
 import { MediaAssetService } from "../media-asset/media-asset.service";
-import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { VideoType } from "../queues/video-transcoder/enums/video-type.enum";
 import { buildSeasonVideoPrefix } from "../s3/processed-key";
 import { toSeasonView } from "./season.mapper";
-import { SeasonInput, SeasonUpdate, SeasonView } from "./season.types";
+import { SeasonInput, SeasonView } from "./season.types";
 
 @Injectable()
 export class SeasonService {
@@ -17,7 +17,7 @@ export class SeasonService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly posterService: PosterService,
+    private readonly imageService: ImageService,
     private readonly mediaAssetService: MediaAssetService,
   ) {}
 
@@ -48,25 +48,13 @@ export class SeasonService {
     return season ? this.toView(season) : null;
   }
 
-  async update(id: string, data: SeasonUpdate): Promise<SeasonView> {
-    const { posterUploaded, ...rest } = data;
-
-    if (posterUploaded === false) {
-      await this.posterService.removeStoredImage("seasons", id);
-    }
-
-    const updated = await this.prisma.season.update({
-      where: { id },
-      data: {
-        ...rest,
-        ...(posterUploaded === false ? { posterKey: null } : {}),
-      },
-    });
+  async update(id: string, data: SeasonInput): Promise<SeasonView> {
+    const updated = await this.prisma.season.update({ where: { id }, data });
     return this.toView(updated);
   }
 
   private toView(season: Season): SeasonView {
-    return toSeasonView(season, this.posterService.toPublicUrl(season.posterKey));
+    return toSeasonView(season, this.imageService.toPublicUrl(season.posterKey));
   }
 
   async delete(id: string): Promise<SeasonView> {
@@ -96,7 +84,7 @@ export class SeasonService {
 
     await settleAllOrLog(
       [
-        { id: "poster", run: () => this.posterService.deleteStoredImage(season.posterKey) },
+        { id: "poster", run: () => this.imageService.deleteStoredImage(season.posterKey) },
         {
           id: "processed-folder",
           run: () =>

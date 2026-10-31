@@ -2,8 +2,8 @@ import { NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { AgeRating, Prisma, ReactionType, TitleType } from "@prisma/client";
 import { FilterRule } from "../../common/pagination/filter-rule.enum";
+import { ImageService } from "../image/image.service";
 import { MediaAssetService } from "../media-asset/media-asset.service";
-import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { VideoType } from "../queues/video-transcoder/enums/video-type.enum";
 import { S3Service } from "../s3/s3.service";
@@ -23,9 +23,9 @@ describe("TitleService", () => {
   let mediaAssetServiceMock: jest.Mocked<MediaAssetService>;
   let seasonServiceMock: jest.Mocked<SeasonService>;
 
-  let posterServiceMock: {
+  let imageServiceMock: {
     toPublicUrl: jest.Mock;
-    removeStoredImage: jest.Mock;
+    remove: jest.Mock;
     deleteStoredImage: jest.Mock;
   };
   let voteStateMock: { forTitles: jest.Mock };
@@ -37,9 +37,9 @@ describe("TitleService", () => {
       reaction: { deleteMany: jest.fn() },
     };
 
-    posterServiceMock = {
+    imageServiceMock = {
       toPublicUrl: jest.fn((key: string | null) => (key ? `https://cdn.example.com/${key}` : null)),
-      removeStoredImage: jest.fn(),
+      remove: jest.fn(),
       deleteStoredImage: jest.fn(),
     };
 
@@ -103,7 +103,7 @@ describe("TitleService", () => {
             deleteFolder: jest.fn(),
           },
         },
-        { provide: PosterService, useValue: posterServiceMock },
+        { provide: ImageService, useValue: imageServiceMock },
         {
           provide: MediaAssetService,
           useValue: {
@@ -630,8 +630,8 @@ describe("TitleService", () => {
     });
   });
 
-  describe("the poster flag on update", () => {
-    it("should ignore a claimed upload rather than write a key", async () => {
+  describe("the poster on update", () => {
+    it("should leave the poster to its own routes", async () => {
       (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
         id: "title-1",
         genres: [],
@@ -641,32 +641,15 @@ describe("TitleService", () => {
         genres: [],
       });
 
-      await service.update("title-1", { posterUploaded: true } as any);
+      await service.update("title-1", { name: "Renamed" } as any);
 
       expect(prismaServiceMock.title.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.not.objectContaining({ posterKey: expect.anything() }),
         }),
       );
-      expect(posterServiceMock.removeStoredImage).not.toHaveBeenCalled();
-    });
-
-    it("should drop both the column and the object when the flag clears it", async () => {
-      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
-        id: "title-1",
-        genres: [],
-      });
-      (prismaServiceMock.title.update as jest.Mock).mockResolvedValue({
-        id: "title-1",
-        genres: [],
-      });
-
-      await service.update("title-1", { posterUploaded: false } as any);
-
-      expect(posterServiceMock.removeStoredImage).toHaveBeenCalledWith("titles", "title-1");
-      expect(prismaServiceMock.title.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ posterKey: null }) }),
-      );
+      expect(imageServiceMock.remove).not.toHaveBeenCalled();
+      expect(imageServiceMock.deleteStoredImage).not.toHaveBeenCalled();
     });
   });
 
@@ -690,7 +673,7 @@ describe("TitleService", () => {
           VideoType.MOVIE,
           "videos/title-1/",
         );
-        expect(posterServiceMock.deleteStoredImage).toHaveBeenCalledWith(
+        expect(imageServiceMock.deleteStoredImage).toHaveBeenCalledWith(
           "posters/titles/title-1/v1.webp",
         );
         expect(prismaServiceMock.title.delete).toHaveBeenCalledWith({
@@ -758,7 +741,7 @@ describe("TitleService", () => {
 
         await service.delete("title-1");
 
-        expect(posterServiceMock.deleteStoredImage).toHaveBeenCalledWith(
+        expect(imageServiceMock.deleteStoredImage).toHaveBeenCalledWith(
           "posters/titles/title-1/v1.webp",
         );
       });
@@ -782,7 +765,7 @@ describe("TitleService", () => {
           where: { id: "title-1" },
           include: { genres: true },
         });
-        expect(posterServiceMock.deleteStoredImage).toHaveBeenCalledWith(
+        expect(imageServiceMock.deleteStoredImage).toHaveBeenCalledWith(
           "posters/titles/title-1/v1.webp",
         );
       });
