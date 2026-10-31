@@ -10,13 +10,8 @@ interface SidebarContextValue {
 
 const SidebarContext = createContext<SidebarContextValue | null>(null);
 
-/**
- * Holds the collapsed state so pages can react to it — the catalog shows more
- * cards per row while the sidebar is out of the way.
- */
 export function SidebarProvider({ children }: { children: ReactNode }) {
   const isMobile = useMediaQuery("(max-width: 768px)");
-  // null means "follow the viewport"; a boolean means the user chose.
   const [manualCollapsed, setManualCollapsed] = useState<boolean | null>(null);
   const collapsed = manualCollapsed ?? isMobile;
 

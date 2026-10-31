@@ -7,8 +7,6 @@ class Dto {
 }
 
 describe("IsIsoDate", () => {
-  // The same options main.ts installs globally; the conversion only happens
-  // because `transform` is on.
   const pipe = new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true });
   const metadata = { type: "body" as const, metatype: Dto };
 
@@ -27,17 +25,10 @@ describe("IsIsoDate", () => {
     expect(dto.releaseDate.toISOString()).toBe("2026-01-01T21:30:00.000Z");
   });
 
-  // `new Date("2026-13-45")` is an Invalid Date, which would reach Prisma as a
-  // column write that fails far from the request that caused it.
   it("refuses a string the Date constructor cannot parse", async () => {
     await expect(run("2026-13-45")).rejects.toThrow(BadRequestException);
   });
 
-  /**
-   * The wire contract stays "a date string". `new Date(1767225600000)` is a
-   * perfectly good Date, which is exactly why the transform leaves non-strings
-   * alone and lets validation reject them.
-   */
   it.each([
     ["a timestamp number", 1767225600000],
     ["an object", { year: 2026 }],

@@ -19,7 +19,6 @@ const duration = new Histogram({
   name: "image_transcode_duration_seconds",
   help: "Time spent converting one image, by outcome",
   labelNames: ["kind", "outcome"],
-  // Interactive: an avatar that takes ten seconds is already a problem.
   buckets: [0.25, 0.5, 1, 2.5, 5, 10, 30],
 });
 

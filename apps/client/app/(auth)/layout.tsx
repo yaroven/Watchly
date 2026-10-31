@@ -42,7 +42,6 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           }}
         >
           {NAV_LINKS.map((label) => (
-            // PLACEHOLDER: marketing pages (Home/About/Contact) don't exist yet.
             <Typography key={label} sx={{ fontWeight: 700, fontSize: "16px", color: "#ffffff", cursor: "default" }}>
               {label}
             </Typography>

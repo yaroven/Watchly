@@ -19,9 +19,6 @@ export default function AuthorizeView({ roles, children }: AuthorizeViewProps) {
   const role = useAuthStore((state) => state.role);
   const isAuthorized = !!role && roles.includes(role);
 
-  // The store starts empty on every hard navigation — wait for the boot-time session
-  // restore (see Providers.tsx) to resolve before deciding the role doesn't match,
-  // otherwise every direct visit to a gated route bounces a logged-in admin away.
   useEffect(() => {
     if (status === "resolved" && !isAuthorized) router.replace(APP.DISCOVER);
   }, [status, isAuthorized, router]);

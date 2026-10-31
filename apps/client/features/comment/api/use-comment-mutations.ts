@@ -43,8 +43,6 @@ export const useSetCommentReaction = (
     ...options,
     mutationFn: ({ commentId, type }: { commentId: string; type: ReactionType | null }) => commentService.setReaction(commentId, type),
     onSuccess: (result, variables, onMutateResult, context) => {
-      // Scoped to the acting viewer: `result` carries their own `myReaction`, and a
-      // bare prefix would write it into every other viewer's cached entry as well.
       queryClient.setQueriesData<InfiniteComments>(forViewer(commentKeys.listsPrefix(), viewerKey), (data) =>
         withReactionInList(data, variables.commentId, result),
       );

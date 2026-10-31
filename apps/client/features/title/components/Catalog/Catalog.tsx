@@ -17,11 +17,9 @@ interface CatalogProps {
   bleed?: boolean;
   bleedSize?: number;
   isLoading?: boolean;
-  /** How many skeleton cards to show while `isLoading` — ignored otherwise. */
   skeletonCount?: number;
 }
 
-// Mirrors TitleCard's poster box (width/aspect-ratio/radius) so the row doesn't jump when real cards swap in.
 function TitleCardSkeleton() {
   return (
     <Skeleton
@@ -69,7 +67,6 @@ export default function Catalog({
               cursor: "pointer",
               transition: "color .15s ease-out",
               ":hover": { color: "primary.main" },
-              // Nudging the arrow on hover echoes the slider controls.
               ":hover .catalog-view-all-arrow": { transform: "translateX(3px)" },
               "@media (prefers-reduced-motion: reduce)": {
                 transition: "none",

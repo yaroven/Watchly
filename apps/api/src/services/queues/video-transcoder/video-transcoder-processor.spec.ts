@@ -30,8 +30,6 @@ jest.mock("fs-extra", () => ({
   }),
   createReadStream: jest.fn().mockReturnValue("mock-read-stream"),
   readdir: jest.fn().mockResolvedValue(["file1.m3u8", "file2.ts", "folder"]),
-  // basename, not a substring: the macOS temp dir is /var/folders/..., so
-  // `includes("folder")` would call every produced file a directory.
   stat: jest
     .fn()
     .mockImplementation((p: string) =>
@@ -39,11 +37,6 @@ jest.mock("fs-extra", () => ({
     ),
 }));
 
-/**
- * The processor owns the order of the stages now, so this spec drives the whole
- * pipeline with its collaborators mocked: `HlsTranscoder.run` is the seam that
- * used to be `VideoTranscoderService.transcodeVideo`.
- */
 describe("VideoTranscoderProcessor", () => {
   let processor: VideoTranscoderProcessor;
   let hlsMock: { run: jest.Mock; probeWidth: jest.Mock };
@@ -71,8 +64,6 @@ describe("VideoTranscoderProcessor", () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    // Metrics are module-level on the default registry, so values survive from
-    // one test to the next unless they are cleared. Registrations stay.
     register.resetMetrics();
     (mkdtemp as jest.Mock).mockImplementation((prefix: string) => Promise.resolve(`${prefix}XXXX`));
     (rm as jest.Mock).mockResolvedValue(undefined);
@@ -192,7 +183,6 @@ describe("VideoTranscoderProcessor", () => {
           outputDir: expect.stringContaining("output"),
         }),
       );
-      // Three entries, one of which is a directory.
       expect(s3Mock.uploadStream).toHaveBeenCalledTimes(2);
     });
 
@@ -265,10 +255,6 @@ describe("VideoTranscoderProcessor", () => {
       expect(s3Mock.uploadStream).toHaveBeenCalledTimes(2);
     });
 
-    /**
-     * The row is re-checked between stages, not once at the start: each stage
-     * is long enough for the title or episode to be deleted while it runs.
-     */
     it("re-checks the row between stages", async () => {
       await processor.process(
         mockJob({
@@ -432,12 +418,6 @@ describe("VideoTranscoderProcessor", () => {
       await expect(sampleFor("success", "movie")).resolves.toBe(true);
     });
 
-    /**
-     * An abort means the title or episode was deleted mid-transcode. The job
-     * returns rather than throwing, so BullMQ does not retry it — counting it
-     * as failed would make a routine deletion look like a broken pipeline,
-     * and the failure-ratio alert would fire on ordinary admin work.
-     */
     it("separates an abort from a failure", async () => {
       hlsMock.run.mockRejectedValue(new TranscodeAbortedError("cancelled"));
 

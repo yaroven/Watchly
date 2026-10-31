@@ -12,10 +12,6 @@ import { useViewer } from "@shared/lib/use-viewer";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
-/**
- * Only the fields the card draws, so adding a column to `Title` cannot silently
- * change this component's contract. Callers may still spread a whole Title.
- */
 type TitleProps = Pick<Title, "id" | "name" | "posterUrl" | "type" | "genres" | "externalRatings" | "engagement"> & {
   onClick: () => void;
 };
@@ -28,25 +24,11 @@ export default function TitleCard({ id, name, posterUrl, type, genres, externalR
   const router = useRouter();
   const viewer = useViewer();
   const setWatchlist = useSetTitleWatchlist(id);
-  // A tinted 12px icon is not feedback a touch user can read — there is no hover
-  // to reveal a tooltip, and the icon still shows the pre-click state. The banner
-  // below says what happened in words, over the poster, where the click was.
   const failed = setWatchlist.isError;
 
-  // A null `viewer` on the payload means it was read without a session — server
-  // side, or during the boot exchange — so their own state is unknown, which is
-  // not the same as not saved. Rendering an empty bookmark for it would assert
-  // something false to anyone reading the page with assistive tech.
   const saved = engagement.viewer?.inWatchlist ?? null;
   const stateUnknown = viewer.status === "signed-in" && saved === null;
 
-  // Never `disabled`: a disabled button fires no click at all, and a bookmark
-  // that silently does nothing is indistinguishable from a broken one. An
-  // anonymous viewer is missing a session, so their click goes to the login page.
-  //
-  // The other two states still swallow it — the boot window, and viewer state we
-  // could not read. The label distinguishes them, but neither has anywhere to be
-  // routed to yet.
   const toggleWatchlist = (event: { stopPropagation: () => void; preventDefault: () => void }) => {
     event.stopPropagation();
     event.preventDefault();
@@ -71,15 +53,9 @@ export default function TitleCard({ id, name, posterUrl, type, genres, externalR
             : "Add to watchlist";
 
   return (
-    // The card is not itself a button: it holds a second control (the watchlist
-    // toggle), and a button may not contain another interactive element — nesting
-    // one hides it from assistive tech and makes its focus order unreliable. The
-    // "open title" affordance is a sibling button stretched over the card instead.
     <Card
       variant="poster"
       sx={{
-        // Grows smoothly with the viewport instead of stepping, so a row of
-        // cards never changes size all at once. 193 is the 1440-wide design.
         position: "relative",
         width: "clamp(150px, 13vw, 260px)",
         display: "block",
@@ -171,17 +147,12 @@ export default function TitleCard({ id, name, posterUrl, type, genres, externalR
             component="button"
             type="button"
             aria-label={toggleLabel}
-            // Only claim a state we actually know — never while it is unknown.
             aria-pressed={saved === null ? undefined : saved}
             aria-busy={setWatchlist.isPending}
             onClick={toggleWatchlist}
             sx={{
-              // Fills the notch: a smaller button would leave an inert strip of it
-              // sitting over the open-title overlay.
               position: "absolute",
               inset: 0,
-              // Same fill as the card frame, so the button reads as a notch
-              // cut out of the poster rather than a chip floating on top of it.
               borderRadius: "8px",
               border: "none",
               padding: 0,

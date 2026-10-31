@@ -20,21 +20,9 @@ export interface SpotlightTitle {
 
 export interface SpotlightTileProps {
   title: SpotlightTitle;
-  /**
-   * Which slot of the grid this tile fills, not a property of the title —
-   * "editorial" centres a narrow text column against the left edge, "poster"
-   * pins a large name to the bottom across the full width.
-   */
   variant: "editorial" | "poster";
   actionPosition: keyof typeof ACTION_POSITIONS;
-  /**
-   * Name size as a percentage of the tile's own width. The slots differ in
-   * width by more than 2x, so a viewport-based size would leave the narrow
-   * one tiny; this makes the type scale with the artwork it sits on. Every
-   * other size in the tile is a fixed ratio of it.
-   */
   titleScale: number;
-  /** The tile's rendered width, for the image optimiser to pick a source. */
   imageSizes: string;
 }
 
@@ -43,12 +31,9 @@ const ACTION_POSITIONS = {
   "bottom-right": { bottom: 16, right: 16 },
 } as const;
 
-// Impact and Alumni Sans from the design. Anton substitutes for Impact —
-// see the comment in app/layout.tsx — with Impact kept as a local fallback.
 const DISPLAY_FONT = 'var(--font-display), Impact, "Arial Narrow", sans-serif';
 const CONDENSED_FONT = 'var(--font-tagline), "Arial Narrow", sans-serif';
 
-// Ratios to the name, measured off the design file.
 const TAGLINE_RATIO = 0.3;
 const GENRE_RATIO = 0.29;
 const BODY_RATIO = 0.22;
@@ -65,14 +50,11 @@ export default function SpotlightTile({ title, variant, actionPosition, titleSca
         minWidth: 0,
         overflow: "hidden",
         borderRadius: "12px",
-        // Turns this tile into the reference box for the cqw sizes below.
         containerType: "inline-size",
       }}
     >
       <Image src={imageUrl} alt="" fill sizes={imageSizes} style={{ objectFit: "cover" }} />
 
-      {/* Editorial darkens the left edge under its text column; poster darkens
-          the floor under the name. Neither dims the artwork it doesn't cover. */}
       <Box
         sx={{
           position: "absolute",
@@ -104,7 +86,6 @@ export default function SpotlightTile({ title, variant, actionPosition, titleSca
           gap: "0.6cqw",
           maxWidth: editorial ? { xs: "100%", md: "50%" } : "100%",
           p: "clamp(16px, 2.5cqw, 40px)",
-          // Leaves the action button clickable through the text layer's gaps.
           pointerEvents: "none",
         }}
       >
@@ -114,12 +95,8 @@ export default function SpotlightTile({ title, variant, actionPosition, titleSca
               fontFamily: CONDENSED_FONT,
               fontSize: `clamp(20px, ${titleScale * TAGLINE_RATIO}cqw, 36px)`,
               fontWeight: 500,
-              // Alumni Sans is condensed; without tracking the line reads as a
-              // solid block at these sizes.
               letterSpacing: "0.04em",
               lineHeight: 1.2,
-              // The poster slots set their tagline as a gold eyebrow over the
-              // name; the editorial one runs as plain copy above its heading.
               textTransform: editorial ? "none" : "uppercase",
               color: editorial ? "#ffffff" : "primary.main",
             }}
@@ -128,8 +105,6 @@ export default function SpotlightTile({ title, variant, actionPosition, titleSca
           </Typography>
         )}
 
-        {/* Baseline alignment puts the genres on the name's first line, so a
-            name that wraps still keeps them level with its top row. */}
         <Box sx={{ display: "flex", alignItems: "baseline", gap: "2cqw", flexWrap: "wrap" }}>
           <Typography
             variant="h1"
@@ -143,7 +118,6 @@ export default function SpotlightTile({ title, variant, actionPosition, titleSca
           >
             {name}
           </Typography>
-          {/* An empty array is 0, which React would render as a stray digit. */}
           {!!genres?.length && (
             <GenreList
               genres={genres}

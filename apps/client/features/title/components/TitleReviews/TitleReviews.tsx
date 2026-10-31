@@ -32,7 +32,6 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
   const userId = useAuthStore((state) => state.userId);
   const authStatus = useAuthStore((state) => state.status);
   const isSignedIn = Boolean(userId);
-  // Both reads are personalised (own score, own reactions), so they wait for the session restore.
   const sessionReady = authStatus === "resolved";
 
   const [sortMode, setSortMode] = useState<CommentSortMode>("newest");
@@ -55,11 +54,7 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
     },
   });
 
-  // Adjusting state during render rather than in an effect: the slider follows the saved score
-  // whenever the server's value changes, but stays put while the viewer is dragging it.
   const [syncedScore, setSyncedScore] = useState<number | null>(null);
-  // `viewer` is null when the read had nobody in scope, which is not the same as
-  // a viewer who has not rated — only the second should move the slider.
   const myScore = engagement?.viewer?.score ?? null;
   if (engagement?.viewer != null && syncedScore !== myScore) {
     setSyncedScore(myScore);

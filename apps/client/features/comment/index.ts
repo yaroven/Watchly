@@ -1,4 +1,3 @@
-/** Public API of the comment feature — other features and routes import from here. */
 export { default as commentKeys } from "./api/comment.keys";
 export { default as commentService, type CommentPage } from "./api/comment.service";
 export { useCreateComment, useDeleteComment, useReportComment, useSetCommentReaction } from "./api/use-comment-mutations";

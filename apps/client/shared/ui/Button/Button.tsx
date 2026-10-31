@@ -7,8 +7,6 @@ type ButtonProps = Omit<MuiButtonProps, "variant" | "color"> & {
   variant?: "contained" | "outlined";
   danger?: boolean;
   isPill?: boolean;
-  // MUI renders an `<a>` when `href` is passed, but `ButtonProps`'s default
-  // "button" component typing doesn't carry anchor-only attributes.
   target?: string;
   rel?: string;
 };

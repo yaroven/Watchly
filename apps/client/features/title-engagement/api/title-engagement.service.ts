@@ -38,8 +38,6 @@ const TitleEngagementService = {
 
   getWatchlist: async (params: { page?: number; limit?: number } = {}): Promise<{ items: Title[]; totalCount: number }> => {
     const { data } = await api.get<{ items: ApiTitle[]; totalCount: number }>("/watchlist", { params });
-    // Same normalisation as every other title read — without it these carry ISO
-    // strings typed as `Date`, and the first component to format one throws.
     return { items: data.items.map(mapTitle), totalCount: data.totalCount };
   },
 };

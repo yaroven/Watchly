@@ -31,8 +31,6 @@ describe("S3EventService", () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    // Metrics are module-level on the default registry, so values survive from
-    // one test to the next unless they are cleared. Registrations stay.
     register.resetMetrics();
 
     const module: TestingModule = await Test.createTestingModule({
@@ -429,11 +427,6 @@ describe("S3EventService", () => {
 
     const textOf = () => register.metrics();
 
-    /**
-     * The end-to-end number: how long an upload waited between S3 accepting
-     * it and a job existing for it. Queue depth alone cannot tell a backlog
-     * from a poller that stopped reading.
-     */
     it("records the delay from the S3 event to the job, labelled by kind", async () => {
       const eventTime = new Date(Date.now() - 4000).toISOString();
 
@@ -447,8 +440,6 @@ describe("S3EventService", () => {
       expect(text).toMatch(/s3_event_lag_seconds_sum\{kind="title-video"\} [45](\.\d+)?/);
     });
 
-    // S3's clock and the pod's are not the same clock; a small negative skew
-    // is not a measurement of anything.
     it("clamps a future event time at zero rather than recording a negative", async () => {
       const eventTime = new Date(Date.now() + 60_000).toISOString();
 
@@ -490,8 +481,6 @@ describe("S3EventService", () => {
       expect(await textOf()).toContain('sqs_messages_total{outcome="unparseable"} 1');
     });
 
-    // A failed message is deliberately left on the queue, so this counter and
-    // sqs_dlq_messages are the two ends of the same story.
     it("counts a message whose record threw as failed, and does not delete it", async () => {
       videoSchedulerMock.schedule.mockRejectedValueOnce(new Error("redis down"));
 
@@ -523,8 +512,6 @@ describe("S3EventService", () => {
       });
     });
 
-    // "Unknown" must not serialise as "empty". Only the HELP and TYPE lines
-    // are present; there is no sample, so nothing reads back as a zero.
     it("reports no sample when no dead-letter queue was resolved", async () => {
       expect(await textOf()).not.toMatch(/^sqs_dlq_messages[{ ]/m);
     });

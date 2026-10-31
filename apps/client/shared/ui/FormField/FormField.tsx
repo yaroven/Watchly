@@ -5,8 +5,6 @@ import { inputVariants, tokens, type InputVariant } from "@shared/mui/theme";
 import type { ReactNode } from "react";
 import { FieldError, FieldValues, Path, UseFormRegister } from "react-hook-form";
 
-// `error` and `name` are re-typed below, so they have to be dropped from the
-// MUI props first — intersecting them would produce `boolean & FieldError`.
 type InputProps<T extends FieldValues> = Omit<MuiInputProps, "error" | "name"> & {
   type?: string;
   label?: string;
@@ -36,8 +34,6 @@ export default function FormField<T extends FieldValues>({
   const fieldId = id ?? String(name).replace(/\./g, "-");
   const errorId = error ? `${fieldId}-error` : undefined;
 
-  // InputBase renders `inputComponent`, not its own children — the <option>
-  // elements have to travel through inputProps to land inside the <select>.
   const selectProps =
     as === "select"
       ? {
@@ -59,15 +55,8 @@ export default function FormField<T extends FieldValues>({
         error={Boolean(error)}
         aria-describedby={errorId}
         multiline={as === "textarea"}
-        // Both variants draw their own frame. Set here rather than only in the
-        // theme, so the field looks right even outside MuiThemeProvider.
         disableUnderline
-        sx={[
-          inputVariants[variant],
-          // A textarea has to grow, so the fixed height is dropped for it.
-          as === "textarea" && { height: "auto", paddingBlock: "10px" },
-          ...(Array.isArray(sx) ? sx : [sx]),
-        ]}
+        sx={[inputVariants[variant], as === "textarea" && { height: "auto", paddingBlock: "10px" }, ...(Array.isArray(sx) ? sx : [sx])]}
         {...selectProps}
         {...rest}
         {...register(name, { valueAsNumber })}

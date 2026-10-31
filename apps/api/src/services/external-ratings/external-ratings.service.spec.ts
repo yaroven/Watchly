@@ -222,7 +222,6 @@ describe("ExternalRatingsService", () => {
       });
     });
 
-    // One bad title must not end the night's run.
     it("keeps going when one title throws", async () => {
       prisma.title.findMany.mockResolvedValueOnce(batchOf(3));
       omdb.fetchByImdbId

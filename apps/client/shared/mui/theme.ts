@@ -8,7 +8,6 @@ declare module "@mui/material/Card" {
   }
 }
 
-// Card resolves its `variant` through Paper, so the union has to be widened there too.
 declare module "@mui/material/Paper" {
   interface PaperPropsVariantOverrides {
     bordered: true;
@@ -17,11 +16,6 @@ declare module "@mui/material/Paper" {
   }
 }
 
-/**
- * design tokens, read directly off the Penpot source file
- * (see the component handoff doc). Font stays PT Sans to match the
- * app's real typography instead of the Figma mockup's Poppins.
- */
 declare module "@mui/material/styles" {
   interface BreakpointOverrides {
     xxl: true;
@@ -30,11 +24,6 @@ declare module "@mui/material/styles" {
 
 const HEADING_FONT = "var(--font-heading), Arial, Helvetica, sans-serif";
 
-/**
- * Semantic tokens, named by meaning rather than colour. Form components
- * (FormField, Select, FormFileInput and friends) import this directly
- * instead of hardcoding hex, so recolouring the app is a one-file change.
- */
 export const tokens = {
   accent: { primary: "#e7bc0f" },
   border: { default: "#cccccc", subtle: "#333333", faint: "#666666" },
@@ -79,11 +68,7 @@ export const tmovieTheme = createTheme({
     borderRadius: 12,
   },
   typography: {
-    // Poppins carries the body copy; Fredoka is scoped to headings only.
     fontFamily: "var(--font-body), Arial, Helvetica, sans-serif",
-    // Sizes clamp between a small-screen floor and a wide-screen ceiling, with
-    // the middle value tracking viewport width. The design's 1440 numbers sit
-    // roughly in the middle of each range.
     h1: { fontFamily: HEADING_FONT, fontWeight: 700, fontSize: "clamp(26px, 2.2vw, 44px)" },
     h2: { fontFamily: HEADING_FONT, fontWeight: 700, fontSize: "clamp(20px, 1.7vw, 34px)" },
     h3: { fontFamily: HEADING_FONT, fontWeight: 600, fontSize: "clamp(18px, 1.4vw, 28px)" },
@@ -100,7 +85,6 @@ export const tmovieTheme = createTheme({
         disableElevation: true,
       },
       styleOverrides: {
-        // Contained = "Submit Btn" / "Play Button": r5, gold fill, black label
         contained: {
           borderRadius: 8,
           minHeight: "clamp(32px, 2.4vw, 44px)",
@@ -108,7 +92,6 @@ export const tmovieTheme = createTheme({
           paddingBlock: 10,
           fontSize: "clamp(13px, 0.95vw, 18px)",
         },
-        // Outlined = "Trailer Button" / "Load More": r8, 1px gold border, gold label
         outlined: {
           borderRadius: 8,
           minHeight: "clamp(32px, 2.4vw, 44px)",
@@ -121,7 +104,6 @@ export const tmovieTheme = createTheme({
     },
     MuiCard: {
       styleOverrides: {
-        // Solid — the dominant container in the template
         root: {
           backgroundColor: "#000000",
           backgroundImage: "none",
@@ -131,7 +113,6 @@ export const tmovieTheme = createTheme({
       },
       variants: [
         {
-          // "David Jones" review card — Film page
           props: { variant: "bordered" },
           style: {
             backgroundColor: "transparent",
@@ -140,7 +121,6 @@ export const tmovieTheme = createTheme({
           },
         },
         {
-          // Login Form panel, sitting over the poster art
           props: { variant: "glass" },
           style: {
             backgroundColor: "rgba(0,0,0,.25)",
@@ -149,7 +129,6 @@ export const tmovieTheme = createTheme({
           },
         },
         {
-          // "Film Card ( Style 1 )" — frame around a poster
           props: { variant: "poster" },
           style: {
             backgroundColor: "#333333",
@@ -162,7 +141,6 @@ export const tmovieTheme = createTheme({
     },
     MuiChip: {
       styleOverrides: {
-        // "Selector" filter pill from the Search Result page
         root: {
           borderRadius: 24,
           height: 36,
@@ -174,7 +152,6 @@ export const tmovieTheme = createTheme({
     },
     MuiInput: {
       defaultProps: {
-        // Both field variants draw their own frame, so MUI's underline is off.
         disableUnderline: true,
       },
       styleOverrides: {
@@ -210,20 +187,14 @@ export const tmovieTheme = createTheme({
   },
 });
 
-/**
- * Field variants from the design file. MUI's Input has no native `variant`
- * prop, so these are applied through `sx` rather than `theme.components`.
- */
 const fieldBase = {
   color: tokens.text.field,
   "& input::placeholder, & textarea::placeholder": { color: tokens.text.placeholder, opacity: 1 },
-  // Native <select> renders its popup with the OS palette unless told otherwise.
   "& select": { color: tokens.text.field, backgroundColor: "transparent" },
   "& select option": { backgroundColor: tokens.surface.fill, color: tokens.text.field },
 } as const;
 
 export const inputVariants = {
-  // Login/Register form field: 466×48, underline only, 16px/500 text
   bordered: {
     ...fieldBase,
     height: 48,
@@ -232,11 +203,9 @@ export const inputVariants = {
     paddingInline: "2px",
     fontSize: "16px",
     fontWeight: 500,
-    // Error wins over focus — declared after it.
     "&.Mui-focused": { borderBottomColor: tokens.accent.primary },
     "&.Mui-error": { borderBottomColor: tokens.feedback.error },
   },
-  // Admin form field: h36, r24, fill, 14px/400 text
   pill: {
     ...fieldBase,
     height: 36,
@@ -245,7 +214,6 @@ export const inputVariants = {
     paddingInline: "18px",
     fontSize: "14px",
     fontWeight: 400,
-    // Error wins over focus — declared after it.
     "&.Mui-focused": { outline: `1px solid ${tokens.accent.primary}` },
     "&.Mui-error": { outline: `1px solid ${tokens.feedback.error}` },
   },

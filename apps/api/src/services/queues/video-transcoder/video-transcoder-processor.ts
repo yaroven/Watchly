@@ -27,9 +27,6 @@ const duration = new Histogram({
   name: "video_transcode_duration_seconds",
   help: "Time spent transcoding one video, by outcome",
   labelNames: ["kind", "outcome"],
-  // Minutes to an hour. An image's buckets are two orders of magnitude lower,
-  // which is why that is a metric of its own rather than a label on this one —
-  // a histogram carries one bucket set for every series.
   buckets: [10, 30, 60, 300, 600, 1800, 3600],
 });
 

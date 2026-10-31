@@ -111,7 +111,6 @@ export default function TitleForm({ initialData }: TitleFormProps) {
 
   const closeSuccessModal = () => setIsSuccessModalOpen(false);
 
-  // A freshly created title takes over the screen — the form has nothing left to say.
   if (!isEditing && createdTitle) {
     return (
       <TitleCreated

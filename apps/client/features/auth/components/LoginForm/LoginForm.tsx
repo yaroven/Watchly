@@ -115,7 +115,6 @@ export default function LoginForm() {
           )}
         />
 
-        {/* PLACEHOLDER: no password-reset flow exists yet */}
         <Typography sx={{ fontSize: "14px", color: "text.secondary", cursor: "default" }}>Forgot Password?</Typography>
       </Box>
 

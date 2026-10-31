@@ -10,8 +10,6 @@ const useWatchlist = (
   params: { page?: number; limit?: number } = {},
   options?: Omit<UseQueryOptions<WatchlistPage, Error, WatchlistPage, readonly unknown[]>, "queryKey" | "queryFn">,
 ) => {
-  // The endpoint is the viewer's own list, so anonymous callers get a 401 —
-  // wait for the session rather than firing one.
   const viewer = useViewer();
 
   return useQuery({

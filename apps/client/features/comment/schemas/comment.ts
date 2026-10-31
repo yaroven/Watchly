@@ -9,7 +9,6 @@ export interface CommentAuthor {
   id: string;
   name: string;
   avatarUrl: string | null;
-  /** The author's own score for this title, null if they never rated it. */
   score: number | null;
 }
 
@@ -22,7 +21,6 @@ export interface Comment {
   likes: number;
   dislikes: number;
   myReaction: ReactionType | null;
-  /** Up to the first few replies; the rest come from /comments/:id/replies. */
   replies: Comment[];
   replyCount: number;
 }

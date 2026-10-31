@@ -29,8 +29,6 @@ interface AdminNavItemProps {
   itemRef: (el: HTMLAnchorElement | null) => void;
 }
 
-// Icon tile + inset active pill give admin nav real visual weight, layered on
-// top of the gold accent bar drawn separately by the sidebar's list indicator.
 export default function AdminNavItem({ href, text, icon, isActive, collapsed, itemRef }: AdminNavItemProps) {
   const accentColor = isActive ? "primary.main" : "#b2b2b2";
 

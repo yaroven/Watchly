@@ -4,10 +4,6 @@ import { CommentSortMode } from "../schemas/comment";
 import commentKeys from "./comment.keys";
 import commentService, { CommentPage } from "./comment.service";
 
-/**
- * `enabled` exists so callers can hold the request until the session is restored — the
- * response carries the viewer's own reaction, which comes back empty on an anonymous call.
- */
 const useComments = (titleId: string, sort: CommentSortMode = "newest", limit = 10, enabled = true) => {
   const viewer = useViewer();
 

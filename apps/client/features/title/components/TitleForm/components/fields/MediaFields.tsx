@@ -13,7 +13,6 @@ import type { UseFormReturn } from "react-hook-form";
 
 interface MediaFieldsProps {
   form: UseFormReturn<TitleFormValues>;
-  /** Movies carry their own file; series get theirs per episode. */
   showVideoField: boolean;
   disabled: boolean;
 }
