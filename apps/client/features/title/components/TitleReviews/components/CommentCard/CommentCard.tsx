@@ -9,6 +9,7 @@ import {
   useReportComment,
   useSetCommentReaction,
 } from "@/features/comment";
+import { FeatureGate } from "@/features/feature-flags";
 import Role from "@/types/role";
 import { ThumbDown as DislikeIcon, ThumbUp as LikeIcon, ChatBubble as ReplyIcon } from "@mui/icons-material";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
@@ -134,34 +135,36 @@ export default function CommentCard({ comment, titleId, depth = 0 }: CommentCard
           </Typography>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: "20px", flexWrap: "wrap" }}>
-            <Box
-              component="button"
-              type="button"
-              aria-label={comment.myReaction === ReactionType.LIKE ? "Remove like" : "Like"}
-              aria-pressed={comment.myReaction === ReactionType.LIKE}
-              disabled={!isSignedIn || react.isPending}
-              onClick={() => handleReact(ReactionType.LIKE)}
-              sx={{ ...reactionButtonSx, color: comment.myReaction === ReactionType.LIKE ? "primary.main" : "text.secondary" }}
-            >
-              <LikeIcon sx={{ fontSize: "18px" }} />
-              <Typography component="span" sx={{ fontSize: "13px" }}>
-                {formatCount(comment.likes)}
-              </Typography>
-            </Box>
-            <Box
-              component="button"
-              type="button"
-              aria-label={comment.myReaction === ReactionType.DISLIKE ? "Remove dislike" : "Dislike"}
-              aria-pressed={comment.myReaction === ReactionType.DISLIKE}
-              disabled={!isSignedIn || react.isPending}
-              onClick={() => handleReact(ReactionType.DISLIKE)}
-              sx={{ ...reactionButtonSx, color: comment.myReaction === ReactionType.DISLIKE ? "primary.main" : "text.secondary" }}
-            >
-              <DislikeIcon sx={{ fontSize: "18px" }} />
-              <Typography component="span" sx={{ fontSize: "13px" }}>
-                {formatCount(comment.dislikes)}
-              </Typography>
-            </Box>
+            <FeatureGate flag="reactions">
+              <Box
+                component="button"
+                type="button"
+                aria-label={comment.myReaction === ReactionType.LIKE ? "Remove like" : "Like"}
+                aria-pressed={comment.myReaction === ReactionType.LIKE}
+                disabled={!isSignedIn || react.isPending}
+                onClick={() => handleReact(ReactionType.LIKE)}
+                sx={{ ...reactionButtonSx, color: comment.myReaction === ReactionType.LIKE ? "primary.main" : "text.secondary" }}
+              >
+                <LikeIcon sx={{ fontSize: "18px" }} />
+                <Typography component="span" sx={{ fontSize: "13px" }}>
+                  {formatCount(comment.likes)}
+                </Typography>
+              </Box>
+              <Box
+                component="button"
+                type="button"
+                aria-label={comment.myReaction === ReactionType.DISLIKE ? "Remove dislike" : "Dislike"}
+                aria-pressed={comment.myReaction === ReactionType.DISLIKE}
+                disabled={!isSignedIn || react.isPending}
+                onClick={() => handleReact(ReactionType.DISLIKE)}
+                sx={{ ...reactionButtonSx, color: comment.myReaction === ReactionType.DISLIKE ? "primary.main" : "text.secondary" }}
+              >
+                <DislikeIcon sx={{ fontSize: "18px" }} />
+                <Typography component="span" sx={{ fontSize: "13px" }}>
+                  {formatCount(comment.dislikes)}
+                </Typography>
+              </Box>
+            </FeatureGate>
             {comment.replyCount > 0 && (
               <Box
                 component="button"
