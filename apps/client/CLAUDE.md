@@ -6,7 +6,11 @@ react-hook-form, hls.js. Dev server on port 4000. `README.md` here is
 
 Tests are **vitest, unit only** (`pnpm --filter client test`, run in CI by Build Client).
 Coverage is thin and deliberate: the auth plumbing in `shared/` and the JWT helpers,
-because they are module-level state that no type can hold. There is no DOM environment
+because they are module-level state that no type can hold, and what a mutation does to
+the cache — `title-engagement.invalidation` (which keys a title write refreshes, checked
+with TanStack's own `partialMatchKey`) and `comment-reaction.cache` (how a comment vote
+is written into the lists and replies). Keep that logic in pure functions beside the
+hook, not inside `onSuccess`, so it stays testable without a DOM. There is no DOM environment
 and no component test yet, so behaviour in a component is still verified in the browser —
 say so when you do.
 

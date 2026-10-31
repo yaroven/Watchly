@@ -3,19 +3,9 @@ import { forViewer } from "@/shared/api/viewer-cache";
 import { useViewer } from "@/shared/lib/use-viewer";
 import { useMutation, UseMutationOptions, useQueryClient } from "@tanstack/react-query";
 import { Comment, CommentReaction, CreateCommentDto, ReactionType } from "../schemas/comment";
+import { InfiniteComments, withReactionInList, withReactionInReplies } from "./comment-reaction.cache";
 import commentKeys from "./comment.keys";
 import commentService, { CommentPage } from "./comment.service";
-
-interface InfiniteComments {
-  pages: CommentPage[];
-  pageParams: unknown[];
-}
-
-const applyReaction = (comment: Comment, commentId: string, result: CommentReaction): Comment => {
-  if (comment.id === commentId) return { ...comment, ...result };
-  if (comment.replies.length === 0) return comment;
-  return { ...comment, replies: comment.replies.map((reply) => applyReaction(reply, commentId, result)) };
-};
 
 export const useCreateComment = (titleId: string, options?: Omit<UseMutationOptions<Comment, Error, CreateCommentDto>, "mutationFn">) => {
   const useCreate = createMutationHook({
@@ -56,19 +46,10 @@ export const useSetCommentReaction = (
       // Scoped to the acting viewer: `result` carries their own `myReaction`, and a
       // bare prefix would write it into every other viewer's cached entry as well.
       queryClient.setQueriesData<InfiniteComments>(forViewer(commentKeys.listsPrefix(), viewerKey), (data) =>
-        data
-          ? {
-              ...data,
-              pages: data.pages.map((page) => ({
-                ...page,
-                items: page.items.map((item) => applyReaction(item, variables.commentId, result)),
-              })),
-            }
-          : data,
+        withReactionInList(data, variables.commentId, result),
       );
-
       queryClient.setQueriesData<CommentPage>(forViewer(commentKeys.repliesPrefix(), viewerKey), (data) =>
-        data ? { ...data, items: data.items.map((item) => applyReaction(item, variables.commentId, result)) } : data,
+        withReactionInReplies(data, variables.commentId, result),
       );
 
       options?.onSuccess?.(result, variables, onMutateResult, context);
