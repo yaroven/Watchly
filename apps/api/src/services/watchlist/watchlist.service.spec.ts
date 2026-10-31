@@ -1,7 +1,5 @@
-import { NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { PrismaService } from "../prisma/prisma.service";
-import { TitleEngagementService } from "../title-engagement/title-engagement.service";
 import { TitleService } from "../title/title.service";
 import { WatchlistService } from "./watchlist.service";
 
@@ -19,8 +17,6 @@ describe("WatchlistService", () => {
   };
   let titleServiceMock: {
     findManyByIds: jest.Mock;
-    readEngagement: jest.Mock;
-    recomputeWatchlistCounts: jest.Mock;
   };
   let txMock: {
     watchlistItem: { upsert: jest.Mock; deleteMany: jest.Mock };
@@ -47,8 +43,6 @@ describe("WatchlistService", () => {
     };
     titleServiceMock = {
       findManyByIds: jest.fn().mockResolvedValue([]),
-      readEngagement: jest.fn().mockResolvedValue({ watchlistCount: 0 }),
-      recomputeWatchlistCounts: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -56,7 +50,6 @@ describe("WatchlistService", () => {
         WatchlistService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: TitleService, useValue: titleServiceMock },
-        { provide: TitleEngagementService, useValue: titleServiceMock },
       ],
     }).compile();
 
@@ -119,59 +112,6 @@ describe("WatchlistService", () => {
       expect(prismaMock.watchlistItem.count).toHaveBeenCalledWith({
         where: { userId: viewerId, title: { is: {} } },
       });
-    });
-  });
-
-  describe("add", () => {
-    it("should be idempotent when the title is already on the list", async () => {
-      await service.add(titleId, viewerId);
-
-      expect(txMock.watchlistItem.upsert).toHaveBeenCalledWith({
-        where: { userId_titleId: { userId: viewerId, titleId } },
-        create: { userId: viewerId, titleId },
-        update: {},
-      });
-    });
-
-    it("should write inside the transaction, never on the base client", async () => {
-      await service.add(titleId, viewerId);
-
-      expect(prismaMock.watchlistItem.upsert).not.toHaveBeenCalled();
-    });
-
-    it("should recompute the counter and read the block back from the same transaction", async () => {
-      await service.add(titleId, viewerId);
-
-      expect(titleServiceMock.recomputeWatchlistCounts).toHaveBeenCalledWith(txMock, titleId);
-      expect(titleServiceMock.readEngagement).toHaveBeenCalledWith(txMock, titleId, viewerId);
-    });
-
-    it("should refuse rather than commit against a title that vanished", async () => {
-      titleServiceMock.readEngagement.mockRejectedValue(new NotFoundException("not found"));
-
-      await expect(service.add(titleId, viewerId)).rejects.toThrow("not found");
-    });
-  });
-
-  describe("remove", () => {
-    it("should delete only the viewer's own row", async () => {
-      await service.remove(titleId, viewerId);
-
-      expect(txMock.watchlistItem.deleteMany).toHaveBeenCalledWith({
-        where: { userId: viewerId, titleId },
-      });
-    });
-
-    it("should recompute the counter after the delete", async () => {
-      await service.remove(titleId, viewerId);
-
-      expect(titleServiceMock.recomputeWatchlistCounts).toHaveBeenCalledWith(txMock, titleId);
-    });
-
-    it("should refuse rather than commit against a title that vanished", async () => {
-      titleServiceMock.readEngagement.mockRejectedValue(new NotFoundException("not found"));
-
-      await expect(service.remove(titleId, viewerId)).rejects.toThrow("not found");
     });
   });
 });

@@ -2,10 +2,10 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { Logged } from "../../decorators/logged.decorator";
 import { PrismaService } from "../prisma/prisma.service";
-import titleQuery, { EngagementRelations } from "../title/utils/title.query";
 import { VoteStateService } from "../vote-cache/vote-state.service";
 import { titleEngagementViewFromRelations } from "./title-engagement.mapper";
 import { TitleEngagementView } from "./title-engagement.types";
+import titleQuery, { EngagementRelations } from "./utils/title.query";
 
 export type EngagementClient = Pick<
   PrismaService,
@@ -47,12 +47,35 @@ export class TitleEngagementService {
   }
 
   @Logged()
+  async addToWatchlist(titleId: string, userId: string): Promise<TitleEngagementView> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.watchlistItem.upsert({
+        where: { userId_titleId: { userId, titleId } },
+        create: { userId, titleId },
+        update: {},
+      });
+
+      await this.recomputeWatchlistCounts(tx, titleId);
+      return this.readEngagement(tx, titleId, userId);
+    });
+  }
+
+  @Logged()
+  async removeFromWatchlist(titleId: string, userId: string): Promise<TitleEngagementView> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.watchlistItem.deleteMany({ where: { userId, titleId } });
+      await this.recomputeWatchlistCounts(tx, titleId);
+      return this.readEngagement(tx, titleId, userId);
+    });
+  }
+
+  @Logged()
   async getEngagement(titleId: string, viewerId: string | null): Promise<TitleEngagementView> {
     return this.readEngagement(this.prisma, titleId, viewerId);
   }
 
   @Logged()
-  async readEngagement(
+  private async readEngagement(
     client: EngagementClient,
     titleId: string,
     viewerId: string | null,
@@ -70,7 +93,7 @@ export class TitleEngagementService {
   }
 
   @Logged()
-  async recomputeWatchlistCounts(client: EngagementClient, titleId: string): Promise<void> {
+  private async recomputeWatchlistCounts(client: EngagementClient, titleId: string): Promise<void> {
     const watchlistCount = await client.watchlistItem.count({ where: { titleId } });
 
     await this.writeCounts(client, titleId, { watchlistCount });

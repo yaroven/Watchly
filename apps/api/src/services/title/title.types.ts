@@ -8,7 +8,7 @@ import {
 } from "@prisma/client";
 import { ExternalRatingView } from "../external-ratings/external-ratings.types";
 import { GenreView } from "../genre/genre.types";
-import { TitleEngagementView } from "../title-engagement/title-engagement.types";
+import { TitleEngagementView } from "./title-engagement.types";
 
 export interface TitleInput {
   name: string;

@@ -1,11 +1,11 @@
 import { countsOf, NO_COUNTS } from "../engagement/engagement-counters.service";
 import { resolveVote, Vote } from "../reaction/utils/vote.util";
-import { EngagementRelations } from "../title/utils/title.query";
 import {
   TitleEngagementCounts,
   TitleEngagementView,
   ViewerTitleEngagementView,
 } from "./title-engagement.types";
+import { EngagementRelations } from "./utils/title.query";
 
 const NO_ENGAGEMENT: TitleEngagementCounts = {
   ...NO_COUNTS,

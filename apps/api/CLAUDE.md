@@ -247,10 +247,13 @@ still processing is client work that has not been done.
   viewer votes again or the TTL sends reads back to the row.
 - A reply is a comment whose parent is a comment. Threads are one level deep because
   `CommentService` refuses the second, not because the schema does.
-- `title/` holds two services. `TitleService` is the catalogue — CRUD and the read assembly. `TitleEngagementService`
-  owns the score and the title-only counters (`rate`, `removeRating`, `readEngagement`, `recomputeWatchlistCounts`), and
-  takes a client so the caller's transaction holds. `WatchlistService` injects the second directly; it used to reach
-  through the first for a counter, which is why they split.
+- `title/` holds two services in one `TitleModule` (ADR-0011). `TitleService` is the catalogue — CRUD and the read
+  assembly. `TitleEngagementService` owns every write that moves a title-only counter and the counter with it: `rate`,
+  `removeRating`, `addToWatchlist`, `removeFromWatchlist`, each one transaction that writes the row, recounts and reads
+  the block back. Nothing outside it takes or passes a Prisma client for that: `readEngagement` and the recounts are
+  private. The watchlist routes call it directly; `WatchlistService` is only the list read. Don't bring
+  `title-engagement/` back as a module of its own — the two import each other's shapes, which is what made the
+  directory split a cycle.
 
 ### Metrics
 
