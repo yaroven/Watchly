@@ -1,5 +1,3 @@
-// Path constants
-
 const ADMIN_BASE = "/admin";
 const DISCOVER_BASE = "/discover";
 const TITLE_BASE = "/title";

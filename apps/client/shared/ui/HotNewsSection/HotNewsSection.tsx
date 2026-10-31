@@ -68,8 +68,6 @@ export default function HotNewsSection({ news }: HotNewsSectionProps) {
           overflow: "hidden",
         }}
       >
-        {/* Only the story itself animates; the heading, counter and arrows
-            stay put. Remounting on id change restarts the animation. */}
         <Box
           key={slide.id}
           sx={{
@@ -89,8 +87,6 @@ export default function HotNewsSection({ news }: HotNewsSectionProps) {
           }}
         >
           <Box sx={{ order: 1, mb: "32px", position: "relative", width: "100%", aspectRatio: "268 / 170" }}>
-            {/* fill lets the image follow the panel width instead of staying
-                at the 268px from the 1440-wide design. */}
             <Image
               src={slide.image}
               alt=""
@@ -121,8 +117,6 @@ export default function HotNewsSection({ news }: HotNewsSectionProps) {
             px: "8px",
             fontSize: "clamp(12px, 0.85vw, 16px)",
             mt: "auto",
-            // Siblings above carry explicit order values, so this needs one too
-            // — an unset order counts as 0 and would jump to the top.
             order: 4,
           }}
         >

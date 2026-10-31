@@ -17,7 +17,6 @@ export default function Avatar({ src, alt, size = 48 }: AvatarProps) {
         width: `${size}px`,
         height: `${size}px`,
         borderRadius: "100%",
-        // Without the clip a non-square source spills past the ring as a rectangle.
         overflow: "hidden",
         border: "1px solid",
         borderColor: "primary.main",

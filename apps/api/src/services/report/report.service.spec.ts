@@ -31,8 +31,6 @@ describe("ReportService", () => {
     });
   });
 
-  // Otherwise one annoyed viewer could inflate a moderation queue by reporting
-  // the same comment repeatedly.
   it("replaces the reason rather than filing a second row", async () => {
     await service.submit(prisma as never, commentId, userId, "abuse");
 

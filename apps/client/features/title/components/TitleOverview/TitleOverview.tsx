@@ -25,7 +25,6 @@ const AGE_RATING_LABELS: Record<AgeRating, string> = {
   [AgeRating.AGE_18]: "18+",
 };
 
-// `tmovie` is Watchly's own score — aggregated from viewer ratings, not an external source.
 const SCORE_ROWS: { key: "imdb" | "rottenTomatoes" | "metacritic" | "tmovie"; icon: typeof IMDB; source: ExternalRatingSource | null }[] = [
   { key: "imdb", icon: IMDB, source: ExternalRatingSource.IMDB },
   { key: "rottenTomatoes", icon: RottenTomatoes, source: ExternalRatingSource.ROTTEN_TOMATOES },
@@ -35,8 +34,6 @@ const SCORE_ROWS: { key: "imdb" | "rottenTomatoes" | "metacritic" | "tmovie"; ic
 
 export default function TitleOverview({ title }: TitleOverviewProps) {
   const router = useRouter();
-  // The page is server-rendered, so the embedded block goes stale the moment the
-  // viewer rates — fall back to it only until the live summary arrives.
   const { data: liveEngagement } = useTitleEngagement(title.id);
   const ratingSummary = liveEngagement ?? title.engagement;
   const ratingBySource = new Map(title.externalRatings.map((rating) => [rating.source, rating.rating]));

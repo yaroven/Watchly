@@ -60,7 +60,6 @@ export interface Title {
   posterUrl: string;
   ageRating: AgeRating;
   country: string;
-  /** ISO date string ("YYYY-MM-DD" or full ISO datetime), matches the native date input's format. */
   releaseDate: string;
   language: string;
   trailerUrl: string;
@@ -72,10 +71,6 @@ export interface Title {
   transcodingStatus: TranscodingStatus;
   externalRatings: ExternalRating[];
   genres: TitleGenre[];
-  /**
-   * Likes, dislikes and watchlist state; the viewer's own included when signed in.
-   * Always present — every construction site on the api passes it explicitly.
-   */
   engagement: TitleEngagement;
 }
 
@@ -150,7 +145,6 @@ export const CreateTitleSchema = BaseTitleSchema.extend({
     },
   );
 
-/** Full-object update: every base field is resent, mirroring the backend's UpdateTitleDto. */
 export const UpdateTitleSchema = BaseTitleSchema.extend({
   videoFile: z.custom<FileList>().optional(),
   posterFile: PosterFileSchema,

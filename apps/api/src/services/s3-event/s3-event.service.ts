@@ -28,11 +28,6 @@ interface S3EventBody {
   Records?: S3EventRecord[];
 }
 
-/**
- * End to end: how long an upload waits between S3 accepting it and a job
- * existing for it. One number for "is the pipeline keeping up" — queue depth
- * cannot distinguish a backlog from a poller that stopped reading.
- */
 const lag = new Histogram({
   name: "s3_event_lag_seconds",
   help: "Delay from the S3 event to the transcode job being scheduled",
@@ -46,29 +41,11 @@ const messages = new Counter({
   labelNames: ["outcome"],
 });
 
-/**
- * Reaching the live service through a holder, because `collect` runs on the
- * metric and has no instance to read the SQS client from. Set by the
- * constructor, replaced rather than added to, so building the service twice —
- * which happens in tests — leaves one sampler.
- */
 let dlqSampler: (() => Promise<void>) | undefined;
 
-/**
- * Nothing watched this before. A record that fails five times leaves the main
- * queue for the dead-letter one (see the RedrivePolicy in
- * localstack-init/provision.sh) and the upload silently never appears.
- *
- * Sampled at scrape time, which costs one GetQueueAttributes call per scrape
- * rather than a poller of its own.
- */
 const dlqMessages = new Gauge({
   name: "sqs_dlq_messages",
   help: "Approximate messages sitting in the S3 event dead-letter queue",
-  // Labelled so the series does not exist until something is written to it.
-  // An unlabelled gauge reports 0 from the moment it is registered, which
-  // would say "the dead-letter queue is empty" when the truth is "the queue
-  // was never resolved" — and an alert on > 0 would then never fire.
   labelNames: ["queue"],
   collect: async () => {
     await dlqSampler?.();
@@ -125,11 +102,6 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /**
-   * Non-fatal, unlike the main queue. The dead-letter queue is a monitoring
-   * convenience; the service has a job to do without it, and a cloud account
-   * may well have named it something else.
-   */
   @Logged()
   private async resolveDlqUrl(): Promise<string | undefined> {
     try {
@@ -148,11 +120,6 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
     return QueueUrl!;
   }
 
-  /**
-   * Swallows its own failure: `registry.metrics()` rejects as a whole if a
-   * collector throws, so an SQS hiccup here would blank out every other
-   * metric in the process.
-   */
   @Logged({ completedLevel: "debug" })
   private async sampleDlq(): Promise<void> {
     if (!this.dlqUrl) return;
@@ -261,8 +228,6 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
     );
 
     if (failed.length > 0) {
-      // Left on the queue on purpose: SQS redelivers, and after five rounds
-      // the RedrivePolicy moves it to the queue sqs_dlq_messages watches.
       messages.inc({ outcome: "failed" });
       return;
     }
@@ -298,25 +263,15 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    // Compared against undefined, never for truthiness: VideoType is a numeric
-    // enum and VideoType.MOVIE is 0.
     const videoType = videoTypeOfRawKind(parsed.kind);
     if (videoType !== undefined) {
       await this.videoScheduler.schedule({ id: parsed.ownerId, type: videoType, rawKey: key });
       return;
     }
 
-    // Thrown rather than logged so the message is left on the queue: a kind
-    // with no scheduler is a deployment that forgot one, and five redeliveries
-    // later it lands in the dead-letter queue sqs_dlq_messages watches. The
-    // switch this replaced fell through silently and the upload vanished.
     throw new Error(`No scheduler for raw object kind "${parsed.kind}"`);
   }
 
-  /**
-   * Clamped at zero: `eventTime` comes from S3's clock and this one from the
-   * pod's, so a small negative skew is expected and is not a measurement.
-   */
   private observeLag(record: S3EventRecord, kind: RawObjectKind): void {
     if (!record.eventTime) return;
 

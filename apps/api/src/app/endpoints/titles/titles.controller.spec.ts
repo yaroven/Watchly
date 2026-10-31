@@ -12,9 +12,6 @@ describe("TitlesController", () => {
   let controller: TitlesController;
   let titleServiceMock: jest.Mocked<TitleService>;
 
-  // One mock behind both providers: the controller forwards the catalogue
-  // routes to one service and the engagement routes to the other, and these
-  // tests only care that it forwards.
   const serviceMock = {
     create: jest.fn(),
     getMovieUrl: jest.fn(),

@@ -45,8 +45,6 @@ describe("VideoTranscodeStateService", () => {
       expect(prismaMock.episode.findUnique).not.toHaveBeenCalled();
     });
 
-    // A deleted row mid-job is an abort, not a failure — the distinction the
-    // processor relies on to avoid marking routine deletions as failed.
     it("throws TranscodeAbortedError when the row is gone", async () => {
       (prismaMock.title.findUnique as jest.Mock).mockResolvedValue(null);
 
@@ -146,7 +144,6 @@ describe("VideoTranscodeStateService", () => {
       });
     });
 
-    // Writing progress for a deleted row would resurrect a FK-less orphan.
     it("writes nothing when the entity is gone", async () => {
       (prismaMock.title.findUnique as jest.Mock).mockResolvedValue(null);
 

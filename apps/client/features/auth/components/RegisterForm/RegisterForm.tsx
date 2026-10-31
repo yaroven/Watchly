@@ -33,7 +33,6 @@ export default function RegisterForm() {
     defaultValues: { name: "", email: "", password: "", confirmPassword: "" },
   });
 
-  // `name`/`confirmPassword` only drive client-side validation — the API takes email/password.
   const onSubmit = async ({ email, password }: RegisterFormValues) => {
     setError(null);
     try {

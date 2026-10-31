@@ -54,12 +54,6 @@ async function uploadPartWithRetry(
   throw lastError;
 }
 
-/**
- * Uploads a file in S3-multipart chunks — a flaky connection only has to retry the one part
- * that failed, not restart a multi-GB transfer from zero. Parts upload sequentially (simpler
- * progress/error accounting than concurrent parts); on an unrecoverable part failure the whole
- * upload is aborted server-side so S3 doesn't keep billing for the orphaned parts.
- */
 export const uploadMultipartFile = async ({
   files,
   startUpload,

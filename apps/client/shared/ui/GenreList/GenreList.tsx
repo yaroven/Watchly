@@ -5,10 +5,6 @@ import { Fragment } from "react";
 
 interface GenreListProps {
   genres: string[];
-  /**
-   * "comma" reads as prose and wraps naturally, so it suits copy sitting
-   * beside a title. "divider" draws the gold pips the hero panel uses.
-   */
   separator?: "comma" | "divider";
   sx?: SxProps<Theme>;
 }

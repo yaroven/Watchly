@@ -7,7 +7,6 @@ const useCommentReplies = (
   commentId: string,
   options?: Omit<UseQueryOptions<CommentPage, Error, CommentPage, readonly unknown[]>, "queryKey" | "queryFn">,
 ) => {
-  // Replies carry the viewer's own reaction, so the key carries the viewer.
   const viewer = useViewer();
 
   return useQuery({

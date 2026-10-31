@@ -4,7 +4,6 @@ import { VideoQuality } from "../types";
 import { clampTime } from "../utils";
 
 export interface PlayerStoreState {
-  // State
   isPlaying: boolean;
   isInitialLoading: boolean;
   isBuffering: boolean;
@@ -18,11 +17,9 @@ export interface PlayerStoreState {
   qualities: VideoQuality[];
   currentLevelIndex: number;
 
-  // Refs
   videoRef: RefObject<HTMLVideoElement | null>;
   containerRef: RefObject<HTMLDivElement | null>;
 
-  // Actions
   togglePlay: () => void | Promise<void>;
   seek: (time: number) => void;
   skip: (offset: number) => void;
@@ -32,7 +29,6 @@ export interface PlayerStoreState {
 
 export const createPlayerStore = (videoRef: RefObject<HTMLVideoElement | null>, containerRef: RefObject<HTMLDivElement | null>) => {
   return createStore<PlayerStoreState>((set) => ({
-    // Initial State
     isPlaying: false,
     isInitialLoading: true,
     isBuffering: false,
@@ -46,11 +42,9 @@ export const createPlayerStore = (videoRef: RefObject<HTMLVideoElement | null>, 
     qualities: [],
     currentLevelIndex: -1,
 
-    // Refs
     videoRef,
     containerRef,
 
-    // Actions
     togglePlay: async () => {
       const video = videoRef.current;
       if (!video) return;

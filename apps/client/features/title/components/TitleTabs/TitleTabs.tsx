@@ -14,7 +14,6 @@ interface TitleTabsProps {
   sections: TitleTabsSection[];
 }
 
-/** Anchor tab bar for the title-detail page: scrolls to a section on click, highlights the section in view. */
 export default function TitleTabs({ sections }: TitleTabsProps) {
   const [activeId, setActiveId] = useState(sections[0]?.id);
   const isClickScrolling = useRef(false);

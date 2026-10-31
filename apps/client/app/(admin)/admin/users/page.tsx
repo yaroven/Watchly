@@ -7,8 +7,6 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  // UsersLibrary keeps its filters in the query string, so prerendering has to
-  // bail out to the client for this subtree.
   return (
     <Suspense>
       <UsersLibrary />

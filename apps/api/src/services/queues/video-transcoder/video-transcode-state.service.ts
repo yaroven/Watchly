@@ -7,15 +7,6 @@ import { TranscodeAbortedError } from "./utils/transcode-aborted.error";
 import { toVideoTranscodingProgressView } from "./video-transcoder.mapper";
 import { VideoTranscodingProgressView } from "./video-transcoder.types";
 
-/**
- * Everything the pipeline records about a transcode in Postgres: the status on
- * the row being transcoded, the progress percentage, and whether the row is
- * still there at all.
- *
- * Exists-checking lives here because it is read from three places — before the
- * download, between stages, and from inside ffmpeg's progress handler — and
- * all three mean the same thing: the title or episode was deleted mid-job.
- */
 @Injectable()
 export class VideoTranscodeStateService {
   constructor(private readonly prisma: PrismaService) {}

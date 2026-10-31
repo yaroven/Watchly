@@ -30,8 +30,6 @@ function toSliderTitle(title: Title): SliderTitle {
     title: title.name,
     description: title.description,
     score: rating !== undefined ? rating.toFixed(1) : "N/A",
-    // Interpolated straight into a CSS `url(...)`, so this needs a plain
-    // string — not `getOptimizedImageSrc`, which can return `StaticImageData`.
     backdropUrl: title.posterUrl,
     watchLink: APP.WATCH(title.id),
     trailerLink: title.trailerUrl,
@@ -63,10 +61,6 @@ export default function DiscoverScreen() {
   const watchlistItems = watchlist?.items ?? [];
 
   const items = data?.items || [];
-  // Each row browses the closest real filter we have (`Title.type`) — there's
-  // no backend concept yet of "trending"/"genre"/"IMDB rank"/"watchlist" to
-  // filter by, so rows that aren't movie- or series-specific just browse
-  // everything (see PLACEHOLDER_DATA_BACKEND_TODO.md).
   const viewAllMovies = () => router.push(APP.SEARCH({ type: TitleType.MOVIE }));
   const viewAllSeries = () => router.push(APP.SEARCH({ type: TitleType.SERIES }));
   const viewAllTitles = () => router.push(APP.SEARCH());
@@ -99,8 +93,6 @@ export default function DiscoverScreen() {
         <Catalog title="IMDB Top Movies" bleed items={items} onViewAll={viewAllMovies} />
         <Catalog title="IMDB Top Series" bleed items={items} onViewAll={viewAllSeries} />
         <Catalog title="Trending TV Shows" bleed items={items} onViewAll={viewAllSeries} />
-        {/* Kept visible on failure: a row that simply disappears is indistinguishable
-            from an empty watchlist, and leaves nothing to report. */}
         {watchlistFailed ? (
           <Box>
             <Typography variant="h3" sx={{ mb: "12px" }}>

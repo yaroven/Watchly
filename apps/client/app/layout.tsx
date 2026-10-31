@@ -2,7 +2,6 @@ import Providers from "@shared/providers";
 import type { Metadata } from "next";
 import { Alumni_Sans, Anton, Fredoka, Poppins } from "next/font/google";
 
-// Body copy — the face used throughout the design file.
 const poppins = Poppins({
   weight: ["300", "400", "500", "600", "700"],
   subsets: ["latin"],
@@ -10,7 +9,6 @@ const poppins = Poppins({
   variable: "--font-body",
 });
 
-// Section headings only; stands in for Moonjelly from the design.
 const fredoka = Fredoka({
   weight: ["500", "600", "700"],
   subsets: ["latin"],
@@ -18,9 +16,6 @@ const fredoka = Fredoka({
   variable: "--font-heading",
 });
 
-// Title treatment on the spotlight tiles. Anton stands in for Impact, which
-// ships with Windows and macOS but not with Linux or Android, so it cannot be
-// relied on over the web; it stays in the stack as a fallback.
 const anton = Anton({
   weight: "400",
   subsets: ["latin"],
@@ -28,7 +23,6 @@ const anton = Anton({
   variable: "--font-display",
 });
 
-// Taglines above those titles.
 const alumniSans = Alumni_Sans({
   subsets: ["latin"],
   display: "swap",

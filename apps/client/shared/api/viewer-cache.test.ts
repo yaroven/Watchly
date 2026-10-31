@@ -11,7 +11,6 @@ const ANONYMOUS = key("anonymous");
 
 const LISTS_PREFIX = ["comment", "list"] as const;
 
-/** Only `queryKey` is read, so a bare object stands in for the Query. */
 const matches = (filters: ReturnType<typeof forViewer>, queryKey: readonly unknown[]): boolean =>
   filters.predicate!({ queryKey } as unknown as Query);
 

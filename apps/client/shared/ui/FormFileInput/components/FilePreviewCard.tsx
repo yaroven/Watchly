@@ -4,7 +4,6 @@ import Typography from "@mui/material/Typography";
 import { tokens } from "@shared/mui/theme";
 
 interface FilePreviewCardProps {
-  /** Id of the hidden file input the replace action opens. */
   inputId: string;
   fileUrl: string;
   fileName: string;
@@ -15,7 +14,6 @@ interface FilePreviewCardProps {
   disabled?: boolean;
 }
 
-/** Filled state: preview, file name and the replace/remove actions. */
 export default function FilePreviewCard({
   inputId,
   fileUrl,
@@ -50,8 +48,6 @@ export default function FilePreviewCard({
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
-          // Without this the raw <img>/<video> renders at its intrinsic size
-          // and blows the card out.
           "& > video, & > img": { width: "100%", height: "100%", objectFit: "cover" },
         }}
       >
@@ -65,8 +61,6 @@ export default function FilePreviewCard({
         )}
       </Box>
 
-      {/* minWidth: 0 lets the name shrink below its content width, which is
-          what makes the ellipsis work inside a flex row. */}
       <Box sx={{ display: "flex", flexDirection: "column", gap: "8px", minWidth: 0 }}>
         <Typography
           title={fileName}
@@ -117,7 +111,6 @@ export default function FilePreviewCard({
   );
 }
 
-/** Shared look for the replace/remove buttons. */
 const actionSx = {
   display: "flex",
   justifyContent: "center",

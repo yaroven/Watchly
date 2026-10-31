@@ -5,11 +5,6 @@ import TranscodingStatus from "@/types/transcoding-status";
 import { parseAsInteger, parseAsString, useQueryStates } from "nuqs";
 import { TitlesPageFilters } from "../types";
 
-/**
- * Keeps the admin library's search, filters and page in the URL. Unknown enum
- * values coming back from the query string are treated as "no filter" rather
- * than forwarded to the API.
- */
 export interface TitlesFiltersState {
   searchString: string;
   typeFilter: TitleType | "";
