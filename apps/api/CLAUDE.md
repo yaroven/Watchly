@@ -49,10 +49,10 @@ Nothing closes the window between the pipe and the write — a `findUnique` take
 never did either. A title deleted mid-request ends as a rollback, not a bad row.
 
 Media conversion is split by **kind**, not by feature: `video-transcoder` is parameterised by `VideoType`,
-`image-transcoder` by `ImageKind`. Adding a kind of image means a profile in `image-profile.const.ts` and a
-`ProcessedImageAttacher` in the owning feature — the attacher supplies the two things only that feature knows, the
-processed key and the row to point at it. The worker wires the attachers, so
-`image-transcoder` never imports a feature module.
+`image-transcoder` by `ImageKind`. Everything that differs per kind of image lives in `services/image/`, and the image
+processor calls `ImageService` for the processed key and the row to point at it. `image/` is a shared module the worker
+loads, not a feature, so the processor depending on it is the same as depending on `s3/`; it never imports a feature
+module.
 
 **Each side is split the same four ways**, and the names line up on purpose:
 
@@ -61,7 +61,7 @@ processed key and the row to point at it. The worker wires the attachers, so
 | producer          | `ImageTranscodeScheduler`  | `VideoTranscodeScheduler`    |
 | conversion        | `ImageTranscoderService`   | `HlsTranscoder`              |
 | orchestration     | `ImageTranscoderProcessor` | `VideoTranscoderProcessor`   |
-| the row it writes | the attachers              | `VideoTranscodeStateService` |
+| the row it writes | `ImageService`             | `VideoTranscodeStateService` |
 
 **Orchestration belongs to the processor**, not to a service beside it: the processor owns the order of the stages and
 each stage's mechanics belong to someone else. That is what keeps the conversion classes free of Prisma —
@@ -106,12 +106,11 @@ on purpose: concurrency is per-queue, and one setting cannot serve a twenty-minu
 What both share lives in `common/utils/`: `DEFAULT_JOB_OPTIONS`, `withWorkDir`, `streamToFile`.
 
 Every uploaded image goes through it — avatars, title and season posters, artist photos — and all four share one
-contract and one service in `services/image/`. `IMAGE_TARGETS`, keyed by `ImageKind`, says per kind which raw prefix the
-upload lands on, which column holds the key and how the processed key is laid out. `ImageService` presigns, attaches,
-removes and builds public URLs from that table, and `image.attacher.ts` turns it into one
-`ProcessedImageAttacher` per kind for the worker, built in a factory because the kind is a constructor argument rather
-than something DI resolves. A new kind is one profile, one
-`RawObjectKind`, one `IMAGE_TARGETS` entry and its pair of routes. The processed key is versioned
+contract and one service in `services/image/`. `IMAGE_TARGETS`, keyed by `ImageKind`, is the one table of what differs
+per kind: the conversion profile, which raw prefix the upload lands on, which column holds the key and how the processed
+key is laid out. `ImageService` presigns, attaches, removes and builds public URLs from it, and the image processor
+calls the same service. A new kind is one `ImageKind`, one `RawObjectKind`, one `IMAGE_TARGETS` entry and its pair of
+routes. The processed key is versioned
 (`posters/<titles|seasons|artists>/<id>/<version>.webp`,
 `avatars/<id>/<version>.webp`): a stable key would leave the superseded image in front of any viewer that cached it.
 `S3Service.uploadStream` sets no `Cache-Control` at all today — the versioned key is what would make an `immutable` one
@@ -306,8 +305,8 @@ still processing is client work that has not been done.
   (0.25s…30s) are two names rather than one with a `queue` label.
 - **Queue depth is read by the api**, since that is the process with a scrape endpoint. Depth is a property of Redis
   rather than of a process, so the numbers are the same either way. `QueueMetricsService` samples it at scrape time and
-  takes its queues through the `METRICS_QUEUES` token, so it never imports a transcoder's queue name — the same
-  arrangement as the image attachers; `VideoTranscoderModule` and
+  takes its queues through the `METRICS_QUEUES` token, so it never imports a transcoder's queue name;
+  `VideoTranscoderModule` and
   `ImageTranscoderModule` export `BullModule` to make the tokens resolvable, while registration stays with the
   transcoder that owns the queue. In prod the api runs two replicas and both publish these series, so **aggregate with
   `max by (queue, state)`**, never `sum`.

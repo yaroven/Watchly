@@ -1,6 +1,6 @@
 import { getQueueToken } from "@nestjs/bullmq";
 import { Test } from "@nestjs/testing";
-import { ImageKind } from "./image-profile.const";
+import { ImageKind } from "../../image/enums/image-kind.enum";
 import {
   IMAGE_TRANSCODE_JOB_NAME,
   IMAGE_TRANSCODE_QUEUE_NAME,

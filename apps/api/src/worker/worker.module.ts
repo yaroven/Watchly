@@ -16,7 +16,6 @@ import redisConfig, {
 import s3Config from "../config/s3.config";
 import { EngagementModule } from "../services/engagement/engagement.module";
 import { FfmpegModule } from "../services/ffmpeg/ffmpeg.module";
-import { imageAttachersProvider } from "../services/image/image.attacher";
 import { ImageModule } from "../services/image/image.module";
 import { LogRootService } from "../services/logging/log-root.service";
 import { PrismaModule } from "../services/prisma/prisma.module";
@@ -75,7 +74,6 @@ import { VoteCacheModule } from "../services/vote-cache/vote-cache.module";
     VideoTranscoderProcessor,
     ImageTranscoderService,
     ImageTranscoderProcessor,
-    imageAttachersProvider,
   ],
 })
 export class WorkerModule {}
