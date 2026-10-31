@@ -7,6 +7,7 @@ import { TitleEngagementService } from "../../../services/title/title-engagement
 import { TitleService } from "../../../services/title/title.service";
 import { TitleExistsPipe } from "../../../services/title/utils/title-exists.pipe";
 import { TitlesController } from "./titles.controller";
+import { TitlesService } from "./titles.service";
 
 describe("TitlesController", () => {
   let controller: TitlesController;
@@ -38,6 +39,7 @@ describe("TitlesController", () => {
           useValue: { title: { findUnique: jest.fn().mockResolvedValue({ id: "title-1" }) } },
         },
         { provide: TitleService, useValue: serviceMock },
+        { provide: TitlesService, useValue: serviceMock },
         { provide: TitleEngagementService, useValue: serviceMock },
         { provide: MediaAssetService, useValue: {} },
       ],

@@ -25,9 +25,9 @@ import type { Request } from "express";
 import { Auth } from "../../../decorators/auth.decorator";
 import { CurrentUserId, OptionalUserId } from "../../../decorators/current-user-id.decorator";
 import { OptionalAuth } from "../../../decorators/optional-auth.decorator";
-import { CommentService } from "../../../services/comment/comment.service";
 import { titleSubject } from "../../../services/comment/utils/comment-subject.const";
 import { Paginated, PaginatedResponseOf } from "../../dto/paginated-response-of.util";
+import { CommentsService } from "./comments.service";
 import { CreateCommentDto } from "./dto/request/create-comment.dto";
 import { GetCommentsDto } from "./dto/request/get-comments.dto";
 import { ReportCommentDto } from "./dto/request/report-comment.dto";
@@ -36,7 +36,7 @@ import { CommentResponseDto } from "./dto/response/comment-response.dto";
 @ApiTags("comments")
 @Controller()
 class CommentsController {
-  constructor(private readonly commentService: CommentService) {}
+  constructor(private readonly commentsService: CommentsService) {}
 
   @ApiOperation({
     summary: "List a title's comments",
@@ -52,7 +52,7 @@ class CommentsController {
     @Query() query: GetCommentsDto,
     @OptionalUserId() userId?: string,
   ): Promise<Paginated<CommentResponseDto>> {
-    return this.commentService.findForSubject(titleSubject(id), query, userId);
+    return this.commentsService.findForSubject(titleSubject(id), query, userId);
   }
 
   @ApiOperation({
@@ -69,7 +69,7 @@ class CommentsController {
     @Query() query: GetCommentsDto,
     @OptionalUserId() userId?: string,
   ): Promise<Paginated<CommentResponseDto>> {
-    return this.commentService.findReplies(id, query, userId);
+    return this.commentsService.findReplies(id, query, userId);
   }
 
   @ApiOperation({ summary: "Comment on a title, or reply to a comment" })
@@ -82,7 +82,7 @@ class CommentsController {
     @Body() data: CreateCommentDto,
     @CurrentUserId() userId: string,
   ): Promise<CommentResponseDto> {
-    return this.commentService.create(id, userId, data);
+    return this.commentsService.create(id, userId, data);
   }
 
   @ApiOperation({ summary: "Report a comment" })
@@ -97,7 +97,7 @@ class CommentsController {
     @Body() data: ReportCommentDto,
     @CurrentUserId() userId: string,
   ) {
-    return this.commentService.report(id, userId, data.reason);
+    return this.commentsService.report(id, userId, data.reason);
   }
 
   @ApiOperation({
@@ -115,7 +115,7 @@ class CommentsController {
     @CurrentUserId() userId: string,
     @Req() { role }: Request,
   ) {
-    return this.commentService.remove(id, userId, role);
+    return this.commentsService.remove(id, userId, role);
   }
 }
 

@@ -4,11 +4,11 @@ import { emptyTitleEngagementView } from "./title-engagement.mapper";
 import { TitleEngagementView } from "./title-engagement.types";
 import { TitleView, TitleWithCatalogueRelations } from "./title.types";
 
-export const toTitleView = (
+export const toTitleView = <V>(
   title: TitleWithCatalogueRelations,
-  engagement: TitleEngagementView,
+  engagement: TitleEngagementView<V>,
   posterUrl: string | null = null,
-): TitleView => ({
+): TitleView<V> => ({
   id: title.id,
   createdAt: title.createdAt,
   updatedAt: title.updatedAt,

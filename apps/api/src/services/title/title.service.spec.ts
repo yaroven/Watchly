@@ -6,7 +6,6 @@ import { ImageService } from "../image/image.service";
 import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { S3Service } from "../s3/s3.service";
-import { VoteStateService } from "../vote-cache/vote-state.service";
 import { TitleService } from "./title.service";
 
 describe("TitleService", () => {
@@ -25,7 +24,6 @@ describe("TitleService", () => {
     remove: jest.Mock;
     deleteStoredImage: jest.Mock;
   };
-  let voteStateMock: { forTitles: jest.Mock };
 
   beforeEach(async () => {
     txMock = {
@@ -40,12 +38,9 @@ describe("TitleService", () => {
       deleteStoredImage: jest.fn(),
     };
 
-    voteStateMock = { forTitles: jest.fn().mockResolvedValue(new Map()) };
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TitleService,
-        { provide: VoteStateService, useValue: voteStateMock },
         {
           provide: PrismaService,
           useValue: {
@@ -375,7 +370,11 @@ describe("TitleService", () => {
 
       const result = await service.findOne("title-1", "viewer-1");
 
-      expect(result?.engagement.viewer).toEqual({ score: 8, reaction: null, inWatchlist: false });
+      expect(result?.engagement.viewer).toEqual({
+        score: 8,
+        storedReaction: null,
+        inWatchlist: false,
+      });
     });
 
     it("should scope the viewer's own rows to that viewer", async () => {
@@ -410,55 +409,26 @@ describe("TitleService", () => {
       expect(result.engagement.viewer).not.toBeNull();
     });
 
-    it("should prefer the cached vote over the relation", async () => {
+    it("should carry the vote Postgres holds as stored, never as the viewer's vote", async () => {
       (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
         ...titleRow,
         reactions: [{ type: ReactionType.LIKE }],
       });
-      voteStateMock.forTitles.mockResolvedValue(new Map([["title-1", ReactionType.DISLIKE]]));
 
       const result = await service.findOne("title-1", "viewer-1");
 
-      expect(result?.engagement.viewer?.reaction).toBe(ReactionType.DISLIKE);
-      expect(voteStateMock.forTitles).toHaveBeenCalledWith(
-        expect.arrayContaining([expect.objectContaining({ id: "title-1" })]),
-        "viewer-1",
-      );
+      expect(result?.engagement.viewer).toMatchObject({ storedReaction: ReactionType.LIKE });
+      expect(result?.engagement.viewer).not.toHaveProperty("reaction");
     });
 
-    it("should prefer a cached withdrawal over the relation", async () => {
-      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
-        ...titleRow,
-        reactions: [{ type: ReactionType.LIKE }],
-      });
-      voteStateMock.forTitles.mockResolvedValue(new Map([["title-1", null]]));
+    it("should read cards without the viewer's vote, since no card shows one", async () => {
+      (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([
+        { ...titleRow, ratings: [{ score: 6 }], watchlistEntries: [{ id: "w-1" }] },
+      ]);
 
-      const result = await service.findOne("title-1", "viewer-1");
+      const [card] = await service.findManyByIds(["title-1"], "viewer-1");
 
-      expect(result?.engagement.viewer?.reaction).toBeNull();
-    });
-
-    it("should hand the cache the relation it loaded, so a miss can fall back to it", async () => {
-      const reactions = [{ type: ReactionType.LIKE }];
-      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
-        ...titleRow,
-        reactions,
-      });
-
-      await service.findOne("title-1", "viewer-1");
-
-      expect(voteStateMock.forTitles).toHaveBeenCalledWith(
-        [expect.objectContaining({ id: "title-1", reactions })],
-        "viewer-1",
-      );
-    });
-
-    it("should hand the absent viewer on rather than inventing one", async () => {
-      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(titleRow);
-
-      await service.findOne("title-1");
-
-      expect(voteStateMock.forTitles).toHaveBeenCalledWith(expect.anything(), null);
+      expect(card.engagement.viewer).toEqual({ score: 6, inWatchlist: true });
     });
 
     it("should answer null, not an empty viewer block, when there is no viewer", async () => {

@@ -9,6 +9,7 @@ import { MediaAssetService } from "../../../services/media-asset/media-asset.ser
 import { PrismaService } from "../../../services/prisma/prisma.service";
 import { VideoType } from "../../../services/queues/video-transcoder/enums/video-type.enum";
 import { EpisodesController } from "./episodes.controller";
+import { EpisodesService } from "./episodes.service";
 
 describe("EpisodeMediaController", () => {
   const EPISODE_ID = "11111111-1111-4111-8111-111111111111";
@@ -31,6 +32,7 @@ describe("EpisodeMediaController", () => {
       providers: [
         EpisodeExistsPipe,
         { provide: EpisodeService, useValue: {} },
+        EpisodesService,
         { provide: MediaAssetService, useValue: mediaAssetService },
         {
           provide: PrismaService,

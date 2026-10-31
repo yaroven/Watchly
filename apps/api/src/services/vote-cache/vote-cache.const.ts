@@ -26,7 +26,7 @@ export const decodeVote = (raw: string | null): Vote | undefined =>
 
 export interface VotedSubject {
   id: string;
-  reactions?: { type: ReactionType }[];
+  storedVote: Vote;
 }
 
 export type ViewerVotes = ReadonlyMap<string, Vote>;

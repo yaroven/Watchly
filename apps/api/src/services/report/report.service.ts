@@ -1,21 +1,20 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { Logged } from "../../decorators/logged.decorator";
 import { PrismaService } from "../prisma/prisma.service";
-
-export type ReportClient = Pick<PrismaService, "report">;
 
 @Injectable()
 export class ReportService {
   constructor(private readonly prisma: PrismaService) {}
 
   @Logged()
-  async submit(
-    client: ReportClient,
-    commentId: string,
-    userId: string,
-    reason?: string,
-  ): Promise<void> {
-    await client.report.upsert({
+  async submit(commentId: string, userId: string, reason?: string): Promise<void> {
+    const comment = await this.prisma.comment.findUnique({
+      where: { id: commentId },
+      select: { id: true },
+    });
+    if (!comment) throw new NotFoundException(`Comment with id ${commentId} not found`);
+
+    await this.prisma.report.upsert({
       where: { commentId_userId: { commentId, userId } },
       create: { commentId, userId, reason },
       update: { reason },

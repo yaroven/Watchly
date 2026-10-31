@@ -19,34 +19,30 @@ import {
 } from "@nestjs/swagger";
 import { Auth } from "../../../decorators/auth.decorator";
 import { CurrentUserId } from "../../../decorators/current-user-id.decorator";
-import { TitleEngagementService } from "../../../services/title/title-engagement.service";
 import { TitleExistsPipe } from "../../../services/title/utils/title-exists.pipe";
 import { WatchlistService } from "../../../services/watchlist/watchlist.service";
 import { PaginatedQueryDto } from "../../dto/paginated-query.dto";
 import { Paginated, PaginatedResponseOf } from "../../dto/paginated-response-of.util";
 import { TitleEngagementDto } from "../titles/dto/response/title-engagement.dto";
-import { TitleResponseDto } from "../titles/dto/response/title-response.dto";
+import { WatchlistTitleResponseDto } from "./dto/response/watchlist-title-response.dto";
 
 @ApiTags("watchlist")
 @Controller("watchlist")
 export class WatchlistController {
-  constructor(
-    private readonly watchlistService: WatchlistService,
-    private readonly engagementService: TitleEngagementService,
-  ) {}
+  constructor(private readonly watchlistService: WatchlistService) {}
 
   @ApiOperation({
     summary: "List the titles on your watchlist",
     description: "Newest addition first. Not sortable or filterable — page and limit only.",
   })
-  @ApiOkResponse({ type: PaginatedResponseOf(TitleResponseDto) })
+  @ApiOkResponse({ type: PaginatedResponseOf(WatchlistTitleResponseDto) })
   @ApiUnauthorizedResponse({ description: "Not signed in" })
   @Auth()
   @Get()
   findAll(
     @Query() query: PaginatedQueryDto,
     @CurrentUserId() userId: string,
-  ): Promise<Paginated<TitleResponseDto>> {
+  ): Promise<Paginated<WatchlistTitleResponseDto>> {
     return this.watchlistService.findAll(userId, query);
   }
 
@@ -62,7 +58,7 @@ export class WatchlistController {
     @Param("titleId", ParseUUIDPipe, TitleExistsPipe) titleId: string,
     @CurrentUserId() userId: string,
   ): Promise<TitleEngagementDto> {
-    return this.engagementService.addToWatchlist(titleId, userId);
+    return this.watchlistService.add(titleId, userId);
   }
 
   @ApiOperation({ summary: "Take a title off your watchlist" })
@@ -76,6 +72,6 @@ export class WatchlistController {
     @Param("titleId", ParseUUIDPipe, TitleExistsPipe) titleId: string,
     @CurrentUserId() userId: string,
   ): Promise<TitleEngagementDto> {
-    return this.engagementService.removeFromWatchlist(titleId, userId);
+    return this.watchlistService.remove(titleId, userId);
   }
 }

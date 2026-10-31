@@ -1,6 +1,6 @@
 "use client";
 
-import { Title } from "@/features/title/schemas/title";
+import { CardTitle } from "@/features/title/schemas/title";
 import { APP } from "@/shared/lib/routes";
 import TitleCard from "@features/title/components/TitleCard";
 import { ArrowForward as ArrowForwardIcon } from "@mui/icons-material";
@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 
 interface CatalogProps {
   title: string;
-  items: Title[];
+  items: CardTitle[];
   onViewAll?: () => void;
   viewAllLabel?: string;
   bleed?: boolean;

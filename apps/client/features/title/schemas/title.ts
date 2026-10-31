@@ -1,4 +1,4 @@
-import type { TitleEngagement } from "@/features/title-engagement/schemas/title-engagement";
+import type { CardTitleEngagement, TitleEngagement } from "@/features/title-engagement/schemas/title-engagement";
 import TranscodingStatus from "@/types/transcoding-status";
 import { z } from "zod";
 
@@ -72,6 +72,10 @@ export interface Title {
   externalRatings: ExternalRating[];
   genres: TitleGenre[];
   engagement: TitleEngagement;
+}
+
+export interface CardTitle extends Omit<Title, "engagement"> {
+  engagement: CardTitleEngagement;
 }
 
 export interface GetAllTitlesDto {

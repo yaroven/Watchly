@@ -6,9 +6,11 @@ import { Logged } from "../../decorators/logged.decorator";
 import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { VideoType } from "../queues/video-transcoder/enums/video-type.enum";
+import { VideoLocation } from "../s3/processed-key";
 import { toEpisodeView } from "./episode.mapper";
 import { EpisodeInput, EpisodeUpdate, EpisodeView } from "./episode.types";
 import { getEpisodeTitleAndSeasonId } from "./utils/episode-path.util";
+import episodeQuery, { EpisodeWithPath } from "./utils/episode.query";
 
 @Injectable()
 export class EpisodeService {
@@ -49,10 +51,10 @@ export class EpisodeService {
   }
 
   @Logged()
-  async findOneDetailed(id: string) {
+  async findOneDetailed(id: string): Promise<EpisodeWithPath | null> {
     return this.prisma.episode.findUnique({
       where: { id },
-      include: { season: { include: { title: true } } },
+      include: episodeQuery.detailed(),
     });
   }
 
@@ -108,18 +110,13 @@ export class EpisodeService {
   }
 
   @Logged()
-  async getStreamUrl(id: string): Promise<{ url: string }> {
+  async locate(id: string): Promise<VideoLocation> {
     const episode = await this.findOneDetailed(id);
 
     if (!episode) throw new NotFoundException(`Episode with id ${id} not found`);
 
     const { seasonId, titleId } = getEpisodeTitleAndSeasonId(episode);
 
-    return this.mediaAssetService.getPlaybackUrl({
-      type: VideoType.EPISODE,
-      titleId,
-      seasonId,
-      episodeId: episode.id,
-    });
+    return { type: VideoType.EPISODE, titleId, seasonId, episodeId: episode.id };
   }
 }

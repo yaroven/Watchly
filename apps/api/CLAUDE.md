@@ -31,12 +31,20 @@ A route whose only domain-specific work is "does this id exist" takes an existen
 its `utils/`, for titles, episodes, seasons, artists, genres and users — instead of a service method that wraps the
 check. A route that then does nothing but forward belongs with the service that owns the mechanics:
 that is why all four image route pairs live on `app/endpoints/images/images.controller.ts`, each injecting only
-`ImageService`.
+`ImageService`. A service beside a controller (`app/endpoints/<group>/<group>.service.ts`) is for composing what only
+that group of routes needs — the vote a title page or a comment thread shows, an episode's playback URL built from
+where `EpisodeService.locate` says the episode lives — and never for logic another reader would have to repeat. Where
+one exists, its controller injects it and nothing else: `TitlesController`, `CommentsController` and
+`EpisodesController` take only `TitlesService`, `CommentsService` and `EpisodesService`, which forward everything they
+do not compose themselves to the services under `src/services/` — including fixing the `VideoType` of the media
+routes (`MOVIE` for a title, `EPISODE` for an episode), so no controller names one. Invariants of a domain operation
+stay in the domain service even when only one route calls it: deleting a title, season or episode cleans its stored
+files up inside `delete`, and filing a report checks the comment exists inside `ReportService.submit`. A controller
+without such a service still injects the domain service directly.
 
 Because a pipe does not run on a direct handler call, the 404 it owns is pinned by a request-level
-`*.controller.existence.spec.ts` beside the unit spec, not by it. The episode's playback URL is the counter-example that
-stayed behind — building it needs the episode's season and title, which only `EpisodeService`
-resolves.
+`*.controller.existence.spec.ts` beside the unit spec, not by it. The episode's playback URL takes no pipe: it needs
+the episode's season and title anyway, so `EpisodeService.locate` reads the row and answers 404 itself.
 
 The engagement writes and the watchlist toggles carry it too, and dropped their own
 `assertTitleExists(tx, …)` when they did: a missing title cannot slip past, because the summary read that closes each
@@ -158,8 +166,9 @@ still processing is client work that has not been done.
     fire-and-forget), the call goes in a small async method that does (`reportProgress`, `abortIfGone`,
     `runPollLoop`), started with `void`.
   - A `Logger` of the service's own is for the one thing the aspect cannot see: an event that is neither an input, a
-    result nor a failure of a method — a skipped S3 event, repaired counter drift, a watchlist pointing at a deleted
-    title, OMDb having no match, OMDb being unconfigured. Never use it to restate a call, its result or its error, and
+    result nor a failure of a method — a skipped S3 event, repaired counter drift, OMDb having no match, OMDb being
+    unconfigured. A race that ends as expected is not one: a watchlist id whose title was deleted between the two reads
+    is dropped from the page without a line. Never use it to restate a call, its result or its error, and
     never throw just to get a warning written: a rejected Promise swallowed at once reads as a failure and logs a
     stack trace for something that went as expected.
   - `completedLevel: "debug"` for anything per-scrape, per-poll or per-row on a hot path;
@@ -222,8 +231,8 @@ still processing is client work that has not been done.
   `rowVote`, a write wants it only to report a count); and **the cache is never asked for a count** — that is what lets
   it answer about one viewer without ever being complete.
 - **`myReaction` on a read comes from the cache; the counts beside it do not.** A read asks `VoteStateService.forTitles`
-  or `forComments` for the whole page — one `MGET` — handing it each subject together with the `reactions` relation the
-  read already loaded, and gets back the vote to render: `resolveVote` settles it there, and nowhere else, so a mapper
+  or `forComments` for the whole page — one `MGET` — handing it each subject together with the vote Postgres holds
+  (`storedVote`, from the `reactions` relation the read already loaded), and gets back the vote to render: `resolveVote` settles it there, and nowhere else, so a mapper
   only ever sees the final answer. A **present** cache entry wins over the relation and an **absent** one falls back to
   it. Both halves matter, and the rule
   lives in one function because getting it backwards is silent: the relation is what the last flush left behind, so
@@ -249,12 +258,23 @@ still processing is client work that has not been done.
 - A reply is a comment whose parent is a comment. Threads are one level deep because
   `CommentService` refuses the second, not because the schema does.
 - `title/` holds two services in one `TitleModule` (ADR-0011). `TitleService` is the catalogue — CRUD and the read
-  assembly. `TitleEngagementService` owns every write that moves a title-only counter and the counter with it: `rate`,
-  `removeRating`, `addToWatchlist`, `removeFromWatchlist`, each one transaction that writes the row, recounts and reads
-  the block back. Nothing outside it takes or passes a Prisma client for that: `readEngagement` and the recounts are
-  private. The watchlist routes call it directly; `WatchlistService` is only the list read. Don't bring
-  `title-engagement/` back as a module of its own — the two import each other's shapes, which is what made the
-  directory split a cycle.
+  assembly. `TitleEngagementService` owns the score and the title-only counters (`rate`, `removeRating`,
+  `readEngagement`, `recomputeWatchlistCounts`) and is the only thing that writes them. The last two take a client so
+  the caller's transaction holds: `WatchlistService.add` and `remove` write the `watchlistItem` row, then recount and
+  read the block back on the same `tx`, so the watchlist's routes, its list read and its writes stay in one service
+  while the counter keeps one writer. Don't bring `title-engagement/` back as a module of its own — the two import
+  each other's shapes, which is what made the directory split a cycle.
+- **`TitleService` never reads the vote cache.** Its reads answer `StoredTitleView`, whose viewer carries
+  `storedReaction` — the vote as Postgres holds it, which is the fallback and nothing more — and the compiler refuses
+  it wherever a response wants `reaction`. Each reader turns it into what it needs: `TitlesService`
+  (`app/endpoints/titles/titles.service.ts`) asks `VoteStateService.forTitles` and answers `TitleView` for the title
+  routes, and `TitleService.findManyByIds` — the watchlist's read — answers `CardTitleView` straight away, with the
+  stored vote dropped by `withoutVote`, because a card shows no vote — `GET /watchlist` has its own `WatchlistTitleResponseDto` without `reaction`, and the client's `CardTitle`
+  matches it. A third reader picks one of those two; it never sends `storedReaction` on as the viewer's vote.
+  Comments follow the same split: `CommentService` answers `StoredCommentView` and never reads the cache, and
+  `CommentsService` (`app/endpoints/comments/comments.service.ts`) asks `forComments` once for the roots and their
+  previewed replies together and answers `CommentView`. `create` settles to no vote directly — a comment nobody has
+  seen yet cannot hold one.
 
 ### Metrics
 

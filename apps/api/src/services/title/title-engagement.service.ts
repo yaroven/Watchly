@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { Logged } from "../../decorators/logged.decorator";
 import { PrismaService } from "../prisma/prisma.service";
 import { VoteStateService } from "../vote-cache/vote-state.service";
-import { titleEngagementViewFromRelations } from "./title-engagement.mapper";
+import { titleEngagementViewFromRelations, withVote } from "./title-engagement.mapper";
 import { TitleEngagementView } from "./title-engagement.types";
 import titleQuery, { EngagementRelations } from "./utils/title.query";
 
@@ -47,35 +47,12 @@ export class TitleEngagementService {
   }
 
   @Logged()
-  async addToWatchlist(titleId: string, userId: string): Promise<TitleEngagementView> {
-    return this.prisma.$transaction(async (tx) => {
-      await tx.watchlistItem.upsert({
-        where: { userId_titleId: { userId, titleId } },
-        create: { userId, titleId },
-        update: {},
-      });
-
-      await this.recomputeWatchlistCounts(tx, titleId);
-      return this.readEngagement(tx, titleId, userId);
-    });
-  }
-
-  @Logged()
-  async removeFromWatchlist(titleId: string, userId: string): Promise<TitleEngagementView> {
-    return this.prisma.$transaction(async (tx) => {
-      await tx.watchlistItem.deleteMany({ where: { userId, titleId } });
-      await this.recomputeWatchlistCounts(tx, titleId);
-      return this.readEngagement(tx, titleId, userId);
-    });
-  }
-
-  @Logged()
   async getEngagement(titleId: string, viewerId: string | null): Promise<TitleEngagementView> {
     return this.readEngagement(this.prisma, titleId, viewerId);
   }
 
   @Logged()
-  private async readEngagement(
+  async readEngagement(
     client: EngagementClient,
     titleId: string,
     viewerId: string | null,
@@ -87,16 +64,17 @@ export class TitleEngagementService {
 
     if (!rows) throw new NotFoundException(`Title with id ${titleId} not found`);
 
+    const stored = titleEngagementViewFromRelations(rows, viewerId);
     const votes = await this.voteState.forTitles(
-      [{ id: titleId, reactions: rows.reactions }],
+      [{ id: titleId, storedVote: stored.viewer?.storedReaction ?? null }],
       viewerId,
     );
 
-    return titleEngagementViewFromRelations(rows, viewerId, votes.get(titleId) ?? null);
+    return withVote(stored, votes.get(titleId) ?? null);
   }
 
   @Logged()
-  private async recomputeWatchlistCounts(client: EngagementClient, titleId: string): Promise<void> {
+  async recomputeWatchlistCounts(client: EngagementClient, titleId: string): Promise<void> {
     const watchlistCount = await client.watchlistItem.count({ where: { titleId } });
 
     await this.writeCounts(client, titleId, { watchlistCount });

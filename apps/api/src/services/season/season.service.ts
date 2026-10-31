@@ -17,6 +17,10 @@ export class SeasonService {
     private readonly mediaAssetService: MediaAssetService,
   ) {}
 
+  private toView(season: Season): SeasonView {
+    return toSeasonView(season, this.imageService.toPublicUrl(season.posterKey));
+  }
+
   @Logged()
   async create(data: SeasonInput): Promise<SeasonView> {
     try {
@@ -51,10 +55,6 @@ export class SeasonService {
   async update(id: string, data: SeasonInput): Promise<SeasonView> {
     const updated = await this.prisma.season.update({ where: { id }, data });
     return this.toView(updated);
-  }
-
-  private toView(season: Season): SeasonView {
-    return toSeasonView(season, this.imageService.toPublicUrl(season.posterKey));
   }
 
   @Logged()

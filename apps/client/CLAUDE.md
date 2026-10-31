@@ -72,6 +72,10 @@ This is where the bugs have been. The rules exist because each was broken:
   can know what a click means. It no longer risks withdrawing a like by accident, as it
   did while the server inferred the toggle — it simply cannot tell `DELETE` from `PUT`
   without that state.
+- **A watchlist item is a `CardTitle`, not a `Title`.** `GET /watchlist` sends no
+  `engagement.viewer.reaction`, because the api skips the vote cache for cards. `TitleCard`
+  and `Catalog` take `CardTitle`, which every title read also fits; don't widen a watchlist
+  item back to `Title` or read a vote from it.
 - A failed refetch still sets `isError`: query-core moves the query to `status: "error"`
   whether or not it already holds data (that is what `isRefetchError` is derived from).
   Don't reach for `failureCount` — it is also non-zero mid-retry on a fetch that will

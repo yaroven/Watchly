@@ -1,17 +1,14 @@
 import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
-import { ReactionType, Role } from "@prisma/client";
+import { Role } from "@prisma/client";
 import { EngagementCountersService } from "../engagement/engagement-counters.service";
 import { ImageService } from "../image/image.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { ReportService } from "../report/report.service";
-import { VoteStateService } from "../vote-cache/vote-state.service";
 import { CommentService } from "./comment.service";
 import { titleSubject } from "./utils/comment-subject.const";
 
 describe("CommentService", () => {
   let service: CommentService;
-  let voteStateMock: { forComments: jest.Mock };
   let prismaMock: jest.Mocked<PrismaService>;
   let txMock: {
     comment: {
@@ -62,13 +59,9 @@ describe("CommentService", () => {
       reaction: { deleteMany: jest.fn() },
     };
 
-    voteStateMock = { forComments: jest.fn().mockResolvedValue(new Map()) };
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CommentService,
-        { provide: VoteStateService, useValue: voteStateMock },
-        ReportService,
         EngagementCountersService,
         {
           provide: ImageService,
@@ -221,33 +214,8 @@ describe("CommentService", () => {
           limit: 10,
         });
 
-        expect(items[0].myReaction).toBeNull();
+        expect(items[0].storedReaction).toBeNull();
         expect(prismaMock.reaction.findMany).not.toHaveBeenCalled();
-
-        expect(voteStateMock.forComments).toHaveBeenCalledWith(expect.anything(), undefined);
-      });
-    });
-
-    describe("should take the viewer's vote from the cache", () => {
-      it("in preference to the relation the page loaded", async () => {
-        mockPage();
-        voteStateMock.forComments.mockResolvedValue(new Map([[commentId, ReactionType.DISLIKE]]));
-
-        const { items } = await service.findForSubject(
-          titleSubject(titleId),
-          { page: 1, limit: 10 },
-          "viewer-1",
-        );
-
-        expect(items[0].myReaction).toBe(ReactionType.DISLIKE);
-      });
-
-      it("asking for roots and previewed replies in one call", async () => {
-        mockPage();
-
-        await service.findForSubject(titleSubject(titleId), { page: 1, limit: 10 }, "viewer-1");
-
-        expect(voteStateMock.forComments).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -350,30 +318,6 @@ describe("CommentService", () => {
       expect(txMock.comment.create).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ hasSpoiler: true }) }),
       );
-    });
-  });
-
-  describe("report", () => {
-    describe("should replace the previous reason", () => {
-      it("rather than failing on the second report from the same viewer", async () => {
-        (prismaMock.comment.findUnique as jest.Mock).mockResolvedValue({ id: commentId });
-
-        await service.report(commentId, userId, "spam");
-
-        expect(prismaMock.report.upsert).toHaveBeenCalledWith({
-          where: { commentId_userId: { commentId, userId } },
-          create: { commentId, userId, reason: "spam" },
-          update: { reason: "spam" },
-        });
-      });
-    });
-
-    describe("should throw NotFoundException", () => {
-      it("if the comment is gone", async () => {
-        (prismaMock.comment.findUnique as jest.Mock).mockResolvedValue(null);
-
-        await expect(service.report(commentId, userId)).rejects.toThrow(NotFoundException);
-      });
     });
   });
 
