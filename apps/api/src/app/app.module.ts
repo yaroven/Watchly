@@ -10,6 +10,7 @@ import { LoggerModule } from "nestjs-pino";
 import { LogRootService } from "../services/logging/log-root.service";
 import { AppController } from "./app.controller";
 
+import featureFlagConfig from "../config/feature-flag.config";
 import jwtConfig, { JwtConfig, JwtConfigName } from "../config/jwt.config";
 import loggerConfig, {
   buildLoggerParams,
@@ -41,6 +42,7 @@ import { AuthEndpointModule } from "./endpoints/auth/auth.module";
 import { CommentsModule } from "./endpoints/comments/comments.module";
 import { EpisodesModule } from "./endpoints/episodes/episodes.module";
 import { ExternalRatingsEndpointModule } from "./endpoints/external-ratings/external-ratings.module";
+import { FeatureFlagsModule } from "./endpoints/feature-flags/feature-flags.module";
 import { GenresModule } from "./endpoints/genres/genres.module";
 import { ImagesModule } from "./endpoints/images/images.module";
 import { MetricsController } from "./endpoints/metrics/metrics.controller";
@@ -87,7 +89,7 @@ import { WatchlistEndpointModule } from "./endpoints/watchlist/watchlist.module"
     }),
     S3Module,
     ConfigModule.forRoot({
-      load: [s3Config, redisConfig, loggerConfig, jwtConfig, omdbConfig],
+      load: [s3Config, redisConfig, loggerConfig, jwtConfig, omdbConfig, featureFlagConfig],
       isGlobal: true,
     }),
     ScheduleModule.forRoot(),
@@ -109,6 +111,7 @@ import { WatchlistEndpointModule } from "./endpoints/watchlist/watchlist.module"
     CommentsModule,
     ImagesModule,
     VideoTranscoderEndpointModule,
+    FeatureFlagsModule,
     ReactionsModule,
     ReactionFlushModule,
     RedisModule,

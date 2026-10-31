@@ -10,6 +10,7 @@ import {
 } from "@nestjs/swagger";
 import { Auth } from "../../../decorators/auth.decorator";
 import { CurrentUserId } from "../../../decorators/current-user-id.decorator";
+import { RequireFeature } from "../../../decorators/require-feature.decorator";
 import { ReactionArc } from "../../../services/reaction/enums/reaction-arc.enum";
 import { REACTIONS, Reactions } from "../../../services/reaction/reaction.types";
 import { ReactableArcPipe } from "../../../services/reaction/utils/reactable-arc.pipe";
@@ -21,6 +22,7 @@ import { ReactDto } from "./dto/request/react.dto";
 import { ReactionResultDto } from "./dto/response/reaction-result.dto";
 
 @ApiTags("reactions")
+@RequireFeature("reactions")
 @Controller("reactions")
 export class ReactionsController {
   constructor(@Inject(REACTIONS) private readonly reactions: Reactions) {}

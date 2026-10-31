@@ -15,7 +15,8 @@ One directory per domain under `src/`, each with `*.module.ts`, `*.controller.ts
 `user` `watchlist`
 
 Infrastructure: `auth`, `prisma`, `redis`, `s3`, `s3-event`, `media-asset`, `poster`,
-`video-transcoder`, `reaction-flush`, `vote-cache`, `metrics`, `worker` (the worker process's root module, which belongs
+`video-transcoder`, `reaction-flush`, `vote-cache`, `metrics`, `feature-flag` (OpenFeature; routes gate with
+`@RequireFeature`), `logging`, `worker` (the worker process's root module, which belongs
 to no domain because it composes all of them),
 `config` (typed `registerAs` factories), `common` (pagination, shared DTOs, `utils/`).
 

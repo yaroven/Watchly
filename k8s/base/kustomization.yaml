@@ -39,6 +39,7 @@ configMapGenerator:
       - SQS_QUEUE_NAME=watchly-s3-event-queue
       - LOG_LEVEL=info
       - LOKI_URL=http://loki:3100
+      - FF_REACTIONS=true
 
   - name: watchly-client-config
     literals:
