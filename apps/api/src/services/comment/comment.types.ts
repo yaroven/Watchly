@@ -10,6 +10,7 @@ export interface CommentPageQuery extends PageQuery {
 export interface CommentInput {
   text: string;
   hasSpoiler?: boolean;
+  parentId?: string;
 }
 
 export type CommentWithAuthor = Comment & {

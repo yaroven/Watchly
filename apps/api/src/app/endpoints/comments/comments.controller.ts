@@ -26,7 +26,7 @@ import { Auth } from "../../../decorators/auth.decorator";
 import { CurrentUserId, OptionalUserId } from "../../../decorators/current-user-id.decorator";
 import { OptionalAuth } from "../../../decorators/optional-auth.decorator";
 import { CommentService } from "../../../services/comment/comment.service";
-import { replySubject, titleSubject } from "../../../services/comment/utils/comment-subject.const";
+import { titleSubject } from "../../../services/comment/utils/comment-subject.const";
 import { Paginated, PaginatedResponseOf } from "../../dto/paginated-response-of.util";
 import { CreateCommentDto } from "./dto/request/create-comment.dto";
 import { GetCommentsDto } from "./dto/request/get-comments.dto";
@@ -79,17 +79,10 @@ class CommentsController {
   @Post("titles/:id/comments")
   create(
     @Param("id", ParseUUIDPipe) id: string,
-    @Body() { parentId, ...data }: CreateCommentDto,
+    @Body() data: CreateCommentDto,
     @CurrentUserId() userId: string,
   ): Promise<CommentResponseDto> {
-    const thread = titleSubject(id);
-
-    return this.commentService.create(
-      parentId ? replySubject(parentId) : thread,
-      userId,
-      data,
-      thread,
-    );
+    return this.commentService.create(id, userId, data);
   }
 
   @ApiOperation({ summary: "Report a comment" })
