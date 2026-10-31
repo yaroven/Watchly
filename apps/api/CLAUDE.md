@@ -221,21 +221,29 @@ still processing is client work that has not been done.
   row through
   `rowVote`, a write wants it only to report a count); and **the cache is never asked for a count** — that is what lets
   it answer about one viewer without ever being complete.
-- **`myReaction` on a read comes from the cache; the counts beside it do not.** A read asks `ViewerVotesService.forPage`
-  for the whole page — one `MGET` — and hands each answer to the DTO, which settles it with `resolveVote`: a **present**
+- **`myReaction` on a read comes from the cache; the counts beside it do not.** A read asks `VoteStateService.forTitles`
+  or `forComments` for the whole page — one `MGET` — and hands each answer to the DTO, which settles it with `resolveVote`: a **present**
   entry wins over the `reactions` relation and an **absent** one falls back to it. Both halves matter, and the rule
   lives in one function because getting it backwards is silent: the relation is what the last flush left behind, so
   preferring it renders a vote the viewer's next request contradicts, while a cache miss has a free and correct answer
   already loaded. `readMany` under it is also the one place a Redis failure is swallowed — reads degrade to the
   relation, and writes degrade too (see the decorator below), so an unreachable Redis is not a 503.
-- **A feature reads votes through `ViewerVotesService`, never through the cache.** It is the read half of the reaction
-  domain and lives in `ViewerVotesModule`, apart from
-  `ReactionModule` so that importing it does not bring the flush queue along — the same reason no feature holds an
-  `@InjectQueue`. It owns the id-to-arc mapping and the rule that an absent viewer reads nothing, both of which were
-  written out once per feature before.
+- **A feature reads votes through `forTitles` / `forComments` on `VoteStateService`, never through `get` or a key.**
+  Those two own the id-to-arc mapping and the rule that an absent viewer reads nothing (both in the private
+  `forPage`), which used to be written out once per feature. `VoteStateService` lives in `vote-cache/`, its own module
+  apart from `ReactionModule`, so a reader does not pull in the flush queue — the same reason no feature holds an
+  `@InjectQueue`. A third reactable kind adds a third method; `forPage` is there if that stops being worth it.
 - `RedisService` extends `ioredis` the way `PrismaService` extends `PrismaClient`, and runs with
   `enableOfflineQueue: false`: a command issued while the socket is down rejects instead of waiting for a reconnect,
-  which is what lets a caller choose between failing and falling back rather than hanging.
+  which is what lets a caller choose between failing and falling back rather than hanging. **The api's BullMQ
+  connection needs the same** (`queueProducerConnectionOptions`, with `maxRetriesPerRequest: 1`): on ioredis's defaults
+  `queue.add` sits in the offline queue for minutes while Redis is down, so the vote fallback is never reached and the
+  request hangs instead. The worker keeps the defaults — a `Worker` must wait for Redis, not give up on it.
+- **`CachedReactionService.record` writes the key before it schedules the flush.** The other way round, a `SET` that
+  fails after the `add` succeeded leaves a flush that mirrors the key's _previous_ vote over the row the fallback just
+  wrote, and the vote silently reverts. In this order every partial failure ends with the key and the row agreeing;
+  the one hole left is the process dying between the two awaits, which leaves a key no flush will mirror until the
+  viewer votes again or the TTL sends reads back to the row.
 - A reply is a comment whose parent is a comment. Threads are one level deep because
   `CommentService` refuses the second, not because the schema does.
 - `title/` holds two services. `TitleService` is the catalogue — CRUD and the read assembly. `TitleEngagementService`

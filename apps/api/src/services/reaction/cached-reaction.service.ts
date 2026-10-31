@@ -66,9 +66,9 @@ export class CachedReactionService implements Reactions {
     failedLevel: (error) => (error instanceof RedisUnavailableError ? "warn" : "error"),
   })
   private async record(target: ReactionTarget, userId: string, vote: Vote): Promise<Vote> {
-    await this.flush.schedule(target, userId);
-
     const displaced = await this.voteState.set(target, userId, vote);
+
+    await this.flush.schedule(target, userId);
 
     return displaced ?? (await rowVote(this.prisma, target, userId));
   }

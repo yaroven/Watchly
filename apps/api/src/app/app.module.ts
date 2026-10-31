@@ -18,9 +18,9 @@ import loggerConfig, {
 } from "../config/logger.config";
 import omdbConfig from "../config/omdb.config";
 import redisConfig, {
+  queueProducerConnectionOptions,
   RedisConfig,
   RedisConfigName,
-  redisConnectionOptions,
 } from "../config/redis.config";
 import s3Config from "../config/s3.config";
 import { MediaAssetModule } from "../services/media-asset/media-asset.module";
@@ -77,7 +77,7 @@ import { WatchlistEndpointModule } from "./endpoints/watchlist/watchlist.module"
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
         const redis = configService.get<RedisConfig>(RedisConfigName)!;
-        return { connection: redisConnectionOptions(redis) };
+        return { connection: queueProducerConnectionOptions(redis) };
       },
     }),
     LoggerModule.forRootAsync({

@@ -30,3 +30,7 @@ export function redisConnectionOptions(config: RedisConfig) {
     ...(config.tls ? { tls: {} } : {}),
   };
 }
+
+export function queueProducerConnectionOptions(config: RedisConfig) {
+  return { ...redisConnectionOptions(config), enableOfflineQueue: false, maxRetriesPerRequest: 1 };
+}

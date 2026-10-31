@@ -89,10 +89,10 @@ describe("CachedReactionService", () => {
       expect(direct.clearVote).not.toHaveBeenCalled();
     });
 
-    it("schedules the flush before writing the vote", async () => {
+    it("writes the vote before scheduling its flush", async () => {
       await service.setVote(target, userId, LIKE);
 
-      expect(calls).toEqual(["schedule", "set"]);
+      expect(calls).toEqual(["set", "schedule"]);
     });
 
     it("refuses a subject that is gone before touching the cache", async () => {
@@ -209,13 +209,22 @@ describe("CachedReactionService", () => {
       expect(direct.clearVote).toHaveBeenCalledWith(target, userId);
     });
 
-    it("falls back when the queue is what cannot be reached", async () => {
+    it("falls back when the queue is what cannot be reached, leaving the key and the row agreeing", async () => {
       flush.schedule.mockRejectedValue(new RedisUnavailableError("schedule a flush", null));
 
       await service.setVote(target, userId, LIKE);
 
-      expect(direct.setVote).toHaveBeenCalled();
-      expect(voteState.set).not.toHaveBeenCalled();
+      expect(voteState.set).toHaveBeenCalledWith(target, userId, LIKE);
+      expect(direct.setVote).toHaveBeenCalledWith(target, userId, LIKE);
+    });
+
+    it("schedules no flush when the vote never reached the cache", async () => {
+      voteState.set.mockRejectedValue(down);
+
+      await service.clearVote(target, userId);
+
+      expect(flush.schedule).not.toHaveBeenCalled();
+      expect(direct.clearVote).toHaveBeenCalledWith(target, userId);
     });
 
     it("does not guess at the cache on the way out", async () => {
