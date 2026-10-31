@@ -187,11 +187,5 @@ export interface UpdateTitleDto {
   network: string;
   director: string;
   closedCaption: boolean;
-  /**
-   * Set once the image has been PUT to the upload URL. The key is derived from
-   * the title server-side, so no URL is sent; omit it to leave the existing
-   * poster alone, and send `false` to clear it.
-   */
-  posterUploaded?: boolean;
   genreIds?: string[];
 }

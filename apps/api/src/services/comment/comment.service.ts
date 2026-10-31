@@ -6,10 +6,9 @@ import {
 } from "@nestjs/common";
 import { Role } from "@prisma/client";
 import { EngagementCountersService } from "../engagement/engagement-counters.service";
+import { ImageService } from "../image/image.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { ReportService } from "../report/report.service";
-import BucketType from "../s3/enums/bucket-type.enum";
-import { S3Service } from "../s3/s3.service";
 import assertTitleExists from "../title/utils/assert-title-exists.util";
 import { VoteStateService } from "../vote-cache/vote-state.service";
 import { toCommentView } from "./comment.mapper";
@@ -36,16 +35,14 @@ const titleOf = (subject: CommentSubject): string | undefined =>
 export class CommentService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly s3Service: S3Service,
+    private readonly imageService: ImageService,
     private readonly reportService: ReportService,
     private readonly counters: EngagementCountersService,
     private readonly voteState: VoteStateService,
   ) {}
 
   private avatarUrl(user: { avatarKey: string | null }): string | null {
-    return user.avatarKey
-      ? this.s3Service.getPublicUrl(user.avatarKey, BucketType.PROCESSED)
-      : null;
+    return this.imageService.toPublicUrl(user.avatarKey);
   }
 
   private toView(

@@ -1,11 +1,11 @@
 import { Module } from "@nestjs/common";
 import { PrismaModule } from "../prisma/prisma.module";
 import { S3Module } from "../s3/s3.module";
-import { UserAvatarService } from "./user-avatar.service";
+import { ImageService } from "./image.service";
 
 @Module({
   imports: [S3Module, PrismaModule],
-  providers: [UserAvatarService],
-  exports: [UserAvatarService],
+  providers: [ImageService],
+  exports: [ImageService],
 })
-export class UserAvatarModule {}
+export class ImageModule {}

@@ -2,8 +2,8 @@ import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { Prisma, Role } from "@prisma/client";
 import { FilterRule } from "../../common/pagination/filter-rule.enum";
+import { ImageService } from "../image/image.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { S3Service } from "../s3/s3.service";
 import { UserService } from "./user.service";
 import { hashPassword, verifyPassword } from "./utils/password.util";
 
@@ -39,8 +39,10 @@ describe("UserService", () => {
       providers: [
         UserService,
         {
-          provide: S3Service,
-          useValue: { getPublicUrl: jest.fn((key: string) => `https://cdn.test/${key}`) },
+          provide: ImageService,
+          useValue: {
+            toPublicUrl: jest.fn((key: string | null) => (key ? `https://cdn.test/${key}` : null)),
+          },
         },
         {
           provide: PrismaService,

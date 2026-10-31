@@ -99,8 +99,8 @@ const TitleService = {
     return eTag;
   },
 
-  getPosterUploadUrl: async (id: string): Promise<{ uploadUrl: string }> => {
-    const { data } = await api.get<{ uploadUrl: string; posterUrl: string }>(`/${prefix}/${id}/poster-upload-url`);
+  getPosterUploadUrl: async (id: string, contentType: string): Promise<{ uploadUrl: string }> => {
+    const { data } = await api.post<{ uploadUrl: string }>(`/${prefix}/${id}/poster/upload-url`, { contentType });
     return data;
   },
 

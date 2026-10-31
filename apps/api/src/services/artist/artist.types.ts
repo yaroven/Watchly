@@ -1,6 +1,5 @@
 export interface ArtistInput {
   name: string;
-  photoUploaded?: boolean;
 }
 
 export interface ArtistView {

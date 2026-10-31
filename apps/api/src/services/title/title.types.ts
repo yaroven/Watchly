@@ -26,10 +26,6 @@ export interface TitleInput {
   genreIds?: string[];
 }
 
-export interface TitleUpdate extends TitleInput {
-  posterUploaded?: boolean;
-}
-
 export type TitleWithCatalogueRelations = Title & {
   genres: Genre[];
   externalRatings?: ExternalRatings[];

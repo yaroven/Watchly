@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-import { PosterService } from "../poster/poster.service";
+import { ImageService } from "../image/image.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { toCastCreditView } from "./title-cast.mapper";
 import { CastCreditInput, CastCreditView } from "./title-cast.types";
@@ -10,14 +10,14 @@ import titleCastQuery from "./utils/title-cast.query";
 export class TitleCastService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly posterService: PosterService,
+    private readonly imageService: ImageService,
   ) {}
 
   async findForTitle(titleId: string): Promise<CastCreditView[]> {
     const credits = await this.prisma.castCredit.findMany(titleCastQuery.forTitle(titleId));
 
     return credits.map((credit) =>
-      toCastCreditView(credit, this.posterService.toPublicUrl(credit.artist.photoKey)),
+      toCastCreditView(credit, this.imageService.toPublicUrl(credit.artist.photoKey)),
     );
   }
 

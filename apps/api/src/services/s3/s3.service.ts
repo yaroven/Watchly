@@ -108,8 +108,17 @@ export class S3Service implements OnModuleInit {
     return parallelUploads3.done();
   }
 
-  async getUploadPresignedUrl(key: string, type: BucketType, expiresIn: number = 3600) {
-    const command = new PutObjectCommand({ Bucket: this.getBucketName(type), Key: key });
+  async getUploadPresignedUrl(
+    key: string,
+    type: BucketType,
+    expiresIn: number = 3600,
+    contentType?: string,
+  ) {
+    const command = new PutObjectCommand({
+      Bucket: this.getBucketName(type),
+      Key: key,
+      ContentType: contentType,
+    });
     const signedUrl = await getSignedUrl(this.s3Client, command, { expiresIn });
     return this.mapSignedUrlToPublicEndpoint(signedUrl);
   }

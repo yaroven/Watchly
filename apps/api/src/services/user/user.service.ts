@@ -3,9 +3,8 @@ import { Prisma, Role, User } from "@prisma/client";
 import { paginate } from "../../common/pagination/paginate.util";
 import { Filter, PageQuery, Sorting } from "../../common/pagination/pagination.types";
 import { buildOrderBy, buildWhere } from "../../common/pagination/prisma-query.util";
+import { ImageService } from "../image/image.service";
 import { PrismaService } from "../prisma/prisma.service";
-import BucketType from "../s3/enums/bucket-type.enum";
-import { S3Service } from "../s3/s3.service";
 import { toUserView } from "./user.mapper";
 import { UserInput, UserUpdate, UserView } from "./user.types";
 import { hashPassword, verifyPassword } from "./utils/password.util";
@@ -23,14 +22,11 @@ const USER_SAFE_SELECT = {
 export class UserService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly s3Service: S3Service,
+    private readonly imageService: ImageService,
   ) {}
 
   private toView(user: Omit<User, "password">): UserView {
-    const avatarUrl = user.avatarKey
-      ? this.s3Service.getPublicUrl(user.avatarKey, BucketType.PROCESSED)
-      : null;
-    return toUserView(user, avatarUrl);
+    return toUserView(user, this.imageService.toPublicUrl(user.avatarKey));
   }
 
   async create(data: UserInput): Promise<UserView> {

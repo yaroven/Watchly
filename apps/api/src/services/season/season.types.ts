@@ -5,10 +5,6 @@ export interface SeasonInput {
   titleId: string;
 }
 
-export interface SeasonUpdate extends SeasonInput {
-  posterUploaded?: boolean;
-}
-
 export interface SeasonView {
   id: string;
   createdAt: Date;

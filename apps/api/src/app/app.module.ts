@@ -41,13 +41,12 @@ import { CommentsModule } from "./endpoints/comments/comments.module";
 import { EpisodesModule } from "./endpoints/episodes/episodes.module";
 import { ExternalRatingsEndpointModule } from "./endpoints/external-ratings/external-ratings.module";
 import { GenresModule } from "./endpoints/genres/genres.module";
+import { ImagesModule } from "./endpoints/images/images.module";
 import { MetricsController } from "./endpoints/metrics/metrics.controller";
-import { PostersModule } from "./endpoints/posters/posters.module";
 import { ReactionsModule } from "./endpoints/reactions/reactions.module";
 import { SeasonsModule } from "./endpoints/seasons/seasons.module";
 import { TitleCastEndpointModule } from "./endpoints/title-cast/title-cast.module";
 import { TitlesModule } from "./endpoints/titles/titles.module";
-import { UserAvatarEndpointModule } from "./endpoints/user-avatar/user-avatar.module";
 import { UsersModule } from "./endpoints/users/users.module";
 import { VideoTranscoderEndpointModule } from "./endpoints/video-transcoder/video-transcoder.module";
 import { WatchlistEndpointModule } from "./endpoints/watchlist/watchlist.module";
@@ -102,13 +101,12 @@ import { WatchlistEndpointModule } from "./endpoints/watchlist/watchlist.module"
     S3EventModule,
     AuthEndpointModule,
     UsersModule,
-    UserAvatarEndpointModule,
     ArtistsModule,
     GenresModule,
     MediaAssetModule,
     ExternalRatingsEndpointModule,
     CommentsModule,
-    PostersModule,
+    ImagesModule,
     VideoTranscoderEndpointModule,
     ReactionsModule,
     ReactionFlushModule,

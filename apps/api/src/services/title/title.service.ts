@@ -4,8 +4,8 @@ import { paginate } from "../../common/pagination/paginate.util";
 import { Filter, PageQuery, Sorting } from "../../common/pagination/pagination.types";
 import { buildOrderBy } from "../../common/pagination/prisma-query.util";
 import { settleAllOrLog } from "../../common/utils/settle-all-or-throw.util";
+import { ImageService } from "../image/image.service";
 import { MediaAssetService } from "../media-asset/media-asset.service";
-import { PosterService } from "../poster/poster.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { VideoType } from "../queues/video-transcoder/enums/video-type.enum";
 import { buildVideoPrefix } from "../s3/processed-key";
@@ -14,7 +14,7 @@ import { titleEngagementViewFromRelations } from "../title-engagement/title-enga
 import { NO_VOTE_OVERRIDES, VoteOverrides } from "../vote-cache/vote-cache.const";
 import { VoteStateService } from "../vote-cache/vote-state.service";
 import { titleViewWithoutEngagement, toTitleView } from "./title.mapper";
-import { TitleInput, TitleUpdate, TitleView } from "./title.types";
+import { TitleInput, TitleView } from "./title.types";
 import assertTitleExists from "./utils/assert-title-exists.util";
 import { buildTitleWhere } from "./utils/title-filter.query";
 import titleQuery, { TitleWithEngagement } from "./utils/title.query";
@@ -25,7 +25,7 @@ export class TitleService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly posterService: PosterService,
+    private readonly imageService: ImageService,
     private readonly seasonService: SeasonService,
     private readonly mediaAssetService: MediaAssetService,
     private readonly voteState: VoteStateService,
@@ -92,22 +92,16 @@ export class TitleService {
 
   async update(
     id: string,
-    { genreIds, posterUploaded, ...rest }: TitleUpdate,
+    { genreIds, ...rest }: TitleInput,
     viewerId?: string,
   ): Promise<TitleView> {
     await assertTitleExists(this.prisma, id);
-
-    if (posterUploaded === false) {
-      await this.posterService.removeStoredImage("titles", id);
-    }
-    const posterKey = posterUploaded === false ? null : undefined;
 
     try {
       const updated = (await this.prisma.title.update({
         where: { id },
         data: {
           ...rest,
-          ...(posterKey !== undefined ? { posterKey } : {}),
           genres:
             genreIds !== undefined
               ? { set: genreIds.map((genreId) => ({ id: genreId })) }
@@ -146,7 +140,7 @@ export class TitleService {
     });
 
     await Promise.all([
-      this.posterService.deleteStoredImage(title.posterKey),
+      this.imageService.deleteStoredImage(title.posterKey),
       this.mediaAssetService.cleanupVideoAsset(
         id,
         VideoType.MOVIE,
@@ -186,7 +180,7 @@ export class TitleService {
     return toTitleView(
       title,
       titleEngagementViewFromRelations(title, viewerId, votes.get(title.id)),
-      this.posterService.toPublicUrl(title.posterKey),
+      this.imageService.toPublicUrl(title.posterKey),
     );
   }
 }

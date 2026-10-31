@@ -15,7 +15,7 @@ export interface ImageProfile {
   allowedUploadTypes: readonly string[];
 }
 
-const IMAGE_UPLOAD_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+export const IMAGE_UPLOAD_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 
 const POSTER_ASPECT = { width: 600, height: 900 } as const;
 

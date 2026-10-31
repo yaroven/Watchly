@@ -1,7 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { Prisma } from "@prisma/client";
-import { PosterService } from "../poster/poster.service";
+import { ImageService } from "../image/image.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { TitleCastService } from "./title-cast.service";
 
@@ -44,7 +44,7 @@ describe("TitleCastService", () => {
       providers: [
         TitleCastService,
         { provide: PrismaService, useValue: prismaMock },
-        { provide: PosterService, useValue: { toPublicUrl: jest.fn().mockReturnValue(null) } },
+        { provide: ImageService, useValue: { toPublicUrl: jest.fn().mockReturnValue(null) } },
       ],
     }).compile();
 
