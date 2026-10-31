@@ -1,7 +1,7 @@
 import { Controller, Get, NotFoundException, Req, Res } from "@nestjs/common";
 import { ApiExcludeEndpoint } from "@nestjs/swagger";
 import { SkipThrottle } from "@nestjs/throttler";
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
 import { register } from "prom-client";
 
 @Controller()
