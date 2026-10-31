@@ -3,6 +3,7 @@ import { ReactionType } from "@prisma/client";
 import { EngagementCountersService } from "../../engagement/engagement-counters.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { RedisService } from "../../redis/redis.service";
+import { ReactionDriftService } from "./reaction-drift.service";
 import { RECONCILE_BATCH_SIZE, ReactionReconciler } from "./reaction-reconciler.service";
 
 const { LIKE, DISLIKE } = ReactionType;
@@ -83,6 +84,7 @@ describe("ReactionReconciler", () => {
         ReactionReconciler,
         { provide: PrismaService, useValue: prisma },
         { provide: EngagementCountersService, useValue: counters },
+        ReactionDriftService,
         { provide: RedisService, useValue: redis },
       ],
     }).compile();

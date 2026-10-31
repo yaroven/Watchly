@@ -438,15 +438,19 @@ describe("TitleService", () => {
       expect(result?.engagement.viewer?.reaction).toBeNull();
     });
 
-    it("should fall back to the relation for a pair the cache has no answer for", async () => {
+    it("should hand the cache the relation it loaded, so a miss can fall back to it", async () => {
+      const reactions = [{ type: ReactionType.LIKE }];
       (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
         ...titleRow,
-        reactions: [{ type: ReactionType.LIKE }],
+        reactions,
       });
 
-      const result = await service.findOne("title-1", "viewer-1");
+      await service.findOne("title-1", "viewer-1");
 
-      expect(result?.engagement.viewer?.reaction).toBe(ReactionType.LIKE);
+      expect(voteStateMock.forTitles).toHaveBeenCalledWith(
+        [expect.objectContaining({ id: "title-1", reactions })],
+        "viewer-1",
+      );
     });
 
     it("should hand the absent viewer on rather than inventing one", async () => {
