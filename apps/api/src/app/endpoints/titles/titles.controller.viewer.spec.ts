@@ -5,7 +5,7 @@ import { JwtAuthGuard } from "../../../guards/jwt-auth.guard";
 import { OptionalJwtAuthGuard } from "../../../guards/optional-jwt-auth.guard";
 import { MediaAssetService } from "../../../services/media-asset/media-asset.service";
 import { PrismaService } from "../../../services/prisma/prisma.service";
-import { TitleEngagementService } from "../../../services/title-engagement/title-engagement.service";
+import { TitleEngagementService } from "../../../services/title/title-engagement.service";
 import { TitleService } from "../../../services/title/title.service";
 import { TitleExistsPipe } from "../../../services/title/utils/title-exists.pipe";
 import { TitlesController } from "./titles.controller";

@@ -244,7 +244,7 @@ describe("TitleEngagementService", () => {
     it("should count the whole watchlist for the title, not just the viewer's row", async () => {
       txMock.watchlistItem.count.mockResolvedValue(12);
 
-      await service.recomputeWatchlistCounts(txMock as never, titleId);
+      await service.addToWatchlist(titleId, userId);
 
       expect(txMock.watchlistItem.count).toHaveBeenCalledWith({ where: { titleId } });
       expect(txMock.titleEngagement.upsert).toHaveBeenCalledWith({
@@ -293,4 +293,62 @@ describe("TitleEngagementService", () => {
       ...overrides,
     };
   }
+  describe("addToWatchlist", () => {
+    it("should be idempotent when the title is already on the list", async () => {
+      await service.addToWatchlist(titleId, userId);
+
+      expect(txMock.watchlistItem.upsert).toHaveBeenCalledWith({
+        where: { userId_titleId: { userId, titleId } },
+        create: { userId, titleId },
+        update: {},
+      });
+    });
+
+    it("should write, recount and read back inside the transaction, never on the base client", async () => {
+      await service.addToWatchlist(titleId, userId);
+
+      expect(prismaMock.watchlistItem.upsert).not.toHaveBeenCalled();
+      expect(prismaMock.watchlistItem.count).not.toHaveBeenCalled();
+      expect(prismaMock.title.findUnique).not.toHaveBeenCalled();
+      expect(txMock.watchlistItem.count).toHaveBeenCalledWith({ where: { titleId } });
+      expect(txMock.title.findUnique).toHaveBeenCalled();
+    });
+
+    it("should refuse rather than commit against a title that vanished", async () => {
+      txMock.title.findUnique.mockResolvedValue(null);
+
+      await expect(service.addToWatchlist(titleId, userId)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe("removeFromWatchlist", () => {
+    it("should delete only the viewer's own row", async () => {
+      await service.removeFromWatchlist(titleId, userId);
+
+      expect(txMock.watchlistItem.deleteMany).toHaveBeenCalledWith({ where: { userId, titleId } });
+      expect(prismaMock.watchlistItem.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it("should recount after the delete", async () => {
+      const calls: string[] = [];
+      txMock.watchlistItem.deleteMany.mockImplementation(() => {
+        calls.push("delete");
+        return Promise.resolve({ count: 1 });
+      });
+      txMock.watchlistItem.count.mockImplementation(() => {
+        calls.push("count");
+        return Promise.resolve(0);
+      });
+
+      await service.removeFromWatchlist(titleId, userId);
+
+      expect(calls).toEqual(["delete", "count"]);
+    });
+
+    it("should refuse rather than commit against a title that vanished", async () => {
+      txMock.title.findUnique.mockResolvedValue(null);
+
+      await expect(service.removeFromWatchlist(titleId, userId)).rejects.toThrow(NotFoundException);
+    });
+  });
 });

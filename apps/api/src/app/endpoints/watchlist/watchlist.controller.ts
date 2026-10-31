@@ -19,6 +19,7 @@ import {
 } from "@nestjs/swagger";
 import { Auth } from "../../../decorators/auth.decorator";
 import { CurrentUserId } from "../../../decorators/current-user-id.decorator";
+import { TitleEngagementService } from "../../../services/title/title-engagement.service";
 import { TitleExistsPipe } from "../../../services/title/utils/title-exists.pipe";
 import { WatchlistService } from "../../../services/watchlist/watchlist.service";
 import { PaginatedQueryDto } from "../../dto/paginated-query.dto";
@@ -29,7 +30,10 @@ import { TitleResponseDto } from "../titles/dto/response/title-response.dto";
 @ApiTags("watchlist")
 @Controller("watchlist")
 export class WatchlistController {
-  constructor(private readonly watchlistService: WatchlistService) {}
+  constructor(
+    private readonly watchlistService: WatchlistService,
+    private readonly engagementService: TitleEngagementService,
+  ) {}
 
   @ApiOperation({
     summary: "List the titles on your watchlist",
@@ -58,7 +62,7 @@ export class WatchlistController {
     @Param("titleId", ParseUUIDPipe, TitleExistsPipe) titleId: string,
     @CurrentUserId() userId: string,
   ): Promise<TitleEngagementDto> {
-    return this.watchlistService.add(titleId, userId);
+    return this.engagementService.addToWatchlist(titleId, userId);
   }
 
   @ApiOperation({ summary: "Take a title off your watchlist" })
@@ -72,6 +76,6 @@ export class WatchlistController {
     @Param("titleId", ParseUUIDPipe, TitleExistsPipe) titleId: string,
     @CurrentUserId() userId: string,
   ): Promise<TitleEngagementDto> {
-    return this.watchlistService.remove(titleId, userId);
+    return this.engagementService.removeFromWatchlist(titleId, userId);
   }
 }

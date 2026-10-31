@@ -30,7 +30,7 @@ import { AdminOnly } from "../../../decorators/roles.decorator";
 import { SortingParams } from "../../../decorators/sorting-params.decorator";
 import { MediaAssetService } from "../../../services/media-asset/media-asset.service";
 import { VideoType } from "../../../services/queues/video-transcoder/enums/video-type.enum";
-import { TitleEngagementService } from "../../../services/title-engagement/title-engagement.service";
+import { TitleEngagementService } from "../../../services/title/title-engagement.service";
 import { TitleService } from "../../../services/title/title.service";
 import { TitleExistsPipe } from "../../../services/title/utils/title-exists.pipe";
 import { TITLE_FILTERABLE } from "../../../services/title/utils/title-filter.query";
