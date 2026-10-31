@@ -1,6 +1,7 @@
 import { InjectQueue } from "@nestjs/bullmq";
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { Queue } from "bullmq";
+import { Logged } from "../../../decorators/logged.decorator";
 import { ImageKind } from "./image-profile.const";
 import {
   IMAGE_TRANSCODE_JOB_NAME,
@@ -10,12 +11,11 @@ import {
 
 @Injectable()
 export class ImageTranscodeScheduler {
-  private readonly logger = new Logger(ImageTranscodeScheduler.name);
-
   constructor(
     @InjectQueue(IMAGE_TRANSCODE_QUEUE_NAME) private readonly queue: Queue<TranscodeImageJob>,
   ) {}
 
+  @Logged()
   async schedule({
     kind,
     ownerId,
@@ -25,8 +25,6 @@ export class ImageTranscodeScheduler {
     ownerId: string;
     rawKey: string;
   }): Promise<void> {
-    this.logger.log(`Scheduling ${kind} conversion for ${ownerId}`);
-
     await this.queue.add(
       IMAGE_TRANSCODE_JOB_NAME,
       { kind, ownerId, rawKey },

@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { ReactionType } from "@prisma/client";
+import { Logged } from "../../decorators/logged.decorator";
 import {
   EngagementCountersService,
   EngagementCounts,
@@ -25,6 +26,7 @@ export class ReactionService implements Reactions {
     private readonly counters: EngagementCountersService,
   ) {}
 
+  @Logged()
   async setVote(
     target: ReactionTarget,
     userId: string,
@@ -33,10 +35,12 @@ export class ReactionService implements Reactions {
     return this.write(target, userId, type);
   }
 
+  @Logged()
   async clearVote(target: ReactionTarget, userId: string): Promise<ReactionResult> {
     return this.write(target, userId, null);
   }
 
+  @Logged()
   async writeVote(
     client: VoteClient,
     target: ReactionTarget,
@@ -54,6 +58,7 @@ export class ReactionService implements Reactions {
     }
   }
 
+  @Logged()
   async applyAbsolute(
     client: ReactionClient,
     target: ReactionTarget,
@@ -65,6 +70,7 @@ export class ReactionService implements Reactions {
     return this.counters.recomputeReactions(target, client);
   }
 
+  @Logged()
   private async write(target: ReactionTarget, userId: string, vote: Vote): Promise<ReactionResult> {
     if (!(await subjectExists(this.prisma, target))) throw subjectNotFound(target);
 

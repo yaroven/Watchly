@@ -1,7 +1,8 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { ExternalRatingSource } from "@prisma/client";
 import pMap from "p-map";
+import { Logged } from "../../decorators/logged.decorator";
 import { PrismaService } from "../prisma/prisma.service";
 import { toExternalRatingView } from "./external-ratings.mapper";
 import { ExternalRatingView, SyncExternalRatingsResult } from "./external-ratings.types";
@@ -35,14 +36,13 @@ const TITLE_SELECTION = {
 
 @Injectable()
 export class ExternalRatingsService {
-  private readonly logger = new Logger(ExternalRatingsService.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly omdb: OmdbClient,
   ) {}
 
   @Cron("0 0 * * *")
+  @Logged()
   async syncExternalRatings(): Promise<SyncExternalRatingsResult> {
     let total = 0;
     let synced = 0;
@@ -55,24 +55,18 @@ export class ExternalRatingsService {
         async (title) => {
           try {
             if (await this.syncTitleRatings(title)) synced++;
-          } catch (error) {
-            this.logger.error(
-              `Failed to sync ratings for title ${title.id} (${title.name}):`,
-              error,
-            );
+          } catch {
+            // @Logged has already logged this failure
           }
         },
         { concurrency: CONCURRENCY },
       );
-
-      this.logger.log(`Synced ratings for ${synced}/${total} titles so far`);
     }
-
-    this.logger.log(`Synced ratings for ${synced}/${total} titles`);
 
     return { total, synced };
   }
 
+  @Logged()
   async syncRatingsForTitle(titleId: string): Promise<ExternalRatingView[]> {
     const title = await this.prisma.title.findUnique({
       where: { id: titleId },
@@ -108,6 +102,7 @@ export class ExternalRatingsService {
     }
   }
 
+  @Logged()
   private async syncTitleRatings(title: TitleToSync): Promise<boolean> {
     const imdbId = title.externalIds[0]?.externalId;
 
@@ -124,6 +119,7 @@ export class ExternalRatingsService {
     return this.writeRatings(title.id, data);
   }
 
+  @Logged()
   private async rememberImdbId(titleId: string, externalId: string): Promise<void> {
     await this.prisma.titleExternalId.upsert({
       where: { titleId_source: { titleId, source: ExternalRatingSource.IMDB } },
@@ -132,6 +128,7 @@ export class ExternalRatingsService {
     });
   }
 
+  @Logged()
   private async writeRatings(titleId: string, data: OmdbTitle): Promise<boolean> {
     let wrote = false;
 

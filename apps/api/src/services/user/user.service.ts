@@ -3,6 +3,7 @@ import { Prisma, Role, User } from "@prisma/client";
 import { paginate } from "../../common/pagination/paginate.util";
 import { Filter, PageQuery, Sorting } from "../../common/pagination/pagination.types";
 import { buildOrderBy, buildWhere } from "../../common/pagination/prisma-query.util";
+import { Logged } from "../../decorators/logged.decorator";
 import { ImageService } from "../image/image.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { toUserView } from "./user.mapper";
@@ -29,6 +30,7 @@ export class UserService {
     return toUserView(user, this.imageService.toPublicUrl(user.avatarKey));
   }
 
+  @Logged()
   async create(data: UserInput): Promise<UserView> {
     const password = await hashPassword(data.password);
 
@@ -46,6 +48,7 @@ export class UserService {
     }
   }
 
+  @Logged()
   async findAll(
     { page = 1, limit = 10 }: PageQuery,
     sort?: Sorting,
@@ -67,16 +70,19 @@ export class UserService {
     return { items: items.map((user) => this.toView(user)), totalCount };
   }
 
+  @Logged()
   async findOne(id: string): Promise<UserView | null> {
     const user = await this.prisma.user.findUnique({ where: { id }, select: USER_SAFE_SELECT });
     return user ? this.toView(user) : null;
   }
 
+  @Logged()
   async findByEmail(email: string): Promise<UserView | null> {
     const user = await this.prisma.user.findUnique({ where: { email }, select: USER_SAFE_SELECT });
     return user ? this.toView(user) : null;
   }
 
+  @Logged()
   async update(id: string, data: UserUpdate): Promise<UserView> {
     const password = data.password ? await hashPassword(data.password) : undefined;
 
@@ -95,6 +101,7 @@ export class UserService {
     }
   }
 
+  @Logged()
   async delete(id: string): Promise<UserView> {
     const user = await this.findOne(id);
     if (!user) throw new NotFoundException(`User with id ${id} not found`);
@@ -103,6 +110,7 @@ export class UserService {
     return this.toView(deleted);
   }
 
+  @Logged({ data: (email: string) => ({ email }) })
   async validateUser(email: string, password: string): Promise<UserView | null> {
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) return null;

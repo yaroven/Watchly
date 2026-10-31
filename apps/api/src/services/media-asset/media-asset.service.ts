@@ -1,5 +1,6 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { settleAllOrLog } from "../../common/utils/settle-all-or-throw.util";
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { settleAll } from "../../common/utils/settle-all-or-throw.util";
+import { Logged } from "../../decorators/logged.decorator";
 import { VideoType } from "../queues/video-transcoder/enums/video-type.enum";
 import { VideoTranscodeScheduler } from "../queues/video-transcoder/video-transcode-scheduler.service";
 import BucketType from "../s3/enums/bucket-type.enum";
@@ -10,13 +11,12 @@ import { S3Service } from "../s3/s3.service";
 
 @Injectable()
 export class MediaAssetService {
-  private readonly logger = new Logger(MediaAssetService.name);
-
   constructor(
     private readonly s3Service: S3Service,
     private readonly scheduler: VideoTranscodeScheduler,
   ) {}
 
+  @Logged()
   async startUpload(id: string, fileSize: number, type: VideoType) {
     return this.s3Service.startMultipartUpload(
       buildVideoRawKey(id, type),
@@ -25,6 +25,7 @@ export class MediaAssetService {
     );
   }
 
+  @Logged()
   async completeUpload(
     id: string,
     uploadId: string,
@@ -40,14 +41,17 @@ export class MediaAssetService {
     await this.scheduleTranscode(id, type);
   }
 
+  @Logged()
   async abortUpload(id: string, uploadId: string, type: VideoType): Promise<void> {
     await this.s3Service.abortMultipartUpload(buildVideoRawKey(id, type), BucketType.RAW, uploadId);
   }
 
+  @Logged()
   async scheduleTranscode(id: string, type: VideoType): Promise<void> {
     await this.scheduler.schedule({ id, type });
   }
 
+  @Logged()
   async getPlaybackUrl(location: VideoLocation): Promise<{ url: string }> {
     const key = buildVideoManifestKey(location);
 
@@ -58,36 +62,23 @@ export class MediaAssetService {
     return { url: await this.s3Service.getReadPresignedUrl(key, BucketType.PROCESSED) };
   }
 
+  @Logged()
   async deleteProcessedFolder(prefix: string): Promise<void> {
     await this.s3Service.deleteFolder(prefix, BucketType.PROCESSED);
   }
 
+  @Logged()
   async cleanupVideoAsset(id: string, type: VideoType, processedPath?: string): Promise<void> {
-    const tasks: { id: string; run: () => Promise<unknown> }[] = [
-      {
-        id: "scheduled-transcodes",
-        run: () => this.scheduler.cancelScheduled(id, type),
-      },
-      {
-        id: "raw-video",
-        run: () => this.s3Service.deleteObject(buildVideoRawKey(id, type), BucketType.RAW),
-      },
-      { id: "raw-video-legacy", run: () => this.s3Service.deleteObject(id, BucketType.RAW) },
+    const tasks: (() => Promise<unknown>)[] = [
+      () => this.scheduler.cancelScheduled(id, type),
+      () => this.s3Service.deleteObject(buildVideoRawKey(id, type), BucketType.RAW),
+      () => this.s3Service.deleteObject(id, BucketType.RAW),
     ];
 
     if (processedPath !== undefined) {
-      tasks.push({
-        id: "processed-folder",
-        run: () => this.s3Service.deleteFolder(processedPath, BucketType.PROCESSED),
-      });
+      tasks.push(() => this.s3Service.deleteFolder(processedPath, BucketType.PROCESSED));
     }
 
-    await settleAllOrLog(
-      tasks,
-      (task) => task.run(),
-      (task) => task.id,
-      this.logger,
-      { itemLabel: "video-asset", parentLabel: VideoType[type].toLowerCase(), parentId: id },
-    );
+    await settleAll(tasks, (run) => run());
   }
 }

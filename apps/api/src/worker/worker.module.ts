@@ -18,6 +18,7 @@ import { EngagementModule } from "../services/engagement/engagement.module";
 import { FfmpegModule } from "../services/ffmpeg/ffmpeg.module";
 import { imageAttachersProvider } from "../services/image/image.attacher";
 import { ImageModule } from "../services/image/image.module";
+import { LogRootService } from "../services/logging/log-root.service";
 import { PrismaModule } from "../services/prisma/prisma.module";
 import { IMAGE_TRANSCODE_QUEUE_OPTIONS } from "../services/queues/image-transcoder/image-transcode-queue.options";
 import { ImageTranscoderProcessor } from "../services/queues/image-transcoder/image-transcoder.processor";
@@ -64,6 +65,7 @@ import { VoteCacheModule } from "../services/vote-cache/vote-cache.module";
     ScheduleModule.forRoot(),
   ],
   providers: [
+    LogRootService,
     ReactionFlushProcessor,
     ReactionReconciler,
     ReactionReconcileSchedule,

@@ -7,6 +7,7 @@ import { ScheduleModule } from "@nestjs/schedule";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { Queue } from "bullmq";
 import { LoggerModule } from "nestjs-pino";
+import { LogRootService } from "../services/logging/log-root.service";
 import { AppController } from "./app.controller";
 
 import jwtConfig, { JwtConfig, JwtConfigName } from "../config/jwt.config";
@@ -114,6 +115,7 @@ import { WatchlistEndpointModule } from "./endpoints/watchlist/watchlist.module"
   ],
   controllers: [AppController, MetricsController],
   providers: [
+    LogRootService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
 
     {

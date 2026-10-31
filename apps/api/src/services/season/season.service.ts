@@ -1,8 +1,9 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { Episode, Prisma, Season } from "@prisma/client";
 import { Filter, Sorting } from "../../common/pagination/pagination.types";
 import { buildOrderBy, buildWhere } from "../../common/pagination/prisma-query.util";
-import { settleAllOrLog } from "../../common/utils/settle-all-or-throw.util";
+import { settleAll } from "../../common/utils/settle-all-or-throw.util";
+import { Logged } from "../../decorators/logged.decorator";
 import { ImageService } from "../image/image.service";
 import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -13,14 +14,13 @@ import { SeasonInput, SeasonView } from "./season.types";
 
 @Injectable()
 export class SeasonService {
-  private readonly logger = new Logger(SeasonService.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly imageService: ImageService,
     private readonly mediaAssetService: MediaAssetService,
   ) {}
 
+  @Logged()
   async create(data: SeasonInput): Promise<SeasonView> {
     try {
       const season = await this.prisma.season.create({ data });
@@ -33,6 +33,7 @@ export class SeasonService {
     }
   }
 
+  @Logged()
   async findAll(filters: Filter[] = [], sort?: Sorting): Promise<SeasonView[]> {
     const where = buildWhere(filters) as Prisma.SeasonWhereInput;
     const orderBy = (buildOrderBy(sort) ?? {
@@ -43,11 +44,13 @@ export class SeasonService {
     return seasons.map((season) => this.toView(season));
   }
 
+  @Logged()
   async findOne(id: string): Promise<SeasonView | null> {
     const season = await this.prisma.season.findUnique({ where: { id } });
     return season ? this.toView(season) : null;
   }
 
+  @Logged()
   async update(id: string, data: SeasonInput): Promise<SeasonView> {
     const updated = await this.prisma.season.update({ where: { id }, data });
     return this.toView(updated);
@@ -57,6 +60,7 @@ export class SeasonService {
     return toSeasonView(season, this.imageService.toPublicUrl(season.posterKey));
   }
 
+  @Logged()
   async delete(id: string): Promise<SeasonView> {
     const season = await this.prisma.season.findUnique({
       where: { id },
@@ -73,30 +77,21 @@ export class SeasonService {
     return this.toView(deleted);
   }
 
+  @Logged()
   async cleanupAssets(season: Season & { episodes: Episode[] }): Promise<void> {
-    await settleAllOrLog(
-      season.episodes,
-      (episode) => this.mediaAssetService.cleanupVideoAsset(episode.id, VideoType.EPISODE),
-      (episode) => episode.id,
-      this.logger,
-      { itemLabel: "episode", parentLabel: "season", parentId: season.id },
+    await settleAll(season.episodes, (episode) =>
+      this.mediaAssetService.cleanupVideoAsset(episode.id, VideoType.EPISODE),
     );
 
-    await settleAllOrLog(
+    await settleAll(
       [
-        { id: "poster", run: () => this.imageService.deleteStoredImage(season.posterKey) },
-        {
-          id: "processed-folder",
-          run: () =>
-            this.mediaAssetService.deleteProcessedFolder(
-              buildSeasonVideoPrefix(season.titleId, season.id),
-            ),
-        },
+        () => this.imageService.deleteStoredImage(season.posterKey),
+        () =>
+          this.mediaAssetService.deleteProcessedFolder(
+            buildSeasonVideoPrefix(season.titleId, season.id),
+          ),
       ],
-      (task) => task.run(),
-      (task) => task.id,
-      this.logger,
-      { itemLabel: "asset", parentLabel: "season", parentId: season.id },
+      (run) => run(),
     );
   }
 }

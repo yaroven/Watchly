@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { Logged } from "../../../decorators/logged.decorator";
 import {
   counterOf,
   EngagementCountersService,
@@ -34,13 +35,15 @@ export class ReactionReconciler {
     private readonly redis: RedisService,
   ) {}
 
+  @Logged()
   async reconcile(): Promise<void> {
     for (const arc of REACTION_ARCS) {
       await this.reconcileArc(arc);
     }
   }
 
-  private async reconcileArc(arc: ReactionArc): Promise<void> {
+  @Logged()
+  private async reconcileArc(arc: ReactionArc): Promise<number> {
     let drifted = 0;
     let after: string | undefined;
 
@@ -59,8 +62,10 @@ export class ReactionReconciler {
     }
 
     await this.publish(arc, drifted);
+    return drifted;
   }
 
+  @Logged()
   private async reconcileBatch(arc: ReactionArc, subjectIds: string[]): Promise<number> {
     const [expected, stored] = await Promise.all([
       this.expectedCounts(arc, subjectIds),
@@ -78,6 +83,7 @@ export class ReactionReconciler {
     return drifted.length;
   }
 
+  @Logged()
   private async expectedCounts(
     arc: ReactionArc,
     subjectIds: string[],
@@ -103,6 +109,7 @@ export class ReactionReconciler {
     return counts;
   }
 
+  @Logged()
   private async storedCounts(arc: ReactionArc, subjectIds: string[]): Promise<Map<string, Counts>> {
     const key = arcKey(arc);
     const rows = await this.prisma.engagementCounters.findMany({
@@ -127,15 +134,17 @@ export class ReactionReconciler {
     return counts;
   }
 
+  @Logged()
   private async publish(arc: ReactionArc, drifted: number): Promise<void> {
     try {
-      await this.redis.set(driftKey(arc), drifted);
-    } catch (error) {
-      this.logger.warn(
-        `Could not publish the ${arc} drift count: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+      await this.writeDrift(arc, drifted);
+    } catch {
+      // @Logged has already logged this failure
     }
+  }
+
+  @Logged({ failedLevel: "warn" })
+  private async writeDrift(arc: ReactionArc, drifted: number): Promise<void> {
+    await this.redis.set(driftKey(arc), drifted);
   }
 }

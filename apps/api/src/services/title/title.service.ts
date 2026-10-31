@@ -1,9 +1,10 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma, TitleType } from "@prisma/client";
 import { paginate } from "../../common/pagination/paginate.util";
 import { Filter, PageQuery, Sorting } from "../../common/pagination/pagination.types";
 import { buildOrderBy } from "../../common/pagination/prisma-query.util";
-import { settleAllOrLog } from "../../common/utils/settle-all-or-throw.util";
+import { settleAll } from "../../common/utils/settle-all-or-throw.util";
+import { Logged } from "../../decorators/logged.decorator";
 import { ImageService } from "../image/image.service";
 import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -21,8 +22,6 @@ import titleQuery, { TitleWithEngagement } from "./utils/title.query";
 
 @Injectable()
 export class TitleService {
-  private readonly logger = new Logger(TitleService.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly imageService: ImageService,
@@ -31,6 +30,7 @@ export class TitleService {
     private readonly voteState: VoteStateService,
   ) {}
 
+  @Logged()
   async create({ genreIds, ...rest }: TitleInput): Promise<TitleView> {
     try {
       const title = await this.prisma.title.create({
@@ -49,6 +49,7 @@ export class TitleService {
     }
   }
 
+  @Logged()
   async findAll(
     { page = 1, limit = 10 }: PageQuery,
     sort?: Sorting,
@@ -76,6 +77,7 @@ export class TitleService {
     };
   }
 
+  @Logged()
   async findOne(id: string, viewerId?: string): Promise<TitleView | null> {
     const title = (await this.prisma.title.findUnique({
       where: { id },
@@ -90,6 +92,7 @@ export class TitleService {
     );
   }
 
+  @Logged()
   async update(
     id: string,
     { genreIds, ...rest }: TitleInput,
@@ -124,6 +127,7 @@ export class TitleService {
     }
   }
 
+  @Logged()
   async delete(id: string): Promise<TitleView> {
     const title = await this.prisma.title.findUnique({
       where: { id },
@@ -147,18 +151,13 @@ export class TitleService {
         buildVideoPrefix({ type: VideoType.MOVIE, titleId: id }),
       ),
       title.type === TitleType.SERIES &&
-        settleAllOrLog(
-          title.seasons,
-          (season) => this.seasonService.cleanupAssets(season),
-          (season) => season.id,
-          this.logger,
-          { itemLabel: "season", parentLabel: "title", parentId: id },
-        ),
+        settleAll(title.seasons, (season) => this.seasonService.cleanupAssets(season)),
     ]);
 
     return titleViewWithoutEngagement(deleted);
   }
 
+  @Logged()
   async findManyByIds(titleIds: string[], viewerId: string | null): Promise<TitleView[]> {
     if (titleIds.length === 0) return [];
 

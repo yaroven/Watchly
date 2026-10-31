@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { Prisma, ReactionType } from "@prisma/client";
+import { Logged } from "../../decorators/logged.decorator";
 import { PrismaService } from "../prisma/prisma.service";
 
 export type CountersClient = Pick<PrismaService, "engagementCounters" | "reaction" | "comment">;
@@ -54,6 +55,7 @@ export const countsOf = (row: EngagementCounts | null | undefined): EngagementCo
 export class EngagementCountersService {
   constructor(private readonly prisma: PrismaService) {}
 
+  @Logged()
   async recomputeReactions(
     subject: CountersSubject,
     client: CountersClient,
@@ -73,6 +75,7 @@ export class EngagementCountersService {
     return this.write(subject, counts, client);
   }
 
+  @Logged()
   async recomputeComments(
     subject: CountersSubject,
     client: CountersClient,
@@ -85,11 +88,13 @@ export class EngagementCountersService {
     return this.write(subject, { commentCount }, client);
   }
 
+  @Logged()
   async countsForOne(subject: CountersSubject, client: CountersClient): Promise<EngagementCounts> {
     const row = await client.engagementCounters.findUnique({ where: subject });
     return countsOf(row);
   }
 
+  @Logged()
   private async write(
     subject: CountersSubject,
     counts: Partial<EngagementCounts>,

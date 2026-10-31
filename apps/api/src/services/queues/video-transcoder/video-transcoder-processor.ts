@@ -1,5 +1,5 @@
 import { Processor, WorkerHost } from "@nestjs/bullmq";
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { TranscodingStatus } from "@prisma/client";
 import { Job } from "bullmq";
 import * as fs from "fs-extra";
@@ -7,16 +7,17 @@ import pMap from "p-map";
 import * as path from "path";
 import { Histogram } from "prom-client";
 import { Readable } from "stream";
+import { JobContext } from "../../../decorators/job-context.decorator";
+import { Logged } from "../../../decorators/logged.decorator";
 import { PrismaService } from "../../prisma/prisma.service";
 import BucketType from "../../s3/enums/bucket-type.enum";
 import { VIDEO_ROOT } from "../../s3/processed-key";
 import { S3Service } from "../../s3/s3.service";
-import logJobFailure from "../utils/log-job-failure.util";
 import withWorkDir from "../utils/work-dir.util";
 import { VideoType } from "./enums/video-type.enum";
 import { HlsTranscoder } from "./hls-transcoder.service";
 import resolveVideoPath from "./utils/resolve-video-path.util";
-import { TranscodeAbortedError } from "./utils/transcode-aborted.error";
+import { abortIsWarning, TranscodeAbortedError } from "./utils/transcode-aborted.error";
 import { PROCESSED_UPLOAD_CONCURRENCY } from "./video-profile.const";
 import { VIDEO_TRANSCODE_QUEUE_NAME } from "./video-transcode-queue.options";
 import { VideoTranscodeStateService } from "./video-transcode-state.service";
@@ -37,8 +38,6 @@ const duration = new Histogram({
 })
 @Injectable()
 export class VideoTranscoderProcessor extends WorkerHost {
-  private readonly logger = new Logger(VideoTranscoderProcessor.name);
-
   constructor(
     private readonly s3Service: S3Service,
     private readonly hls: HlsTranscoder,
@@ -48,6 +47,8 @@ export class VideoTranscoderProcessor extends WorkerHost {
     super();
   }
 
+  @JobContext()
+  @Logged({ failedLevel: abortIsWarning })
   async process(job: Job<TranscodeVideoJob>) {
     const { type, id } = job.data;
     const jobId = job.id;
@@ -65,24 +66,22 @@ export class VideoTranscoderProcessor extends WorkerHost {
 
         await this.state.updateStatus(id, type, TranscodingStatus.COMPLETED);
         await this.state.updateProgress(id, type, 100);
-        this.logger.log(`Job ${jobId} finished successfully.`);
         stop({ outcome: "success" });
         return { result: "success" };
       } catch (error) {
         if (error instanceof TranscodeAbortedError) {
-          this.logger.warn(`Job ${jobId} aborted: ${error.message}`);
           stop({ outcome: "aborted" });
           return { result: "aborted" };
         }
 
         await this.state.updateStatus(id, type, TranscodingStatus.FAILED);
-        logJobFailure(this.logger, `Job ${jobId}`, error);
         stop({ outcome: "failed" });
         throw error;
       }
     });
   }
 
+  @Logged({ failedLevel: abortIsWarning })
   private async transcode(id: string, type: VideoType, inputPath: string, outputDir: string) {
     await this.state.ensureExists(id, type);
     const uploadTo = await resolveVideoPath(this.prisma, id, type);
@@ -91,27 +90,28 @@ export class VideoTranscoderProcessor extends WorkerHost {
 
     const sourceWidth = await this.hls.probeWidth(inputPath);
 
-    this.logger.log(`Starting HLS Transcoding for ${id}`);
     await this.hls.run({
       input: inputPath,
       outputDir,
       sourceWidth,
-      onProgress: (percent) =>
-        void this.state
-          .updateProgress(id, type, percent)
-          .catch((err: unknown) =>
-            this.logger.error(
-              `Failed to update progress: ${err instanceof Error ? err.message : String(err)}`,
-            ),
-          ),
+      onProgress: (percent) => void this.reportProgress(id, type, percent),
       shouldAbort: async () => !(await this.state.exists(id, type)),
     });
 
     await this.upload(id, type, uploadTo, outputDir);
   }
 
+  @Logged({ completedLevel: "debug" })
+  private async reportProgress(id: string, type: VideoType, percent: number): Promise<void> {
+    try {
+      await this.state.updateProgress(id, type, percent);
+    } catch {
+      // @Logged has already logged this failure
+    }
+  }
+
+  @Logged({ failedLevel: abortIsWarning })
   private async download(key: string, writePath: string) {
-    this.logger.log(`Downloading ${key} to ${writePath}`);
     let downloadStream: Readable;
     try {
       downloadStream = await this.s3Service.get(key, BucketType.RAW);
@@ -134,9 +134,9 @@ export class VideoTranscoderProcessor extends WorkerHost {
     });
   }
 
+  @Logged({ failedLevel: abortIsWarning })
   private async upload(id: string, type: VideoType, key: string, outputDir: string) {
     await this.state.ensureExists(id, type);
-    this.logger.log(`Uploading processed files to Object DB...`);
     const files = (await fs.readdir(outputDir, { recursive: true })) as string[];
 
     await pMap(

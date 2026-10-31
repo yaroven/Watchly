@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
+import { Logged } from "../../decorators/logged.decorator";
 import { PrismaService } from "../prisma/prisma.service";
 import titleQuery, { EngagementRelations } from "../title/utils/title.query";
 import { VoteStateService } from "../vote-cache/vote-state.service";
@@ -18,6 +19,7 @@ export class TitleEngagementService {
     private readonly voteState: VoteStateService,
   ) {}
 
+  @Logged()
   async rate(titleId: string, userId: string, score: number): Promise<TitleEngagementView> {
     return this.prisma.$transaction(async (tx) => {
       await tx.titleRating.upsert({
@@ -31,6 +33,7 @@ export class TitleEngagementService {
     });
   }
 
+  @Logged()
   async removeRating(titleId: string, userId: string): Promise<TitleEngagementView> {
     return this.prisma.$transaction(async (tx) => {
       const deleted = await tx.titleRating.deleteMany({ where: { titleId, userId } });
@@ -43,10 +46,12 @@ export class TitleEngagementService {
     });
   }
 
+  @Logged()
   async getEngagement(titleId: string, viewerId: string | null): Promise<TitleEngagementView> {
     return this.readEngagement(this.prisma, titleId, viewerId);
   }
 
+  @Logged()
   async readEngagement(
     client: EngagementClient,
     titleId: string,
@@ -64,12 +69,14 @@ export class TitleEngagementService {
     return titleEngagementViewFromRelations(rows, viewerId, votes.get(titleId));
   }
 
+  @Logged()
   async recomputeWatchlistCounts(client: EngagementClient, titleId: string): Promise<void> {
     const watchlistCount = await client.watchlistItem.count({ where: { titleId } });
 
     await this.writeCounts(client, titleId, { watchlistCount });
   }
 
+  @Logged()
   private async recomputeRatingCounts(client: EngagementClient, titleId: string): Promise<void> {
     const { _avg, _count } = await client.titleRating.aggregate({
       where: { titleId },
@@ -83,6 +90,7 @@ export class TitleEngagementService {
     });
   }
 
+  @Logged()
   private async writeCounts(
     client: EngagementClient,
     titleId: string,

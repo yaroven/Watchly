@@ -3,7 +3,7 @@ import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
-import { Logger } from "nestjs-pino";
+import { Logger, LoggerErrorInterceptor } from "nestjs-pino";
 import { collectDefaultMetrics } from "prom-client";
 import { AppModule } from "./app/app.module";
 import { DEV_DEFAULTS } from "./common/dev-defaults.const";
@@ -29,6 +29,7 @@ async function bootstrap() {
   app.use(cookieParser());
 
   app.useLogger(app.get(Logger));
+  app.useGlobalInterceptors(new LoggerErrorInterceptor());
 
   app.use(helmet());
 

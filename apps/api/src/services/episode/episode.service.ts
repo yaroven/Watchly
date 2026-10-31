@@ -1,7 +1,8 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { Filter, Sorting } from "../../common/pagination/pagination.types";
 import { buildOrderBy, buildWhere } from "../../common/pagination/prisma-query.util";
+import { Logged } from "../../decorators/logged.decorator";
 import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { VideoType } from "../queues/video-transcoder/enums/video-type.enum";
@@ -12,13 +13,12 @@ import { getEpisodeTitleAndSeasonId } from "./utils/episode-path.util";
 
 @Injectable()
 export class EpisodeService {
-  private readonly logger = new Logger(EpisodeService.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly mediaAssetService: MediaAssetService,
   ) {}
 
+  @Logged()
   async create(data: EpisodeInput): Promise<EpisodeView> {
     try {
       const episode = await this.prisma.episode.create({ data });
@@ -38,6 +38,7 @@ export class EpisodeService {
     }
   }
 
+  @Logged()
   async findAll(filters: Filter[] = [], sort?: Sorting): Promise<EpisodeView[]> {
     const where = buildWhere(filters) as Prisma.EpisodeWhereInput;
     const orderBy = (buildOrderBy(sort) ?? {
@@ -48,6 +49,7 @@ export class EpisodeService {
     return episodes.map(toEpisodeView);
   }
 
+  @Logged()
   async findOneDetailed(id: string) {
     return this.prisma.episode.findUnique({
       where: { id },
@@ -55,11 +57,13 @@ export class EpisodeService {
     });
   }
 
+  @Logged()
   async findOne(id: string): Promise<EpisodeView | null> {
     const episode = await this.prisma.episode.findUnique({ where: { id } });
     return episode ? toEpisodeView(episode) : null;
   }
 
+  @Logged()
   async update(id: string, data: EpisodeUpdate): Promise<EpisodeView> {
     const episode = await this.findOne(id);
     if (!episode) throw new NotFoundException(`Episode with id ${id} not found`);
@@ -90,6 +94,7 @@ export class EpisodeService {
     }
   }
 
+  @Logged()
   async delete(id: string): Promise<EpisodeView> {
     const episode = await this.findOneDetailed(id);
     if (!episode) throw new NotFoundException(`Episode with id ${id} not found`);
@@ -107,6 +112,7 @@ export class EpisodeService {
     return toEpisodeView(deleted);
   }
 
+  @Logged()
   async getStreamUrl(id: string): Promise<{ url: string }> {
     const episode = await this.findOneDetailed(id);
 

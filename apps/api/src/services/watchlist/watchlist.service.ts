@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { Logged } from "../../decorators/logged.decorator";
 import { PrismaService } from "../prisma/prisma.service";
 import { TitleEngagementService } from "../title-engagement/title-engagement.service";
 import { TitleEngagementView } from "../title-engagement/title-engagement.types";
@@ -16,6 +17,7 @@ export class WatchlistService {
     private readonly engagementService: TitleEngagementService,
   ) {}
 
+  @Logged()
   async add(titleId: string, userId: string): Promise<TitleEngagementView> {
     return this.prisma.$transaction(async (tx) => {
       await tx.watchlistItem.upsert({
@@ -29,6 +31,7 @@ export class WatchlistService {
     });
   }
 
+  @Logged()
   async remove(titleId: string, userId: string): Promise<TitleEngagementView> {
     return this.prisma.$transaction(async (tx) => {
       await tx.watchlistItem.deleteMany({ where: { userId, titleId } });
@@ -37,6 +40,7 @@ export class WatchlistService {
     });
   }
 
+  @Logged()
   async findAll(
     viewerId: string,
     { page = 1, limit = 10 }: { page?: number; limit?: number },
@@ -62,6 +66,7 @@ export class WatchlistService {
     };
   }
 
+  @Logged()
   private async findTitleIds(
     userId: string,
     page: { page?: number; limit?: number },

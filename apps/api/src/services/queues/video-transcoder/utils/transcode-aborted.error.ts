@@ -11,3 +11,6 @@ export class TranscodeAbortedError extends Error {
     this.name = "TranscodeAbortedError";
   }
 }
+
+export const abortIsWarning = (error: unknown): "warn" | "error" =>
+  error instanceof TranscodeAbortedError ? "warn" : "error";
