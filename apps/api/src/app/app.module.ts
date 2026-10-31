@@ -30,6 +30,7 @@ import { VoteDriftMetricsService } from "../services/metrics/vote-drift-metrics.
 import { PrismaModule } from "../services/prisma/prisma.module";
 import { IMAGE_TRANSCODE_QUEUE_OPTIONS } from "../services/queues/image-transcoder/image-transcode-queue.options";
 import { ImageTranscoderModule } from "../services/queues/image-transcoder/image-transcoder.module";
+import { ReactionDriftModule } from "../services/queues/reaction-flush/reaction-drift.module";
 import { REACTION_FLUSH_QUEUE_OPTIONS } from "../services/queues/reaction-flush/reaction-flush-queue.options";
 import { ReactionFlushModule } from "../services/queues/reaction-flush/reaction-flush.module";
 import { VIDEO_TRANSCODE_QUEUE_OPTIONS } from "../services/queues/video-transcoder/video-transcode-queue.options";
@@ -114,6 +115,7 @@ import { WatchlistEndpointModule } from "./endpoints/watchlist/watchlist.module"
     FeatureFlagsModule,
     ReactionsModule,
     ReactionFlushModule,
+    ReactionDriftModule,
     RedisModule,
   ],
   controllers: [AppController, MetricsController],

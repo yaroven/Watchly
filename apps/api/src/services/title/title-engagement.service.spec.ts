@@ -2,6 +2,7 @@ import { NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { ReactionType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { RedisService } from "../redis/redis.service";
 import { VoteStateService } from "../vote-cache/vote-state.service";
 import { TitleEngagementService } from "./title-engagement.service";
 
@@ -76,9 +77,10 @@ describe("TitleEngagementService", () => {
       providers: [
         TitleEngagementService,
         { provide: PrismaService, useValue: prismaMock },
+        VoteStateService,
         {
-          provide: VoteStateService,
-          useValue: { forTitles: jest.fn().mockResolvedValue(new Map()) },
+          provide: RedisService,
+          useValue: { mget: jest.fn((keys: string[]) => Promise.resolve(keys.map(() => null))) },
         },
       ],
     }).compile();

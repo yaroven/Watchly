@@ -222,8 +222,10 @@ still processing is client work that has not been done.
   `rowVote`, a write wants it only to report a count); and **the cache is never asked for a count** — that is what lets
   it answer about one viewer without ever being complete.
 - **`myReaction` on a read comes from the cache; the counts beside it do not.** A read asks `VoteStateService.forTitles`
-  or `forComments` for the whole page — one `MGET` — and hands each answer to the DTO, which settles it with `resolveVote`: a **present**
-  entry wins over the `reactions` relation and an **absent** one falls back to it. Both halves matter, and the rule
+  or `forComments` for the whole page — one `MGET` — handing it each subject together with the `reactions` relation the
+  read already loaded, and gets back the vote to render: `resolveVote` settles it there, and nowhere else, so a mapper
+  only ever sees the final answer. A **present** cache entry wins over the relation and an **absent** one falls back to
+  it. Both halves matter, and the rule
   lives in one function because getting it backwards is silent: the relation is what the last flush left behind, so
   preferring it renders a vote the viewer's next request contradicts, while a cache miss has a free and correct answer
   already loaded. `readMany` under it is also the one place a Redis failure is swallowed — reads degrade to the
@@ -283,8 +285,9 @@ still processing is client work that has not been done.
   `image_size_ratio` — the metrics register themselves on import — but those numbers have no reader until the worker
   gets a listener of its own.
   - So anything the worker learns that the api should publish goes **through Redis**, like queue depth does.
-    `ReactionReconciler` leaves its repair count under
-    `reactions:drift:<arc>` and `VoteDriftMetricsService` samples it at scrape time. That number is the only evidence
+    `ReactionReconciler` publishes its repair count through `ReactionDriftService` and `VoteDriftMetricsService` reads
+    it back through the same service at scrape time; the key (`reactions:drift:<arc>`) and its parsing live there
+    and nowhere else. That number is the only evidence
     that "drift is rare and self-healing" — the assumption the whole vote cache rests on — is actually true.
   - `bullmq_queue_jobs` samples `completed` for the same reason: the flush processor runs in the worker, so the
     queue's own counts in Redis are how the api can see that votes are landing at all.

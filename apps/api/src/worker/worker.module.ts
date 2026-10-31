@@ -22,6 +22,7 @@ import { PrismaModule } from "../services/prisma/prisma.module";
 import { IMAGE_TRANSCODE_QUEUE_OPTIONS } from "../services/queues/image-transcoder/image-transcode-queue.options";
 import { ImageTranscoderProcessor } from "../services/queues/image-transcoder/image-transcoder.processor";
 import { ImageTranscoderService } from "../services/queues/image-transcoder/image-transcoder.service";
+import { ReactionDriftModule } from "../services/queues/reaction-flush/reaction-drift.module";
 import { ReactionFlushModule } from "../services/queues/reaction-flush/reaction-flush.module";
 import { ReactionFlushProcessor } from "../services/queues/reaction-flush/reaction-flush.processor";
 import { ReactionReconcileSchedule } from "../services/queues/reaction-flush/reaction-reconcile-schedule.service";
@@ -54,6 +55,7 @@ import { VoteCacheModule } from "../services/vote-cache/vote-cache.module";
     S3Module,
     PrismaModule,
     ReactionFlushModule,
+    ReactionDriftModule,
     ReactionModule,
     VoteCacheModule,
     RedisModule,

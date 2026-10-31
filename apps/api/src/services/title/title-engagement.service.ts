@@ -87,9 +87,12 @@ export class TitleEngagementService {
 
     if (!rows) throw new NotFoundException(`Title with id ${titleId} not found`);
 
-    const votes = await this.voteState.forTitles([{ id: titleId }], viewerId);
+    const votes = await this.voteState.forTitles(
+      [{ id: titleId, reactions: rows.reactions }],
+      viewerId,
+    );
 
-    return titleEngagementViewFromRelations(rows, viewerId, votes.get(titleId));
+    return titleEngagementViewFromRelations(rows, viewerId, votes.get(titleId) ?? null);
   }
 
   @Logged()

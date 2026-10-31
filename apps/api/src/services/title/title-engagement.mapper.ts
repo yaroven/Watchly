@@ -1,5 +1,5 @@
 import { countsOf, NO_COUNTS } from "../engagement/engagement-counters.service";
-import { resolveVote, Vote } from "../reaction/utils/vote.util";
+import { Vote } from "../reaction/utils/vote.util";
 import {
   TitleEngagementCounts,
   TitleEngagementView,
@@ -34,7 +34,7 @@ export const emptyTitleEngagementView = (
 export const titleEngagementViewFromRelations = (
   rows: EngagementRelations,
   viewerId: string | null,
-  myReaction?: Vote,
+  myReaction: Vote,
 ): TitleEngagementView => {
   const counts: TitleEngagementCounts = {
     ...NO_ENGAGEMENT,
@@ -53,7 +53,7 @@ export const titleEngagementViewFromRelations = (
     viewerId
       ? {
           score: rows.ratings?.[0]?.score ?? null,
-          reaction: resolveVote(myReaction, rows.reactions?.[0]?.type ?? null),
+          reaction: myReaction,
           inWatchlist: (rows.watchlistEntries?.length ?? 0) > 0,
         }
       : null,

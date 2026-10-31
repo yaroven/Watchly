@@ -7,7 +7,7 @@ import { Logged } from "../../decorators/logged.decorator";
 import { ImageService } from "../image/image.service";
 import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { NO_VOTE_OVERRIDES, VoteOverrides } from "../vote-cache/vote-cache.const";
+import { ViewerVotes } from "../vote-cache/vote-cache.const";
 import { VoteStateService } from "../vote-cache/vote-state.service";
 import { titleEngagementViewFromRelations } from "./title-engagement.mapper";
 import { titleViewWithoutEngagement, toTitleView } from "./title.mapper";
@@ -160,11 +160,11 @@ export class TitleService {
   private toView(
     title: TitleWithEngagement,
     viewerId: string | null,
-    votes: VoteOverrides = NO_VOTE_OVERRIDES,
+    votes: ViewerVotes,
   ): TitleView {
     return toTitleView(
       title,
-      titleEngagementViewFromRelations(title, viewerId, votes.get(title.id)),
+      titleEngagementViewFromRelations(title, viewerId, votes.get(title.id) ?? null),
       this.imageService.toPublicUrl(title.posterKey),
     );
   }

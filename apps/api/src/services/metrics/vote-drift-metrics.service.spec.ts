@@ -1,5 +1,6 @@
 import { Test } from "@nestjs/testing";
 import { register } from "prom-client";
+import { ReactionDriftService } from "../queues/reaction-flush/reaction-drift.service";
 import { RedisService } from "../redis/redis.service";
 import { VoteDriftMetricsService } from "./vote-drift-metrics.service";
 
@@ -20,7 +21,11 @@ describe("VoteDriftMetricsService", () => {
     redis = { mget: jest.fn().mockResolvedValue([null, null]) };
 
     await Test.createTestingModule({
-      providers: [VoteDriftMetricsService, { provide: RedisService, useValue: redis }],
+      providers: [
+        VoteDriftMetricsService,
+        ReactionDriftService,
+        { provide: RedisService, useValue: redis },
+      ],
     }).compile();
   });
 

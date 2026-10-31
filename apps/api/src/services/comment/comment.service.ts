@@ -86,7 +86,7 @@ export class CommentService {
     const votes = await this.voteState.forComments([...roots, ...replies], viewerId);
 
     const viewOf = (comment: CommentWithAuthor, nested: CommentView[] = []) =>
-      this.toView(comment, { replies: nested, myReaction: votes.get(comment.id) });
+      this.toView(comment, { replies: nested, myReaction: votes.get(comment.id) ?? null });
 
     const repliesByParent = new Map<string, CommentView[]>();
     for (const reply of replies) {
@@ -171,7 +171,9 @@ export class CommentService {
     const votes = await this.voteState.forComments(replies, viewerId);
 
     return {
-      items: replies.map((reply) => this.toView(reply, { myReaction: votes.get(reply.id) })),
+      items: replies.map((reply) =>
+        this.toView(reply, { myReaction: votes.get(reply.id) ?? null }),
+      ),
       totalCount,
     };
   }
