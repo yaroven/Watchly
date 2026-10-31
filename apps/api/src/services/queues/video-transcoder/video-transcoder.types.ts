@@ -3,6 +3,7 @@ import { VideoType } from "./enums/video-type.enum";
 export interface TranscodeVideoJob {
   id: string;
   type: VideoType;
+  rawKey: string;
 }
 
 export interface VideoTranscodingProgressView {

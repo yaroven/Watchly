@@ -37,7 +37,7 @@ describe("EpisodeService", () => {
             abortUpload: jest.fn(),
             scheduleTranscode: jest.fn(),
             getPlaybackUrl: jest.fn(),
-            cleanupVideoAsset: jest.fn(),
+            cleanupEpisode: jest.fn(),
           },
         },
       ],
@@ -247,16 +247,16 @@ describe("EpisodeService", () => {
           season: { titleId: "title-1" },
         };
         (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(episode);
-        (mediaAssetServiceMock.cleanupVideoAsset as jest.Mock).mockResolvedValue(undefined);
+        (mediaAssetServiceMock.cleanupEpisode as jest.Mock).mockResolvedValue(undefined);
         (prismaMock.episode.delete as jest.Mock).mockResolvedValue(episode);
 
         const result = await service.delete("episode-1");
 
-        expect(mediaAssetServiceMock.cleanupVideoAsset).toHaveBeenCalledWith(
-          "episode-1",
-          VideoType.EPISODE,
-          "videos/title-1/season-1/episode-1/",
-        );
+        expect(mediaAssetServiceMock.cleanupEpisode).toHaveBeenCalledWith({
+          id: "episode-1",
+          seasonId: "season-1",
+          titleId: "title-1",
+        });
         expect(prismaMock.episode.delete).toHaveBeenCalledWith({ where: { id: "episode-1" } });
         expect(result).toEqual({ id: episode.id, seasonId: episode.seasonId });
       });
