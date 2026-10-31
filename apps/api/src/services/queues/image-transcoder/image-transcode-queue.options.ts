@@ -1,6 +1,6 @@
 import { RegisterQueueOptions } from "@nestjs/bullmq";
+import { ImageKind } from "../../image/enums/image-kind.enum";
 import { DEFAULT_JOB_OPTIONS } from "../utils/job-queue.const";
-import { ImageKind } from "./image-profile.const";
 
 export const IMAGE_TRANSCODE_QUEUE_NAME = "image-transcode";
 export const IMAGE_TRANSCODE_JOB_NAME = "transcode-image";

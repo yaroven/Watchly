@@ -3,7 +3,7 @@ import { stat } from "node:fs/promises";
 import { Logged } from "../../../decorators/logged.decorator";
 import { FfmpegRunner } from "../../ffmpeg/ffmpeg.runner";
 import { FfmpegJob } from "../../ffmpeg/ffmpeg.types";
-import { ImageProfile } from "./image-profile.const";
+import { ImageProfile } from "../../image/image.types";
 
 @Injectable()
 export class ImageTranscoderService {

@@ -2,13 +2,13 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { Job } from "bullmq";
 import { writeFile } from "node:fs/promises";
 import { Readable } from "node:stream";
+import { ImageKind } from "../../image/enums/image-kind.enum";
+import { ImageService } from "../../image/image.service";
 import BucketType from "../../s3/enums/bucket-type.enum";
 import { S3Service } from "../../s3/s3.service";
-import { ImageKind } from "./image-profile.const";
 import { TranscodeImageJob } from "./image-transcode-queue.options";
 import { ImageTranscoderProcessor } from "./image-transcoder.processor";
 import { ImageTranscoderService } from "./image-transcoder.service";
-import { IMAGE_ATTACHERS, ProcessedImageAttacher } from "./processed-image-attacher";
 
 describe("ImageTranscoderProcessor", () => {
   const ownerId = "44444444-4444-4444-8444-444444444444";
@@ -21,7 +21,7 @@ describe("ImageTranscoderProcessor", () => {
     assertDecodable: jest.Mock;
     assertWithinSizeLimit: jest.Mock;
   };
-  let attacher: ProcessedImageAttacher & { attach: jest.Mock; buildKey: jest.Mock };
+  let images: { attachProcessed: jest.Mock; buildProcessedKey: jest.Mock };
 
   const job = (overrides: Partial<Job<TranscodeImageJob>> = {}): Job<TranscodeImageJob> =>
     ({
@@ -32,13 +32,13 @@ describe("ImageTranscoderProcessor", () => {
       ...overrides,
     }) as unknown as Job<TranscodeImageJob>;
 
-  const build = async (attachers: ProcessedImageAttacher[]) => {
+  const build = async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ImageTranscoderProcessor,
         { provide: S3Service, useValue: s3Mock },
         { provide: ImageTranscoderService, useValue: transcoderMock },
-        { provide: IMAGE_ATTACHERS, useValue: attachers },
+        { provide: ImageService, useValue: images },
       ],
     }).compile();
 
@@ -56,18 +56,19 @@ describe("ImageTranscoderProcessor", () => {
       assertDecodable: jest.fn().mockResolvedValue(undefined),
       assertWithinSizeLimit: jest.fn().mockResolvedValue(undefined),
     };
-    attacher = {
-      kind: ImageKind.USER_AVATAR,
-      buildKey: jest.fn((id: string, version: string) => `avatars/${id}/${version}.webp`),
-      attach: jest.fn().mockResolvedValue(undefined),
+    images = {
+      buildProcessedKey: jest.fn(
+        (_kind: ImageKind, id: string, version: string) => `avatars/${id}/${version}.webp`,
+      ),
+      attachProcessed: jest.fn().mockResolvedValue(undefined),
     };
 
-    processor = await build([attacher]);
+    processor = await build();
   });
 
   afterEach(() => jest.clearAllMocks());
 
-  it("should convert, upload under the attacher's key and attach it", async () => {
+  it("should convert, upload under the image module's key and attach it", async () => {
     const result = await processor.process(job());
 
     expect(transcoderMock.convert).toHaveBeenCalled();
@@ -77,16 +78,13 @@ describe("ImageTranscoderProcessor", () => {
       expect.anything(),
       "image/webp",
     );
-    expect(attacher.attach).toHaveBeenCalledWith(ownerId, `avatars/${ownerId}/one.webp`);
+    expect(images.buildProcessedKey).toHaveBeenCalledWith(ImageKind.USER_AVATAR, ownerId, "one");
+    expect(images.attachProcessed).toHaveBeenCalledWith(
+      ImageKind.USER_AVATAR,
+      ownerId,
+      `avatars/${ownerId}/one.webp`,
+    );
     expect(result).toEqual({ key: `avatars/${ownerId}/one.webp` });
-  });
-
-  it("should refuse a kind that nobody registered", async () => {
-    processor = await build([]);
-
-    await expect(processor.process(job())).rejects.toThrow("No attacher registered");
-    expect(transcoderMock.convert).not.toHaveBeenCalled();
-    expect(s3Mock.uploadStream).not.toHaveBeenCalled();
   });
 
   it("should delete the original once it has been processed", async () => {
@@ -110,7 +108,7 @@ describe("ImageTranscoderProcessor", () => {
   });
 
   it("should delete an upload that was never attached when the last attempt fails", async () => {
-    attacher.attach.mockRejectedValue(new Error("gone"));
+    images.attachProcessed.mockRejectedValue(new Error("gone"));
 
     await expect(processor.process(job({ attemptsMade: 3 }))).rejects.toThrow("gone");
     expect(s3Mock.deleteObject).toHaveBeenCalledWith(

@@ -1,10 +1,11 @@
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { PrismaService } from "../prisma/prisma.service";
-import { ImageKind, imageProfile } from "../queues/image-transcoder/image-profile.const";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
+import { ImageKind } from "./enums/image-kind.enum";
 import { ImageService } from "./image.service";
+import { imageProfile } from "./utils/image-target.const";
 
 describe("ImageService", () => {
   const OWNER = "11111111-1111-4111-8111-111111111111";

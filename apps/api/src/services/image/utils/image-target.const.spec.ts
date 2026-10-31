@@ -1,6 +1,6 @@
 import { videoTypeOfRawKind } from "../../media-asset/utils/video-location.util";
-import { ImageKind } from "../../queues/image-transcoder/image-profile.const";
 import { RawObjectKind } from "../../s3/raw-key";
+import { ImageKind } from "../enums/image-kind.enum";
 import { imageKindOfRawKind } from "./image-target.const";
 
 describe("image targets by raw kind", () => {

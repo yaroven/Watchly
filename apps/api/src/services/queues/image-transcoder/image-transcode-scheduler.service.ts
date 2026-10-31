@@ -2,7 +2,7 @@ import { InjectQueue } from "@nestjs/bullmq";
 import { Injectable } from "@nestjs/common";
 import { Queue } from "bullmq";
 import { Logged } from "../../../decorators/logged.decorator";
-import { ImageKind } from "./image-profile.const";
+import { ImageKind } from "../../image/enums/image-kind.enum";
 import {
   IMAGE_TRANSCODE_JOB_NAME,
   IMAGE_TRANSCODE_QUEUE_NAME,

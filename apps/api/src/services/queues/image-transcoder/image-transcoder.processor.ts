@@ -1,5 +1,4 @@
 import { Processor, WorkerHost } from "@nestjs/bullmq";
-import { Inject } from "@nestjs/common";
 import { Job } from "bullmq";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
@@ -7,14 +6,14 @@ import path from "node:path";
 import { Histogram } from "prom-client";
 import { JobContext } from "../../../decorators/job-context.decorator";
 import { Logged } from "../../../decorators/logged.decorator";
+import { ImageService } from "../../image/image.service";
+import { imageProfile } from "../../image/utils/image-target.const";
 import BucketType from "../../s3/enums/bucket-type.enum";
 import { S3Service } from "../../s3/s3.service";
 import streamToFile from "../utils/stream-to-file.util";
 import withWorkDir from "../utils/work-dir.util";
-import { imageProfile } from "./image-profile.const";
 import { IMAGE_TRANSCODE_QUEUE_NAME, TranscodeImageJob } from "./image-transcode-queue.options";
 import { ImageTranscoderService } from "./image-transcoder.service";
-import { IMAGE_ATTACHERS, ProcessedImageAttacher } from "./processed-image-attacher";
 
 const duration = new Histogram({
   name: "image_transcode_duration_seconds",
@@ -35,15 +34,12 @@ const sizeRatio = new Histogram({
   concurrency: Number(process.env.IMAGE_TRANSCODE_CONCURRENCY) || 4,
 })
 export class ImageTranscoderProcessor extends WorkerHost {
-  private readonly attachers: Map<string, ProcessedImageAttacher>;
-
   constructor(
     private readonly s3Service: S3Service,
     private readonly transcoder: ImageTranscoderService,
-    @Inject(IMAGE_ATTACHERS) attachers: ProcessedImageAttacher[],
+    private readonly images: ImageService,
   ) {
     super();
-    this.attachers = new Map(attachers.map((attacher) => [attacher.kind, attacher]));
   }
 
   @JobContext()
@@ -56,13 +52,7 @@ export class ImageTranscoderProcessor extends WorkerHost {
   private async convert(job: Job<TranscodeImageJob>, workDir: string): Promise<{ key: string }> {
     const { kind, ownerId, rawKey } = job.data;
     const profile = imageProfile(kind);
-    const attacher = this.attachers.get(kind);
     const stop = duration.startTimer({ kind });
-
-    if (!attacher) {
-      stop({ outcome: "failed" });
-      throw new Error(`No attacher registered for image kind ${kind}`);
-    }
 
     let uploadedKey: string | undefined;
 
@@ -75,7 +65,7 @@ export class ImageTranscoderProcessor extends WorkerHost {
       await this.transcoder.assertDecodable(originalPath);
       await this.transcoder.convert(originalPath, convertedPath, profile);
 
-      const key = attacher.buildKey(ownerId, path.basename(rawKey));
+      const key = this.images.buildProcessedKey(kind, ownerId, path.basename(rawKey));
       await this.s3Service.uploadStream(
         BucketType.PROCESSED,
         key,
@@ -84,7 +74,7 @@ export class ImageTranscoderProcessor extends WorkerHost {
       );
       uploadedKey = key;
 
-      await attacher.attach(ownerId, key);
+      await this.images.attachProcessed(kind, ownerId, key);
 
       await this.measure(kind, originalPath, convertedPath);
 

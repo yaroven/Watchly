@@ -4,9 +4,9 @@ import request from "supertest";
 import { JwtAuthGuard } from "../../../guards/jwt-auth.guard";
 import { RolesGuard } from "../../../guards/roles.guard";
 import { ArtistExistsPipe } from "../../../services/artist/utils/artist-exists.pipe";
+import { ImageKind } from "../../../services/image/enums/image-kind.enum";
 import { ImageService } from "../../../services/image/image.service";
 import { PrismaService } from "../../../services/prisma/prisma.service";
-import { ImageKind } from "../../../services/queues/image-transcoder/image-profile.const";
 import { SeasonExistsPipe } from "../../../services/season/utils/season-exists.pipe";
 import { TitleExistsPipe } from "../../../services/title/utils/title-exists.pipe";
 import {

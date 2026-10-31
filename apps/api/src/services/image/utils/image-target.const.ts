@@ -1,10 +1,12 @@
 import { PrismaService } from "../../prisma/prisma.service";
-import { ImageKind } from "../../queues/image-transcoder/image-profile.const";
 import { RawObjectKind } from "../../s3/raw-key";
+import { ImageKind } from "../enums/image-kind.enum";
+import { ImageProfile } from "../image.types";
 
 export type ImageClient = Pick<PrismaService, "title" | "season" | "artist" | "user">;
 
 export interface ImageTarget {
+  profile: ImageProfile;
   rawKind: RawObjectKind;
   label: string;
   processedKey(ownerId: string, version: string): string;
@@ -12,8 +14,20 @@ export interface ImageTarget {
   write(client: ImageClient, ownerId: string, key: string | null): Promise<void>;
 }
 
+export const IMAGE_UPLOAD_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+
+const POSTER_ASPECT = { width: 600, height: 900 } as const;
+
 export const IMAGE_TARGETS: Record<ImageKind, ImageTarget> = {
   [ImageKind.TITLE_POSTER]: {
+    profile: {
+      ...POSTER_ASPECT,
+      format: "webp",
+      quality: 82,
+      contentType: "image/webp",
+      maxUploadBytes: 15 * 1024 * 1024,
+      allowedUploadTypes: IMAGE_UPLOAD_TYPES,
+    },
     rawKind: RawObjectKind.TITLE_POSTER,
     label: "Title",
     processedKey: (ownerId, version) => `posters/titles/${ownerId}/${version}.webp`,
@@ -26,6 +40,14 @@ export const IMAGE_TARGETS: Record<ImageKind, ImageTarget> = {
     },
   },
   [ImageKind.SEASON_POSTER]: {
+    profile: {
+      ...POSTER_ASPECT,
+      format: "webp",
+      quality: 82,
+      contentType: "image/webp",
+      maxUploadBytes: 15 * 1024 * 1024,
+      allowedUploadTypes: IMAGE_UPLOAD_TYPES,
+    },
     rawKind: RawObjectKind.SEASON_POSTER,
     label: "Season",
     processedKey: (ownerId, version) => `posters/seasons/${ownerId}/${version}.webp`,
@@ -38,6 +60,15 @@ export const IMAGE_TARGETS: Record<ImageKind, ImageTarget> = {
     },
   },
   [ImageKind.ARTIST_PHOTO]: {
+    profile: {
+      width: 400,
+      height: 600,
+      format: "webp",
+      quality: 82,
+      contentType: "image/webp",
+      maxUploadBytes: 10 * 1024 * 1024,
+      allowedUploadTypes: IMAGE_UPLOAD_TYPES,
+    },
     rawKind: RawObjectKind.ARTIST_PHOTO,
     label: "Artist",
     processedKey: (ownerId, version) => `posters/artists/${ownerId}/${version}.webp`,
@@ -50,6 +81,15 @@ export const IMAGE_TARGETS: Record<ImageKind, ImageTarget> = {
     },
   },
   [ImageKind.USER_AVATAR]: {
+    profile: {
+      width: 256,
+      height: 256,
+      format: "webp",
+      quality: 80,
+      contentType: "image/webp",
+      maxUploadBytes: 10 * 1024 * 1024,
+      allowedUploadTypes: IMAGE_UPLOAD_TYPES,
+    },
     rawKind: RawObjectKind.USER_AVATAR,
     label: "User",
     processedKey: (ownerId, version) => `avatars/${ownerId}/${version}.webp`,
@@ -72,4 +112,8 @@ const IMAGE_KINDS_BY_RAW_KIND = new Map(
 
 export function imageKindOfRawKind(kind: RawObjectKind): ImageKind | undefined {
   return IMAGE_KINDS_BY_RAW_KIND.get(kind);
+}
+
+export function imageProfile(kind: ImageKind): ImageProfile {
+  return IMAGE_TARGETS[kind].profile;
 }
