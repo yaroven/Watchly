@@ -9,6 +9,7 @@ import { TitleEngagementService } from "../../../services/title/title-engagement
 import { TitleService } from "../../../services/title/title.service";
 import { TitleExistsPipe } from "../../../services/title/utils/title-exists.pipe";
 import { TitlesController } from "./titles.controller";
+import { TitlesService } from "./titles.service";
 
 describe("TitlesController (viewer propagation)", () => {
   let app: INestApplication;
@@ -33,6 +34,7 @@ describe("TitlesController (viewer propagation)", () => {
       providers: [
         TitleExistsPipe,
         { provide: TitleService, useValue: titleService },
+        { provide: TitlesService, useValue: titleService },
         { provide: TitleEngagementService, useValue: titleService },
         { provide: MediaAssetService, useValue: {} },
         {

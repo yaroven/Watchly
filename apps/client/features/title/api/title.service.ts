@@ -2,20 +2,32 @@ import { StartMultipartUpload } from "@/shared/api/upload-media";
 import { parseApiDate } from "@/shared/lib/parse-api-date";
 import api from "@shared/api/axios";
 import axios from "axios";
-import { CastCredit, CastCreditInput, CreateTitleDto, ExternalRating, GetAllTitlesDto, Title, UpdateTitleDto } from "../schemas/title";
+import {
+  CardTitle,
+  CastCredit,
+  CastCreditInput,
+  CreateTitleDto,
+  ExternalRating,
+  GetAllTitlesDto,
+  Title,
+  UpdateTitleDto,
+} from "../schemas/title";
 
 const prefix = "titles";
 
-export interface ApiTitle extends Omit<Title, "createdAt" | "updatedAt"> {
+export type ApiOf<T extends CardTitle> = Omit<T, "createdAt" | "updatedAt"> & {
   createdAt: string;
   updatedAt: string;
-}
+};
 
-export const mapTitle = (title: ApiTitle): Title => ({
-  ...title,
-  createdAt: parseApiDate(title.createdAt),
-  updatedAt: parseApiDate(title.updatedAt),
-});
+export type ApiTitle = ApiOf<Title>;
+
+export const mapTitle = <T extends CardTitle = Title>(title: ApiOf<T>): T =>
+  ({
+    ...title,
+    createdAt: parseApiDate(title.createdAt),
+    updatedAt: parseApiDate(title.updatedAt),
+  }) as T;
 
 type TitleCreatePayload = CreateTitleDto;
 type TitleUpdatePayload = UpdateTitleDto;

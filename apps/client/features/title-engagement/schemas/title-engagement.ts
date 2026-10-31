@@ -20,6 +20,10 @@ export interface TitleEngagement extends TitleEngagementCounts {
   viewer: ViewerTitleEngagement | null;
 }
 
+export interface CardTitleEngagement extends TitleEngagementCounts {
+  viewer: Omit<ViewerTitleEngagement, "reaction"> | null;
+}
+
 export interface ReactionResult {
   likes: number;
   dislikes: number;

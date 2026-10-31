@@ -1,7 +1,7 @@
 "use client";
 
 import { useSetTitleWatchlist } from "@/features/title-engagement";
-import { ExternalRatingSource, type Title } from "@/features/title/schemas/title";
+import { type CardTitle, ExternalRatingSource } from "@/features/title/schemas/title";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import { BookmarkBorder as BookmarkBorderIcon, Bookmark as BookmarkIcon, Star as StarIcon } from "@mui/icons-material";
 import Box from "@mui/material/Box";
@@ -12,7 +12,7 @@ import { useViewer } from "@shared/lib/use-viewer";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
-type TitleProps = Pick<Title, "id" | "name" | "posterUrl" | "type" | "genres" | "externalRatings" | "engagement"> & {
+type TitleProps = Pick<CardTitle, "id" | "name" | "posterUrl" | "type" | "genres" | "externalRatings" | "engagement"> & {
   onClick: () => void;
 };
 

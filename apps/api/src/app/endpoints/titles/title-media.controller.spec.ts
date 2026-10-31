@@ -9,7 +9,9 @@ import { VideoType } from "../../../services/queues/video-transcoder/enums/video
 import { TitleEngagementService } from "../../../services/title/title-engagement.service";
 import { TitleService } from "../../../services/title/title.service";
 import { TitleExistsPipe } from "../../../services/title/utils/title-exists.pipe";
+import { VoteStateService } from "../../../services/vote-cache/vote-state.service";
 import { TitlesController } from "./titles.controller";
+import { TitlesService } from "./titles.service";
 
 describe("TitleMediaController", () => {
   const TITLE_ID = "11111111-1111-4111-8111-111111111111";
@@ -33,6 +35,8 @@ describe("TitleMediaController", () => {
       providers: [
         TitleExistsPipe,
         { provide: TitleService, useValue: {} },
+        TitlesService,
+        { provide: VoteStateService, useValue: {} },
         { provide: TitleEngagementService, useValue: {} },
         { provide: MediaAssetService, useValue: mediaAssetService },
         {

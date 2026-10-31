@@ -1,6 +1,8 @@
 import { countsOf, NO_COUNTS } from "../engagement/engagement-counters.service";
 import { Vote } from "../reaction/utils/vote.util";
 import {
+  CardTitleEngagementView,
+  StoredTitleEngagementView,
   TitleEngagementCounts,
   TitleEngagementView,
   ViewerTitleEngagementView,
@@ -14,10 +16,10 @@ const NO_ENGAGEMENT: TitleEngagementCounts = {
   watchlistCount: 0,
 };
 
-export const toTitleEngagementView = (
+export const toTitleEngagementView = <V>(
   counts: TitleEngagementCounts,
-  viewer: ViewerTitleEngagementView | null,
-): TitleEngagementView => ({
+  viewer: V | null,
+): TitleEngagementView<V> => ({
   averageScore: counts.averageScore === null ? null : Math.round(counts.averageScore * 10) / 10,
   ratingCount: counts.ratingCount,
   likes: counts.likes,
@@ -34,8 +36,7 @@ export const emptyTitleEngagementView = (
 export const titleEngagementViewFromRelations = (
   rows: EngagementRelations,
   viewerId: string | null,
-  myReaction: Vote,
-): TitleEngagementView => {
+): StoredTitleEngagementView => {
   const counts: TitleEngagementCounts = {
     ...NO_ENGAGEMENT,
     ...countsOf(rows.counters),
@@ -53,9 +54,23 @@ export const titleEngagementViewFromRelations = (
     viewerId
       ? {
           score: rows.ratings?.[0]?.score ?? null,
-          reaction: myReaction,
+          storedReaction: rows.reactions?.[0]?.type ?? null,
           inWatchlist: (rows.watchlistEntries?.length ?? 0) > 0,
         }
       : null,
   );
 };
+
+export const withVote = (view: StoredTitleEngagementView, vote: Vote): TitleEngagementView => ({
+  ...view,
+  viewer: view.viewer && {
+    score: view.viewer.score,
+    reaction: vote,
+    inWatchlist: view.viewer.inWatchlist,
+  },
+});
+
+export const withoutVote = (view: StoredTitleEngagementView): CardTitleEngagementView => ({
+  ...view,
+  viewer: view.viewer && { score: view.viewer.score, inWatchlist: view.viewer.inWatchlist },
+});

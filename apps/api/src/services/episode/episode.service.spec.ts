@@ -263,37 +263,25 @@ describe("EpisodeService", () => {
     });
   });
 
-  describe("getStreamUrl", () => {
-    describe("should throw NotFoundException", () => {
-      it("if the episode does not exist", async () => {
-        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
+  describe("locate", () => {
+    it("should answer 404 for an episode that does not exist", async () => {
+      (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
 
-        const action = service.getStreamUrl("non-existent");
-
-        await expect(action).rejects.toThrow(NotFoundException);
-      });
+      await expect(service.locate("non-existent")).rejects.toThrow(NotFoundException);
     });
 
-    describe("should return the stream url", () => {
-      it("if the episode exists", async () => {
-        const episode = {
-          id: "episode-1",
-          seasonId: "season-1",
-          season: { titleId: "title-1" },
-        };
-        const url = "stream-url";
-        (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(episode);
-        (mediaAssetServiceMock.getPlaybackUrl as jest.Mock).mockResolvedValue({ url });
+    it("should place the episode under its season and title", async () => {
+      (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue({
+        id: "episode-1",
+        seasonId: "season-1",
+        season: { titleId: "title-1" },
+      });
 
-        const result = await service.getStreamUrl("episode-1");
-
-        expect(mediaAssetServiceMock.getPlaybackUrl).toHaveBeenCalledWith({
-          type: VideoType.EPISODE,
-          titleId: "title-1",
-          seasonId: "season-1",
-          episodeId: "episode-1",
-        });
-        expect(result).toEqual({ url });
+      await expect(service.locate("episode-1")).resolves.toEqual({
+        type: VideoType.EPISODE,
+        titleId: "title-1",
+        seasonId: "season-1",
+        episodeId: "episode-1",
       });
     });
   });

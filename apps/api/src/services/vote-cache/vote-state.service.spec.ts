@@ -94,7 +94,13 @@ describe("VoteStateService", () => {
     it("asks for the whole page in one call", async () => {
       redis.mget.mockResolvedValue(["L", "N"]);
 
-      const votes = await service.forTitles([{ id: titleId }, { id: "other" }], userId);
+      const votes = await service.forTitles(
+        [
+          { id: titleId, storedVote: null },
+          { id: "other", storedVote: null },
+        ],
+        userId,
+      );
 
       expect(redis.mget).toHaveBeenCalledWith([key, `vote:title:other:${userId}`]);
       expect(votes.get(titleId)).toBe(LIKE);
@@ -104,7 +110,7 @@ describe("VoteStateService", () => {
     it("keys a comment on its own arc", async () => {
       redis.mget.mockResolvedValue(["L"]);
 
-      await service.forComments([{ id: "c1" }], userId);
+      await service.forComments([{ id: "c1", storedVote: null }], userId);
 
       expect(redis.mget).toHaveBeenCalledWith([`vote:comment:c1:${userId}`]);
     });
@@ -114,8 +120,8 @@ describe("VoteStateService", () => {
 
       const votes = await service.forTitles(
         [
-          { id: titleId, reactions: [{ type: LIKE }] },
-          { id: "other", reactions: [] },
+          { id: titleId, storedVote: LIKE },
+          { id: "other", storedVote: null },
         ],
         userId,
       );
@@ -127,7 +133,7 @@ describe("VoteStateService", () => {
     it("prefers the cache over the relation when the cache has an answer", async () => {
       redis.mget.mockResolvedValue(["N"]);
 
-      const votes = await service.forTitles([{ id: titleId, reactions: [{ type: LIKE }] }], userId);
+      const votes = await service.forTitles([{ id: titleId, storedVote: LIKE }], userId);
 
       expect(votes.get(titleId)).toBeNull();
     });
@@ -138,7 +144,7 @@ describe("VoteStateService", () => {
     });
 
     it.each([[null], [undefined]])("asks nothing when the viewer is %p", async (viewerId) => {
-      const votes = await service.forTitles([{ id: titleId }], viewerId);
+      const votes = await service.forTitles([{ id: titleId, storedVote: null }], viewerId);
 
       expect(redis.mget).not.toHaveBeenCalled();
       expect(votes.size).toBe(0);
@@ -147,9 +153,9 @@ describe("VoteStateService", () => {
     it("answers from the relation when redis is unreachable", async () => {
       redis.mget.mockRejectedValue(new Error("redis is down"));
 
-      await expect(
-        service.forTitles([{ id: titleId, reactions: [{ type: LIKE }] }], userId),
-      ).resolves.toEqual(new Map([[titleId, LIKE]]));
+      await expect(service.forTitles([{ id: titleId, storedVote: LIKE }], userId)).resolves.toEqual(
+        new Map([[titleId, LIKE]]),
+      );
     });
   });
 });

@@ -1,10 +1,10 @@
-import type { Title } from "@/features/title/schemas/title";
+import type { CardTitle } from "@/features/title/schemas/title";
 import { useViewer } from "@shared/lib/use-viewer";
 import { useQuery, UseQueryOptions } from "@tanstack/react-query";
 import titleEngagementKeys from "./title-engagement.keys";
 import titleEngagementService from "./title-engagement.service";
 
-type WatchlistPage = { items: Title[]; totalCount: number };
+type WatchlistPage = { items: CardTitle[]; totalCount: number };
 
 const useWatchlist = (
   params: { page?: number; limit?: number } = {},

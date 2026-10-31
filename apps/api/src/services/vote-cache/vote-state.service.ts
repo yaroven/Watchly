@@ -51,7 +51,7 @@ export class VoteStateService {
     return new Map(
       subjects.map((subject) => [
         subject.id,
-        resolveVote(cached.get(subject.id), subject.reactions?.[0]?.type ?? null),
+        resolveVote(cached.get(subject.id), subject.storedVote),
       ]),
     );
   }
