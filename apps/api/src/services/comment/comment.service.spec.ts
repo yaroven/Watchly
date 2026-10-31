@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from "@nestjs/common";
+import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { ReactionType, Role } from "@prisma/client";
 import { EngagementCountersService } from "../engagement/engagement-counters.service";
@@ -7,7 +7,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { ReportService } from "../report/report.service";
 import { VoteStateService } from "../vote-cache/vote-state.service";
 import { CommentService } from "./comment.service";
-import { replySubject, titleSubject } from "./utils/comment-subject.const";
+import { titleSubject } from "./utils/comment-subject.const";
 
 describe("CommentService", () => {
   let service: CommentService;
@@ -288,52 +288,68 @@ describe("CommentService", () => {
   });
 
   describe("create", () => {
+    const otherTitleId = "44444444-4444-4444-8444-444444444444";
+
     beforeEach(() => {
       txMock.comment.create.mockResolvedValue(rootComment);
     });
 
-    describe("should throw BadRequestException", () => {
-      it("if replying to a reply, since threads are one level deep", async () => {
-        (prismaMock.comment.findUnique as jest.Mock).mockResolvedValue(
-          replySubject("some-other-comment"),
-        );
+    it("should hang a comment without a parent off the title", async () => {
+      await service.create(titleId, userId, { text: "hi" });
 
-        const action = service.create(replySubject(commentId), userId, { text: "hi" });
-
-        await expect(action).rejects.toThrow(BadRequestException);
-        expect(txMock.comment.create).not.toHaveBeenCalled();
-      });
-
-      it("if the thread the reply resolves to is not the one the caller named", async () => {
-        (prismaMock.comment.findUnique as jest.Mock).mockResolvedValue(
-          titleSubject("44444444-4444-4444-8444-444444444444"),
-        );
-
-        const action = service.create(
-          replySubject(commentId),
-          userId,
-          { text: "hi" },
-          titleSubject(titleId),
-        );
-
-        await expect(action).rejects.toThrow(BadRequestException);
-        expect(txMock.comment.create).not.toHaveBeenCalled();
-      });
+      expect(txMock.comment.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ titleId, userId }) }),
+      );
     });
 
-    describe("should store the spoiler flag", () => {
-      it("instead of leaving the warning to the text", async () => {
-        await service.create(titleSubject(titleId), userId, {
-          text: "the dog dies",
-          hasSpoiler: true,
-        });
+    it("should hang a comment with a parent off that parent", async () => {
+      (prismaMock.comment.findUnique as jest.Mock).mockResolvedValue({ titleId, parentId: null });
 
-        expect(txMock.comment.create).toHaveBeenCalledWith(
-          expect.objectContaining({
-            data: expect.objectContaining({ hasSpoiler: true }),
-          }),
-        );
+      await service.create(titleId, userId, { text: "hi", parentId: commentId });
+
+      const [{ data }] = txMock.comment.create.mock.calls[0] as [{ data: Record<string, unknown> }];
+      expect(data).toMatchObject({ parentId: commentId, userId });
+      expect(data).not.toHaveProperty("titleId");
+    });
+
+    it("should refuse a reply to a reply, since threads are one level deep", async () => {
+      (prismaMock.comment.findUnique as jest.Mock).mockResolvedValue({
+        titleId: null,
+        parentId: "some-other-comment",
       });
+
+      const action = service.create(titleId, userId, { text: "hi", parentId: commentId });
+
+      await expect(action).rejects.toThrow("Replies cannot be replied to");
+      expect(txMock.comment.create).not.toHaveBeenCalled();
+    });
+
+    it("should refuse a reply whose parent belongs to another title", async () => {
+      (prismaMock.comment.findUnique as jest.Mock).mockResolvedValue({
+        titleId: otherTitleId,
+        parentId: null,
+      });
+
+      const action = service.create(titleId, userId, { text: "hi", parentId: commentId });
+
+      await expect(action).rejects.toThrow("That comment belongs to a different thread");
+      expect(txMock.comment.create).not.toHaveBeenCalled();
+    });
+
+    it("should refuse a reply to a parent that is gone", async () => {
+      (prismaMock.comment.findUnique as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        service.create(titleId, userId, { text: "hi", parentId: commentId }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("should store the spoiler flag instead of leaving the warning to the text", async () => {
+      await service.create(titleId, userId, { text: "the dog dies", hasSpoiler: true });
+
+      expect(txMock.comment.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ hasSpoiler: true }) }),
+      );
     });
   });
 

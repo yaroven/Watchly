@@ -25,7 +25,9 @@ import {
   CommentSubject,
   countersSubjectOf,
   replySubject,
+  subjectOfRow,
   subjectWhere,
+  titleSubject,
 } from "./utils/comment-subject.const";
 import commentQuery from "./utils/comment.query";
 
@@ -104,21 +106,17 @@ export class CommentService {
 
   @Logged()
   async create(
-    subject: CommentSubject,
+    titleId: string,
     userId: string,
-    { text, hasSpoiler = false }: CommentInput,
-    expectedThread?: CommentSubject,
+    { text, hasSpoiler = false, parentId }: CommentInput,
   ): Promise<CommentView> {
-    const thread = await this.assertSubjectAcceptsComments(subject);
-
-    if (expectedThread && JSON.stringify(thread) !== JSON.stringify(expectedThread)) {
-      throw new BadRequestException("That comment belongs to a different thread");
-    }
+    const subject = parentId ? replySubject(parentId) : titleSubject(titleId);
+    await this.assertAcceptsCommentsUnder(subject, titleId);
 
     const comment = await this.prisma.$transaction(async (tx) => {
       const created = (await tx.comment.create({
         data: { ...subject, userId, text, hasSpoiler },
-        include: commentQuery.withViewer(userId, titleOf(thread)),
+        include: commentQuery.withViewer(userId, titleId),
       })) as CommentWithAuthor;
 
       const counts = await this.counters.recomputeComments(countersSubjectOf(subject), tx);
@@ -197,9 +195,7 @@ export class CommentService {
       throw new ForbiddenException("You can only delete your own comments");
     }
 
-    const subject: CommentSubject = comment.titleId
-      ? { titleId: comment.titleId }
-      : { parentId: comment.parentId! };
+    const subject = subjectOfRow(comment);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.comment.delete({ where: { id: commentId } });
@@ -250,21 +246,25 @@ export class CommentService {
     });
     if (!comment) throw new NotFoundException(`Comment with id ${commentId} not found`);
 
-    return comment.titleId ? { titleId: comment.titleId } : { parentId: comment.parentId! };
+    return subjectOfRow(comment);
   }
 
   @Logged()
-  private async assertSubjectAcceptsComments(subject: CommentSubject): Promise<CommentSubject> {
+  private async assertAcceptsCommentsUnder(
+    subject: CommentSubject,
+    titleId: string,
+  ): Promise<void> {
     if ("titleId" in subject) {
       await assertTitleExists(this.prisma, subject.titleId);
-      return subject;
+      return;
     }
 
     const parent = await this.readSubjectOf(subject.parentId);
     if (!("titleId" in parent)) {
       throw new BadRequestException("Replies cannot be replied to — reply to the comment instead");
     }
-
-    return parent;
+    if (parent.titleId !== titleId) {
+      throw new BadRequestException("That comment belongs to a different thread");
+    }
   }
 }
