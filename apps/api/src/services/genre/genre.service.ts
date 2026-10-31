@@ -3,6 +3,7 @@ import { Genre, Prisma } from "@prisma/client";
 import { paginate } from "../../common/pagination/paginate.util";
 import { Filter, PageQuery, Sorting } from "../../common/pagination/pagination.types";
 import { buildOrderBy, buildWhere } from "../../common/pagination/prisma-query.util";
+import { Logged } from "../../decorators/logged.decorator";
 import { PrismaService } from "../prisma/prisma.service";
 import { toGenreView } from "./genre.mapper";
 import { GenreInput, GenreView } from "./genre.types";
@@ -11,6 +12,7 @@ import { GenreInput, GenreView } from "./genre.types";
 export class GenreService {
   constructor(private readonly prisma: PrismaService) {}
 
+  @Logged()
   async create(data: GenreInput): Promise<GenreView> {
     try {
       const genre = await this.prisma.genre.create({ data });
@@ -23,6 +25,7 @@ export class GenreService {
     }
   }
 
+  @Logged()
   async findAll(
     { page = 1, limit = 10 }: PageQuery,
     sort?: Sorting,
@@ -47,6 +50,7 @@ export class GenreService {
     return { items: items.map(toGenreView), totalCount };
   }
 
+  @Logged()
   async findOne(id: string): Promise<GenreView | null> {
     const genre = await this.prisma.genre.findUnique({
       where: { id },
@@ -55,6 +59,7 @@ export class GenreService {
     return genre ? toGenreView(genre) : null;
   }
 
+  @Logged()
   async update(id: string, data: GenreInput): Promise<GenreView> {
     try {
       const updated = await this.prisma.genre.update({ where: { id }, data });
@@ -67,6 +72,7 @@ export class GenreService {
     }
   }
 
+  @Logged()
   async delete(id: string): Promise<GenreView> {
     const genre = await this.findOne(id);
     if (!genre) {

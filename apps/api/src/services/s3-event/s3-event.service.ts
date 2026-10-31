@@ -10,6 +10,7 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/commo
 import { ConfigService } from "@nestjs/config";
 import { Counter, Gauge, Histogram } from "prom-client";
 import { S3Config, S3ConfigName } from "../../config/s3.config";
+import { Logged } from "../../decorators/logged.decorator";
 import { PrismaService } from "../prisma/prisma.service";
 import { ImageTranscodeScheduler } from "../queues/image-transcoder/image-transcode-scheduler.service";
 import { VideoType } from "../queues/video-transcoder/enums/video-type.enum";
@@ -110,17 +111,22 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  @Logged()
   async onModuleInit() {
-    if (!this.config.eventsEnabled) {
-      this.logger.log("S3 events disabled — transcodes are scheduled on upload completion instead");
-      return;
-    }
+    if (!this.config.eventsEnabled) return;
 
     this.queueUrl = await this.resolveQueueUrl();
     this.dlqUrl = await this.resolveDlqUrl();
-    this.pollLoopFinished = this.pollLoop().catch((err) =>
-      this.logger.error("Critical polling error", err),
-    );
+    this.pollLoopFinished = this.runPollLoop();
+  }
+
+  @Logged()
+  private async runPollLoop(): Promise<void> {
+    try {
+      await this.pollLoop();
+    } catch {
+      // @Logged has already logged this failure
+    }
   }
 
   /**
@@ -128,18 +134,22 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
    * convenience; the service has a job to do without it, and a cloud account
    * may well have named it something else.
    */
+  @Logged()
   private async resolveDlqUrl(): Promise<string | undefined> {
-    const queueName = this.dlqName();
-
     try {
-      const { QueueUrl } = await this.sqsClient.send(
-        new GetQueueUrlCommand({ QueueName: queueName }),
-      );
-      return QueueUrl;
+      return await this.queueUrlOf(this.dlqName());
     } catch {
-      this.logger.warn(`No dead-letter queue "${queueName}" — sqs_dlq_messages stays unreported`);
+      // @Logged has already logged this failure
       return undefined;
     }
+  }
+
+  @Logged({ failedLevel: "warn" })
+  private async queueUrlOf(queueName: string): Promise<string> {
+    const { QueueUrl } = await this.sqsClient.send(
+      new GetQueueUrlCommand({ QueueName: queueName }),
+    );
+    return QueueUrl!;
   }
 
   /**
@@ -147,43 +157,47 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
    * collector throws, so an SQS hiccup here would blank out every other
    * metric in the process.
    */
+  @Logged({ completedLevel: "debug" })
   private async sampleDlq(): Promise<void> {
     if (!this.dlqUrl) return;
 
+    let depth: number;
     try {
-      const { Attributes } = await this.sqsClient.send(
-        new GetQueueAttributesCommand({
-          QueueUrl: this.dlqUrl,
-          AttributeNames: ["ApproximateNumberOfMessages"],
-        }),
-      );
-
-      dlqMessages.set(
-        { queue: this.dlqName() },
-        Number(Attributes?.ApproximateNumberOfMessages ?? 0),
-      );
-    } catch (error) {
-      this.logger.error("Failed to read the dead-letter queue depth", error);
+      depth = await this.readDlqDepth(this.dlqUrl);
+    } catch {
+      // @Logged has already logged this failure
+      return;
     }
+
+    dlqMessages.set({ queue: this.dlqName() }, depth);
+  }
+
+  @Logged({ completedLevel: "debug" })
+  private async readDlqDepth(dlqUrl: string): Promise<number> {
+    const { Attributes } = await this.sqsClient.send(
+      new GetQueueAttributesCommand({
+        QueueUrl: dlqUrl,
+        AttributeNames: ["ApproximateNumberOfMessages"],
+      }),
+    );
+    return Number(Attributes?.ApproximateNumberOfMessages ?? 0);
   }
 
   private dlqName(): string {
     return `${this.config.queueName}-dlq`;
   }
 
+  @Logged()
   async onModuleDestroy() {
-    this.logger.log("Stopping S3 polling...");
     this.isShuttingDown = true;
     this.shutdownController.abort();
     await this.pollLoopFinished;
   }
 
+  @Logged()
   private async resolveQueueUrl(): Promise<string> {
     try {
-      const { QueueUrl } = await this.sqsClient.send(
-        new GetQueueUrlCommand({ QueueName: this.config.queueName }),
-      );
-      return QueueUrl!;
+      return await this.queueUrlOf(this.config.queueName);
     } catch (error) {
       throw new Error(
         `Queue "${this.config.queueName}" does not exist. It is part of the environment, not something this service creates — provision it, or set S3_EVENTS_ENABLED=false to run without the event path.`,
@@ -192,43 +206,45 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  @Logged()
   private async pollLoop() {
-    this.logger.log("S3 Polling started...");
     while (!this.isShuttingDown) {
       try {
-        const { Messages } = await this.sqsClient.send(
-          new ReceiveMessageCommand({
-            QueueUrl: this.queueUrl,
-            MaxNumberOfMessages: 5,
-            WaitTimeSeconds: 20, // Long polling
-          }),
-          { abortSignal: this.shutdownController.signal },
-        );
-
-        if (Messages) {
-          for (const msg of Messages) {
-            if (this.isShuttingDown) break;
-            await this.processMessage(msg);
-          }
+        for (const msg of await this.receive()) {
+          if (this.isShuttingDown) break;
+          await this.processMessage(msg);
         }
-      } catch (error) {
+      } catch {
         if (this.isShuttingDown) break;
-        this.logger.error("Polling error", error);
         await new Promise((res) => setTimeout(res, 5000));
       }
     }
-    this.logger.log("S3 polling stopped.");
   }
 
+  @Logged({ completedLevel: "debug" })
+  private async receive(): Promise<Message[]> {
+    try {
+      const { Messages } = await this.sqsClient.send(
+        new ReceiveMessageCommand({
+          QueueUrl: this.queueUrl,
+          MaxNumberOfMessages: 5,
+          WaitTimeSeconds: 20, // Long polling
+        }),
+        { abortSignal: this.shutdownController.signal },
+      );
+      return Messages ?? [];
+    } catch (error) {
+      if (this.isShuttingDown) return [];
+      throw error;
+    }
+  }
+
+  @Logged({ completedLevel: "debug" })
   private async processMessage(message: Message) {
     let body: S3EventBody;
     try {
-      body = JSON.parse(message.Body!) as S3EventBody;
-    } catch (error) {
-      this.logger.error(
-        `Discarding unparseable SQS message ${message.MessageId}: ${message.Body}`,
-        error,
-      );
+      body = this.parseBody(message);
+    } catch {
       messages.inc({ outcome: "unparseable" });
       await this.deleteMessage(message);
       return;
@@ -249,9 +265,6 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
     );
 
     if (failed.length > 0) {
-      for (const { reason } of failed) {
-        this.logger.error(`Failed to process record in message ${message.MessageId}`, reason);
-      }
       // Left on the queue on purpose: SQS redelivers, and after five rounds
       // the RedrivePolicy moves it to the queue sqs_dlq_messages watches.
       messages.inc({ outcome: "failed" });
@@ -262,6 +275,12 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
     await this.deleteMessage(message);
   }
 
+  @Logged({ completedLevel: "debug" })
+  private parseBody(message: Message): S3EventBody {
+    return JSON.parse(message.Body!) as S3EventBody;
+  }
+
+  @Logged()
   private async processRecord(record: S3EventRecord) {
     const key = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
     const parsed = parseRawKey(key);
@@ -311,6 +330,7 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
     lag.observe({ kind }, Math.max(0, (Date.now() - eventAt) / 1000));
   }
 
+  @Logged()
   private async processLegacyRecord(key: string) {
     if (!isLegacyBareUuidKey(key)) {
       this.logger.warn(`Skipping S3 event for unrecognised object key "${key}"`);
@@ -323,10 +343,10 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    this.logger.warn(`Resolved "${key}" by database probe — it predates the raw key scheme`);
     await this.videoScheduler.schedule(task);
   }
 
+  @Logged({ completedLevel: "debug" })
   private async deleteMessage(message: Message) {
     await this.sqsClient.send(
       new DeleteMessageCommand({
@@ -336,6 +356,7 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
+  @Logged()
   private async resolveLegacyTask(id: string) {
     const episode = await this.prisma.episode.findUnique({ where: { id } });
     if (episode) return { id, type: VideoType.EPISODE };

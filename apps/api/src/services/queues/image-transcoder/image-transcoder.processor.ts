@@ -1,13 +1,14 @@
 import { Processor, WorkerHost } from "@nestjs/bullmq";
-import { Inject, Logger } from "@nestjs/common";
+import { Inject } from "@nestjs/common";
 import { Job } from "bullmq";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { Histogram } from "prom-client";
+import { JobContext } from "../../../decorators/job-context.decorator";
+import { Logged } from "../../../decorators/logged.decorator";
 import BucketType from "../../s3/enums/bucket-type.enum";
 import { S3Service } from "../../s3/s3.service";
-import logJobFailure from "../utils/log-job-failure.util";
 import streamToFile from "../utils/stream-to-file.util";
 import withWorkDir from "../utils/work-dir.util";
 import { imageProfile } from "./image-profile.const";
@@ -34,7 +35,6 @@ const sizeRatio = new Histogram({
   concurrency: Number(process.env.IMAGE_TRANSCODE_CONCURRENCY) || 4,
 })
 export class ImageTranscoderProcessor extends WorkerHost {
-  private readonly logger = new Logger(ImageTranscoderProcessor.name);
   private readonly attachers: Map<string, ProcessedImageAttacher>;
 
   constructor(
@@ -46,10 +46,13 @@ export class ImageTranscoderProcessor extends WorkerHost {
     this.attachers = new Map(attachers.map((attacher) => [attacher.kind, attacher]));
   }
 
+  @JobContext()
+  @Logged()
   async process(job: Job<TranscodeImageJob>): Promise<{ key: string }> {
     return withWorkDir(`image-${job.data.kind}`, (workDir) => this.convert(job, workDir));
   }
 
+  @Logged()
   private async convert(job: Job<TranscodeImageJob>, workDir: string): Promise<{ key: string }> {
     const { kind, ownerId, rawKey } = job.data;
     const profile = imageProfile(kind);
@@ -83,18 +86,13 @@ export class ImageTranscoderProcessor extends WorkerHost {
 
       await attacher.attach(ownerId, key);
 
-      const [before, after] = await Promise.all([stat(originalPath), stat(convertedPath)]);
-      if (before.size > 0) sizeRatio.observe({ kind }, after.size / before.size);
-      this.logger.log(
-        `${kind} for ${ownerId}: ${before.size} → ${after.size} bytes (${Math.round((1 - after.size / before.size) * 100)}% smaller)`,
-      );
+      await this.measure(kind, originalPath, convertedPath);
 
       await this.discard(rawKey, BucketType.RAW);
       stop({ outcome: "success" });
       return { key };
     } catch (error) {
       stop({ outcome: "failed" });
-      logJobFailure(this.logger, `Image job ${job.id} (${kind} for ${ownerId})`, error);
 
       if (this.isFinalAttempt(job)) {
         await this.discard(rawKey, BucketType.RAW);
@@ -104,13 +102,27 @@ export class ImageTranscoderProcessor extends WorkerHost {
     }
   }
 
+  @Logged()
+  private async measure(
+    kind: TranscodeImageJob["kind"],
+    originalPath: string,
+    convertedPath: string,
+  ): Promise<{ before: number; after: number }> {
+    const [before, after] = await Promise.all([stat(originalPath), stat(convertedPath)]);
+    if (before.size > 0) sizeRatio.observe({ kind }, after.size / before.size);
+    return { before: before.size, after: after.size };
+  }
+
   private isFinalAttempt(job: Job<TranscodeImageJob>): boolean {
     return job.attemptsMade >= (job.opts.attempts ?? 1);
   }
 
+  @Logged()
   private async discard(key: string, bucket: BucketType): Promise<void> {
-    await this.s3Service
-      .deleteObject(key, bucket)
-      .catch((error: unknown) => this.logger.error(`Failed to delete ${key}`, error));
+    try {
+      await this.s3Service.deleteObject(key, bucket);
+    } catch {
+      // @Logged has already logged this failure
+    }
   }
 }

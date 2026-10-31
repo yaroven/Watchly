@@ -15,17 +15,17 @@ import {
 } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { Injectable, InternalServerErrorException, Logger, OnModuleInit } from "@nestjs/common";
+import { Injectable, InternalServerErrorException, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import pMap from "p-map";
 import { Readable } from "stream";
 import { S3Config, S3ConfigName } from "../../config/s3.config";
+import { Logged } from "../../decorators/logged.decorator";
 import BucketType from "./enums/bucket-type.enum";
 import { MULTIPART_PART_SIZE, MultipartUploadPart } from "./multipart.constants";
 
 @Injectable()
 export class S3Service implements OnModuleInit {
-  private readonly logger = new Logger(S3Service.name);
   private s3Config: S3Config;
   private s3Client: S3Client;
   private processedBucketName: string;
@@ -58,6 +58,7 @@ export class S3Service implements OnModuleInit {
     return signedUrl.toString();
   }
 
+  @Logged()
   async onModuleInit() {
     await Promise.all([
       this.verifyBucket(this.rawBucketName),
@@ -65,11 +66,11 @@ export class S3Service implements OnModuleInit {
     ]);
   }
 
+  @Logged()
   private async verifyBucket(bucketName: string, retries = 3) {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        await this.s3Client.send(new HeadBucketCommand({ Bucket: bucketName }));
-        this.logger.log(`Bucket "${bucketName}" verified.`);
+        await this.headBucket(bucketName);
         return;
       } catch (error) {
         if (error instanceof NotFound) {
@@ -78,16 +79,21 @@ export class S3Service implements OnModuleInit {
           );
         }
         if (attempt === retries) throw error;
-        this.logger.warn(`Could not reach bucket "${bucketName}". Retrying in 2 seconds...`);
         await new Promise((resolve) => setTimeout(resolve, 2000));
       }
     }
+  }
+
+  @Logged()
+  private async headBucket(bucketName: string): Promise<void> {
+    await this.s3Client.send(new HeadBucketCommand({ Bucket: bucketName }));
   }
 
   private getBucketName(type: BucketType): string {
     return type === BucketType.RAW ? this.rawBucketName : this.processedBucketName;
   }
 
+  @Logged()
   async get(key: string, type: BucketType): Promise<Readable> {
     const response = await this.s3Client.send(
       new GetObjectCommand({ Bucket: this.getBucketName(type), Key: key }),
@@ -95,6 +101,7 @@ export class S3Service implements OnModuleInit {
     return response.Body as Readable;
   }
 
+  @Logged()
   async uploadStream(type: BucketType, key: string, stream: Readable, contentType: string) {
     const parallelUploads3 = new Upload({
       client: this.s3Client,
@@ -108,6 +115,7 @@ export class S3Service implements OnModuleInit {
     return parallelUploads3.done();
   }
 
+  @Logged()
   async getUploadPresignedUrl(
     key: string,
     type: BucketType,
@@ -123,6 +131,7 @@ export class S3Service implements OnModuleInit {
     return this.mapSignedUrlToPublicEndpoint(signedUrl);
   }
 
+  @Logged()
   async startMultipartUpload(
     key: string,
     type: BucketType,
@@ -151,6 +160,7 @@ export class S3Service implements OnModuleInit {
     return { uploadId: UploadId, partSize: MULTIPART_PART_SIZE, parts };
   }
 
+  @Logged({ completedLevel: "debug" })
   private async getUploadPartPresignedUrl(
     key: string,
     type: BucketType,
@@ -168,6 +178,7 @@ export class S3Service implements OnModuleInit {
     return this.mapSignedUrlToPublicEndpoint(signedUrl);
   }
 
+  @Logged()
   async completeMultipartUpload(
     key: string,
     type: BucketType,
@@ -188,6 +199,7 @@ export class S3Service implements OnModuleInit {
     );
   }
 
+  @Logged()
   async abortMultipartUpload(key: string, type: BucketType, uploadId: string): Promise<void> {
     await this.s3Client.send(
       new AbortMultipartUploadCommand({
@@ -198,6 +210,7 @@ export class S3Service implements OnModuleInit {
     );
   }
 
+  @Logged()
   async getReadPresignedUrl(key: string, type: BucketType, expiresIn: number = 3600) {
     const command = new GetObjectCommand({ Bucket: this.getBucketName(type), Key: key });
     const signedUrl = await getSignedUrl(this.s3Client, command, { expiresIn });
@@ -209,6 +222,7 @@ export class S3Service implements OnModuleInit {
     return `${endpoint}/${this.getBucketName(type)}/${key}`;
   }
 
+  @Logged()
   async objectExists(key: string, type: BucketType): Promise<boolean> {
     const bucketName = this.getBucketName(type);
     try {
@@ -216,59 +230,44 @@ export class S3Service implements OnModuleInit {
       return true;
     } catch (error) {
       if (error instanceof NotFound) return false;
-      this.logger.error(`Failed to stat object "${key}" in bucket "${bucketName}":`, error);
       throw error;
     }
   }
 
+  @Logged()
   async deleteObject(key: string, type: BucketType) {
-    const bucketName = this.getBucketName(type);
-    try {
-      await this.s3Client.send(new DeleteObjectCommand({ Bucket: bucketName, Key: key }));
-      this.logger.log(`Deleted object "${key}" from bucket "${bucketName}".`);
-    } catch (error) {
-      this.logger.error(`Failed to delete object "${key}" from bucket "${bucketName}":`, error);
-      throw error;
-    }
+    await this.s3Client.send(
+      new DeleteObjectCommand({ Bucket: this.getBucketName(type), Key: key }),
+    );
   }
 
-  async deleteFolder(prefix: string, type: BucketType) {
+  @Logged()
+  async deleteFolder(prefix: string, type: BucketType): Promise<number> {
     const bucketName = this.getBucketName(type);
     const internalPrefix = prefix.endsWith("/") ? prefix : prefix + "/";
-    try {
-      let continuationToken: string | undefined;
-      do {
-        const listResponse = await this.s3Client.send(
-          new ListObjectsV2Command({
-            Bucket: bucketName,
-            Prefix: internalPrefix,
-            ContinuationToken: continuationToken,
-          }),
-        );
+    let deleted = 0;
+    let continuationToken: string | undefined;
+    do {
+      const listResponse = await this.s3Client.send(
+        new ListObjectsV2Command({
+          Bucket: bucketName,
+          Prefix: internalPrefix,
+          ContinuationToken: continuationToken,
+        }),
+      );
 
-        if (listResponse.Contents && listResponse.Contents.length > 0) {
-          const deleteParams = {
-            Bucket: bucketName,
-            Delete: {
-              Objects: listResponse.Contents.map((obj) => ({ Key: obj.Key })),
-            },
-          };
-          await this.s3Client.send(new DeleteObjectsCommand(deleteParams));
-          this.logger.log(
-            `Deleted batch of ${listResponse.Contents.length} objects with prefix "${internalPrefix}".`,
-          );
-        }
-        continuationToken = listResponse.NextContinuationToken;
-      } while (continuationToken);
-      this.logger.log(
-        `Finished deleting folder with prefix "${internalPrefix}" from bucket "${bucketName}".`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `Failed to delete folder "${internalPrefix}" from bucket "${bucketName}":`,
-        error,
-      );
-      throw error;
-    }
+      if (listResponse.Contents && listResponse.Contents.length > 0) {
+        const deleteParams = {
+          Bucket: bucketName,
+          Delete: {
+            Objects: listResponse.Contents.map((obj) => ({ Key: obj.Key })),
+          },
+        };
+        await this.s3Client.send(new DeleteObjectsCommand(deleteParams));
+        deleted += listResponse.Contents.length;
+      }
+      continuationToken = listResponse.NextContinuationToken;
+    } while (continuationToken);
+    return deleted;
   }
 }

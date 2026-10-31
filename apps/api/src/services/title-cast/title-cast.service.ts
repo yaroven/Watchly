@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
+import { Logged } from "../../decorators/logged.decorator";
 import { ImageService } from "../image/image.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { toCastCreditView } from "./title-cast.mapper";
@@ -13,6 +14,7 @@ export class TitleCastService {
     private readonly imageService: ImageService,
   ) {}
 
+  @Logged()
   async findForTitle(titleId: string): Promise<CastCreditView[]> {
     const credits = await this.prisma.castCredit.findMany(titleCastQuery.forTitle(titleId));
 
@@ -21,6 +23,7 @@ export class TitleCastService {
     );
   }
 
+  @Logged()
   async replaceForTitle(titleId: string, credits: CastCreditInput[]): Promise<CastCreditView[]> {
     try {
       await this.prisma.$transaction([

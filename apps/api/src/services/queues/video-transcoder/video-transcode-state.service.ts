@@ -1,5 +1,6 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { TranscodingStatus } from "@prisma/client";
+import { Logged } from "../../../decorators/logged.decorator";
 import { PrismaService } from "../../prisma/prisma.service";
 import { VideoType } from "./enums/video-type.enum";
 import { TranscodeAbortedError } from "./utils/transcode-aborted.error";
@@ -17,8 +18,6 @@ import { VideoTranscodingProgressView } from "./video-transcoder.types";
  */
 @Injectable()
 export class VideoTranscodeStateService {
-  private readonly logger = new Logger(VideoTranscodeStateService.name);
-
   constructor(private readonly prisma: PrismaService) {}
 
   private readonly existsCheckers: Record<VideoType, (id: string) => Promise<boolean>> = {
@@ -28,18 +27,19 @@ export class VideoTranscodeStateService {
       !!(await this.prisma.title.findUnique({ where: { id }, select: { id: true } })),
   };
 
+  @Logged({ completedLevel: "debug" })
   async exists(id: string, type: VideoType): Promise<boolean> {
     return this.existsCheckers[type](id);
   }
 
+  @Logged({ completedLevel: "debug", failedLevel: "warn" })
   async ensureExists(id: string, type: VideoType): Promise<void> {
     if (!(await this.exists(id, type)))
       throw new TranscodeAbortedError(`Entity ${id} was deleted during transcoding`);
   }
 
+  @Logged()
   async updateStatus(id: string, type: VideoType, status: TranscodingStatus) {
-    this.logger.log(`Updating ${type} ${id} status to ${status}`);
-
     const data = { transcodingStatus: status };
 
     if (type === VideoType.EPISODE) {
@@ -59,6 +59,7 @@ export class VideoTranscodeStateService {
     }
   }
 
+  @Logged({ completedLevel: "debug" })
   async updateProgress(id: string, type: VideoType, progress: number) {
     if (!(await this.exists(id, type))) return;
 
@@ -74,6 +75,7 @@ export class VideoTranscodeStateService {
     });
   }
 
+  @Logged()
   async getProgress(id: string, type: VideoType): Promise<VideoTranscodingProgressView | null> {
     const where = type === VideoType.EPISODE ? { episodeId: id } : { titleId: id };
     const progress = await this.prisma.videoTranscodingProgress.findUnique({ where });

@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import ffmpeg from "fluent-ffmpeg";
+import { Logged } from "../../decorators/logged.decorator";
 import { FfmpegHandle, FfmpegHooks, FfmpegJob, MediaInfo, MediaStreamKind } from "./ffmpeg.types";
 
 const kindOf = (codecType: string | undefined): MediaStreamKind =>
@@ -7,6 +8,7 @@ const kindOf = (codecType: string | undefined): MediaStreamKind =>
 
 @Injectable()
 export class FfmpegRunner {
+  @Logged()
   start(job: FfmpegJob, { onStart, onProgress }: FfmpegHooks = {}): FfmpegHandle {
     const command = ffmpeg(job.input);
 
@@ -28,6 +30,7 @@ export class FfmpegRunner {
     return { done, kill: () => command.kill("SIGKILL") };
   }
 
+  @Logged()
   probe(filePath: string): Promise<MediaInfo> {
     return new Promise((resolve, reject) => {
       ffmpeg.ffprobe(filePath, (error: Error | null, data: ffmpeg.FfprobeData) => {

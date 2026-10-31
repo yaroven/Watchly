@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { Role } from "@prisma/client";
+import { Logged } from "../../decorators/logged.decorator";
 import { EngagementCountersService } from "../engagement/engagement-counters.service";
 import { ImageService } from "../image/image.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -55,6 +56,7 @@ export class CommentService {
     });
   }
 
+  @Logged()
   async findForSubject(
     subject: CommentSubject,
     { page = 1, limit = 10, sort = "newest" }: CommentPageQuery,
@@ -100,6 +102,7 @@ export class CommentService {
     return { items, totalCount };
   }
 
+  @Logged()
   async create(
     subject: CommentSubject,
     userId: string,
@@ -126,6 +129,7 @@ export class CommentService {
     return this.toView(comment);
   }
 
+  @Logged()
   private async findReplyPreviews(
     rootIds: string[],
     viewerId?: string,
@@ -146,6 +150,7 @@ export class CommentService {
     });
   }
 
+  @Logged()
   async findReplies(
     commentId: string,
     { page = 1, limit = 10 }: { page?: number; limit?: number },
@@ -173,12 +178,14 @@ export class CommentService {
     };
   }
 
+  @Logged()
   async report(commentId: string, userId: string, reason?: string): Promise<void> {
     await this.assertCommentExists(commentId);
 
     await this.reportService.submit(this.prisma, commentId, userId, reason);
   }
 
+  @Logged()
   async remove(commentId: string, userId: string, role?: Role): Promise<void> {
     const comment = await this.prisma.comment.findUnique({
       where: { id: commentId },
@@ -200,6 +207,7 @@ export class CommentService {
     });
   }
 
+  @Logged()
   private async findRootIds(
     subject: CommentSubject,
     sort: CommentSortMode,
@@ -225,6 +233,7 @@ export class CommentService {
     return roots.map((root) => root.id);
   }
 
+  @Logged()
   private async assertCommentExists(commentId: string) {
     const comment = await this.prisma.comment.findUnique({
       where: { id: commentId },
@@ -233,6 +242,7 @@ export class CommentService {
     if (!comment) throw new NotFoundException(`Comment with id ${commentId} not found`);
   }
 
+  @Logged()
   private async readSubjectOf(commentId: string): Promise<CommentSubject> {
     const comment = await this.prisma.comment.findUnique({
       where: { id: commentId },
@@ -243,6 +253,7 @@ export class CommentService {
     return comment.titleId ? { titleId: comment.titleId } : { parentId: comment.parentId! };
   }
 
+  @Logged()
   private async assertSubjectAcceptsComments(subject: CommentSubject): Promise<CommentSubject> {
     if ("titleId" in subject) {
       await assertTitleExists(this.prisma, subject.titleId);

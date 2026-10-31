@@ -1,6 +1,7 @@
 import { InjectQueue } from "@nestjs/bullmq";
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { Queue } from "bullmq";
+import { Logged } from "../../../decorators/logged.decorator";
 import { VideoType } from "./enums/video-type.enum";
 import {
   VIDEO_TRANSCODE_JOB_NAME,
@@ -10,20 +11,18 @@ import { TranscodeVideoJob } from "./video-transcoder.types";
 
 @Injectable()
 export class VideoTranscodeScheduler {
-  private readonly logger = new Logger(VideoTranscodeScheduler.name);
-
   constructor(@InjectQueue(VIDEO_TRANSCODE_QUEUE_NAME) private readonly queue: Queue) {}
 
   private jobId({ id, type }: TranscodeVideoJob): string {
     return `transcode-${type}-${id}`;
   }
 
+  @Logged()
   async schedule(payload: TranscodeVideoJob): Promise<void> {
-    this.logger.log(`Scheduling ${VideoType[payload.type]} transcode for ${payload.id}`);
-
     await this.queue.add(VIDEO_TRANSCODE_JOB_NAME, payload, { jobId: this.jobId(payload) });
   }
 
+  @Logged()
   async cancelScheduled(id: string, type: VideoType): Promise<void> {
     const cancellableStates = ["waiting", "delayed", "prioritized", "waiting-children"];
     const job = await this.queue.getJob(this.jobId({ id, type }));

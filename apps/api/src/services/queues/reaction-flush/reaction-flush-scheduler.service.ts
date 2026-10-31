@@ -1,6 +1,7 @@
 import { InjectQueue } from "@nestjs/bullmq";
 import { Injectable } from "@nestjs/common";
 import { Queue } from "bullmq";
+import { Logged } from "../../../decorators/logged.decorator";
 import { arcOf, ReactionTarget, subjectIdOf } from "../../reaction/utils/reaction-target.const";
 import { throughRedis } from "../../redis/redis.error";
 import {
@@ -19,6 +20,7 @@ export class ReactionFlushScheduler {
     @InjectQueue(REACTION_FLUSH_QUEUE_NAME) private readonly queue: Queue<ReactionFlushQueueJob>,
   ) {}
 
+  @Logged()
   async schedule(target: ReactionTarget, userId: string): Promise<void> {
     const arc = arcOf(target);
     const subjectId = subjectIdOf(target);
@@ -37,6 +39,7 @@ export class ReactionFlushScheduler {
     );
   }
 
+  @Logged()
   async scheduleRecount(target: ReactionTarget): Promise<void> {
     const arc = arcOf(target);
     const subjectId = subjectIdOf(target);

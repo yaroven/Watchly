@@ -9,6 +9,7 @@ import { ConfigService } from "@nestjs/config";
 import { JwtService, JwtSignOptions } from "@nestjs/jwt";
 import { Role } from "@prisma/client";
 import { JwtConfig, JwtConfigName } from "../../config/jwt.config";
+import { Logged } from "../../decorators/logged.decorator";
 import { UserService } from "../user/user.service";
 import { UserView } from "../user/user.types";
 import { AuthCredentials } from "./auth.types";
@@ -29,6 +30,7 @@ export class AuthService {
     private configService: ConfigService,
   ) {}
 
+  @Logged()
   async login({ email, password }: AuthCredentials): Promise<AuthTokens> {
     const user = await this.userService.validateUser(email, password);
     if (!user) throw new BadRequestException("Invalid email or password");
@@ -36,6 +38,7 @@ export class AuthService {
     return this.issueTokens({ userId: user.id, role: user.role });
   }
 
+  @Logged()
   async register({ email, password }: AuthCredentials): Promise<AuthTokens> {
     const existing = await this.userService.findByEmail(email);
     if (existing) throw new ConflictException("User with this email already exists");
@@ -44,12 +47,14 @@ export class AuthService {
     return this.issueTokens({ userId: user.id, role: user.role });
   }
 
+  @Logged()
   async getMe(userId: string): Promise<UserView> {
     const user = await this.userService.findOne(userId);
     if (!user) throw new NotFoundException("User not found");
     return user;
   }
 
+  @Logged({ data: () => [] })
   async refreshTokens(refreshToken: string): Promise<AuthTokens> {
     const { refreshSecret } = this.configService.get<JwtConfig>(JwtConfigName)!;
 

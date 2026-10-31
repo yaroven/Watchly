@@ -1,25 +1,36 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { Gauge } from "prom-client";
+import { Logged } from "../../decorators/logged.decorator";
 import { driftKey } from "../queues/reaction-flush/reaction-drift.const";
 import { REACTION_ARCS } from "../reaction/utils/reaction-target.const";
 import { RedisService } from "../redis/redis.service";
 
-const logger = new Logger("VoteDriftMetrics");
-
-let client: RedisService | null = null;
+let sampler: (() => Promise<void>) | undefined;
 
 const drift = new Gauge({
   name: "reaction_counter_drift_subjects",
   help: "Subjects whose engagement counters the last reconciliation had to repair, by arc",
   labelNames: ["arc"],
-  collect: () => sample(),
+  collect: async () => {
+    await sampler?.();
+  },
 });
 
-async function sample(): Promise<void> {
-  if (!client) return;
+@Injectable()
+export class VoteDriftMetricsService {
+  constructor(private readonly redis: RedisService) {
+    sampler = () => this.sample();
+  }
 
-  try {
-    const values = await client.mget(REACTION_ARCS.map(driftKey));
+  @Logged({ completedLevel: "debug" })
+  private async sample(): Promise<void> {
+    let values: (string | null)[];
+    try {
+      values = await this.readDrift();
+    } catch {
+      // @Logged has already logged this failure
+      return;
+    }
 
     REACTION_ARCS.forEach((arc, index) => {
       const raw = values[index];
@@ -28,14 +39,10 @@ async function sample(): Promise<void> {
       const subjects = Number(raw);
       if (Number.isFinite(subjects)) drift.set({ arc }, subjects);
     });
-  } catch (error) {
-    logger.error("Failed to sample the reaction counter drift", error);
   }
-}
 
-@Injectable()
-export class VoteDriftMetricsService {
-  constructor(redis: RedisService) {
-    client = redis;
+  @Logged({ completedLevel: "debug" })
+  private readDrift(): Promise<(string | null)[]> {
+    return this.redis.mget(REACTION_ARCS.map(driftKey));
   }
 }

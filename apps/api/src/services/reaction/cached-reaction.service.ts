@@ -1,5 +1,6 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { ReactionType } from "@prisma/client";
+import { Logged } from "../../decorators/logged.decorator";
 import { countsOf, EngagementCounts } from "../engagement/engagement-counters.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { ReactionFlushScheduler } from "../queues/reaction-flush/reaction-flush-scheduler.service";
@@ -17,8 +18,6 @@ import { Vote, voteDelta } from "./utils/vote.util";
 
 @Injectable()
 export class CachedReactionService implements Reactions {
-  private readonly logger = new Logger(CachedReactionService.name);
-
   constructor(
     private readonly direct: ReactionService,
     private readonly voteState: VoteStateService,
@@ -26,6 +25,7 @@ export class CachedReactionService implements Reactions {
     private readonly prisma: PrismaService,
   ) {}
 
+  @Logged()
   async setVote(
     target: ReactionTarget,
     userId: string,
@@ -34,10 +34,12 @@ export class CachedReactionService implements Reactions {
     return this.cast(target, userId, type, () => this.direct.setVote(target, userId, type));
   }
 
+  @Logged()
   async clearVote(target: ReactionTarget, userId: string): Promise<ReactionResult> {
     return this.cast(target, userId, null, () => this.direct.clearVote(target, userId));
   }
 
+  @Logged()
   private async cast(
     target: ReactionTarget,
     userId: string,
@@ -54,13 +56,15 @@ export class CachedReactionService implements Reactions {
     } catch (error) {
       if (!(error instanceof RedisUnavailableError)) throw error;
 
-      this.logger.warn(`Writing a vote straight to Postgres: ${error.message}`);
       return withoutCache();
     }
 
     return this.answer(countsOf(subject.counters), previous, vote);
   }
 
+  @Logged({
+    failedLevel: (error) => (error instanceof RedisUnavailableError ? "warn" : "error"),
+  })
   private async record(target: ReactionTarget, userId: string, vote: Vote): Promise<Vote> {
     await this.flush.schedule(target, userId);
 

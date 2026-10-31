@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { Logged } from "../../decorators/logged.decorator";
 import { PrismaService } from "../prisma/prisma.service";
 
 export type ReportClient = Pick<PrismaService, "report">;
@@ -21,6 +22,7 @@ export class ReportService {
    *
    * The comment's existence is the caller's business — it owns the 404.
    */
+  @Logged()
   async submit(
     client: ReportClient,
     commentId: string,

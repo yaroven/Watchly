@@ -1,5 +1,6 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
+import { Logged } from "../../decorators/logged.decorator";
 import { PrismaService } from "../prisma/prisma.service";
 import { ImageKind, imageProfile } from "../queues/image-transcoder/image-profile.const";
 import BucketType from "../s3/enums/bucket-type.enum";
@@ -12,13 +13,12 @@ const UPLOAD_URL_TTL_SECONDS = 120;
 
 @Injectable()
 export class ImageService {
-  private readonly logger = new Logger(ImageService.name);
-
   constructor(
     private readonly s3Service: S3Service,
     private readonly prisma: PrismaService,
   ) {}
 
+  @Logged()
   async createUploadUrl(
     kind: ImageKind,
     ownerId: string,
@@ -52,12 +52,17 @@ export class ImageService {
     return IMAGE_TARGETS[kind].processedKey(ownerId, version);
   }
 
+  @Logged()
   async attachProcessed(kind: ImageKind, ownerId: string, newKey: string): Promise<void> {
     const target = IMAGE_TARGETS[kind];
     const previous = await target.read(this.prisma, ownerId);
 
     if (!previous) {
-      await this.s3Service.deleteObject(newKey, BucketType.PROCESSED).catch(() => undefined);
+      try {
+        await this.s3Service.deleteObject(newKey, BucketType.PROCESSED);
+      } catch {
+        // @Logged has already logged this failure
+      }
       throw new NotFoundException(`${target.label} with id ${ownerId} not found`);
     }
 
@@ -68,6 +73,7 @@ export class ImageService {
     }
   }
 
+  @Logged()
   async remove(kind: ImageKind, ownerId: string): Promise<void> {
     const target = IMAGE_TARGETS[kind];
     const stored = await target.read(this.prisma, ownerId);
@@ -78,12 +84,15 @@ export class ImageService {
     await this.deleteStoredImage(stored.key);
   }
 
+  @Logged()
   async deleteStoredImage(key: string | null | undefined): Promise<void> {
     if (!key) return;
 
-    await this.s3Service
-      .deleteObject(key, BucketType.PROCESSED)
-      .catch((error: unknown) => this.logger.error(`Failed to remove image object ${key}`, error));
+    try {
+      await this.s3Service.deleteObject(key, BucketType.PROCESSED);
+    } catch {
+      // @Logged has already logged this failure
+    }
   }
 
   toPublicUrl(key: string | null | undefined): string | null {
