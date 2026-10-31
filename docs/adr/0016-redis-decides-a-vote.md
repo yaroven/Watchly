@@ -173,3 +173,26 @@ Three properties carry the design:
 - The cache is **not** consulted for counts, ever. If that changes, the hydration
   problem a set would have had comes back, and this record should be superseded rather
   than amended.
+
+## Addendum (2026-10-31) — what the fallback rests on
+
+The fallback above did not work as written, for two reasons the mocked specs could not
+see.
+
+- **The flush queue waited for Redis instead of failing.** `RedisService` rejects at
+  once while Redis is down, but the api's BullMQ `Queue` was built on ioredis's
+  defaults, so `queue.add` sat in the offline queue — and an in-flight one was resent
+  up to twenty times — while the request hung. `CachedReactionService` scheduled the
+  flush first, so a Redis outage never reached `RedisUnavailableError` and never fell
+  back. The api's queue connection now carries `enableOfflineQueue: false` and
+  `maxRetriesPerRequest: 1`, matching `RedisService`. A `Worker` keeps the defaults:
+  it should wait for Redis, not give up on it. BullMQ still waits once for the first
+  `ready` at startup; that path is covered by the order below, since the `SET` is the
+  first thing to touch Redis and fails fast on its own client.
+- **The order of the two writes could revert a vote.** With the flush scheduled before
+  the `SET`, a `SET` that failed after the `add` succeeded fell back to writing the
+  row, and two seconds later the flush mirrored the key's previous vote back over it.
+  The key is now written first. If the `SET` fails nothing is scheduled; if the `add`
+  fails the fallback writes the same vote the key holds. The remaining hole is a
+  process dying between the two awaits: a key with no flush behind it, which stands
+  until the viewer votes again or the TTL expires and reads go back to the row.
