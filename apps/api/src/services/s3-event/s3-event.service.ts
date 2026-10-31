@@ -11,17 +11,13 @@ import { ConfigService } from "@nestjs/config";
 import { Counter, Gauge, Histogram } from "prom-client";
 import { S3Config, S3ConfigName } from "../../config/s3.config";
 import { Logged } from "../../decorators/logged.decorator";
+import { imageKindOfRawKind } from "../image/utils/image-target.const";
+import { videoTypeOfRawKind } from "../media-asset/utils/video-location.util";
 import { PrismaService } from "../prisma/prisma.service";
 import { ImageTranscodeScheduler } from "../queues/image-transcoder/image-transcode-scheduler.service";
 import { VideoType } from "../queues/video-transcoder/enums/video-type.enum";
 import { VideoTranscodeScheduler } from "../queues/video-transcoder/video-transcode-scheduler.service";
-import {
-  imageKindOf,
-  isLegacyBareUuidKey,
-  parseRawKey,
-  RawObjectKind,
-  videoTypeOf,
-} from "../s3/raw-key";
+import { isLegacyBareUuidKey, parseRawKey, RawObjectKind } from "../s3/raw-key";
 
 interface S3EventRecord {
   eventTime?: string;
@@ -292,7 +288,7 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
 
     this.observeLag(record, parsed.kind);
 
-    const imageKind = imageKindOf(parsed.kind);
+    const imageKind = imageKindOfRawKind(parsed.kind);
     if (imageKind !== undefined) {
       await this.imageTranscodeScheduler.schedule({
         kind: imageKind,
@@ -304,9 +300,9 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
 
     // Compared against undefined, never for truthiness: VideoType is a numeric
     // enum and VideoType.MOVIE is 0.
-    const videoType = videoTypeOf(parsed.kind);
+    const videoType = videoTypeOfRawKind(parsed.kind);
     if (videoType !== undefined) {
-      await this.videoScheduler.schedule({ id: parsed.ownerId, type: videoType });
+      await this.videoScheduler.schedule({ id: parsed.ownerId, type: videoType, rawKey: key });
       return;
     }
 
@@ -343,7 +339,7 @@ export class S3EventService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    await this.videoScheduler.schedule(task);
+    await this.videoScheduler.schedule({ ...task, rawKey: key });
   }
 
   @Logged({ completedLevel: "debug" })

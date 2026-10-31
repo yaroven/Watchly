@@ -4,7 +4,6 @@ import { FilterRule } from "../../common/pagination/filter-rule.enum";
 import { ImageService } from "../image/image.service";
 import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { VideoType } from "../queues/video-transcoder/enums/video-type.enum";
 import { S3Service } from "../s3/s3.service";
 import { SeasonService } from "./season.service";
 
@@ -55,8 +54,7 @@ describe("SeasonService", () => {
         {
           provide: MediaAssetService,
           useValue: {
-            cleanupVideoAsset: jest.fn(),
-            deleteProcessedFolder: jest.fn(),
+            cleanupSeason: jest.fn(),
           },
         },
         { provide: ImageService, useValue: imageServiceMock },
@@ -211,51 +209,36 @@ describe("SeasonService", () => {
       });
     });
 
-    describe("should delete the season, its episodes from S3, and its poster/folder from S3", () => {
-      it("if the season exists", async () => {
-        const season = {
-          id: "season-1",
-          titleId: "title-1",
-          posterKey: "posters/seasons/season-1/v1.webp",
-          episodes: [{ id: "episode-1" }, { id: "episode-2" }],
-        };
-        (prismaMock.season.findUnique as jest.Mock).mockResolvedValue(season);
-        s3ServiceMock.deleteObject.mockResolvedValue(undefined as any);
-        (mediaAssetServiceMock.deleteProcessedFolder as jest.Mock).mockResolvedValue(undefined);
-        (mediaAssetServiceMock.cleanupVideoAsset as jest.Mock).mockResolvedValue(undefined);
-        (prismaMock.season.delete as jest.Mock).mockResolvedValue(season);
+    it("should delete the row, then hand the season to media-asset", async () => {
+      const season = {
+        id: "season-1",
+        titleId: "title-1",
+        posterKey: "posters/seasons/season-1/v1.webp",
+        episodes: [{ id: "episode-1" }, { id: "episode-2" }],
+      };
+      const calls: string[] = [];
+      (prismaMock.season.findUnique as jest.Mock).mockResolvedValue(season);
+      (prismaMock.season.delete as jest.Mock).mockImplementation(() => {
+        calls.push("delete");
+        return Promise.resolve(season);
+      });
+      (mediaAssetServiceMock.cleanupSeason as jest.Mock).mockImplementation(() => {
+        calls.push("cleanup");
+        return Promise.resolve();
+      });
 
-        const result = await service.delete("season-1");
+      const result = await service.delete("season-1");
 
-        expect(prismaMock.season.findUnique).toHaveBeenCalledWith({
-          where: { id: "season-1" },
-          include: { episodes: true },
-        });
-
-        expect(mediaAssetServiceMock.cleanupVideoAsset).toHaveBeenCalledWith(
-          "episode-1",
-          VideoType.EPISODE,
-        );
-        expect(mediaAssetServiceMock.cleanupVideoAsset).toHaveBeenCalledWith(
-          "episode-2",
-          VideoType.EPISODE,
-        );
-
-        expect(imageServiceMock.deleteStoredImage).toHaveBeenCalledWith(
-          "posters/seasons/season-1/v1.webp",
-        );
-        expect(mediaAssetServiceMock.deleteProcessedFolder).toHaveBeenCalledWith(
-          "videos/title-1/season-1/",
-        );
-
-        expect(prismaMock.season.delete).toHaveBeenCalledWith({
-          where: { id: "season-1" },
-        });
-        expect(result).toEqual({
-          id: season.id,
-          titleId: season.titleId,
-          posterUrl: "https://cdn.example.com/posters/seasons/season-1/v1.webp",
-        });
+      expect(prismaMock.season.findUnique).toHaveBeenCalledWith({
+        where: { id: "season-1" },
+        include: { episodes: true },
+      });
+      expect(mediaAssetServiceMock.cleanupSeason).toHaveBeenCalledWith(season);
+      expect(calls).toEqual(["delete", "cleanup"]);
+      expect(result).toEqual({
+        id: season.id,
+        titleId: season.titleId,
+        posterUrl: "https://cdn.example.com/posters/seasons/season-1/v1.webp",
       });
     });
   });

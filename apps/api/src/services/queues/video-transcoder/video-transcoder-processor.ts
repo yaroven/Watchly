@@ -11,12 +11,12 @@ import { JobContext } from "../../../decorators/job-context.decorator";
 import { Logged } from "../../../decorators/logged.decorator";
 import { PrismaService } from "../../prisma/prisma.service";
 import BucketType from "../../s3/enums/bucket-type.enum";
-import { VIDEO_ROOT } from "../../s3/processed-key";
+import { buildVideoPrefix, VideoLocation } from "../../s3/processed-key";
 import { S3Service } from "../../s3/s3.service";
 import withWorkDir from "../utils/work-dir.util";
 import { VideoType } from "./enums/video-type.enum";
 import { HlsTranscoder } from "./hls-transcoder.service";
-import resolveVideoPath from "./utils/resolve-video-path.util";
+import resolveVideoLocation from "./utils/resolve-video-location.util";
 import { abortIsWarning, TranscodeAbortedError } from "./utils/transcode-aborted.error";
 import { PROCESSED_UPLOAD_CONCURRENCY } from "./video-profile.const";
 import { VIDEO_TRANSCODE_QUEUE_NAME } from "./video-transcode-queue.options";
@@ -51,6 +51,7 @@ export class VideoTranscoderProcessor extends WorkerHost {
   @Logged({ failedLevel: abortIsWarning })
   async process(job: Job<TranscodeVideoJob>) {
     const { type, id } = job.data;
+    const rawKey = (job.data as Partial<TranscodeVideoJob>).rawKey ?? id;
     const jobId = job.id;
     const stop = duration.startTimer({ kind: VideoType[type].toLowerCase() });
 
@@ -62,7 +63,7 @@ export class VideoTranscoderProcessor extends WorkerHost {
         await this.state.updateStatus(id, type, TranscodingStatus.PROCESSING);
         await this.state.updateProgress(id, type, 0);
         await fs.ensureDir(outputDir);
-        await this.transcode(id, type, inputPath, outputDir);
+        await this.transcode(id, type, rawKey, inputPath, outputDir);
 
         await this.state.updateStatus(id, type, TranscodingStatus.COMPLETED);
         await this.state.updateProgress(id, type, 100);
@@ -82,10 +83,16 @@ export class VideoTranscoderProcessor extends WorkerHost {
   }
 
   @Logged({ failedLevel: abortIsWarning })
-  private async transcode(id: string, type: VideoType, inputPath: string, outputDir: string) {
+  private async transcode(
+    id: string,
+    type: VideoType,
+    rawKey: string,
+    inputPath: string,
+    outputDir: string,
+  ) {
     await this.state.ensureExists(id, type);
-    const uploadTo = await resolveVideoPath(this.prisma, id, type);
-    await this.download(id, inputPath);
+    const location = await resolveVideoLocation(this.prisma, id, type);
+    await this.download(rawKey, id, type, inputPath);
     await this.state.ensureExists(id, type);
 
     const sourceWidth = await this.hls.probeWidth(inputPath);
@@ -98,7 +105,7 @@ export class VideoTranscoderProcessor extends WorkerHost {
       shouldAbort: async () => !(await this.state.exists(id, type)),
     });
 
-    await this.upload(id, type, uploadTo, outputDir);
+    await this.upload(id, type, location, outputDir);
   }
 
   @Logged({ completedLevel: "debug" })
@@ -111,16 +118,13 @@ export class VideoTranscoderProcessor extends WorkerHost {
   }
 
   @Logged({ failedLevel: abortIsWarning })
-  private async download(key: string, writePath: string) {
+  private async download(rawKey: string, id: string, type: VideoType, writePath: string) {
     let downloadStream: Readable;
     try {
-      downloadStream = await this.s3Service.get(key, BucketType.RAW);
+      downloadStream = await this.s3Service.get(rawKey, BucketType.RAW);
     } catch (error) {
-      if (
-        !(await this.state.exists(key, VideoType.MOVIE)) &&
-        !(await this.state.exists(key, VideoType.EPISODE))
-      )
-        throw new TranscodeAbortedError(`Source entity ${key} was deleted during transcoding`);
+      if (!(await this.state.exists(id, type)))
+        throw new TranscodeAbortedError(`Source entity ${id} was deleted during transcoding`);
 
       throw error;
     }
@@ -135,7 +139,7 @@ export class VideoTranscoderProcessor extends WorkerHost {
   }
 
   @Logged({ failedLevel: abortIsWarning })
-  private async upload(id: string, type: VideoType, key: string, outputDir: string) {
+  private async upload(id: string, type: VideoType, location: VideoLocation, outputDir: string) {
     await this.state.ensureExists(id, type);
     const files = (await fs.readdir(outputDir, { recursive: true })) as string[];
 
@@ -145,7 +149,7 @@ export class VideoTranscoderProcessor extends WorkerHost {
         const localFilePath = path.join(outputDir, file);
         if ((await fs.stat(localFilePath)).isDirectory()) return;
 
-        const s3Key = `${VIDEO_ROOT}/${key}/${file}`;
+        const s3Key = `${buildVideoPrefix(location)}${file}`;
         const contentType = file.endsWith(".m3u8") ? "application/x-mpegURL" : "video/MP2T";
 
         await this.s3Service.uploadStream(

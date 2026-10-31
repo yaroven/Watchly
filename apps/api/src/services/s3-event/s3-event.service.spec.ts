@@ -167,6 +167,7 @@ describe("S3EventService", () => {
       expect(videoSchedulerMock.schedule).toHaveBeenCalledWith({
         id: TITLE_ID,
         type: VideoType.MOVIE,
+        rawKey: `title-video/${TITLE_ID}`,
       });
       expect(prismaMock.title.findUnique).not.toHaveBeenCalled();
       expect(prismaMock.episode.findUnique).not.toHaveBeenCalled();
@@ -179,6 +180,7 @@ describe("S3EventService", () => {
       expect(videoSchedulerMock.schedule).toHaveBeenCalledWith({
         id: TITLE_ID,
         type: VideoType.EPISODE,
+        rawKey: `episode-video/${TITLE_ID}`,
       });
     });
 
@@ -230,6 +232,7 @@ describe("S3EventService", () => {
       expect(videoSchedulerMock.schedule).toHaveBeenCalledWith({
         id: TITLE_ID,
         type: VideoType.EPISODE,
+        rawKey: TITLE_ID,
       });
     });
   });
@@ -255,6 +258,7 @@ describe("S3EventService", () => {
       expect(videoSchedulerMock.schedule).toHaveBeenCalledWith({
         id: "11111111-1111-4111-8111-111111111111",
         type: VideoType.EPISODE,
+        rawKey: "11111111-1111-4111-8111-111111111111",
       });
       expect(mockSend).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -285,6 +289,7 @@ describe("S3EventService", () => {
       expect(videoSchedulerMock.schedule).toHaveBeenCalledWith({
         id: "22222222-2222-4222-8222-222222222222",
         type: VideoType.MOVIE,
+        rawKey: "22222222-2222-4222-8222-222222222222",
       });
     });
 

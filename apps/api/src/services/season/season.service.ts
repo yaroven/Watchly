@@ -1,14 +1,11 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { Episode, Prisma, Season } from "@prisma/client";
+import { Prisma, Season } from "@prisma/client";
 import { Filter, Sorting } from "../../common/pagination/pagination.types";
 import { buildOrderBy, buildWhere } from "../../common/pagination/prisma-query.util";
-import { settleAll } from "../../common/utils/settle-all-or-throw.util";
 import { Logged } from "../../decorators/logged.decorator";
 import { ImageService } from "../image/image.service";
 import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { VideoType } from "../queues/video-transcoder/enums/video-type.enum";
-import { buildSeasonVideoPrefix } from "../s3/processed-key";
 import { toSeasonView } from "./season.mapper";
 import { SeasonInput, SeasonView } from "./season.types";
 
@@ -72,26 +69,8 @@ export class SeasonService {
     }
 
     const deleted = await this.prisma.season.delete({ where: { id } });
-    await this.cleanupAssets(season);
+    await this.mediaAssetService.cleanupSeason(season);
 
     return this.toView(deleted);
-  }
-
-  @Logged()
-  async cleanupAssets(season: Season & { episodes: Episode[] }): Promise<void> {
-    await settleAll(season.episodes, (episode) =>
-      this.mediaAssetService.cleanupVideoAsset(episode.id, VideoType.EPISODE),
-    );
-
-    await settleAll(
-      [
-        () => this.imageService.deleteStoredImage(season.posterKey),
-        () =>
-          this.mediaAssetService.deleteProcessedFolder(
-            buildSeasonVideoPrefix(season.titleId, season.id),
-          ),
-      ],
-      (run) => run(),
-    );
   }
 }

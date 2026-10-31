@@ -1,16 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { Prisma, TitleType } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { paginate } from "../../common/pagination/paginate.util";
 import { Filter, PageQuery, Sorting } from "../../common/pagination/pagination.types";
 import { buildOrderBy } from "../../common/pagination/prisma-query.util";
-import { settleAll } from "../../common/utils/settle-all-or-throw.util";
 import { Logged } from "../../decorators/logged.decorator";
 import { ImageService } from "../image/image.service";
 import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { VideoType } from "../queues/video-transcoder/enums/video-type.enum";
-import { buildVideoPrefix } from "../s3/processed-key";
-import { SeasonService } from "../season/season.service";
 import { titleEngagementViewFromRelations } from "../title-engagement/title-engagement.mapper";
 import { NO_VOTE_OVERRIDES, VoteOverrides } from "../vote-cache/vote-cache.const";
 import { VoteStateService } from "../vote-cache/vote-state.service";
@@ -25,7 +21,6 @@ export class TitleService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly imageService: ImageService,
-    private readonly seasonService: SeasonService,
     private readonly mediaAssetService: MediaAssetService,
     private readonly voteState: VoteStateService,
   ) {}
@@ -143,16 +138,7 @@ export class TitleService {
       include: titleQuery.deleted(),
     });
 
-    await Promise.all([
-      this.imageService.deleteStoredImage(title.posterKey),
-      this.mediaAssetService.cleanupVideoAsset(
-        id,
-        VideoType.MOVIE,
-        buildVideoPrefix({ type: VideoType.MOVIE, titleId: id }),
-      ),
-      title.type === TitleType.SERIES &&
-        settleAll(title.seasons, (season) => this.seasonService.cleanupAssets(season)),
-    ]);
+    await this.mediaAssetService.cleanupTitle(title);
 
     return titleViewWithoutEngagement(deleted);
   }
