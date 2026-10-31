@@ -1,6 +1,6 @@
 # apps/api
 
-NestJS 11, Prisma + Postgres, BullMQ on Redis, AWS SDK v3 for S3/SQS. Two entrypoints from one codebase and one
+NestJS 11, Prisma + Postgres, BullMQ on Redis, AWS SDK v3 for S3 (DigitalOcean Spaces in prod). Two entrypoints from one codebase and one
 Dockerfile: `src/main.ts` (HTTP, port 3000) and
 `src/worker-main.ts` (background worker). `README.md` here is `nest new` boilerplate — ignore it.
 
@@ -14,7 +14,7 @@ One directory per domain under `src/`, each with `*.module.ts`, `*.controller.ts
 `artist` `comment` `episode` `external-ratings` `genre` `season` `title` `title-cast`
 `user` `watchlist`
 
-Infrastructure: `auth`, `prisma`, `redis`, `s3`, `s3-event`, `media-asset`, `poster`,
+Infrastructure: `auth`, `prisma`, `redis`, `s3`, `media-asset`, `poster`,
 `video-transcoder`, `reaction-flush`, `vote-cache`, `metrics`, `feature-flag` (OpenFeature; routes gate with
 `@RequireFeature`), `logging`, `worker` (the worker process's root module, which belongs
 to no domain because it composes all of them),
@@ -95,10 +95,10 @@ find out. The api injects `VideoTranscodeScheduler`
 `VideoTranscodeScheduler.schedule`, `ImageTranscodeScheduler.schedule` and
 `ReactionFlushScheduler.schedule` are the only producers — the third is not a transcoder, but it follows the rule for
 the same reason. A feature injects the scheduler and sees neither a `Queue` nor a job name. Handing out an upload URL
-needs no queue at all — `ImageService` only presigns, and the job is raised by the S3 event — so
-`UserModule`, and `AuthModule` behind it, pull in no Redis queue. `s3-event`
-maps the raw key's kind to an `ImageKind` the same way it maps one to a `VideoType`, and calls the producer; the dedup
-convention lives with the producer too, rather than once per feature — `image-<rawKey>` as a `jobId`, and
+needs no queue at all — `ImageService` only presigns and checks what was uploaded, and the job is raised by
+`ImagesService` (`app/endpoints/images/`) when the client confirms the upload — so `UserModule`, and `AuthModule`
+behind it, pull in no Redis queue; only the images endpoint module does. The dedup convention lives with the producer
+too, rather than once per feature — `image-<rawKey>` as a `jobId`, and
 `vote-<arc>-<subjectId>-<userId>` as a
 `deduplication.id` for a flush. **A flush must not set a `jobId`**: an explicit one is checked for existence before
 BullMQ's deduplication runs, so it silently drops a vote that arrives while the flush is being processed.
@@ -124,13 +124,18 @@ routes. The processed key is versioned
 `S3Service.uploadStream` sets no `Cache-Control` at all today — the versioned key is what would make an `immutable` one
 safe to add, not evidence that one is set.
 
-Over HTTP every kind has the same pair: `POST …/upload-url` with `{ contentType }` and
-`DELETE …`, on `/titles/:id/poster`, `/seasons/:id/poster`, `/artists/:id/photo` and
-`/users/me/avatar`. The PUT URL is signed for that content type, so S3 refuses any other; the worker still runs ffprobe,
+Over HTTP every kind has the same three routes: `POST …/upload-url` with `{ contentType }`,
+`POST …/upload-url/complete` with `{ rawKey }` and `DELETE …`, on `/titles/:id/poster`, `/seasons/:id/poster`,
+`/artists/:id/photo` and `/users/me/avatar`. The PUT URL is signed for that content type, so S3 refuses any other; the worker still runs ffprobe,
 because a header proves nothing about the bytes.
 
-An upload is **asynchronous**: the worker records the key off the S3 event, so creating or updating the owner never
-mentions its image. `posterUploaded` / `photoUploaded` are gone, and `forbidNonWhitelisted` answers 400 to anything
+An upload is **confirmed by the client, then processed asynchronously** (ADR-0018). There is no bucket notification
+and no SQS: the storage is DigitalOcean Spaces, which has neither. After its PUT the client posts the `rawKey` to
+`upload-url/complete`; `ImageService.assertUploaded` refuses a key that is not this owner's and this kind's, or that
+nothing was uploaded to, and only then is the conversion queued — `image-<rawKey>` makes a repeated confirmation queue
+one job. A video confirms itself the same way through `completeUpload`, and `POST …/transcode` re-queues one by hand,
+which also finds a pre-scheme bare-uuid object. An upload whose client never confirms stays an unprocessed raw object:
+nothing sweeps the raw bucket yet. Creating or updating the owner never mentions its image. `posterUploaded` / `photoUploaded` are gone, and `forbidNonWhitelisted` answers 400 to anything
 still sending them. Removing an image clears the column before deleting the object, so a row never points at nothing.
 Cleanup goes **by the stored key** (`deleteStoredImage`), never one derived from the id, because the version exists only
 on the row: a caller that deletes the row hands the key over.
@@ -150,7 +155,7 @@ still processing is client work that has not been done.
   actually emit**. A route documenting only 200 is wrong.
 - **Services log calls through `@Logged()` on each method, and only events through a `Logger`** (never `console.log`). Every
   `async` method of a service carries it, private ones included; sync helpers and mappers do not, unless their call is
-  worth a line (`FfmpegRunner.start`, `S3EventService.parseBody`). It is a method decorator only — there is no class
+  worth a line (`FfmpegRunner.start`, `HlsTranscoder.spawned`). It is a method decorator only — there is no class
   form, so what a class logs is visible method by method. Each line carries the class as `context` and
   `<Class.method>` as `action`. It writes `<Class.method> completed` with its duration at info, the arguments and the
   result at debug, and a failure with its arguments and stack — at `warn` for a 4xx `HttpException`, `error` otherwise.
@@ -158,15 +163,15 @@ still processing is client work that has not been done.
   - There is deliberately no way to take a method out: a noisy one goes to `completedLevel: "debug"`
     (`S3Service.getUploadPartPresignedUrl`, once per part), so its failures still reach the log.
   - A failure that is caught and swallowed is invisible to the aspect, so the operation that can fail goes in a
-    decorated method of its own that throws, and the caller catches it (`queueUrlOf`, `readDlqDepth`,
-    `S3Service.headBucket`). The caller swallows it with a `try` around an `await` and a catch that holds only
+    decorated method of its own that throws, and the caller catches it (`QueueMetricsService.countJobs`,
+    `ReactionDriftService.read`, `S3Service.headBucket`). The caller swallows it with a `try` around an `await` and a catch that holds only
     `// @Logged has already logged this failure` — never `.catch(() => undefined)`. The `try` must sit outside the
     wrapper, around a call to a `@Logged` method: wrapped around a raw client inside a method's own body, the
     aspect sees a success and the failure is gone. Where there is no `await` to put a `try` around (a callback, a
-    fire-and-forget), the call goes in a small async method that does (`reportProgress`, `abortIfGone`,
-    `runPollLoop`), started with `void`.
+    fire-and-forget), the call goes in a small async method that does (`reportProgress`, `abortIfGone`), started
+    with `void`.
   - A `Logger` of the service's own is for the one thing the aspect cannot see: an event that is neither an input, a
-    result nor a failure of a method — a skipped S3 event, repaired counter drift, OMDb having no match, OMDb being
+    result nor a failure of a method — repaired counter drift, OMDb having no match, OMDb being
     unconfigured. A race that ends as expected is not one: a watchlist id whose title was deleted between the two reads
     is dropped from the page without a line. Never use it to restate a call, its result or its error, and
     never throw just to get a warning written: a rejected Promise swallowed at once reads as a failure and logs a
@@ -285,7 +290,7 @@ still processing is client work that has not been done.
   - The cost is shared state: observations carry over from one test to the next, so a spec asserting an exact value
     calls `register.resetMetrics()` in `beforeEach` (it clears values and keeps registrations). Four specs do.
   - Metrics with a `collect` callback are the awkward case, since `collect` runs on the metric and has no instance to
-    read from. `QueueMetricsService` and `S3EventService`
+    read from. `QueueMetricsService` and `VoteDriftMetricsService`
     each set a module-level holder from their constructor, replacing rather than appending so a second construction
     leaves one sampler.
 - **`GET /metrics` on the application port**, served by `MetricsController`, excluded from Swagger and `@SkipThrottle()`
@@ -296,7 +301,7 @@ still processing is client work that has not been done.
     proxy, while ingress-nginx always sets it. The alternative was an nginx `server-snippet` denying the path, which
     ingress-nginx ≥ 1.9 ignores unless `allow-snippet-annotations` is re-enabled — a protection that can silently not
     apply is worse than none.
-  - Collection is not free (it reads Redis, and SQS), and on this port it competes with user traffic. Keep `collect`
+  - Collection is not free (it reads Redis), and on this port it competes with user traffic. Keep `collect`
     callbacks cheap, and never put metrics behind
     `/health`: the probes read that one, so a Redis blip would make kubelet restart the pod.
 - **The worker exposes nothing.** `worker-main.ts` builds an application context with no HTTP server, and it was left
@@ -334,13 +339,13 @@ still processing is client work that has not been done.
   transcoder that owns the queue. In prod the api runs two replicas and both publish these series, so **aggregate with
   `max by (queue, state)`**, never `sum`.
 - **A collector that throws fails the whole scrape.** `registry.metrics()` rejects as a unit, so an unreachable Redis or
-  a denied SQS call would blank out every other metric in the process, including the ones that say it is alive. Anything
+  a failed read would blank out every other metric in the process, including the ones that say it is alive. Anything
   sampling an external system in `collect` swallows and logs its own failure — `QueueMetricsService.sample`
-  and `S3EventService.sampleDlq` both do.
+  and `VoteDriftMetricsService.sample` both do.
 - **"Unknown" must not serialise as a zero**, for the same reason `viewer` is nullable. An unlabelled gauge reports `0`
-  from the moment it is registered, so `sqs_dlq_messages`
-  carries a `queue` label and the series does not exist until a depth has actually been read. Reporting a confident `0`
-  for a dead-letter queue that was never resolved would mean an alert on `> 0` never fires.
+  from the moment it is registered, so `reaction_counter_drift_subjects` carries an `arc` label and the series does not
+  exist until a count has actually been read. Reporting a confident `0` for a drift nobody has measured would mean an
+  alert on `> 0` never fires.
 - An abort is not a failure. `video_transcode_duration_seconds` separates
   `outcome="aborted"` — the entity was deleted mid-transcode, and the job returns rather than throwing, so BullMQ does
   not retry — from `outcome="failed"`. Collapsing them makes routine admin deletions fire the failure-ratio alert.

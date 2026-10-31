@@ -103,17 +103,6 @@ export const IMAGE_TARGETS: Record<ImageKind, ImageTarget> = {
   },
 };
 
-const IMAGE_KINDS_BY_RAW_KIND = new Map(
-  (Object.entries(IMAGE_TARGETS) as [ImageKind, ImageTarget][]).map(([kind, target]) => [
-    target.rawKind,
-    kind,
-  ]),
-);
-
-export function imageKindOfRawKind(kind: RawObjectKind): ImageKind | undefined {
-  return IMAGE_KINDS_BY_RAW_KIND.get(kind);
-}
-
 export function imageProfile(kind: ImageKind): ImageProfile {
   return IMAGE_TARGETS[kind].profile;
 }

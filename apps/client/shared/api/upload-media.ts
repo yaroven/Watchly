@@ -17,12 +17,13 @@ type UploadMultipartFileParams = {
   onPartProgress?: (completedParts: number, totalParts: number) => void;
 };
 
-export type GetImageUploadUrl = (contentType: string) => Promise<{ uploadUrl: string }>;
+export type GetImageUploadUrl = (contentType: string) => Promise<{ uploadUrl: string; rawKey: string }>;
 
 type UploadImageFileParams = {
   files?: FileList | null;
   getUploadUrl: GetImageUploadUrl;
   uploadToUrl: UploadToUrl;
+  completeUpload: (rawKey: string) => Promise<void>;
   onProgress?: UploadProgressHandler;
 };
 
@@ -101,13 +102,15 @@ export const uploadImageFile = async ({
   files,
   getUploadUrl,
   uploadToUrl,
+  completeUpload,
   onProgress = noopProgress,
 }: UploadImageFileParams): Promise<boolean> => {
   const file = getFirstFile(files);
   if (!file) return false;
 
-  const { uploadUrl } = await getUploadUrl(file.type);
+  const { uploadUrl, rawKey } = await getUploadUrl(file.type);
   await uploadToUrl(uploadUrl, file, onProgress);
+  await completeUpload(rawKey);
 
   return true;
 };

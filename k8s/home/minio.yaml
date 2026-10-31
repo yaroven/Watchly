@@ -1,10 +1,8 @@
 # S3 without AWS. MinIO speaks the same API and the same path-style URLs the
 # client's image proxy matches on, so only the endpoints change.
 #
-# What it cannot do is the bucket-notification-into-SQS wiring: it rejects an
-# AWS queue ARN. That is why the overlay sets S3_EVENTS_ENABLED=false — the
-# api then schedules the transcode itself when an upload completes, and no
-# queue service is needed at all.
+# Uploads are confirmed by the client, so no bucket notification or queue
+# service is needed for it to work. What it cannot do is PutBucketCors.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

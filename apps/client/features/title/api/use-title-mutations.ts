@@ -72,6 +72,7 @@ export const useCreateTitleWithUpload = (options?: CreateTitleWithUploadOptions)
         await uploadImageFile({
           files: posterFile,
           getUploadUrl: (contentType) => titleService.getPosterUploadUrl(titleId, contentType),
+          completeUpload: (rawKey) => titleService.completePosterUpload(titleId, rawKey),
           uploadToUrl: titleService.uploadToS3,
           onProgress: options?.onUploadProgress,
         });
@@ -112,6 +113,7 @@ export const useUpdateTitle = (options?: Omit<UseMutationOptions<Title, Error, U
       await uploadImageFile({
         files: payload.posterFile,
         getUploadUrl: (contentType) => titleService.getPosterUploadUrl(id, contentType),
+        completeUpload: (rawKey) => titleService.completePosterUpload(id, rawKey),
         uploadToUrl: titleService.uploadToS3,
       });
 

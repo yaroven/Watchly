@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { Logged } from "../../decorators/logged.decorator";
 import { PrismaService } from "../prisma/prisma.service";
 import BucketType from "../s3/enums/bucket-type.enum";
-import { buildRawKey } from "../s3/raw-key";
+import { buildRawKey, parseRawKey } from "../s3/raw-key";
 import { S3Service } from "../s3/s3.service";
 import { ImageKind } from "./enums/image-kind.enum";
 import { ImageUploadInput, ImageUploadUrl } from "./image.types";
@@ -17,6 +17,22 @@ export class ImageService {
     private readonly s3Service: S3Service,
     private readonly prisma: PrismaService,
   ) {}
+
+  @Logged({ failedLevel: "warn" })
+  async assertUploaded(kind: ImageKind, ownerId: string, rawKey: string): Promise<void> {
+    const target = IMAGE_TARGETS[kind];
+    const parsed = parseRawKey(rawKey);
+
+    if (!parsed?.name || parsed.kind !== target.rawKind || parsed.ownerId !== ownerId) {
+      throw new BadRequestException(
+        `That upload is not a ${target.label.toLowerCase()} image for ${ownerId}`,
+      );
+    }
+
+    if (!(await this.s3Service.objectExists(rawKey, BucketType.RAW))) {
+      throw new BadRequestException("Nothing has been uploaded to that key yet");
+    }
+  }
 
   @Logged()
   async createUploadUrl(
