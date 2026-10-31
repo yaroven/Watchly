@@ -27,12 +27,12 @@ const TitleEngagementService = {
   },
 
   addToWatchlist: async (titleId: string): Promise<TitleEngagement> => {
-    const { data } = await api.post<TitleEngagement>(`/titles/${titleId}/watchlist`);
+    const { data } = await api.post<TitleEngagement>(`/watchlist/${titleId}`);
     return data;
   },
 
   removeFromWatchlist: async (titleId: string): Promise<TitleEngagement> => {
-    const { data } = await api.delete<TitleEngagement>(`/titles/${titleId}/watchlist`);
+    const { data } = await api.delete<TitleEngagement>(`/watchlist/${titleId}`);
     return data;
   },
 

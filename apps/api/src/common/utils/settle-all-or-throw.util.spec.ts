@@ -1,42 +1,35 @@
-import { InternalServerErrorException, Logger } from "@nestjs/common";
-import { settleAllOrLog, settleAllOrThrow } from "./settle-all-or-throw.util";
+import { InternalServerErrorException } from "@nestjs/common";
+import { settleAll, settleAllOrThrow } from "./settle-all-or-throw.util";
+
+const context = { itemLabel: "item", parentLabel: "parent", parentId: "parent-1" };
 
 describe("settleAllOrThrow", () => {
-  let logger: jest.Mocked<Logger>;
-
-  beforeEach(() => {
-    logger = { error: jest.fn() } as unknown as jest.Mocked<Logger>;
-  });
-
   it("should resolve without throwing when every item succeeds", async () => {
-    const items = ["a", "b", "c"];
     const action = settleAllOrThrow(
-      items,
+      ["a", "b", "c"],
       async () => undefined,
       (item) => item,
-      logger,
-      { itemLabel: "item", parentLabel: "parent", parentId: "parent-1" },
+      context,
     );
 
     await expect(action).resolves.toBeUndefined();
-    expect(logger.error).not.toHaveBeenCalled();
   });
 
-  it("should log each failure and throw once when some items fail", async () => {
-    const items = ["a", "b", "c"];
+  it("should run every item and throw once, naming only the failed ones", async () => {
+    const ran: string[] = [];
     const action = settleAllOrThrow(
-      items,
+      ["a", "b", "c"],
       async (item) => {
+        ran.push(item);
         if (item === "b") throw new Error("b failed");
       },
       (item) => item,
-      logger,
-      { itemLabel: "item", parentLabel: "parent", parentId: "parent-1" },
+      context,
     );
 
     await expect(action).rejects.toThrow(InternalServerErrorException);
-    expect(logger.error).toHaveBeenCalledTimes(1);
-    expect(logger.error).toHaveBeenCalledWith(expect.stringContaining("item b"), expect.any(Error));
+    await expect(action).rejects.toThrow("Failed to clean up 1 of 3 items for parent parent-1: b");
+    expect(ran).toEqual(["a", "b", "c"]);
   });
 
   it("should never run more items concurrently than the configured limit", async () => {
@@ -53,8 +46,7 @@ describe("settleAllOrThrow", () => {
         active--;
       },
       (item) => String(item),
-      logger,
-      { itemLabel: "item", parentLabel: "parent", parentId: "parent-1" },
+      context,
       3,
     );
 
@@ -62,45 +54,15 @@ describe("settleAllOrThrow", () => {
   });
 });
 
-describe("settleAllOrLog", () => {
-  let logger: jest.Mocked<Logger>;
-
-  beforeEach(() => {
-    logger = { error: jest.fn() } as unknown as jest.Mocked<Logger>;
-  });
-
-  it("should resolve without throwing even when every item fails", async () => {
-    const items = ["a", "b"];
-    const action = settleAllOrLog(
-      items,
-      async () => {
-        throw new Error("cleanup failed");
-      },
-      (item) => item,
-      logger,
-      { itemLabel: "asset", parentLabel: "parent", parentId: "parent-1" },
-    );
+describe("settleAll", () => {
+  it("should run every item and resolve even when every item fails", async () => {
+    const ran: string[] = [];
+    const action = settleAll(["a", "b"], async (item) => {
+      ran.push(item);
+      throw new Error("cleanup failed");
+    });
 
     await expect(action).resolves.toBeUndefined();
-    expect(logger.error).toHaveBeenCalledTimes(2);
-  });
-
-  it("should only log failed items, not successful ones", async () => {
-    const items = ["a", "b", "c"];
-    await settleAllOrLog(
-      items,
-      async (item) => {
-        if (item === "b") throw new Error("boom");
-      },
-      (item) => item,
-      logger,
-      { itemLabel: "asset", parentLabel: "parent", parentId: "parent-1" },
-    );
-
-    expect(logger.error).toHaveBeenCalledTimes(1);
-    expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining("asset b"),
-      expect.any(Error),
-    );
+    expect(ran).toEqual(["a", "b"]);
   });
 });

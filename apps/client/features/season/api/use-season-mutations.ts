@@ -1,7 +1,7 @@
 import createMutationHook from "@/shared/api/createMutationHook";
-import { updateEntityPoster, withPosterUploaded } from "@/shared/api/upload-media";
+import { uploadImageFile } from "@/shared/api/upload-media";
 import { UseMutationOptions } from "@tanstack/react-query";
-import { CreateSeasonDto, Season, SeasonFormValues, UpdateSeasonDto } from "../schemas/season";
+import { CreateSeasonDto, Season, SeasonFormValues } from "../schemas/season";
 import seasonKeys from "./season.keys";
 import SeasonService from "./season.service";
 
@@ -12,20 +12,13 @@ export const useCreateSeason = (options?: Omit<UseMutationOptions<Season, Error,
   const useCreateSeason = createMutationHook({
     mutationFn: async ({ posterFile, ...payload }: CreateSeasonWithPosterPayload) => {
       const season = await SeasonService.create(payload);
-      return updateEntityPoster({
-        entity: season,
+      await uploadImageFile({
         files: posterFile,
-        getPosterUploadUrl: SeasonService.getPosterUploadUrl,
+        getUploadUrl: (contentType) => SeasonService.getPosterUploadUrl(season.id, contentType),
         uploadToUrl: SeasonService.uploadToS3,
-        buildPayload: (season, posterUploaded): UpdateSeasonDto => ({
-          number: season.number,
-          name: season.name,
-          description: season.description,
-          titleId: season.titleId,
-          posterUploaded,
-        }),
-        update: SeasonService.update,
       });
+
+      return season;
     },
     getInvalidateKeys: () => [seasonKeys.all()],
   });
@@ -38,14 +31,13 @@ export const useUpdateSeason = (
   const useUpdateSeason = createMutationHook({
     mutationFn: async ({ id, payload }: { id: string; payload: UpdateSeasonWithPosterPayload }) => {
       const { posterFile, ...seasonPayload } = payload;
-      const nextPayload = await withPosterUploaded<UpdateSeasonDto>({
-        payload: seasonPayload,
+      await uploadImageFile({
         files: posterFile,
-        getPosterUploadUrl: () => SeasonService.getPosterUploadUrl(id),
+        getUploadUrl: (contentType) => SeasonService.getPosterUploadUrl(id, contentType),
         uploadToUrl: SeasonService.uploadToS3,
       });
 
-      return SeasonService.update(id, nextPayload);
+      return SeasonService.update(id, seasonPayload);
     },
     getInvalidateKeys: ({ id }: { id: string }) => [seasonKeys.all(), seasonKeys.detail(id)],
   });
