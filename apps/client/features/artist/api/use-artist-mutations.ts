@@ -1,7 +1,7 @@
 import createMutationHook from "@/shared/api/createMutationHook";
-import { updateEntityPoster, withPosterUploaded } from "@/shared/api/upload-media";
+import { uploadImageFile } from "@/shared/api/upload-media";
 import { UseMutationOptions } from "@tanstack/react-query";
-import { Artist, ArtistFormValues, UpdateArtistDto } from "../schemas/artist";
+import { Artist, ArtistFormValues } from "../schemas/artist";
 import artistKeys from "./artist.keys";
 import artistService from "./artist.service";
 
@@ -20,16 +20,11 @@ export const useCreateArtistWithUpload = (options?: CreateArtistWithUploadOption
 
       try {
         createdArtist = await artistService.create(payload);
-        createdArtist = await updateEntityPoster({
-          entity: createdArtist,
+        const artistId = createdArtist.id;
+        await uploadImageFile({
           files: photoFile,
-          getPosterUploadUrl: artistService.getPhotoUploadUrl,
+          getUploadUrl: (contentType) => artistService.getPhotoUploadUrl(artistId, contentType),
           uploadToUrl: artistService.uploadToS3,
-          buildPayload: (artist, photoUploaded): UpdateArtistDto => ({
-            name: artist.name,
-            photoUploaded,
-          }),
-          update: artistService.update,
           onProgress: options?.onUploadProgress,
         });
 
@@ -55,15 +50,14 @@ export const useUpdateArtistWithUpload = (options?: UpdateArtistMutationOptions)
   const useUpdateArtistWithUpload = createMutationHook({
     mutationFn: async ({ id, payload }: UpdateArtistMutationArgs) => {
       const { name, photoFile } = payload;
-      const nextPayload = await withPosterUploaded<UpdateArtistDto>({
-        payload: { name },
+      await uploadImageFile({
         files: photoFile,
-        getPosterUploadUrl: () => artistService.getPhotoUploadUrl(id),
+        getUploadUrl: (contentType) => artistService.getPhotoUploadUrl(id, contentType),
         uploadToUrl: artistService.uploadToS3,
         onProgress: options?.onUploadProgress,
       });
 
-      return artistService.update(id, nextPayload);
+      return artistService.update(id, { name });
     },
     getInvalidateKeys: ({ id }: UpdateArtistMutationArgs) => [artistKeys.all(), artistKeys.detail(id)],
   });

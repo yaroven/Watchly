@@ -1,7 +1,5 @@
 type UploadProgressHandler = (progress: number) => void;
 type UploadToUrl = (url: string, file: File, onProgress: UploadProgressHandler) => Promise<void>;
-type EntityWithId = { id: string };
-type PosterUploadedFlag = { posterUploaded: true };
 
 export type UploadPartToUrl = (url: string, chunk: Blob, onLoaded: (loaded: number) => void) => Promise<string>;
 
@@ -19,28 +17,11 @@ type UploadMultipartFileParams = {
   onPartProgress?: (completedParts: number, totalParts: number) => void;
 };
 
-type UploadPosterFileParams = {
-  files?: FileList | null;
-  getPosterUploadUrl: () => Promise<{ uploadUrl: string }>;
-  uploadToUrl: UploadToUrl;
-  onProgress?: UploadProgressHandler;
-};
+export type GetImageUploadUrl = (contentType: string) => Promise<{ uploadUrl: string }>;
 
-type UpdateEntityPosterParams<TEntity extends EntityWithId, TPayload> = {
-  entity: TEntity;
+type UploadImageFileParams = {
   files?: FileList | null;
-  getPosterUploadUrl: (id: string) => Promise<{ uploadUrl: string }>;
-  uploadToUrl: UploadToUrl;
-  /** Update endpoints take the full entity, not just the poster — build that payload from `entity` plus the flag. */
-  buildPayload: (entity: TEntity, posterUploaded: true) => TPayload;
-  update: (id: string, payload: TPayload) => Promise<TEntity>;
-  onProgress?: UploadProgressHandler;
-};
-
-type WithPosterUploadedParams<TPayload extends object> = {
-  payload: TPayload;
-  files?: FileList | null;
-  getPosterUploadUrl: () => Promise<{ uploadUrl: string }>;
+  getUploadUrl: GetImageUploadUrl;
   uploadToUrl: UploadToUrl;
   onProgress?: UploadProgressHandler;
 };
@@ -122,70 +103,17 @@ export const uploadMultipartFile = async ({
   return true;
 };
 
-/**
- * Uploads the image and reports whether there was one, nothing more.
- *
- * It used to return the read URL the endpoint handed back, which the caller then
- * sent to the update endpoint to be stored in the row — a presigned URL with an
- * hour on it, persisted. The key is derived from the entity server-side now, so
- * the only thing worth telling the server is that the object is there.
- */
-export const uploadPosterFile = async ({
+export const uploadImageFile = async ({
   files,
-  getPosterUploadUrl,
+  getUploadUrl,
   uploadToUrl,
   onProgress = noopProgress,
-}: UploadPosterFileParams): Promise<boolean> => {
+}: UploadImageFileParams): Promise<boolean> => {
   const file = getFirstFile(files);
   if (!file) return false;
 
-  const { uploadUrl } = await getPosterUploadUrl();
+  const { uploadUrl } = await getUploadUrl(file.type);
   await uploadToUrl(uploadUrl, file, onProgress);
 
   return true;
-};
-
-export const updateEntityPoster = async <TEntity extends EntityWithId, TPayload>({
-  entity,
-  files,
-  getPosterUploadUrl,
-  uploadToUrl,
-  buildPayload,
-  update,
-  onProgress,
-}: UpdateEntityPosterParams<TEntity, TPayload>): Promise<TEntity> => {
-  const uploaded = await uploadPosterFile({
-    files,
-    getPosterUploadUrl: () => getPosterUploadUrl(entity.id),
-    uploadToUrl,
-    onProgress,
-  });
-
-  if (!uploaded) return entity;
-
-  return update(entity.id, buildPayload(entity, true));
-};
-
-export const withPosterUploaded = async <TPayload extends object>({
-  payload,
-  files,
-  getPosterUploadUrl,
-  uploadToUrl,
-  onProgress,
-}: WithPosterUploadedParams<TPayload>): Promise<TPayload & Partial<PosterUploadedFlag>> => {
-  const uploaded = await uploadPosterFile({
-    files,
-    getPosterUploadUrl,
-    uploadToUrl,
-    onProgress,
-  });
-
-  // Left off entirely when there is no new image: `false` would clear a poster
-  // the user never touched.
-  if (!uploaded) return payload;
-
-  return {
-    ...payload,
-    posterUploaded: true,
-  };
 };

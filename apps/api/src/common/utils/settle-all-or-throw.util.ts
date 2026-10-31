@@ -1,4 +1,4 @@
-import { InternalServerErrorException, Logger } from "@nestjs/common";
+import { InternalServerErrorException } from "@nestjs/common";
 import pSettle from "p-settle";
 
 export interface SettleAllOrThrowContext {
@@ -13,7 +13,6 @@ export async function settleAllOrThrow<T>(
   items: T[],
   fn: (item: T) => Promise<unknown>,
   getId: (item: T) => string,
-  logger: Logger,
   context: SettleAllOrThrowContext,
   concurrency: number = DEFAULT_CONCURRENCY,
 ): Promise<void> {
@@ -22,48 +21,24 @@ export async function settleAllOrThrow<T>(
     { concurrency },
   );
 
-  const failed = results
-    .map((result, index) => ({ result, id: getId(items[index]) }))
-    .filter(
-      (entry): entry is { result: pSettle.PromiseRejectedResult; id: string } =>
-        entry.result.isRejected,
-    );
+  const failedIds = results.flatMap((result, index) =>
+    result.isRejected ? [getId(items[index])] : [],
+  );
 
-  if (failed.length === 0) return;
-
-  for (const { id, result } of failed) {
-    logger.error(
-      `Failed to clean up ${context.itemLabel} ${id} while deleting ${context.parentLabel} ${context.parentId}`,
-      result.reason,
-    );
-  }
+  if (failedIds.length === 0) return;
 
   throw new InternalServerErrorException(
-    `Failed to clean up ${failed.length} of ${items.length} ${context.itemLabel}s for ${context.parentLabel} ${context.parentId}: ${failed
-      .map((f) => f.id)
-      .join(", ")}`,
+    `Failed to clean up ${failedIds.length} of ${items.length} ${context.itemLabel}s for ${context.parentLabel} ${context.parentId}: ${failedIds.join(", ")}`,
   );
 }
 
-export async function settleAllOrLog<T>(
+export async function settleAll<T>(
   items: T[],
   fn: (item: T) => Promise<unknown>,
-  getId: (item: T) => string,
-  logger: Logger,
-  context: SettleAllOrThrowContext,
   concurrency: number = DEFAULT_CONCURRENCY,
 ): Promise<void> {
-  const results = await pSettle(
+  await pSettle(
     items.map((item) => () => fn(item)),
     { concurrency },
   );
-
-  results.forEach((result, index) => {
-    if (result.isRejected) {
-      logger.error(
-        `Failed to clean up ${context.itemLabel} ${getId(items[index])} after deleting ${context.parentLabel} ${context.parentId}`,
-        result.reason,
-      );
-    }
-  });
 }
