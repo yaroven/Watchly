@@ -24,6 +24,7 @@ export const useCreateArtistWithUpload = (options?: CreateArtistWithUploadOption
         await uploadImageFile({
           files: photoFile,
           getUploadUrl: (contentType) => artistService.getPhotoUploadUrl(artistId, contentType),
+          completeUpload: (rawKey) => artistService.completePhotoUpload(artistId, rawKey),
           uploadToUrl: artistService.uploadToS3,
           onProgress: options?.onUploadProgress,
         });
@@ -53,6 +54,7 @@ export const useUpdateArtistWithUpload = (options?: UpdateArtistMutationOptions)
       await uploadImageFile({
         files: photoFile,
         getUploadUrl: (contentType) => artistService.getPhotoUploadUrl(id, contentType),
+        completeUpload: (rawKey) => artistService.completePhotoUpload(id, rawKey),
         uploadToUrl: artistService.uploadToS3,
         onProgress: options?.onUploadProgress,
       });

@@ -106,9 +106,13 @@ const TitleService = {
     return eTag;
   },
 
-  getPosterUploadUrl: async (id: string, contentType: string): Promise<{ uploadUrl: string }> => {
-    const { data } = await api.post<{ uploadUrl: string }>(`/${prefix}/${id}/poster/upload-url`, { contentType });
+  getPosterUploadUrl: async (id: string, contentType: string): Promise<{ uploadUrl: string; rawKey: string }> => {
+    const { data } = await api.post<{ uploadUrl: string; rawKey: string }>(`/${prefix}/${id}/poster/upload-url`, { contentType });
     return data;
+  },
+
+  completePosterUpload: async (id: string, rawKey: string): Promise<void> => {
+    await api.post(`/${prefix}/${id}/poster/upload-url/complete`, { rawKey });
   },
 
   async uploadToS3(url: string, file: File, onProgress: (percent: number) => void): Promise<void> {

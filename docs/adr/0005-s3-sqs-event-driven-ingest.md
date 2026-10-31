@@ -1,6 +1,6 @@
 # ADR-0005 — Ingest is event-driven: S3 → SQS → BullMQ
 
-**Status:** accepted
+**Status:** superseded by ADR-0018 — Spaces has no bucket notifications, so the client confirms uploads instead.
 
 ## Context
 

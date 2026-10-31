@@ -13,8 +13,6 @@ export interface RawObjectKey {
   name?: string;
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 const KINDS = new Set<string>(Object.values(RawObjectKind));
 
 export function buildRawKey({ kind, ownerId, name }: RawObjectKey): string {
@@ -31,8 +29,4 @@ export function parseRawKey(key: string): RawObjectKey | null {
     ownerId,
     ...(rest.length > 0 ? { name: rest.join("/") } : {}),
   };
-}
-
-export function isLegacyBareUuidKey(key: string): boolean {
-  return UUID.test(key);
 }

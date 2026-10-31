@@ -58,9 +58,13 @@ const ArtistService = {
     await api.delete(`/${prefix}/${id}`);
   },
 
-  getPhotoUploadUrl: async (id: string, contentType: string): Promise<{ uploadUrl: string }> => {
-    const { data } = await api.post<{ uploadUrl: string }>(`/${prefix}/${id}/photo/upload-url`, { contentType });
+  getPhotoUploadUrl: async (id: string, contentType: string): Promise<{ uploadUrl: string; rawKey: string }> => {
+    const { data } = await api.post<{ uploadUrl: string; rawKey: string }>(`/${prefix}/${id}/photo/upload-url`, { contentType });
     return data;
+  },
+
+  completePhotoUpload: async (id: string, rawKey: string): Promise<void> => {
+    await api.post(`/${prefix}/${id}/photo/upload-url/complete`, { rawKey });
   },
 
   async uploadToS3(url: string, file: File, onProgress: (percent: number) => void): Promise<void> {

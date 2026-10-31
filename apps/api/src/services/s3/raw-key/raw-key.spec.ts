@@ -1,4 +1,4 @@
-import { buildRawKey, isLegacyBareUuidKey, parseRawKey, RawObjectKind } from "./raw-key";
+import { buildRawKey, parseRawKey, RawObjectKind } from "./raw-key";
 
 const OWNER = "773bca63-f8ca-439f-ab2f-d28c333afa13";
 
@@ -57,20 +57,6 @@ describe("raw key", () => {
       ["an empty key", ""],
     ])("returns null for %s", (_case, key) => {
       expect(parseRawKey(key)).toBeNull();
-    });
-  });
-
-  describe("isLegacyBareUuidKey", () => {
-    it("recognises the pre-prefix shape", () => {
-      expect(isLegacyBareUuidKey(OWNER)).toBe(true);
-    });
-
-    it.each([
-      ["a prefixed key", `title-video/${OWNER}`],
-      ["a uuid with anything appended", `${OWNER}/extra`],
-      ["something that is not a uuid", "not-a-uuid"],
-    ])("rejects %s", (_case, key) => {
-      expect(isLegacyBareUuidKey(key)).toBe(false);
     });
   });
 });
