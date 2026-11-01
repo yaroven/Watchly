@@ -28,10 +28,6 @@ import { FilteringParams } from "../../../decorators/filtering-params.decorator"
 import { OptionalAuth } from "../../../decorators/optional-auth.decorator";
 import { AdminOnly } from "../../../decorators/roles.decorator";
 import { SortingParams } from "../../../decorators/sorting-params.decorator";
-import { MediaAssetService } from "../../../services/media-asset/media-asset.service";
-import { VideoType } from "../../../services/queues/video-transcoder/enums/video-type.enum";
-import { TitleEngagementService } from "../../../services/title-engagement/title-engagement.service";
-import { TitleService } from "../../../services/title/title.service";
 import { TitleExistsPipe } from "../../../services/title/utils/title-exists.pipe";
 import { TITLE_FILTERABLE } from "../../../services/title/utils/title-filter.query";
 import { Paginated, PaginatedResponseOf } from "../../dto/paginated-response-of.util";
@@ -45,22 +41,19 @@ import { SetTitleRatingDto } from "./dto/request/set-title-rating.dto";
 import { UpdateTitleDto } from "./dto/request/update-title.dto";
 import { TitleEngagementDto } from "./dto/response/title-engagement.dto";
 import { TitleResponseDto } from "./dto/response/title-response.dto";
+import { TitlesService } from "./titles.service";
 
 @ApiTags("titles")
 @Controller("titles")
 export class TitlesController {
-  constructor(
-    private readonly titleService: TitleService,
-    private readonly engagementService: TitleEngagementService,
-    private readonly mediaAssetService: MediaAssetService,
-  ) {}
+  constructor(private readonly titlesService: TitlesService) {}
 
   @ApiOperation({ summary: "Create a title (movie or series)" })
   @ApiCreatedResponse({ type: TitleResponseDto })
   @AdminOnly()
   @Post()
   async create(@Body() data: CreateTitleDto): Promise<TitleResponseDto> {
-    return this.titleService.create(data);
+    return this.titlesService.create(data);
   }
 
   @ApiOperation({
@@ -80,7 +73,7 @@ export class TitlesController {
     @FilteringParams(TITLE_FILTERABLE) filters?: Filter[],
     @OptionalUserId() userId?: string,
   ): Promise<Paginated<TitleResponseDto>> {
-    return this.titleService.findAll(query, sort, filters, userId);
+    return this.titlesService.findAll(query, sort, filters, userId);
   }
 
   @ApiOperation({ summary: "Get a title by id" })
@@ -93,7 +86,7 @@ export class TitlesController {
     @Param("id", ParseUUIDPipe) id: string,
     @OptionalUserId() userId?: string,
   ): Promise<TitleResponseDto> {
-    const title = await this.titleService.findOne(id, userId);
+    const title = await this.titlesService.findOne(id, userId);
 
     if (!title) throw new NotFoundException(`Title with id ${id} not found`);
 
@@ -111,7 +104,7 @@ export class TitlesController {
     @Body() data: UpdateTitleDto,
     @CurrentUserId() userId: string,
   ): Promise<TitleResponseDto> {
-    return this.titleService.update(id, data, userId);
+    return this.titlesService.update(id, data, userId);
   }
 
   @ApiOperation({ summary: "Delete a title and cascade-delete its seasons/episodes" })
@@ -121,7 +114,7 @@ export class TitlesController {
   @AdminOnly()
   @Delete(":id")
   async delete(@Param("id", ParseUUIDPipe) id: string): Promise<TitleResponseDto> {
-    return this.titleService.delete(id);
+    return this.titlesService.delete(id);
   }
 
   @ApiOperation({
@@ -138,7 +131,7 @@ export class TitlesController {
     @Param("id", ParseUUIDPipe) id: string,
     @OptionalUserId() userId?: string,
   ): Promise<TitleEngagementDto> {
-    return this.engagementService.getEngagement(id, userId ?? null);
+    return this.titlesService.getEngagement(id, userId ?? null);
   }
 
   @ApiOperation({ summary: "Set or change your score for a title" })
@@ -153,7 +146,7 @@ export class TitlesController {
     @Body() data: SetTitleRatingDto,
     @CurrentUserId() userId: string,
   ): Promise<TitleEngagementDto> {
-    return this.engagementService.rate(id, userId, data.score);
+    return this.titlesService.rate(id, userId, data.score);
   }
 
   @ApiOperation({ summary: "Withdraw your score" })
@@ -167,7 +160,7 @@ export class TitlesController {
     @Param("id", ParseUUIDPipe, TitleExistsPipe) id: string,
     @CurrentUserId() userId: string,
   ): Promise<TitleEngagementDto> {
-    return this.engagementService.removeRating(id, userId);
+    return this.titlesService.removeRating(id, userId);
   }
 
   @ApiOperation({ summary: "Start a multipart upload for the raw movie file" })
@@ -181,7 +174,7 @@ export class TitlesController {
     @Param("id", ParseUUIDPipe, TitleExistsPipe) id: string,
     @Body() dto: StartMultipartUploadDto,
   ) {
-    return this.mediaAssetService.startUpload(id, dto.fileSize, VideoType.MOVIE);
+    return this.titlesService.startUpload(id, dto.fileSize);
   }
 
   @ApiOperation({ summary: "Complete a multipart upload for the raw movie file" })
@@ -193,7 +186,7 @@ export class TitlesController {
     @Param("id", ParseUUIDPipe, TitleExistsPipe) id: string,
     @Body() dto: CompleteMultipartUploadDto,
   ) {
-    return this.mediaAssetService.completeUpload(id, dto.uploadId, dto.parts, VideoType.MOVIE);
+    return this.titlesService.completeUpload(id, dto.uploadId, dto.parts);
   }
 
   @ApiOperation({ summary: "Abort a multipart upload for the raw movie file" })
@@ -201,7 +194,7 @@ export class TitlesController {
   @AdminOnly()
   @Delete(":id/upload-url/:uploadId")
   abortUpload(@Param("id", ParseUUIDPipe) id: string, @Param("uploadId") uploadId: string) {
-    return this.mediaAssetService.abortUpload(id, uploadId, VideoType.MOVIE);
+    return this.titlesService.abortUpload(id, uploadId);
   }
 
   @ApiOperation({ summary: "Schedule HLS transcoding for a movie" })
@@ -212,7 +205,7 @@ export class TitlesController {
   @AdminOnly()
   @Post(":id/transcode")
   transcode(@Param("id", ParseUUIDPipe, TitleExistsPipe) id: string) {
-    return this.mediaAssetService.scheduleTranscode(id, VideoType.MOVIE);
+    return this.titlesService.scheduleTranscode(id);
   }
 
   @ApiOperation({ summary: "Get a presigned playback URL for a movie" })
@@ -221,6 +214,6 @@ export class TitlesController {
   @ApiNotFoundResponse({ description: "This title has no playable media yet" })
   @Get(":id/video")
   getPlaybackUrl(@Param("id", ParseUUIDPipe) id: string) {
-    return this.mediaAssetService.getPlaybackUrl({ type: VideoType.MOVIE, titleId: id });
+    return this.titlesService.getPlaybackUrl(id);
   }
 }

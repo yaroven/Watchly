@@ -11,8 +11,6 @@ export interface SelectOption {
   label: string;
 }
 
-// `error` and `name` are re-typed below, so they are dropped from the MUI props
-// first — intersecting them would produce `boolean & FieldError`.
 type SelectFieldProps<T extends FieldValues> = Omit<MuiSelectProps, "error" | "name" | "variant"> & {
   label?: string;
   name: Path<T>;
@@ -23,11 +21,6 @@ type SelectFieldProps<T extends FieldValues> = Omit<MuiSelectProps, "error" | "n
   variant?: InputVariant;
 };
 
-/**
- * Dropdown with the app's own menu, rather than the browser's native one.
- * MUI renders the list as a styled popover, so `<option>` limitations
- * (no theming, OS palette) don't apply.
- */
 export default function Select<T extends FieldValues>({
   id,
   label,

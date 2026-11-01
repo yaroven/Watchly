@@ -1,7 +1,8 @@
 import { stat } from "node:fs/promises";
 import { FfmpegRunner } from "../../ffmpeg/ffmpeg.runner";
 import { FfmpegJob, MediaStream } from "../../ffmpeg/ffmpeg.types";
-import { ImageKind, imageProfile } from "./image-profile.const";
+import { ImageKind } from "../../image/enums/image-kind.enum";
+import { imageProfile } from "../../image/utils/image-target.const";
 import { ImageTranscoderService } from "./image-transcoder.service";
 
 jest.mock("node:fs/promises");

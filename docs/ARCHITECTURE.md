@@ -12,7 +12,7 @@ Defined in `config/dev/docker-compose.yml`, started with `pnpm dev:up`.
 | `transcoder-worker` | Same image, `src/worker-main.ts` entrypoint | — |
 | `db` | Postgres | 5433→5432 |
 | `redis` | BullMQ backend | 6379 |
-| `localstack` | S3 + SQS stand-ins | 4566 |
+| `localstack` | S3 stand-in | 4566 |
 | `grafana` | Log UI | 3001→3000 |
 | `loki` | Log store | 3100 |
 
@@ -21,12 +21,13 @@ Dockerfile targets (`runner`, `worker-runner`, plus `migrator` for schema jobs).
 
 ## Media pipeline
 
-An upload is written to the raw S3 bucket. S3 emits an event to SQS; `s3-event` consumes
-it with `sqs-consumer` and enqueues a BullMQ job. The **worker process** — not a thread
-in the API — picks it up, runs ffmpeg and writes its output to the processed bucket.
+An upload is written to the raw bucket through a presigned URL, and then the client
+confirms it: `completeUpload` for a multipart video, `POST …/upload-url/complete` with the
+`rawKey` for an image. The api checks the key and the object and enqueues a BullMQ job. The
+**worker process** — not a thread in the API — picks it up, runs ffmpeg and writes its
+output to the processed bucket. Nothing listens to the bucket itself (ADR-0018).
 
-Every raw object carries a kind prefix, and which queue the event lands on is a `switch`
-on that prefix. `src/s3/raw-key/` owns the scheme:
+Every raw object carries a kind prefix. `src/services/s3/raw-key/` owns the scheme:
 
 | Prefix | Queue | Output |
 | --- | --- | --- |
@@ -37,18 +38,15 @@ on that prefix. `src/s3/raw-key/` owns the scheme:
 | `season-poster/<seasonId>/<uploadId>` | `image-transcode` | a 600×900 webp, plus `Season.posterKey` |
 | `artist-photo/<artistId>/<uploadId>` | `image-transcode` | a 400×600 webp, plus `Artist.photoKey` |
 
-Before this, the consumer took a raw key to be a bare entity uuid and probed the database
-for a row that matched — episode first, then title. The type of an upload was a property
-of whichever rows happened to exist rather than of the upload, so a third kind of object
-could not be told apart from a stale one. A key that parses to nothing is now logged and
-skipped rather than guessed at; bare-uuid keys still route through the old probe, for
-objects uploaded before the scheme.
+Objects uploaded before the scheme sit under a bare entity uuid; the manual
+`POST …/transcode` still finds them.
 
 Playback is hls.js against a presigned URL. Avatars are served unsigned, since a public
 avatar gains nothing from an expiring link and loses browser caching.
 
-Ingest is event-driven rather than polled, and the worker is a separate process, so a
-long transcode cannot occupy an API request thread. See ADR-0004 and ADR-0005.
+Ingest is confirmed by the client rather than by a bucket event, and the worker is a
+separate process, so a long transcode cannot occupy an API request thread. See ADR-0004 and
+ADR-0018.
 
 ## Auth
 

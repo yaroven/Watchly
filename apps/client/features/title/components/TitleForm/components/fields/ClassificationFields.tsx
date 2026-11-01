@@ -12,7 +12,6 @@ import { Controller } from "react-hook-form";
 interface ClassificationFieldsProps {
   form: UseFormReturn<TitleFormValues>;
   columns: 1 | 2;
-  /** Type is fixed once a title exists — seasons and video already hang off it. */
   isEditing: boolean;
   selectedType?: TitleType;
 }

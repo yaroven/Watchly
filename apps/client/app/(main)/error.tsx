@@ -7,10 +7,6 @@ import Typography from "@mui/material/Typography";
 import Button from "@shared/ui/Button";
 import { useEffect } from "react";
 
-/**
- * Error boundary for the public site. It renders inside (main)/layout, so the
- * site frame comes from there — adding it here would duplicate the header.
- */
 export default function MainError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error(error);

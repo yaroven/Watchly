@@ -22,10 +22,7 @@ import { Filter, Sorting } from "../../../common/pagination/pagination.types";
 import { FilteringParams } from "../../../decorators/filtering-params.decorator";
 import { AdminOnly } from "../../../decorators/roles.decorator";
 import { SortingParams } from "../../../decorators/sorting-params.decorator";
-import { EpisodeService } from "../../../services/episode/episode.service";
 import { EpisodeExistsPipe } from "../../../services/episode/utils/episode-exists.pipe";
-import { MediaAssetService } from "../../../services/media-asset/media-asset.service";
-import { VideoType } from "../../../services/queues/video-transcoder/enums/video-type.enum";
 import { CompleteMultipartUploadDto } from "../../dto/request/complete-multipart-upload.dto";
 import { StartMultipartUploadDto } from "../../dto/request/start-multipart-upload.dto";
 import { MultipartUploadResponseDto } from "../../dto/response/multipart-upload-response.dto";
@@ -33,21 +30,19 @@ import { UrlResponseDto } from "../../dto/url-response.dto";
 import { CreateEpisodeDto } from "./dto/request/create-episode.dto";
 import { UpdateEpisodeDto } from "./dto/request/update-episode.dto";
 import { EpisodeResponseDto } from "./dto/response/episode-response.dto";
+import { EpisodesService } from "./episodes.service";
 
 @ApiTags("episodes")
 @Controller("episodes")
 export class EpisodesController {
-  constructor(
-    private readonly episodeService: EpisodeService,
-    private readonly mediaAssetService: MediaAssetService,
-  ) {}
+  constructor(private readonly episodesService: EpisodesService) {}
 
   @ApiOperation({ summary: "Create an episode for a season" })
   @ApiCreatedResponse({ type: EpisodeResponseDto })
   @AdminOnly()
   @Post()
   async create(@Body() createEpisodeDto: CreateEpisodeDto): Promise<EpisodeResponseDto> {
-    return this.episodeService.create(createEpisodeDto);
+    return this.episodesService.create(createEpisodeDto);
   }
 
   @ApiOperation({
@@ -62,7 +57,7 @@ export class EpisodesController {
     @FilteringParams(["seasonId", "number", "name"]) filters: Filter[],
     @SortingParams(["number", "name", "createdAt"]) sort?: Sorting,
   ): Promise<EpisodeResponseDto[]> {
-    return this.episodeService.findAll(filters, sort);
+    return this.episodesService.findAll(filters, sort);
   }
 
   @ApiOperation({ summary: "Get an episode by id" })
@@ -71,7 +66,7 @@ export class EpisodesController {
   @ApiNotFoundResponse({ description: "Episode not found" })
   @Get(":id")
   async findOne(@Param("id", ParseUUIDPipe) id: string): Promise<EpisodeResponseDto> {
-    const episode = await this.episodeService.findOne(id);
+    const episode = await this.episodesService.findOne(id);
 
     if (!episode) throw new NotFoundException(`Episode with id ${id} not found`);
 
@@ -88,7 +83,7 @@ export class EpisodesController {
     @Param("id", ParseUUIDPipe) id: string,
     @Body() updateEpisodeDto: UpdateEpisodeDto,
   ): Promise<EpisodeResponseDto> {
-    return this.episodeService.update(id, updateEpisodeDto);
+    return this.episodesService.update(id, updateEpisodeDto);
   }
 
   @ApiOperation({ summary: "Delete an episode" })
@@ -98,7 +93,7 @@ export class EpisodesController {
   @AdminOnly()
   @Delete(":id")
   async delete(@Param("id", ParseUUIDPipe) id: string): Promise<EpisodeResponseDto> {
-    return this.episodeService.delete(id);
+    return this.episodesService.delete(id);
   }
 
   @ApiOperation({ summary: "Get a presigned playback URL for an episode" })
@@ -107,7 +102,7 @@ export class EpisodesController {
   @ApiNotFoundResponse({ description: "Episode not found" })
   @Get(":id/video")
   getStreamUrl(@Param("id", ParseUUIDPipe) id: string) {
-    return this.episodeService.getStreamUrl(id);
+    return this.episodesService.getStreamUrl(id);
   }
 
   @ApiOperation({ summary: "Schedule HLS transcoding for an episode" })
@@ -118,7 +113,7 @@ export class EpisodesController {
   @Throttle({ default: { limit: 3, ttl: 60000 } })
   @Post(":id/transcode")
   transcode(@Param("id", ParseUUIDPipe, EpisodeExistsPipe) id: string) {
-    return this.mediaAssetService.scheduleTranscode(id, VideoType.EPISODE);
+    return this.episodesService.scheduleTranscode(id);
   }
 
   @ApiOperation({ summary: "Start a multipart upload for the raw episode file" })
@@ -132,7 +127,7 @@ export class EpisodesController {
     @Param("id", ParseUUIDPipe, EpisodeExistsPipe) id: string,
     @Body() dto: StartMultipartUploadDto,
   ) {
-    return this.mediaAssetService.startUpload(id, dto.fileSize, VideoType.EPISODE);
+    return this.episodesService.startUpload(id, dto.fileSize);
   }
 
   @ApiOperation({ summary: "Complete a multipart upload for the raw episode file" })
@@ -144,7 +139,7 @@ export class EpisodesController {
     @Param("id", ParseUUIDPipe, EpisodeExistsPipe) id: string,
     @Body() dto: CompleteMultipartUploadDto,
   ) {
-    return this.mediaAssetService.completeUpload(id, dto.uploadId, dto.parts, VideoType.EPISODE);
+    return this.episodesService.completeUpload(id, dto.uploadId, dto.parts);
   }
 
   @ApiOperation({ summary: "Abort a multipart upload for the raw episode file" })
@@ -152,6 +147,6 @@ export class EpisodesController {
   @AdminOnly()
   @Delete(":id/upload-url/:uploadId")
   abortUpload(@Param("id", ParseUUIDPipe) id: string, @Param("uploadId") uploadId: string) {
-    return this.mediaAssetService.abortUpload(id, uploadId, VideoType.EPISODE);
+    return this.episodesService.abortUpload(id, uploadId);
   }
 }

@@ -3,11 +3,6 @@ import { EventEmitter } from "node:events";
 import { register } from "prom-client";
 import { httpMetricsMiddleware } from "./http-metrics.middleware";
 
-/**
- * The middleware is driven directly rather than through a server: every label
- * it reads is taken at `finish`, so emitting that event by hand is the whole
- * contract. No express app, no supertest, nothing to get flaky.
- */
 function record(req: Partial<Request>, statusCode: number): { next: jest.Mock } {
   const middleware = httpMetricsMiddleware();
   const res = new EventEmitter() as EventEmitter & Response;
@@ -31,8 +26,6 @@ async function labelsOf(): Promise<Record<string, string>[]> {
 }
 
 describe("httpMetricsMiddleware", () => {
-  // Metrics live on the default registry, so observations carry over between
-  // tests unless they are cleared. Registrations stay.
   beforeEach(() => register.resetMetrics());
 
   it("calls next so the request is still handled", () => {
@@ -41,8 +34,6 @@ describe("httpMetricsMiddleware", () => {
     expect(next).toHaveBeenCalled();
   });
 
-  // The whole point of the route label. A URL here would mint one series per
-  // title and keep it for the life of the Prometheus instance.
   it("labels the route with the pattern, not the url", async () => {
     record(
       { method: "GET", baseUrl: "", route: { path: "/titles/:id" }, url: "/titles/abc-123" },
@@ -53,7 +44,6 @@ describe("httpMetricsMiddleware", () => {
     expect(labels.route).toBe("/titles/:id");
   });
 
-  // An unmatched path is attacker-controlled, so it must never reach a label.
   it("collapses a request that matched no route into one bucket", async () => {
     record({ method: "GET", baseUrl: "", url: "/../../etc/passwd" }, 404);
 
@@ -62,11 +52,6 @@ describe("httpMetricsMiddleware", () => {
     expect(labels.status_class).toBe("4xx");
   });
 
-  /**
-   * This is the case an interceptor gets wrong: it reads `statusCode` before
-   * the exception filter has written it, so a thrown error is recorded as the
-   * status the handler never set. Recording on `finish` sees the real one.
-   */
   it("records the status the response actually finished with", async () => {
     record({ method: "PATCH", baseUrl: "", route: { path: "/titles/:id" } }, 500);
 

@@ -39,9 +39,7 @@ export default function VideoPlayerSkeleton() {
           },
         }}
         style={{ opacity: 0.5 }}
-      >
-        {/* Placeholder for the loader icon if needed, but the shimmer should suffice */}
-      </Box>
+      ></Box>
     </Box>
   );
 }

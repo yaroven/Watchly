@@ -17,16 +17,6 @@ interface TitleMoreLikeThisProps {
   title: Title;
 }
 
-/**
- * Distinct from the poster-overlay `TitleCard` used elsewhere (Catalog rows
- * on /discover) — this section's Figma card shows the image on top and the
- * title/genres/rating in plain text below it.
- *
- * "Similar" has no dedicated backend concept — this browses other titles
- * sharing the current title's first genre (the only many-to-many filter the
- * list endpoint supports) and falls back to a plain recent-titles list when
- * this title has no genres yet.
- */
 export default function TitleMoreLikeThis({ title }: TitleMoreLikeThisProps) {
   const router = useRouter();
   const { data } = useTitles({ genreId: title.genres[0]?.id, limit: RESULT_LIMIT + 1 });

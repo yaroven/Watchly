@@ -12,17 +12,11 @@ interface ModalProps {
   size?: "sm" | "md" | "lg" | "xl";
 }
 
-/**
- * Dialog owns the focus trap, Escape handling, scroll lock and the portal,
- * so this only supplies the framing and the close button.
- */
 export default function Modal({ children, isOpen, onClose, size = "md" }: ModalProps) {
   return (
     <Dialog
       open={isOpen}
-      // Dialog calls onClose with (event, reason); the callers take no args.
       onClose={() => onClose()}
-      // The widths below are the app's own, not MUI's breakpoint scale.
       maxWidth={false}
       slotProps={{
         paper: {

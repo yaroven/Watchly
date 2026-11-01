@@ -22,8 +22,8 @@ images:
   - name: razanka/watchly-client
     newTag: home-3eb8c46
   # The tags base pins are the ones built for DigitalOcean. This cluster runs
-  # its own build — it has to, since the S3_EVENTS_ENABLED switch the overlay
-  # relies on postdates them.
+  # its own build — it has to, since the settings the overlay relies on
+  # postdate them.
   - name: razanka/watchly-api
     newTag: 3eb8c46
   - name: razanka/watchly-transcoder-worker
@@ -45,12 +45,10 @@ configMapGenerator:
       - REDIS_PORT=6379
       - REDIS_TLS=false
 
-      # LocalStack serves S3 and SQS from one port, which is why SQS needs
-      # no separate host. s3.service.ts signs with the internal endpoint and
+      # s3.service.ts signs with the internal endpoint and
       # rewrites only the host afterwards; that stays valid here because the
       # emulator does not verify the Host header the way real SigV4 does.
       - S3_ENDPOINT_INTERNAL=http://localstack:4566
-      - SQS_ENDPOINT=http://localstack:4566
       - S3_ENDPOINT_PUBLIC=http://s3.watchly.192-168-31-100.sslip.io
       - S3_REGION=us-east-1
       - S3_RAW_BUCKET_NAME=raw

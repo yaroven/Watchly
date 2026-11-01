@@ -29,7 +29,6 @@ const filled = (value: unknown) => {
   return Boolean(value);
 };
 
-/** Live "what is still empty" view of the form — the rail's counter and the missing list read from this. */
 export function getTitleReadiness(values: Partial<TitleFormValues>, { needsVideo }: { needsVideo: boolean }): TitleReadiness {
   const sections: ReadinessSection[] = [
     {

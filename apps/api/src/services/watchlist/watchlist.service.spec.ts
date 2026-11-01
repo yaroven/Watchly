@@ -1,7 +1,7 @@
 import { NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { PrismaService } from "../prisma/prisma.service";
-import { TitleEngagementService } from "../title-engagement/title-engagement.service";
+import { TitleEngagementService } from "../title/title-engagement.service";
 import { TitleService } from "../title/title.service";
 import { WatchlistService } from "./watchlist.service";
 
@@ -65,6 +65,11 @@ describe("WatchlistService", () => {
 
   afterEach(() => jest.clearAllMocks());
 
+  const card = (id: string) => ({
+    id,
+    engagement: { likes: 0, viewer: { score: 6, inWatchlist: true } },
+  });
+
   const watchlistPage = (titleIds: string[], totalCount: number) => {
     prismaMock.watchlistItem.findMany.mockResolvedValueOnce(
       titleIds.map((id) => ({ titleId: id })),
@@ -73,9 +78,17 @@ describe("WatchlistService", () => {
   };
 
   describe("findAll", () => {
+    it("should page in a fixed order even when two rows were added in the same instant", async () => {
+      await service.findAll(viewerId, {});
+
+      expect(prismaMock.watchlistItem.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: [{ createdAt: "desc" }, { id: "desc" }] }),
+      );
+    });
+
     it("should return the titles in the order the watchlist gave them, not the database's", async () => {
       watchlistPage(["title-b", "title-a"], 2);
-      titleServiceMock.findManyByIds.mockResolvedValue([{ id: "title-a" }, { id: "title-b" }]);
+      titleServiceMock.findManyByIds.mockResolvedValue([card("title-a"), card("title-b")]);
 
       const result = await service.findAll(viewerId, {});
 
@@ -93,7 +106,7 @@ describe("WatchlistService", () => {
 
     it("should drop a title that no longer exists, and not count it either", async () => {
       watchlistPage(["title-a", "gone"], 2);
-      titleServiceMock.findManyByIds.mockResolvedValue([{ id: "title-a" }]);
+      titleServiceMock.findManyByIds.mockResolvedValue([card("title-a")]);
 
       const result = await service.findAll(viewerId, {});
 

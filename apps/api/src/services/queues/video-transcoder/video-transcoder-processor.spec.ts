@@ -7,6 +7,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import * as path from "path";
 import { register } from "prom-client";
 import { Readable } from "stream";
+import { rawVideoKey } from "../../media-asset/utils/video-location.util";
 import { PrismaService } from "../../prisma/prisma.service";
 import BucketType from "../../s3/enums/bucket-type.enum";
 import { S3Service } from "../../s3/s3.service";
@@ -29,8 +30,6 @@ jest.mock("fs-extra", () => ({
   }),
   createReadStream: jest.fn().mockReturnValue("mock-read-stream"),
   readdir: jest.fn().mockResolvedValue(["file1.m3u8", "file2.ts", "folder"]),
-  // basename, not a substring: the macOS temp dir is /var/folders/..., so
-  // `includes("folder")` would call every produced file a directory.
   stat: jest
     .fn()
     .mockImplementation((p: string) =>
@@ -38,11 +37,6 @@ jest.mock("fs-extra", () => ({
     ),
 }));
 
-/**
- * The processor owns the order of the stages now, so this spec drives the whole
- * pipeline with its collaborators mocked: `HlsTranscoder.run` is the seam that
- * used to be `VideoTranscoderService.transcodeVideo`.
- */
 describe("VideoTranscoderProcessor", () => {
   let processor: VideoTranscoderProcessor;
   let hlsMock: { run: jest.Mock; probeWidth: jest.Mock };
@@ -70,8 +64,6 @@ describe("VideoTranscoderProcessor", () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    // Metrics are module-level on the default registry, so values survive from
-    // one test to the next unless they are cleared. Registrations stay.
     register.resetMetrics();
     (mkdtemp as jest.Mock).mockImplementation((prefix: string) => Promise.resolve(`${prefix}XXXX`));
     (rm as jest.Mock).mockResolvedValue(undefined);
@@ -115,7 +107,13 @@ describe("VideoTranscoderProcessor", () => {
 
   describe("status and progress", () => {
     it("marks PROCESSING and zero before starting", async () => {
-      await processor.process(mockJob({ id: "ep-1", type: VideoType.EPISODE }));
+      await processor.process(
+        mockJob({
+          id: "ep-1",
+          type: VideoType.EPISODE,
+          rawKey: rawVideoKey("ep-1", VideoType.EPISODE),
+        }),
+      );
 
       expect(stateMock.updateStatus).toHaveBeenCalledWith(
         "ep-1",
@@ -126,7 +124,13 @@ describe("VideoTranscoderProcessor", () => {
     });
 
     it("marks COMPLETED and a hundred on success", async () => {
-      await processor.process(mockJob({ id: "ep-1", type: VideoType.EPISODE }));
+      await processor.process(
+        mockJob({
+          id: "ep-1",
+          type: VideoType.EPISODE,
+          rawKey: rawVideoKey("ep-1", VideoType.EPISODE),
+        }),
+      );
 
       expect(stateMock.updateStatus).toHaveBeenCalledWith(
         "ep-1",
@@ -137,7 +141,13 @@ describe("VideoTranscoderProcessor", () => {
     });
 
     it("answers { result: 'success' }", async () => {
-      const result = await processor.process(mockJob({ id: "ep-1", type: VideoType.EPISODE }));
+      const result = await processor.process(
+        mockJob({
+          id: "ep-1",
+          type: VideoType.EPISODE,
+          rawKey: rawVideoKey("ep-1", VideoType.EPISODE),
+        }),
+      );
 
       expect(result).toEqual({ result: "success" });
     });
@@ -145,15 +155,27 @@ describe("VideoTranscoderProcessor", () => {
 
   describe("the pipeline", () => {
     it("creates the output directory before transcoding", async () => {
-      await processor.process(mockJob({ id: "ep-1", type: VideoType.EPISODE }));
+      await processor.process(
+        mockJob({
+          id: "ep-1",
+          type: VideoType.EPISODE,
+          rawKey: rawVideoKey("ep-1", VideoType.EPISODE),
+        }),
+      );
 
       expect(fs.ensureDir).toHaveBeenCalled();
     });
 
     it("downloads the raw object, probes it and uploads every produced file", async () => {
-      await processor.process(mockJob({ id: "vid-1", type: VideoType.MOVIE }));
+      await processor.process(
+        mockJob({
+          id: "vid-1",
+          type: VideoType.MOVIE,
+          rawKey: rawVideoKey("vid-1", VideoType.MOVIE),
+        }),
+      );
 
-      expect(s3Mock.get).toHaveBeenCalledWith("vid-1", BucketType.RAW);
+      expect(s3Mock.get).toHaveBeenCalledWith("title-video/vid-1", BucketType.RAW);
       expect(hlsMock.probeWidth).toHaveBeenCalled();
       expect(hlsMock.run).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -161,12 +183,70 @@ describe("VideoTranscoderProcessor", () => {
           outputDir: expect.stringContaining("output"),
         }),
       );
-      // Three entries, one of which is a directory.
       expect(s3Mock.uploadStream).toHaveBeenCalledTimes(2);
     });
 
+    it("reads exactly the key the job carries", async () => {
+      await processor.process(
+        mockJob({
+          id: "vid-1",
+          type: VideoType.MOVIE,
+          rawKey: "a1b2c3d4-0000-4000-8000-000000000000",
+        }),
+      );
+
+      expect(s3Mock.get).toHaveBeenCalledWith(
+        "a1b2c3d4-0000-4000-8000-000000000000",
+        BucketType.RAW,
+      );
+    });
+
+    it("reads the bare id for a job queued before jobs carried their key", async () => {
+      const legacy = { id: "vid-1", type: VideoType.MOVIE } as TranscodeVideoJob;
+
+      await processor.process(mockJob(legacy));
+
+      expect(s3Mock.get).toHaveBeenCalledWith("vid-1", BucketType.RAW);
+    });
+
+    it("uploads a movie under its processed prefix", async () => {
+      await processor.process(
+        mockJob({
+          id: "vid-1",
+          type: VideoType.MOVIE,
+          rawKey: rawVideoKey("vid-1", VideoType.MOVIE),
+        }),
+      );
+
+      expect(s3Mock.uploadStream.mock.calls.map(([, key]) => key)).toEqual([
+        "videos/vid-1/file1.m3u8",
+        "videos/vid-1/file2.ts",
+      ]);
+    });
+
+    it("uploads an episode under its season and title", async () => {
+      await processor.process(
+        mockJob({
+          id: "ep-1",
+          type: VideoType.EPISODE,
+          rawKey: rawVideoKey("ep-1", VideoType.EPISODE),
+        }),
+      );
+
+      expect(s3Mock.uploadStream.mock.calls.map(([, key]) => key)).toEqual([
+        "videos/t-1/s-1/ep-1/file1.m3u8",
+        "videos/t-1/s-1/ep-1/file2.ts",
+      ]);
+    });
+
     it("resolves an episode's path through its season and title", async () => {
-      await processor.process(mockJob({ id: "ep-1", type: VideoType.EPISODE }));
+      await processor.process(
+        mockJob({
+          id: "ep-1",
+          type: VideoType.EPISODE,
+          rawKey: rawVideoKey("ep-1", VideoType.EPISODE),
+        }),
+      );
 
       expect(prismaMock.episode.findUnique).toHaveBeenCalledWith({
         where: { id: "ep-1" },
@@ -175,12 +255,14 @@ describe("VideoTranscoderProcessor", () => {
       expect(s3Mock.uploadStream).toHaveBeenCalledTimes(2);
     });
 
-    /**
-     * The row is re-checked between stages, not once at the start: each stage
-     * is long enough for the title or episode to be deleted while it runs.
-     */
     it("re-checks the row between stages", async () => {
-      await processor.process(mockJob({ id: "vid-1", type: VideoType.MOVIE }));
+      await processor.process(
+        mockJob({
+          id: "vid-1",
+          type: VideoType.MOVIE,
+          rawKey: rawVideoKey("vid-1", VideoType.MOVIE),
+        }),
+      );
 
       expect(stateMock.ensureExists.mock.calls.length).toBeGreaterThanOrEqual(3);
     });
@@ -189,7 +271,13 @@ describe("VideoTranscoderProcessor", () => {
       prismaMock.episode.findUnique.mockResolvedValue(null);
 
       await expect(
-        processor.process(mockJob({ id: "ep-1", type: VideoType.EPISODE })),
+        processor.process(
+          mockJob({
+            id: "ep-1",
+            type: VideoType.EPISODE,
+            rawKey: rawVideoKey("ep-1", VideoType.EPISODE),
+          }),
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -198,7 +286,13 @@ describe("VideoTranscoderProcessor", () => {
     it("answers { result: 'aborted' } without marking the job FAILED", async () => {
       hlsMock.run.mockRejectedValue(new TranscodeAbortedError("Job was cancelled"));
 
-      const result = await processor.process(mockJob({ id: "ep-1", type: VideoType.EPISODE }));
+      const result = await processor.process(
+        mockJob({
+          id: "ep-1",
+          type: VideoType.EPISODE,
+          rawKey: rawVideoKey("ep-1", VideoType.EPISODE),
+        }),
+      );
 
       expect(result).toEqual({ result: "aborted" });
       expect(stateMock.updateStatus).not.toHaveBeenCalledWith(
@@ -212,7 +306,13 @@ describe("VideoTranscoderProcessor", () => {
       hlsMock.run.mockRejectedValue(new Error("ffmpeg error"));
 
       await expect(
-        processor.process(mockJob({ id: "ep-1", type: VideoType.EPISODE })),
+        processor.process(
+          mockJob({
+            id: "ep-1",
+            type: VideoType.EPISODE,
+            rawKey: rawVideoKey("ep-1", VideoType.EPISODE),
+          }),
+        ),
       ).rejects.toThrow("ffmpeg error");
 
       expect(stateMock.updateStatus).toHaveBeenCalledWith(
@@ -222,13 +322,17 @@ describe("VideoTranscoderProcessor", () => {
       );
     });
 
-    // A missing raw object is only an abort when the row is gone for both
-    // kinds — the key alone does not say which it was.
     it("turns a failed download into an abort when the row is gone", async () => {
       s3Mock.get.mockRejectedValue(new Error("NoSuchKey"));
       stateMock.exists.mockResolvedValue(false);
 
-      const result = await processor.process(mockJob({ id: "vid-1", type: VideoType.MOVIE }));
+      const result = await processor.process(
+        mockJob({
+          id: "vid-1",
+          type: VideoType.MOVIE,
+          rawKey: rawVideoKey("vid-1", VideoType.MOVIE),
+        }),
+      );
 
       expect(result).toEqual({ result: "aborted" });
     });
@@ -238,14 +342,26 @@ describe("VideoTranscoderProcessor", () => {
       stateMock.exists.mockResolvedValue(true);
 
       await expect(
-        processor.process(mockJob({ id: "vid-1", type: VideoType.MOVIE })),
+        processor.process(
+          mockJob({
+            id: "vid-1",
+            type: VideoType.MOVIE,
+            rawKey: rawVideoKey("vid-1", VideoType.MOVIE),
+          }),
+        ),
       ).rejects.toThrow("NoSuchKey");
     });
   });
 
   describe("temp directory", () => {
     it("is cleaned up on success", async () => {
-      await processor.process(mockJob({ id: "ep-1", type: VideoType.EPISODE }));
+      await processor.process(
+        mockJob({
+          id: "ep-1",
+          type: VideoType.EPISODE,
+          rawKey: rawVideoKey("ep-1", VideoType.EPISODE),
+        }),
+      );
 
       expect(rm).toHaveBeenCalledWith(expect.stringContaining("transcode-job-123"), {
         recursive: true,
@@ -257,7 +373,13 @@ describe("VideoTranscoderProcessor", () => {
       hlsMock.run.mockRejectedValue(new Error("error"));
 
       await expect(
-        processor.process(mockJob({ id: "ep-1", type: VideoType.EPISODE })),
+        processor.process(
+          mockJob({
+            id: "ep-1",
+            type: VideoType.EPISODE,
+            rawKey: rawVideoKey("ep-1", VideoType.EPISODE),
+          }),
+        ),
       ).rejects.toThrow();
 
       expect(rm).toHaveBeenCalled();
@@ -266,7 +388,13 @@ describe("VideoTranscoderProcessor", () => {
     it("is cleaned up on abort", async () => {
       hlsMock.run.mockRejectedValue(new TranscodeAbortedError("cancelled"));
 
-      await processor.process(mockJob({ id: "ep-1", type: VideoType.EPISODE }));
+      await processor.process(
+        mockJob({
+          id: "ep-1",
+          type: VideoType.EPISODE,
+          rawKey: rawVideoKey("ep-1", VideoType.EPISODE),
+        }),
+      );
 
       expect(rm).toHaveBeenCalled();
     });
@@ -279,21 +407,27 @@ describe("VideoTranscoderProcessor", () => {
       );
 
     it("records a completed transcode as success, labelled by kind", async () => {
-      await processor.process(mockJob({ id: "mv-1", type: VideoType.MOVIE }));
+      await processor.process(
+        mockJob({
+          id: "mv-1",
+          type: VideoType.MOVIE,
+          rawKey: rawVideoKey("mv-1", VideoType.MOVIE),
+        }),
+      );
 
       await expect(sampleFor("success", "movie")).resolves.toBe(true);
     });
 
-    /**
-     * An abort means the title or episode was deleted mid-transcode. The job
-     * returns rather than throwing, so BullMQ does not retry it — counting it
-     * as failed would make a routine deletion look like a broken pipeline,
-     * and the failure-ratio alert would fire on ordinary admin work.
-     */
     it("separates an abort from a failure", async () => {
       hlsMock.run.mockRejectedValue(new TranscodeAbortedError("cancelled"));
 
-      await processor.process(mockJob({ id: "ep-1", type: VideoType.EPISODE }));
+      await processor.process(
+        mockJob({
+          id: "ep-1",
+          type: VideoType.EPISODE,
+          rawKey: rawVideoKey("ep-1", VideoType.EPISODE),
+        }),
+      );
 
       await expect(sampleFor("aborted")).resolves.toBe(true);
       await expect(sampleFor("failed")).resolves.toBe(false);
@@ -303,7 +437,13 @@ describe("VideoTranscoderProcessor", () => {
       hlsMock.run.mockRejectedValue(new Error("ffmpeg died"));
 
       await expect(
-        processor.process(mockJob({ id: "ep-1", type: VideoType.EPISODE })),
+        processor.process(
+          mockJob({
+            id: "ep-1",
+            type: VideoType.EPISODE,
+            rawKey: rawVideoKey("ep-1", VideoType.EPISODE),
+          }),
+        ),
       ).rejects.toThrow();
 
       await expect(sampleFor("failed")).resolves.toBe(true);

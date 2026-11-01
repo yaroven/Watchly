@@ -1,21 +1,15 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { Prisma, TitleType } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { paginate } from "../../common/pagination/paginate.util";
 import { Filter, PageQuery, Sorting } from "../../common/pagination/pagination.types";
 import { buildOrderBy } from "../../common/pagination/prisma-query.util";
-import { settleAll } from "../../common/utils/settle-all-or-throw.util";
 import { Logged } from "../../decorators/logged.decorator";
 import { ImageService } from "../image/image.service";
 import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { VideoType } from "../queues/video-transcoder/enums/video-type.enum";
-import { buildVideoPrefix } from "../s3/processed-key";
-import { SeasonService } from "../season/season.service";
-import { titleEngagementViewFromRelations } from "../title-engagement/title-engagement.mapper";
-import { NO_VOTE_OVERRIDES, VoteOverrides } from "../vote-cache/vote-cache.const";
-import { VoteStateService } from "../vote-cache/vote-state.service";
+import { titleEngagementViewFromRelations, withoutVote } from "./title-engagement.mapper";
 import { titleViewWithoutEngagement, toTitleView } from "./title.mapper";
-import { TitleInput, TitleView } from "./title.types";
+import { CardTitleView, StoredTitleView, TitleInput, TitleView } from "./title.types";
 import assertTitleExists from "./utils/assert-title-exists.util";
 import { buildTitleWhere } from "./utils/title-filter.query";
 import titleQuery, { TitleWithEngagement } from "./utils/title.query";
@@ -25,10 +19,16 @@ export class TitleService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly imageService: ImageService,
-    private readonly seasonService: SeasonService,
     private readonly mediaAssetService: MediaAssetService,
-    private readonly voteState: VoteStateService,
   ) {}
+
+  private toView(title: TitleWithEngagement, viewerId: string | null): StoredTitleView {
+    return toTitleView(
+      title,
+      titleEngagementViewFromRelations(title, viewerId),
+      this.imageService.toPublicUrl(title.posterKey),
+    );
+  }
 
   @Logged()
   async create({ genreIds, ...rest }: TitleInput): Promise<TitleView> {
@@ -55,7 +55,7 @@ export class TitleService {
     sort?: Sorting,
     filters: Filter[] = [],
     viewerId?: string,
-  ): Promise<{ items: TitleView[]; totalCount: number }> {
+  ): Promise<{ items: StoredTitleView[]; totalCount: number }> {
     const where = buildTitleWhere(filters);
     const orderBy = (buildOrderBy(sort) ?? {
       createdAt: "desc",
@@ -69,27 +69,21 @@ export class TitleService {
       extra: { include: titleQuery.withEngagement(viewerId ?? null) },
     });
 
-    const votes = await this.voteState.forTitles(items, viewerId ?? null);
-
     return {
-      items: items.map((title) => this.toView(title, viewerId ?? null, votes)),
+      items: items.map((title) => this.toView(title, viewerId ?? null)),
       totalCount,
     };
   }
 
   @Logged()
-  async findOne(id: string, viewerId?: string): Promise<TitleView | null> {
+  async findOne(id: string, viewerId?: string): Promise<StoredTitleView | null> {
     const title = (await this.prisma.title.findUnique({
       where: { id },
       include: titleQuery.withEngagement(viewerId ?? null),
     })) as TitleWithEngagement | null;
     if (!title) return null;
 
-    return this.toView(
-      title,
-      viewerId ?? null,
-      await this.voteState.forTitles([title], viewerId ?? null),
-    );
+    return this.toView(title, viewerId ?? null);
   }
 
   @Logged()
@@ -97,7 +91,7 @@ export class TitleService {
     id: string,
     { genreIds, ...rest }: TitleInput,
     viewerId?: string,
-  ): Promise<TitleView> {
+  ): Promise<StoredTitleView> {
     await assertTitleExists(this.prisma, id);
 
     try {
@@ -113,11 +107,7 @@ export class TitleService {
         include: titleQuery.withEngagement(viewerId ?? null),
       })) as TitleWithEngagement;
 
-      return this.toView(
-        updated,
-        viewerId ?? null,
-        await this.voteState.forTitles([updated], viewerId ?? null),
-      );
+      return this.toView(updated, viewerId ?? null);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
         await assertTitleExists(this.prisma, id);
@@ -143,22 +133,13 @@ export class TitleService {
       include: titleQuery.deleted(),
     });
 
-    await Promise.all([
-      this.imageService.deleteStoredImage(title.posterKey),
-      this.mediaAssetService.cleanupVideoAsset(
-        id,
-        VideoType.MOVIE,
-        buildVideoPrefix({ type: VideoType.MOVIE, titleId: id }),
-      ),
-      title.type === TitleType.SERIES &&
-        settleAll(title.seasons, (season) => this.seasonService.cleanupAssets(season)),
-    ]);
+    await this.mediaAssetService.cleanupTitle(title);
 
     return titleViewWithoutEngagement(deleted);
   }
 
   @Logged()
-  async findManyByIds(titleIds: string[], viewerId: string | null): Promise<TitleView[]> {
+  async findManyByIds(titleIds: string[], viewerId: string | null): Promise<CardTitleView[]> {
     if (titleIds.length === 0) return [];
 
     const titles = (await this.prisma.title.findMany({
@@ -166,20 +147,9 @@ export class TitleService {
       include: titleQuery.withEngagement(viewerId),
     })) as TitleWithEngagement[];
 
-    const votes = await this.voteState.forTitles(titles, viewerId);
-
-    return titles.map((title) => this.toView(title, viewerId, votes));
-  }
-
-  private toView(
-    title: TitleWithEngagement,
-    viewerId: string | null,
-    votes: VoteOverrides = NO_VOTE_OVERRIDES,
-  ): TitleView {
-    return toTitleView(
-      title,
-      titleEngagementViewFromRelations(title, viewerId, votes.get(title.id)),
-      this.imageService.toPublicUrl(title.posterKey),
-    );
+    return titles.map((title) => {
+      const view = this.toView(title, viewerId);
+      return { ...view, engagement: withoutVote(view.engagement) };
+    });
   }
 }

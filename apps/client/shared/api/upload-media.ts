@@ -17,12 +17,13 @@ type UploadMultipartFileParams = {
   onPartProgress?: (completedParts: number, totalParts: number) => void;
 };
 
-export type GetImageUploadUrl = (contentType: string) => Promise<{ uploadUrl: string }>;
+export type GetImageUploadUrl = (contentType: string) => Promise<{ uploadUrl: string; rawKey: string }>;
 
 type UploadImageFileParams = {
   files?: FileList | null;
   getUploadUrl: GetImageUploadUrl;
   uploadToUrl: UploadToUrl;
+  completeUpload: (rawKey: string) => Promise<void>;
   onProgress?: UploadProgressHandler;
 };
 
@@ -54,12 +55,6 @@ async function uploadPartWithRetry(
   throw lastError;
 }
 
-/**
- * Uploads a file in S3-multipart chunks — a flaky connection only has to retry the one part
- * that failed, not restart a multi-GB transfer from zero. Parts upload sequentially (simpler
- * progress/error accounting than concurrent parts); on an unrecoverable part failure the whole
- * upload is aborted server-side so S3 doesn't keep billing for the orphaned parts.
- */
 export const uploadMultipartFile = async ({
   files,
   startUpload,
@@ -107,13 +102,15 @@ export const uploadImageFile = async ({
   files,
   getUploadUrl,
   uploadToUrl,
+  completeUpload,
   onProgress = noopProgress,
 }: UploadImageFileParams): Promise<boolean> => {
   const file = getFirstFile(files);
   if (!file) return false;
 
-  const { uploadUrl } = await getUploadUrl(file.type);
+  const { uploadUrl, rawKey } = await getUploadUrl(file.type);
   await uploadToUrl(uploadUrl, file, onProgress);
+  await completeUpload(rawKey);
 
   return true;
 };

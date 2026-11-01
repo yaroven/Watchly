@@ -29,7 +29,6 @@ export default function HeroSlider({ titles }: HeroSliderProps) {
 
   if (!titles.length) return null;
 
-  // Wraps around, so the hero keeps cycling in both directions.
   const go = (step: -1 | 1) => {
     setDirection(step);
     setIndex((current) => (current + step + titles.length) % titles.length);
@@ -44,7 +43,6 @@ export default function HeroSlider({ titles }: HeroSliderProps) {
         overflow: "hidden",
         flexGrow: 1,
         width: "100%",
-        // 400 is the 1440-wide design; wider screens get proportionally taller.
         height: { xs: 280, sm: 340, lg: 400, xl: 480, xxl: 560 },
         backgroundColor: "#111111",
         borderRadius: "20px",
@@ -54,8 +52,6 @@ export default function HeroSlider({ titles }: HeroSliderProps) {
         alignItems: "end",
       }}
     >
-      {/* background-image cannot be transitioned, so the backdrop gets its own
-          layer and the new picture fades in on top of the old one. */}
       <Box
         key={slide.backdropUrl}
         sx={{

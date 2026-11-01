@@ -5,11 +5,14 @@ import { EpisodeService } from "../../../services/episode/episode.service";
 import { EpisodeExistsPipe } from "../../../services/episode/utils/episode-exists.pipe";
 import { MediaAssetService } from "../../../services/media-asset/media-asset.service";
 import { PrismaService } from "../../../services/prisma/prisma.service";
+import { VideoType } from "../../../services/queues/video-transcoder/enums/video-type.enum";
 import { EpisodesController } from "./episodes.controller";
+import { EpisodesService } from "./episodes.service";
 
 describe("EpisodeController", () => {
   let controller: EpisodesController;
   let episodeServiceMock: jest.Mocked<EpisodeService>;
+  let mediaAssetServiceMock: jest.Mocked<MediaAssetService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -30,14 +33,17 @@ describe("EpisodeController", () => {
             startUpload: jest.fn(),
             completeUpload: jest.fn(),
             abortUpload: jest.fn(),
-            getStreamUrl: jest.fn(),
+            locate: jest.fn(),
           },
         },
+        EpisodesService,
+        { provide: MediaAssetService, useValue: { getPlaybackUrl: jest.fn() } },
       ],
     }).compile();
 
     controller = module.get<EpisodesController>(EpisodesController);
     episodeServiceMock = module.get(EpisodeService) as jest.Mocked<EpisodeService>;
+    mediaAssetServiceMock = module.get(MediaAssetService) as jest.Mocked<MediaAssetService>;
   });
 
   afterEach(() => {
@@ -143,16 +149,21 @@ describe("EpisodeController", () => {
   });
 
   describe("getStreamUrl", () => {
-    describe("should return the stream URL", () => {
-      it("if called with an existing id", async () => {
-        const urlResponse = { url: "stream-url" };
-        (episodeServiceMock.getStreamUrl as jest.Mock).mockResolvedValue(urlResponse);
+    it("should sign a playback URL for where the episode lives", async () => {
+      const location = {
+        type: VideoType.EPISODE,
+        titleId: "t-1",
+        seasonId: "s-1",
+        episodeId: "episode-1",
+      };
+      (episodeServiceMock.locate as jest.Mock).mockResolvedValue(location);
+      (mediaAssetServiceMock.getPlaybackUrl as jest.Mock).mockResolvedValue({ url: "stream-url" });
 
-        const result = await controller.getStreamUrl("episode-1");
+      const result = await controller.getStreamUrl("episode-1");
 
-        expect(episodeServiceMock.getStreamUrl).toHaveBeenCalledWith("episode-1");
-        expect(result).toEqual(urlResponse);
-      });
+      expect(episodeServiceMock.locate).toHaveBeenCalledWith("episode-1");
+      expect(mediaAssetServiceMock.getPlaybackUrl).toHaveBeenCalledWith(location);
+      expect(result).toEqual({ url: "stream-url" });
     });
   });
 });

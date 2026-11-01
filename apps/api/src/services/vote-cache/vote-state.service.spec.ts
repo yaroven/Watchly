@@ -94,7 +94,13 @@ describe("VoteStateService", () => {
     it("asks for the whole page in one call", async () => {
       redis.mget.mockResolvedValue(["L", "N"]);
 
-      const votes = await service.forTitles([{ id: titleId }, { id: "other" }], userId);
+      const votes = await service.forTitles(
+        [
+          { id: titleId, storedVote: null },
+          { id: "other", storedVote: null },
+        ],
+        userId,
+      );
 
       expect(redis.mget).toHaveBeenCalledWith([key, `vote:title:other:${userId}`]);
       expect(votes.get(titleId)).toBe(LIKE);
@@ -104,17 +110,32 @@ describe("VoteStateService", () => {
     it("keys a comment on its own arc", async () => {
       redis.mget.mockResolvedValue(["L"]);
 
-      await service.forComments([{ id: "c1" }], userId);
+      await service.forComments([{ id: "c1", storedVote: null }], userId);
 
       expect(redis.mget).toHaveBeenCalledWith([`vote:comment:c1:${userId}`]);
     });
 
-    it("leaves a pair the cache cannot answer for out of the map", async () => {
-      redis.mget.mockResolvedValue([null]);
+    it("answers from the relation for a pair the cache cannot answer for", async () => {
+      redis.mget.mockResolvedValue([null, null]);
 
-      const votes = await service.forTitles([{ id: titleId }], userId);
+      const votes = await service.forTitles(
+        [
+          { id: titleId, storedVote: LIKE },
+          { id: "other", storedVote: null },
+        ],
+        userId,
+      );
 
-      expect(votes.has(titleId)).toBe(false);
+      expect(votes.get(titleId)).toBe(LIKE);
+      expect(votes.get("other")).toBeNull();
+    });
+
+    it("prefers the cache over the relation when the cache has an answer", async () => {
+      redis.mget.mockResolvedValue(["N"]);
+
+      const votes = await service.forTitles([{ id: titleId, storedVote: LIKE }], userId);
+
+      expect(votes.get(titleId)).toBeNull();
     });
 
     it("asks nothing for an empty page", async () => {
@@ -123,16 +144,18 @@ describe("VoteStateService", () => {
     });
 
     it.each([[null], [undefined]])("asks nothing when the viewer is %p", async (viewerId) => {
-      const votes = await service.forTitles([{ id: titleId }], viewerId);
+      const votes = await service.forTitles([{ id: titleId, storedVote: null }], viewerId);
 
       expect(redis.mget).not.toHaveBeenCalled();
       expect(votes.size).toBe(0);
     });
 
-    it("falls back to an empty answer when redis is unreachable", async () => {
+    it("answers from the relation when redis is unreachable", async () => {
       redis.mget.mockRejectedValue(new Error("redis is down"));
 
-      await expect(service.forTitles([{ id: titleId }], userId)).resolves.toEqual(new Map());
+      await expect(service.forTitles([{ id: titleId, storedVote: LIKE }], userId)).resolves.toEqual(
+        new Map([[titleId, LIKE]]),
+      );
     });
   });
 });

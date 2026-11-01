@@ -14,8 +14,6 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   app.enableShutdownHooks();
 
-  // Heap, event loop lag, GC. Once per process, on the default registry the
-  // metrics controller serves; a second call would throw on duplicate names.
   collectDefaultMetrics();
   app.use(httpMetricsMiddleware());
 

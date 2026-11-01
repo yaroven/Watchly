@@ -52,8 +52,6 @@ export default function TitleCastManager({ titleId }: TitleCastManagerProps) {
     { enabled: artistSearch.length > 0 },
   );
 
-  // Sync local editable rows whenever the server cast changes (initial load, or after a save) —
-  // done during render rather than in an effect, per React's "adjusting state" pattern.
   if (cast && cast !== syncedCast) {
     setSyncedCast(cast);
     setRows(toRows(cast));

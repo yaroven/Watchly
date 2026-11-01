@@ -9,7 +9,6 @@ interface PlayerOverlayProps {
   onPlay: () => void;
 }
 
-// shared centering rule for the loader spinner and the center play button
 const centeredOverlaySx = {
   position: "absolute",
   top: "50%",

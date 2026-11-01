@@ -5,11 +5,6 @@ import { PrismaService } from "../prisma/prisma.service";
 
 export type CountersClient = Pick<PrismaService, "engagementCounters" | "reaction" | "comment">;
 
-/**
- * Which arc the row hangs off. Exactly one, the way the CHECK constraint says —
- * a union rather than two optional fields, so "neither" and "both" are not
- * expressible in the first place.
- */
 export type CountersSubject = { titleId: string } | { commentId: string };
 
 export interface EngagementCounts {
@@ -47,7 +42,6 @@ export const titleCounters = (titleId: string): CountersSubject => ({ titleId })
 
 export const commentCounters = (commentId: string): CountersSubject => ({ commentId });
 
-/** A row, or the zeroes that mean "nothing counted yet". */
 export const countsOf = (row: EngagementCounts | null | undefined): EngagementCounts =>
   row ? { likes: row.likes, dislikes: row.dislikes, commentCount: row.commentCount } : NO_COUNTS;
 

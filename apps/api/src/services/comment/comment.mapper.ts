@@ -1,10 +1,15 @@
-import { resolveVote } from "../reaction/utils/vote.util";
-import { CommentView, CommentViewOptions, CommentWithAuthor } from "./comment.types";
+import { ViewerVotes, VotedSubject } from "../vote-cache/vote-cache.const";
+import {
+  CommentView,
+  CommentViewOptions,
+  CommentWithAuthor,
+  StoredCommentView,
+} from "./comment.types";
 
 export const toCommentView = (
   comment: CommentWithAuthor,
-  { replies = [], authorAvatarUrl = null, myReaction }: CommentViewOptions = {},
-): CommentView => ({
+  { replies = [], authorAvatarUrl = null }: CommentViewOptions = {},
+): StoredCommentView => ({
   id: comment.id,
   author: {
     id: comment.user.id,
@@ -17,7 +22,23 @@ export const toCommentView = (
   createdAt: comment.createdAt,
   likes: comment.counters?.likes ?? 0,
   dislikes: comment.counters?.dislikes ?? 0,
-  myReaction: resolveVote(myReaction, comment.reactions?.[0]?.type ?? null),
+  storedReaction: comment.reactions?.[0]?.type ?? null,
   replies,
   replyCount: comment.counters?.commentCount ?? 0,
 });
+
+export const votedSubjectsOf = (comments: StoredCommentView[]): VotedSubject[] =>
+  comments.flatMap((comment) => [
+    { id: comment.id, storedVote: comment.storedReaction },
+    ...votedSubjectsOf(comment.replies),
+  ]);
+
+export const withVotes = (comment: StoredCommentView, votes: ViewerVotes): CommentView => {
+  const { storedReaction: _stored, replies, ...rest } = comment;
+
+  return {
+    ...rest,
+    myReaction: votes.get(comment.id) ?? null,
+    replies: replies.map((reply) => withVotes(reply, votes)),
+  };
+};

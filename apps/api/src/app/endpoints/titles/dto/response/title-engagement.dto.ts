@@ -3,7 +3,7 @@ import { ReactionType } from "@prisma/client";
 import {
   TitleEngagementView,
   ViewerTitleEngagementView,
-} from "../../../../../services/title-engagement/title-engagement.types";
+} from "../../../../../services/title/title-engagement.types";
 
 export class ViewerTitleEngagementDto implements ViewerTitleEngagementView {
   @ApiProperty({

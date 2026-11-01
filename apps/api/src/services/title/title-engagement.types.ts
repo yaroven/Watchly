@@ -13,12 +13,25 @@ export interface ViewerTitleEngagementView {
   inWatchlist: boolean;
 }
 
-export interface TitleEngagementView {
+export interface StoredViewerTitleEngagementView extends Omit<
+  ViewerTitleEngagementView,
+  "reaction"
+> {
+  storedReaction: ReactionType | null;
+}
+
+export type CardViewerTitleEngagementView = Omit<ViewerTitleEngagementView, "reaction">;
+
+export interface TitleEngagementView<V = ViewerTitleEngagementView> {
   averageScore: number | null;
   ratingCount: number;
   likes: number;
   dislikes: number;
   watchlistCount: number;
   commentCount: number;
-  viewer: ViewerTitleEngagementView | null;
+  viewer: V | null;
 }
+
+export type StoredTitleEngagementView = TitleEngagementView<StoredViewerTitleEngagementView>;
+
+export type CardTitleEngagementView = TitleEngagementView<CardViewerTitleEngagementView>;

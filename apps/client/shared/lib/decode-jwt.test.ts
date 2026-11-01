@@ -19,8 +19,6 @@ describe("isAccessTokenExpired", () => {
     expect(isAccessTokenExpired(tokenWith({ exp: Math.floor(Date.now() / 1000) + 5 }), 10)).toBe(true);
   });
 
-  // The caller cannot fall back on the server noticing: @OptionalAuth() routes answer a
-  // dead token with 200-anonymous, so an unreadable token would never be replaced.
   it("should treat an unreadable token as expired, and say so", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 

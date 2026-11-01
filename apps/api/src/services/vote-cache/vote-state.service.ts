@@ -2,16 +2,17 @@ import { Injectable } from "@nestjs/common";
 import { Logged } from "../../decorators/logged.decorator";
 import { ReactionArc } from "../reaction/enums/reaction-arc.enum";
 import { ReactionTarget, subjectIdOf, targetOf } from "../reaction/utils/reaction-target.const";
-import { Vote } from "../reaction/utils/vote.util";
+import { resolveVote, Vote } from "../reaction/utils/vote.util";
 import { throughRedis } from "../redis/redis.error";
 import { RedisService } from "../redis/redis.service";
 import {
   decodeVote,
   encodeVote,
-  NO_VOTE_OVERRIDES,
+  NO_VIEWER_VOTES,
+  ViewerVotes,
   VOTE_TTL_SECONDS,
+  VotedSubject,
   voteKey,
-  VoteOverrides,
 } from "./vote-cache.const";
 
 @Injectable()
@@ -26,43 +27,47 @@ export class VoteStateService {
   }
 
   @Logged({ completedLevel: "debug" })
-  forTitles(
-    subjects: { id: string }[],
-    viewerId: string | null | undefined,
-  ): Promise<VoteOverrides> {
+  forTitles(subjects: VotedSubject[], viewerId: string | null | undefined): Promise<ViewerVotes> {
     return this.forPage(ReactionArc.TITLE, subjects, viewerId);
   }
 
   @Logged({ completedLevel: "debug" })
-  forComments(
-    subjects: { id: string }[],
-    viewerId: string | null | undefined,
-  ): Promise<VoteOverrides> {
+  forComments(subjects: VotedSubject[], viewerId: string | null | undefined): Promise<ViewerVotes> {
     return this.forPage(ReactionArc.COMMENT, subjects, viewerId);
   }
 
-  private forPage(
+  private async forPage(
     arc: ReactionArc,
-    subjects: { id: string }[],
+    subjects: VotedSubject[],
     viewerId: string | null | undefined,
-  ): Promise<VoteOverrides> {
-    if (!viewerId) return Promise.resolve(NO_VOTE_OVERRIDES);
+  ): Promise<ViewerVotes> {
+    if (!viewerId) return NO_VIEWER_VOTES;
 
-    return this.readMany(
+    const cached = await this.readMany(
       subjects.map((subject) => targetOf(arc, subject.id)),
       viewerId,
+    );
+
+    return new Map(
+      subjects.map((subject) => [
+        subject.id,
+        resolveVote(cached.get(subject.id), subject.storedVote),
+      ]),
     );
   }
 
   @Logged({ completedLevel: "debug" })
-  private async readMany(targets: ReactionTarget[], userId: string): Promise<VoteOverrides> {
-    if (targets.length === 0) return NO_VOTE_OVERRIDES;
+  private async readMany(
+    targets: ReactionTarget[],
+    userId: string,
+  ): Promise<ReadonlyMap<string, Vote>> {
+    if (targets.length === 0) return new Map();
 
     let raw: (string | null)[];
     try {
       raw = await this.mget(targets.map((target) => voteKey(target, userId)));
     } catch {
-      return NO_VOTE_OVERRIDES;
+      return new Map();
     }
 
     const votes = new Map<string, Vote>();

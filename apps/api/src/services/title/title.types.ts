@@ -8,7 +8,12 @@ import {
 } from "@prisma/client";
 import { ExternalRatingView } from "../external-ratings/external-ratings.types";
 import { GenreView } from "../genre/genre.types";
-import { TitleEngagementView } from "../title-engagement/title-engagement.types";
+import {
+  CardViewerTitleEngagementView,
+  StoredViewerTitleEngagementView,
+  TitleEngagementView,
+  ViewerTitleEngagementView,
+} from "./title-engagement.types";
 
 export interface TitleInput {
   name: string;
@@ -31,7 +36,7 @@ export type TitleWithCatalogueRelations = Title & {
   externalRatings?: ExternalRatings[];
 };
 
-export interface TitleView {
+export interface TitleView<V = ViewerTitleEngagementView> {
   id: string;
   createdAt: Date;
   updatedAt: Date;
@@ -50,6 +55,10 @@ export interface TitleView {
   closedCaption: boolean;
   genres: GenreView[];
   transcodingStatus: TranscodingStatus;
-  engagement: TitleEngagementView;
+  engagement: TitleEngagementView<V>;
   externalRatings: ExternalRatingView[];
 }
+
+export type StoredTitleView = TitleView<StoredViewerTitleEngagementView>;
+
+export type CardTitleView = TitleView<CardViewerTitleEngagementView>;

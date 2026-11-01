@@ -28,7 +28,6 @@ const FIELD_LABELS: Partial<Record<keyof TitleFormValues, string>> = {
   videoFile: "Video file",
 };
 
-/** Anchors for fields whose own input is hidden (file inputs) or custom-rendered. */
 const FIELD_ANCHORS: Partial<Record<keyof TitleFormValues, string>> = {
   ageRating: "field-ageRating",
   posterFile: "section-media",

@@ -4,20 +4,16 @@ import Typography from "@mui/material/Typography";
 import { tokens } from "@shared/mui/theme";
 
 interface UploadDropzoneProps {
-  /** Id of the hidden file input this label opens. */
   inputId: string;
   hint?: string;
   hasError?: boolean;
   disabled?: boolean;
 }
 
-/** Empty state: the dashed area shown until a file is picked. */
 export default function UploadDropzone({ inputId, hint, hasError = false, disabled = false }: UploadDropzoneProps) {
   return (
     <Box
       component="label"
-      // A <label> opens the input through its association, so the link itself
-      // has to go when disabled — pointer styling alone would not stop it.
       htmlFor={disabled ? undefined : inputId}
       sx={{
         minHeight: "110px",

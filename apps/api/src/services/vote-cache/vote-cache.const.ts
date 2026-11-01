@@ -24,6 +24,11 @@ export const encodeVote = (vote: Vote): string => (vote ? CODES[vote] : NO_VOTE)
 export const decodeVote = (raw: string | null): Vote | undefined =>
   raw !== null && raw in VOTES ? VOTES[raw] : undefined;
 
-export type VoteOverrides = ReadonlyMap<string, Vote>;
+export interface VotedSubject {
+  id: string;
+  storedVote: Vote;
+}
 
-export const NO_VOTE_OVERRIDES: VoteOverrides = new Map();
+export type ViewerVotes = ReadonlyMap<string, Vote>;
+
+export const NO_VIEWER_VOTES: ViewerVotes = new Map();

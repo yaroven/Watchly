@@ -69,8 +69,6 @@ export default function WatchlistScreen() {
         </Box>
       )}
 
-      {/* A failed load must never read as an empty watchlist — someone whose forty
-          saved titles did not arrive would be told they never saved anything. */}
       {isError && (
         <EmptyState message={`Could not load your watchlist: ${error.message}`} icon={<ErrorOutlineIcon sx={iconSx} />}>
           <Button variant="outlined" disabled={isFetching} onClick={() => void refetch()}>

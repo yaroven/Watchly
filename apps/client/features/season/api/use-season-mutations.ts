@@ -15,6 +15,7 @@ export const useCreateSeason = (options?: Omit<UseMutationOptions<Season, Error,
       await uploadImageFile({
         files: posterFile,
         getUploadUrl: (contentType) => SeasonService.getPosterUploadUrl(season.id, contentType),
+        completeUpload: (rawKey) => SeasonService.completePosterUpload(season.id, rawKey),
         uploadToUrl: SeasonService.uploadToS3,
       });
 
@@ -34,6 +35,7 @@ export const useUpdateSeason = (
       await uploadImageFile({
         files: posterFile,
         getUploadUrl: (contentType) => SeasonService.getPosterUploadUrl(id, contentType),
+        completeUpload: (rawKey) => SeasonService.completePosterUpload(id, rawKey),
         uploadToUrl: SeasonService.uploadToS3,
       });
 

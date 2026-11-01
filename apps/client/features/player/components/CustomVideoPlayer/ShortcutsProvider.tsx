@@ -13,14 +13,12 @@ const normalizeShortcut = (shortcut: Shortcut): string => {
 };
 
 const ShortcutProvider = ({ children }: { children: React.ReactNode }) => {
-  // Registry for shortcut with key as shortcut combination and value as the handler
   const ShortcutRegisteryRef = useRef<ShortcutRegistry>(new Map());
 
   const register = useCallback((shortcut: Shortcut, handler: ShortcutHandler, override = false) => {
     const ShortcutRegistery = ShortcutRegisteryRef.current;
     const normalizedKey = normalizeShortcut(shortcut);
 
-    // here checking for conflicts
     if (ShortcutRegistery.has(normalizedKey) && !override) {
       console.warn(`Conflict: "${normalizedKey}" is already registered for shortcut. Use override=true to replace or handle conflict.`);
       return;
@@ -35,7 +33,6 @@ const ShortcutProvider = ({ children }: { children: React.ReactNode }) => {
 
   const handleKeyDown = (event: KeyboardEvent) => {
     const target = event.target as HTMLElement;
-    // this check is important as without this we wont be able to write in these inputs
     if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
       return;
     }

@@ -1,9 +1,3 @@
-/**
- * TEMPORARY: design-file fixture for the discover screen's news rail — there's
- * no news/announcements backend at all. Drop this file once that lands;
- * nothing else imports it.
- */
-
 export const news = [
   {
     id: "1",

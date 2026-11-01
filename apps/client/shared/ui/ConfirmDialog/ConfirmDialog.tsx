@@ -19,9 +19,7 @@ interface ConfirmDialogProps {
   onClose: () => void;
   onConfirm: () => void;
   title: string;
-  /** Body copy — a node, so callers can emphasise the item name. */
   description: ReactNode;
-  /** Picks the icon and accent; also makes the confirm button red on danger. */
   tone?: ConfirmTone;
   confirmLabel?: string;
   pendingLabel?: string;
@@ -29,7 +27,6 @@ interface ConfirmDialogProps {
   isPending?: boolean;
 }
 
-/** Confirmation dialog for actions that need a deliberate yes. */
 export default function ConfirmDialog({
   isOpen,
   onClose,

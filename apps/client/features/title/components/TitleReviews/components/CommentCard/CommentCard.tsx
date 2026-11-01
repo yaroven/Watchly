@@ -252,8 +252,6 @@ export default function CommentCard({ comment, titleId, depth = 0 }: CommentCard
       </Box>
 
       {replies.length > 0 && (
-        // A rail rather than a plain margin, so a long reply thread still reads as
-        // hanging off its parent once the parent has scrolled out of view.
         <Box
           sx={{
             display: "flex",

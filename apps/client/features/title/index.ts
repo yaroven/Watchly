@@ -1,4 +1,3 @@
-/** Public API of the title feature — routes and other features import from here. */
 export { default as AdminTitle } from "./components/AdminTitle";
 export { default as Catalog } from "./components/Catalog";
 export { default as DiscoverScreen } from "./components/DiscoverScreen";

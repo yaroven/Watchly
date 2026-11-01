@@ -36,13 +36,6 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
 
   useEffect(() => () => window.clearTimeout(shareTimer.current), []);
 
-  // The page is server-rendered with no session — `shared/api/axios.ts` reads its
-  // bearer from the auth store, which is empty there, and the refresh cookie is not
-  // forwarded. So `title.engagement` seeds the public counts, and its `viewer` is
-  // null by construction; only the client query can fill that in.
-  // `isError` covers a failed refetch too: query-core sets `status: "error"`
-  // whether or not data is already held — that is what `isRefetchError` is
-  // derived from. Stale viewer state is as dangerous here as missing state.
   const { data: liveEngagement, isError: engagementFailed, refetch } = useTitleEngagement(title.id);
   const engagement = liveEngagement ?? title.engagement;
   const viewerEngagement = engagement.viewer;
@@ -54,9 +47,6 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
   const viewerStateUnknown = viewer.status === "signed-in" && (viewerEngagement === null || engagementFailed);
   const togglesDisabled = viewer.status !== "signed-in" || viewerStateUnknown;
 
-  // Each of the three viewer states gets its own answer. Anonymous is not a
-  // failure — it is a viewer who needs an account, and the sibling TitleCard
-  // sends them to one rather than dimming a control at them.
   const handleToggleWhileAnonymous = () => router.push(APP.LOGIN);
 
   const handleReact = (type: ReactionType) => {
@@ -72,8 +62,6 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
   };
 
   const handleShare = async () => {
-    // `navigator.clipboard` is undefined outside a secure context, so this is a
-    // plain failure on any http deployment rather than something exceptional.
     if (!navigator.clipboard) {
       flashShareState("failed");
       return;
@@ -221,9 +209,6 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
         </Box>
       </Box>
 
-      {/* `viewerStateUnknown` is true in a case where nothing failed: the read
-          succeeded and simply carried no viewer. Leaving it out of this condition
-          disabled every control with no explanation at all. */}
       {(writeError || engagementFailed || viewerStateUnknown) && (
         <Alert
           severity="error"
