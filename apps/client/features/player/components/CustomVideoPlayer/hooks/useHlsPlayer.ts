@@ -48,7 +48,6 @@ export default function useHlsPlayer(
     [store],
   );
 
-  // Register setQuality action to the store
   useEffect(() => {
     store.setState({
       setQuality,

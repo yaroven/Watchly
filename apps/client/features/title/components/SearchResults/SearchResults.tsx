@@ -48,9 +48,6 @@ const menuProps = {
   },
 };
 
-// Movie/Series, Director, Network, and Genre are wired below. Age rating,
-// Artist, Country, Order, and Quality have no equivalent filter yet
-// (see PLACEHOLDER_DATA_BACKEND_TODO.md), so those still render disabled.
 const DISABLED_FILTERS = [{ label: "Age rating" }, { label: "Artist" }, { label: "Country" }, { label: "Order" }, { label: "Quality" }];
 
 function DisabledFilter({ label }: { label: string }) {
@@ -73,8 +70,6 @@ export default function SearchResults() {
   const networkFilter = searchParams.get("network") ?? "";
   const genreIdFilter = searchParams.get("genreId") ?? "";
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  // Local, uncommitted text — only pushed to the URL (and so refetched) on Enter/blur,
-  // same as the header search bar, instead of firing a request per keystroke.
   const [directorInput, setDirectorInput] = useState(directorFilter);
   const [networkInput, setNetworkInput] = useState(networkFilter);
 

@@ -13,10 +13,6 @@ describe("commentQuery", () => {
       expect(include.user).toEqual({ select: expect.objectContaining({ avatarKey: true }) });
     });
 
-    /**
-     * Prisma reads `undefined` in a `where` as "no filter", so a relation left
-     * in place for an anonymous read would hand back every viewer's votes.
-     */
     it("omits the viewer's reaction entirely when there is no viewer", () => {
       expect(commentQuery.withViewer()).not.toHaveProperty("reactions");
       expect(commentQuery.withViewer("viewer-1")).toHaveProperty("reactions", {
@@ -40,8 +36,6 @@ describe("commentQuery", () => {
   });
 
   describe("hottestRootIds", () => {
-    // One query for both kinds of subject: the arc is a fragment, so the join
-    // and the ordering cannot drift between a title's thread and a reply's.
     it("ranks on the cached like counter for either subject", () => {
       const forTitle = commentQuery.hottestRootIds(titleSubject(titleId), 10, 0);
       const forReply = commentQuery.hottestRootIds(replySubject(commentId), 10, 0);

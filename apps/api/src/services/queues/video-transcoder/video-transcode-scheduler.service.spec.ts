@@ -25,16 +25,15 @@ describe("VideoTranscodeScheduler", () => {
 
   describe("schedule", () => {
     it("adds the job to the queue", async () => {
-      const payload = { id: "vid-1", type: VideoType.MOVIE };
+      const payload = { id: "vid-1", type: VideoType.MOVIE, rawKey: "title-video/vid-1" };
 
       await scheduler.schedule(payload);
 
       expect(queueMock.add).toHaveBeenCalledWith("transcode-video", payload, expect.any(Object));
     });
 
-    // Deterministic, so a redelivered S3 event does not queue a second job.
     it("derives the jobId from the type and the id", async () => {
-      await scheduler.schedule({ id: "vid-1", type: VideoType.MOVIE });
+      await scheduler.schedule({ id: "vid-1", type: VideoType.MOVIE, rawKey: "title-video/vid-1" });
 
       expect(queueMock.add).toHaveBeenCalledWith(
         expect.anything(),
@@ -60,11 +59,6 @@ describe("VideoTranscodeScheduler", () => {
       expect(job.remove).toHaveBeenCalled();
     });
 
-    /**
-     * A running job is stopped co-operatively instead — the progress handler
-     * notices the row is gone and kills ffmpeg. Removing it here would leave
-     * the ffmpeg process orphaned.
-     */
     it("leaves a job that is already active", async () => {
       const job = jobInState("active");
       queueMock.getJob.mockResolvedValue(job);

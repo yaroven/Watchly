@@ -1,10 +1,11 @@
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { PrismaService } from "../prisma/prisma.service";
-import { ImageKind, imageProfile } from "../queues/image-transcoder/image-profile.const";
 import BucketType from "../s3/enums/bucket-type.enum";
 import { S3Service } from "../s3/s3.service";
+import { ImageKind } from "./enums/image-kind.enum";
 import { ImageService } from "./image.service";
+import { imageProfile } from "./utils/image-target.const";
 
 describe("ImageService", () => {
   const OWNER = "11111111-1111-4111-8111-111111111111";
@@ -14,6 +15,7 @@ describe("ImageService", () => {
     getUploadPresignedUrl: jest.Mock;
     deleteObject: jest.Mock;
     getPublicUrl: jest.Mock;
+    objectExists: jest.Mock;
   };
   let prisma: Record<
     "title" | "season" | "artist" | "user",
@@ -27,6 +29,7 @@ describe("ImageService", () => {
       getUploadPresignedUrl: jest.fn().mockResolvedValue("https://s3.example.com/raw/signed"),
       deleteObject: jest.fn().mockResolvedValue(undefined),
       getPublicUrl: jest.fn((key: string) => `https://cdn.example.com/content/${key}`),
+      objectExists: jest.fn().mockResolvedValue(true),
     };
     prisma = { title: table(), season: table(), artist: table(), user: table() };
 
@@ -42,6 +45,41 @@ describe("ImageService", () => {
   });
 
   afterEach(() => jest.clearAllMocks());
+
+  describe("assertUploaded", () => {
+    const RAW = `title-poster/${OWNER}/a1b2`;
+
+    it("should accept a key issued for this owner and kind once the object is there", async () => {
+      await expect(
+        service.assertUploaded(ImageKind.TITLE_POSTER, OWNER, RAW),
+      ).resolves.toBeUndefined();
+      expect(s3.objectExists).toHaveBeenCalledWith(RAW, BucketType.RAW);
+    });
+
+    it.each([
+      ["another kind", ImageKind.SEASON_POSTER, RAW],
+      [
+        "another owner",
+        ImageKind.TITLE_POSTER,
+        `title-poster/22222222-2222-4222-8222-222222222222/a1b2`,
+      ],
+      ["no upload name", ImageKind.TITLE_POSTER, `title-poster/${OWNER}`],
+      ["a key outside the scheme", ImageKind.TITLE_POSTER, "../../etc/passwd"],
+    ])("should refuse a key for %s without asking the bucket", async (_case, kind, rawKey) => {
+      await expect(service.assertUploaded(kind, OWNER, rawKey)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(s3.objectExists).not.toHaveBeenCalled();
+    });
+
+    it("should refuse a key nothing has been uploaded to yet", async () => {
+      s3.objectExists.mockResolvedValue(false);
+
+      await expect(service.assertUploaded(ImageKind.TITLE_POSTER, OWNER, RAW)).rejects.toThrow(
+        "Nothing has been uploaded to that key yet",
+      );
+    });
+  });
 
   describe("createUploadUrl", () => {
     it.each([

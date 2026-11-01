@@ -30,12 +30,12 @@ import { VoteDriftMetricsService } from "../services/metrics/vote-drift-metrics.
 import { PrismaModule } from "../services/prisma/prisma.module";
 import { IMAGE_TRANSCODE_QUEUE_OPTIONS } from "../services/queues/image-transcoder/image-transcode-queue.options";
 import { ImageTranscoderModule } from "../services/queues/image-transcoder/image-transcoder.module";
+import { ReactionDriftModule } from "../services/queues/reaction-flush/reaction-drift.module";
 import { REACTION_FLUSH_QUEUE_OPTIONS } from "../services/queues/reaction-flush/reaction-flush-queue.options";
 import { ReactionFlushModule } from "../services/queues/reaction-flush/reaction-flush.module";
 import { VIDEO_TRANSCODE_QUEUE_OPTIONS } from "../services/queues/video-transcoder/video-transcode-queue.options";
 import { VideoTranscoderModule } from "../services/queues/video-transcoder/video-transcoder.module";
 import { RedisModule } from "../services/redis/redis.module";
-import { S3EventModule } from "../services/s3-event/s3-event.module";
 import { S3Module } from "../services/s3/s3.module";
 import { ArtistsModule } from "./endpoints/artists/artists.module";
 import { AuthEndpointModule } from "./endpoints/auth/auth.module";
@@ -101,7 +101,6 @@ import { WatchlistEndpointModule } from "./endpoints/watchlist/watchlist.module"
     PrismaModule,
     EpisodesModule,
     SeasonsModule,
-    S3EventModule,
     AuthEndpointModule,
     UsersModule,
     ArtistsModule,
@@ -114,6 +113,7 @@ import { WatchlistEndpointModule } from "./endpoints/watchlist/watchlist.module"
     FeatureFlagsModule,
     ReactionsModule,
     ReactionFlushModule,
+    ReactionDriftModule,
     RedisModule,
   ],
   controllers: [AppController, MetricsController],

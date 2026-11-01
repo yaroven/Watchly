@@ -21,7 +21,6 @@ interface MenuItemConfig {
   text: string;
   href: string;
   icon: ReactNode;
-  /** Omit for a public item — visible whether or not the visitor is signed in. */
   roles?: Role[];
 }
 
@@ -35,14 +34,11 @@ export default function Sidebar() {
   const pathname = usePathname();
   const userRole = useAuthStore((state) => state.role);
 
-  // No `roles` means public; otherwise the visitor's role must be in the list.
   const visibleItems = useMemo(
     () => menuItems.filter((item) => !item.roles || (userRole !== null && item.roles.includes(userRole))),
     [userRole],
   );
 
-  // Nested routes such as /discover/movie still belong to Discover, so this
-  // matches by prefix and keeps the longest match when several apply.
   const activeIndex =
     visibleItems
       .map((item, index) => ({ index, href: item.href }))

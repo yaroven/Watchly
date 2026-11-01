@@ -18,8 +18,6 @@ describe("MetricsController", () => {
   };
 
   beforeEach(async () => {
-    // Metrics live on the default registry, so values carry over between tests
-    // unless they are cleared. Registrations stay.
     register.resetMetrics();
 
     const moduleRef = await Test.createTestingModule({
@@ -36,8 +34,6 @@ describe("MetricsController", () => {
     await expect(controller.metrics(request(), res)).resolves.toContain("probe_widgets_total 2");
   });
 
-  // Prometheus parses by content type; the default JSON one would make the
-  // scrape fail rather than look empty.
   it("sets the exposition content type", async () => {
     const { res, setHeader } = response();
 
@@ -46,11 +42,6 @@ describe("MetricsController", () => {
     expect(setHeader).toHaveBeenCalledWith("Content-Type", register.contentType);
   });
 
-  /**
-   * This is what keeps the route off the internet now that it shares the port
-   * the Ingress publishes. A scrape goes to the pod IP and carries no
-   * forwarded header; anything arriving through ingress-nginx does.
-   */
   it("refuses a request that came through the proxy", async () => {
     const { res } = response();
 
@@ -67,8 +58,6 @@ describe("MetricsController", () => {
     );
   });
 
-  // ThrottlerGuard is global, and a scrape is not user traffic. The key is the
-  // library constant suffixed with the throttler's name.
   it("is exempt from the global rate limit", () => {
     const skip: unknown = Reflect.getMetadata(
       `${THROTTLER_SKIP}default`,
@@ -78,8 +67,6 @@ describe("MetricsController", () => {
     expect(skip).toBe(true);
   });
 
-  // It would otherwise show up in /docs as a public endpoint. The key is
-  // swagger's own and is not exported from the package, so it is spelled out.
   it("is kept out of the swagger document", () => {
     const excluded: unknown = Reflect.getMetadata(
       "swagger/apiExcludeEndpoint",

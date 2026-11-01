@@ -91,10 +91,8 @@ export default function AdminHeader() {
               borderColor: alpha(tokens.border.subtle, 0.8),
             }}
           >
-            {/* PLACEHOLDER: no auth/session yet — needs a real logged-in user (name + avatarUrl) endpoint */}
             <Avatar src="https://www.svgrepo.com/show/384670/account-avatar-profile-user.svg" alt="Admin user" />
             <Box sx={{ display: "flex", flexDirection: "column" }}>
-              {/* PLACEHOLDER: no auth/session yet — needs a real logged-in admin user endpoint */}
               <Typography sx={{ fontSize: "16px", fontWeight: 600, color: "#ffffff" }}>Admin User</Typography>
               <Typography sx={{ fontSize: "14px", color: "text.secondary" }}>Super Admin</Typography>
             </Box>

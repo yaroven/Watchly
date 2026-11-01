@@ -7,7 +7,7 @@ const watchlistQuery = {
   titleIds: (userId: string, { page = 1, limit = 10 }: { page?: number; limit?: number }) =>
     ({
       where: watchlistQuery.forViewer(userId),
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       skip: (page - 1) * limit,
       take: limit,
       select: { titleId: true },

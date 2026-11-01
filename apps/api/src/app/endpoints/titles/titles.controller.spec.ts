@@ -3,18 +3,16 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { FilterRule } from "../../../common/pagination/filter-rule.enum";
 import { MediaAssetService } from "../../../services/media-asset/media-asset.service";
 import { PrismaService } from "../../../services/prisma/prisma.service";
-import { TitleEngagementService } from "../../../services/title-engagement/title-engagement.service";
+import { TitleEngagementService } from "../../../services/title/title-engagement.service";
 import { TitleService } from "../../../services/title/title.service";
 import { TitleExistsPipe } from "../../../services/title/utils/title-exists.pipe";
 import { TitlesController } from "./titles.controller";
+import { TitlesService } from "./titles.service";
 
 describe("TitlesController", () => {
   let controller: TitlesController;
   let titleServiceMock: jest.Mocked<TitleService>;
 
-  // One mock behind both providers: the controller forwards the catalogue
-  // routes to one service and the engagement routes to the other, and these
-  // tests only care that it forwards.
   const serviceMock = {
     create: jest.fn(),
     getMovieUrl: jest.fn(),
@@ -41,6 +39,7 @@ describe("TitlesController", () => {
           useValue: { title: { findUnique: jest.fn().mockResolvedValue({ id: "title-1" }) } },
         },
         { provide: TitleService, useValue: serviceMock },
+        { provide: TitlesService, useValue: serviceMock },
         { provide: TitleEngagementService, useValue: serviceMock },
         { provide: MediaAssetService, useValue: {} },
       ],

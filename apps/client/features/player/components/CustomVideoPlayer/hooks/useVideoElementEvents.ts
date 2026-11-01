@@ -90,7 +90,6 @@ export default function useVideoElementEvents(
       });
       syncDuration();
 
-      // Seek to initial time from URL query if it's the first time loading this video source
       if (!hasSeekedInitialTimeRef.current) {
         hasSeekedInitialTimeRef.current = true;
         const initialTime = urlTime;
@@ -142,7 +141,6 @@ export default function useVideoElementEvents(
       const currentTime = video.currentTime;
       store.setState({ timeline: currentTime });
 
-      // Update URL query parameter 't' with the current playback time during playback
       if (!video.paused) {
         void setUrlTime(Math.floor(currentTime));
       }
@@ -160,7 +158,6 @@ export default function useVideoElementEvents(
         isBuffering: false,
       });
 
-      // Instantly sync URL parameter upon manual seek
       void setUrlTime(Math.floor(currentTime));
     };
 

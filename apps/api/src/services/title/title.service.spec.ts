@@ -5,10 +5,7 @@ import { FilterRule } from "../../common/pagination/filter-rule.enum";
 import { ImageService } from "../image/image.service";
 import { MediaAssetService } from "../media-asset/media-asset.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { VideoType } from "../queues/video-transcoder/enums/video-type.enum";
 import { S3Service } from "../s3/s3.service";
-import { SeasonService } from "../season/season.service";
-import { VoteStateService } from "../vote-cache/vote-state.service";
 import { TitleService } from "./title.service";
 
 describe("TitleService", () => {
@@ -21,14 +18,12 @@ describe("TitleService", () => {
   };
   let s3ServiceMock: jest.Mocked<S3Service>;
   let mediaAssetServiceMock: jest.Mocked<MediaAssetService>;
-  let seasonServiceMock: jest.Mocked<SeasonService>;
 
   let imageServiceMock: {
     toPublicUrl: jest.Mock;
     remove: jest.Mock;
     deleteStoredImage: jest.Mock;
   };
-  let voteStateMock: { forTitles: jest.Mock };
 
   beforeEach(async () => {
     txMock = {
@@ -43,12 +38,9 @@ describe("TitleService", () => {
       deleteStoredImage: jest.fn(),
     };
 
-    voteStateMock = { forTitles: jest.fn().mockResolvedValue(new Map()) };
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TitleService,
-        { provide: VoteStateService, useValue: voteStateMock },
         {
           provide: PrismaService,
           useValue: {
@@ -112,14 +104,7 @@ describe("TitleService", () => {
             abortUpload: jest.fn(),
             scheduleTranscode: jest.fn(),
             getPlaybackUrl: jest.fn(),
-            cleanupVideoAsset: jest.fn(),
-          },
-        },
-        {
-          provide: SeasonService,
-          useValue: {
-            delete: jest.fn(),
-            cleanupAssets: jest.fn(),
+            cleanupTitle: jest.fn(),
           },
         },
       ],
@@ -129,7 +114,6 @@ describe("TitleService", () => {
     prismaServiceMock = module.get(PrismaService) as jest.Mocked<PrismaService>;
     s3ServiceMock = module.get(S3Service) as jest.Mocked<S3Service>;
     mediaAssetServiceMock = module.get(MediaAssetService) as jest.Mocked<MediaAssetService>;
-    seasonServiceMock = module.get(SeasonService) as jest.Mocked<SeasonService>;
   });
 
   afterEach(() => {
@@ -386,7 +370,11 @@ describe("TitleService", () => {
 
       const result = await service.findOne("title-1", "viewer-1");
 
-      expect(result?.engagement.viewer).toEqual({ score: 8, reaction: null, inWatchlist: false });
+      expect(result?.engagement.viewer).toEqual({
+        score: 8,
+        storedReaction: null,
+        inWatchlist: false,
+      });
     });
 
     it("should scope the viewer's own rows to that viewer", async () => {
@@ -421,35 +409,7 @@ describe("TitleService", () => {
       expect(result.engagement.viewer).not.toBeNull();
     });
 
-    it("should prefer the cached vote over the relation", async () => {
-      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
-        ...titleRow,
-        reactions: [{ type: ReactionType.LIKE }],
-      });
-      voteStateMock.forTitles.mockResolvedValue(new Map([["title-1", ReactionType.DISLIKE]]));
-
-      const result = await service.findOne("title-1", "viewer-1");
-
-      expect(result?.engagement.viewer?.reaction).toBe(ReactionType.DISLIKE);
-      expect(voteStateMock.forTitles).toHaveBeenCalledWith(
-        expect.arrayContaining([expect.objectContaining({ id: "title-1" })]),
-        "viewer-1",
-      );
-    });
-
-    it("should prefer a cached withdrawal over the relation", async () => {
-      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
-        ...titleRow,
-        reactions: [{ type: ReactionType.LIKE }],
-      });
-      voteStateMock.forTitles.mockResolvedValue(new Map([["title-1", null]]));
-
-      const result = await service.findOne("title-1", "viewer-1");
-
-      expect(result?.engagement.viewer?.reaction).toBeNull();
-    });
-
-    it("should fall back to the relation for a pair the cache has no answer for", async () => {
+    it("should carry the vote Postgres holds as stored, never as the viewer's vote", async () => {
       (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
         ...titleRow,
         reactions: [{ type: ReactionType.LIKE }],
@@ -457,15 +417,18 @@ describe("TitleService", () => {
 
       const result = await service.findOne("title-1", "viewer-1");
 
-      expect(result?.engagement.viewer?.reaction).toBe(ReactionType.LIKE);
+      expect(result?.engagement.viewer).toMatchObject({ storedReaction: ReactionType.LIKE });
+      expect(result?.engagement.viewer).not.toHaveProperty("reaction");
     });
 
-    it("should hand the absent viewer on rather than inventing one", async () => {
-      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(titleRow);
+    it("should read cards without the viewer's vote, since no card shows one", async () => {
+      (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([
+        { ...titleRow, ratings: [{ score: 6 }], watchlistEntries: [{ id: "w-1" }] },
+      ]);
 
-      await service.findOne("title-1");
+      const [card] = await service.findManyByIds(["title-1"], "viewer-1");
 
-      expect(voteStateMock.forTitles).toHaveBeenCalledWith(expect.anything(), null);
+      expect(card.engagement.viewer).toEqual({ score: 6, inWatchlist: true });
     });
 
     it("should answer null, not an empty viewer block, when there is no viewer", async () => {
@@ -654,121 +617,47 @@ describe("TitleService", () => {
   });
 
   describe("delete", () => {
-    describe("should delete the title and cleanup its resources", () => {
-      it("if the title exists as a MOVIE", async () => {
-        const title = {
-          id: "title-1",
-          type: TitleType.MOVIE,
-          posterKey: "posters/titles/title-1/v1.webp",
-          seasons: [],
-          genres: [],
-        };
-        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(title);
-        (prismaServiceMock.title.delete as jest.Mock).mockResolvedValue(title);
+    const TITLE = {
+      id: "title-1",
+      type: TitleType.SERIES,
+      posterKey: "posters/titles/title-1/v1.webp",
+      seasons: [{ id: "season-1", posterKey: null, episodes: [{ id: "episode-1" }] }],
+      genres: [],
+    };
 
-        const result = await service.delete("title-1");
+    it("should let the database take the dependents and media-asset the stored files", async () => {
+      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(TITLE);
+      (prismaServiceMock.title.delete as jest.Mock).mockResolvedValue(TITLE);
 
-        expect(mediaAssetServiceMock.cleanupVideoAsset).toHaveBeenCalledWith(
-          "title-1",
-          VideoType.MOVIE,
-          "videos/title-1/",
-        );
-        expect(imageServiceMock.deleteStoredImage).toHaveBeenCalledWith(
-          "posters/titles/title-1/v1.webp",
-        );
-        expect(prismaServiceMock.title.delete).toHaveBeenCalledWith({
-          where: { id: "title-1" },
-          include: { genres: true },
-        });
-        expect(result).toMatchObject({ id: title.id, type: title.type, genres: [] });
+      const result = await service.delete("title-1");
+
+      expect(prismaServiceMock.title.findUnique).toHaveBeenCalledWith({
+        where: { id: "title-1" },
+        include: { seasons: { include: { episodes: true } } },
       });
+      expect(prismaServiceMock.title.delete).toHaveBeenCalledWith({
+        where: { id: "title-1" },
+        include: { genres: true },
+      });
+      expect(mediaAssetServiceMock.cleanupTitle).toHaveBeenCalledWith(TITLE);
+      expect(result).toMatchObject({ id: TITLE.id, type: TITLE.type, genres: [] });
     });
 
-    describe("should clean up assets for each season after the title row is deleted", () => {
-      it("if the title exists as a SERIES", async () => {
-        const title = {
-          id: "title-1",
-          type: TitleType.SERIES,
-          seasons: [{ id: "season-1" }, { id: "season-2" }],
-          genres: [],
-        };
-        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(title);
-        (prismaServiceMock.title.delete as jest.Mock).mockResolvedValue(title);
-
-        await service.delete("title-1");
-
-        expect(prismaServiceMock.title.delete).toHaveBeenCalledWith({
-          where: { id: "title-1" },
-          include: { genres: true },
-        });
-        expect(seasonServiceMock.cleanupAssets).toHaveBeenCalledWith(title.seasons[0]);
-        expect(seasonServiceMock.cleanupAssets).toHaveBeenCalledWith(title.seasons[1]);
+    it("should hand the title to media-asset only after its row is gone", async () => {
+      const calls: string[] = [];
+      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(TITLE);
+      (prismaServiceMock.title.delete as jest.Mock).mockImplementation(() => {
+        calls.push("delete");
+        return Promise.resolve(TITLE);
       });
-    });
-
-    describe("should clean up the movie's own video asset", () => {
-      it("if the title exists as a SERIES", async () => {
-        const title = {
-          id: "title-1",
-          type: TitleType.SERIES,
-          seasons: [{ id: "season-1" }, { id: "season-2" }],
-          genres: [],
-        };
-        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(title);
-        (prismaServiceMock.title.delete as jest.Mock).mockResolvedValue(title);
-
-        await service.delete("title-1");
-
-        expect(mediaAssetServiceMock.cleanupVideoAsset).toHaveBeenCalledWith(
-          "title-1",
-          VideoType.MOVIE,
-          "videos/title-1/",
-        );
+      mediaAssetServiceMock.cleanupTitle.mockImplementation(() => {
+        calls.push("cleanup");
+        return Promise.resolve();
       });
-    });
 
-    describe("should cleanup the poster", () => {
-      it("if the title exists as a SERIES", async () => {
-        const title = {
-          id: "title-1",
-          type: TitleType.SERIES,
-          posterKey: "posters/titles/title-1/v1.webp",
-          seasons: [{ id: "season-1" }, { id: "season-2" }],
-          genres: [],
-        };
-        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(title);
-        (prismaServiceMock.title.delete as jest.Mock).mockResolvedValue(title);
+      await service.delete("title-1");
 
-        await service.delete("title-1");
-
-        expect(imageServiceMock.deleteStoredImage).toHaveBeenCalledWith(
-          "posters/titles/title-1/v1.webp",
-        );
-      });
-    });
-
-    describe("should let the database take the dependents", () => {
-      it("deleting the row rather than clearing tables by hand", async () => {
-        const title = {
-          id: "title-1",
-          type: TitleType.MOVIE,
-          posterKey: "posters/titles/title-1/v1.webp",
-          seasons: [],
-          genres: [],
-        };
-        (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(title);
-        (prismaServiceMock.title.delete as jest.Mock).mockResolvedValue(title);
-
-        await service.delete("title-1");
-
-        expect(prismaServiceMock.title.delete).toHaveBeenCalledWith({
-          where: { id: "title-1" },
-          include: { genres: true },
-        });
-        expect(imageServiceMock.deleteStoredImage).toHaveBeenCalledWith(
-          "posters/titles/title-1/v1.webp",
-        );
-      });
+      expect(calls).toEqual(["delete", "cleanup"]);
     });
 
     describe("should throw NotFoundException", () => {

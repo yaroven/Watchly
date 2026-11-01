@@ -2,7 +2,8 @@
 
 Streaming catalogue with a video transcoding pipeline. pnpm workspace: `apps/api`
 (NestJS 11) and `apps/client` (Next.js 16, App Router). Postgres via Prisma, BullMQ on
-Redis for jobs, S3 + SQS for media ingest (LocalStack in dev), Loki for logs, Kubernetes
+Redis for jobs, S3-compatible storage for media (DigitalOcean Spaces in prod, LocalStack in dev;
+uploads are confirmed by the client, ADR-0018), Loki for logs, Kubernetes
 via kustomize overlays under `k8s/`.
 
 `apps/api/prisma/schema.prisma` is the source of truth for the domain. The Makefile,
@@ -68,6 +69,16 @@ Worth knowing before trusting a green build:
 - `apps/api` specs are in the ESLint ignore list.
 - `test:e2e` and `test:integration` in `apps/api/package.json` point at a `test/`
   directory that does not exist. There is no e2e coverage; don't claim any.
+- **Nothing starts the app.** No gate runs `node dist/src/main` or builds the Nest module
+  graph, so a missing runtime dependency or an unresolvable provider passes every check
+  and fails only at boot. Both happened at once: a value `import { Request } from
+  "express"` (express is not a direct dependency, so `pnpm deploy` does not ship it) and
+  an endpoint module providing an existence pipe without `PrismaModule`. A decorated
+  signature that only needs express's types imports them with `import type`. To check
+  the graph without the infrastructure, build and call
+  `NestFactory.createApplicationContext` on `dist/src/app/app.module.js` and
+  `dist/src/worker/worker.module.js`: a `UnknownDependenciesException` comes before any
+  connection is attempted. jest cannot do it — `@nestjs/schedule` ships ESM.
 
 ## Planning docs
 

@@ -4,16 +4,10 @@ import type { BoxProps } from "@mui/material/Box";
 import Box from "@mui/material/Box";
 
 interface GradientCardProps extends BoxProps {
-  /** Lifts + brightens the border on hover — for clickable/interactive cards. */
   interactive?: boolean;
   radius?: number;
 }
 
-// The card language established for the Episodes frame: fill fades from a
-// lighter tile at the top into the page background, and the border fades
-// with it — so every admin surface reads as part of one frame instead of a
-// flat grey box. Reused everywhere a "panel" is needed instead of each
-// screen inventing its own card styling.
 export default function GradientCard({ interactive = false, radius = 20, sx, children, ...rest }: GradientCardProps) {
   return (
     <Box

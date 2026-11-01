@@ -1,9 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import { Gauge } from "prom-client";
 import { Logged } from "../../decorators/logged.decorator";
-import { driftKey } from "../queues/reaction-flush/reaction-drift.const";
-import { REACTION_ARCS } from "../reaction/utils/reaction-target.const";
-import { RedisService } from "../redis/redis.service";
+import {
+  ReactionDrift,
+  ReactionDriftService,
+} from "../queues/reaction-flush/reaction-drift.service";
 
 let sampler: (() => Promise<void>) | undefined;
 
@@ -18,31 +19,22 @@ const drift = new Gauge({
 
 @Injectable()
 export class VoteDriftMetricsService {
-  constructor(private readonly redis: RedisService) {
+  constructor(private readonly reactionDrift: ReactionDriftService) {
     sampler = () => this.sample();
   }
 
   @Logged({ completedLevel: "debug" })
   private async sample(): Promise<void> {
-    let values: (string | null)[];
+    let repaired: ReactionDrift;
     try {
-      values = await this.readDrift();
+      repaired = await this.reactionDrift.read();
     } catch {
       // @Logged has already logged this failure
       return;
     }
 
-    REACTION_ARCS.forEach((arc, index) => {
-      const raw = values[index];
-      if (raw === null) return;
-
-      const subjects = Number(raw);
-      if (Number.isFinite(subjects)) drift.set({ arc }, subjects);
-    });
-  }
-
-  @Logged({ completedLevel: "debug" })
-  private readDrift(): Promise<(string | null)[]> {
-    return this.redis.mget(REACTION_ARCS.map(driftKey));
+    for (const [arc, subjects] of Object.entries(repaired)) {
+      drift.set({ arc }, subjects);
+    }
   }
 }

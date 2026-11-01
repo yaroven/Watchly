@@ -1,6 +1,6 @@
 # apps/api
 
-NestJS 11, Prisma + Postgres, BullMQ on Redis, AWS SDK v3 for S3/SQS. Two entrypoints from one codebase and one
+NestJS 11, Prisma + Postgres, BullMQ on Redis, AWS SDK v3 for S3 (DigitalOcean Spaces in prod). Two entrypoints from one codebase and one
 Dockerfile: `src/main.ts` (HTTP, port 3000) and
 `src/worker-main.ts` (background worker). `README.md` here is `nest new` boilerplate — ignore it.
 
@@ -14,7 +14,7 @@ One directory per domain under `src/`, each with `*.module.ts`, `*.controller.ts
 `artist` `comment` `episode` `external-ratings` `genre` `season` `title` `title-cast`
 `user` `watchlist`
 
-Infrastructure: `auth`, `prisma`, `redis`, `s3`, `s3-event`, `media-asset`, `poster`,
+Infrastructure: `auth`, `prisma`, `redis`, `s3`, `media-asset`, `poster`,
 `video-transcoder`, `reaction-flush`, `vote-cache`, `metrics`, `feature-flag` (OpenFeature; routes gate with
 `@RequireFeature`), `logging`, `worker` (the worker process's root module, which belongs
 to no domain because it composes all of them),
@@ -31,12 +31,20 @@ A route whose only domain-specific work is "does this id exist" takes an existen
 its `utils/`, for titles, episodes, seasons, artists, genres and users — instead of a service method that wraps the
 check. A route that then does nothing but forward belongs with the service that owns the mechanics:
 that is why all four image route pairs live on `app/endpoints/images/images.controller.ts`, each injecting only
-`ImageService`.
+`ImageService`. A service beside a controller (`app/endpoints/<group>/<group>.service.ts`) is for composing what only
+that group of routes needs — the vote a title page or a comment thread shows, an episode's playback URL built from
+where `EpisodeService.locate` says the episode lives — and never for logic another reader would have to repeat. Where
+one exists, its controller injects it and nothing else: `TitlesController`, `CommentsController` and
+`EpisodesController` take only `TitlesService`, `CommentsService` and `EpisodesService`, which forward everything they
+do not compose themselves to the services under `src/services/` — including fixing the `VideoType` of the media
+routes (`MOVIE` for a title, `EPISODE` for an episode), so no controller names one. Invariants of a domain operation
+stay in the domain service even when only one route calls it: deleting a title, season or episode cleans its stored
+files up inside `delete`, and filing a report checks the comment exists inside `ReportService.submit`. A controller
+without such a service still injects the domain service directly.
 
 Because a pipe does not run on a direct handler call, the 404 it owns is pinned by a request-level
-`*.controller.existence.spec.ts` beside the unit spec, not by it. The episode's playback URL is the counter-example that
-stayed behind — building it needs the episode's season and title, which only `EpisodeService`
-resolves.
+`*.controller.existence.spec.ts` beside the unit spec, not by it. The episode's playback URL takes no pipe: it needs
+the episode's season and title anyway, so `EpisodeService.locate` reads the row and answers 404 itself.
 
 The engagement writes and the watchlist toggles carry it too, and dropped their own
 `assertTitleExists(tx, …)` when they did: a missing title cannot slip past, because the summary read that closes each
@@ -49,10 +57,10 @@ Nothing closes the window between the pipe and the write — a `findUnique` take
 never did either. A title deleted mid-request ends as a rollback, not a bad row.
 
 Media conversion is split by **kind**, not by feature: `video-transcoder` is parameterised by `VideoType`,
-`image-transcoder` by `ImageKind`. Adding a kind of image means a profile in `image-profile.const.ts` and a
-`ProcessedImageAttacher` in the owning feature — the attacher supplies the two things only that feature knows, the
-processed key and the row to point at it. The worker wires the attachers, so
-`image-transcoder` never imports a feature module.
+`image-transcoder` by `ImageKind`. Everything that differs per kind of image lives in `services/image/`, and the image
+processor calls `ImageService` for the processed key and the row to point at it. `image/` is a shared module the worker
+loads, not a feature, so the processor depending on it is the same as depending on `s3/`; it never imports a feature
+module.
 
 **Each side is split the same four ways**, and the names line up on purpose:
 
@@ -61,7 +69,7 @@ processed key and the row to point at it. The worker wires the attachers, so
 | producer          | `ImageTranscodeScheduler`  | `VideoTranscodeScheduler`    |
 | conversion        | `ImageTranscoderService`   | `HlsTranscoder`              |
 | orchestration     | `ImageTranscoderProcessor` | `VideoTranscoderProcessor`   |
-| the row it writes | the attachers              | `VideoTranscodeStateService` |
+| the row it writes | `ImageService`             | `VideoTranscodeStateService` |
 
 **Orchestration belongs to the processor**, not to a service beside it: the processor owns the order of the stages and
 each stage's mechanics belong to someone else. That is what keeps the conversion classes free of Prisma —
@@ -87,10 +95,10 @@ find out. The api injects `VideoTranscodeScheduler`
 `VideoTranscodeScheduler.schedule`, `ImageTranscodeScheduler.schedule` and
 `ReactionFlushScheduler.schedule` are the only producers — the third is not a transcoder, but it follows the rule for
 the same reason. A feature injects the scheduler and sees neither a `Queue` nor a job name. Handing out an upload URL
-needs no queue at all — `ImageService` only presigns, and the job is raised by the S3 event — so
-`UserModule`, and `AuthModule` behind it, pull in no Redis queue. `s3-event`
-maps the raw key's kind to an `ImageKind` the same way it maps one to a `VideoType`, and calls the producer; the dedup
-convention lives with the producer too, rather than once per feature — `image-<rawKey>` as a `jobId`, and
+needs no queue at all — `ImageService` only presigns and checks what was uploaded, and the job is raised by
+`ImagesService` (`app/endpoints/images/`) when the client confirms the upload — so `UserModule`, and `AuthModule`
+behind it, pull in no Redis queue; only the images endpoint module does. The dedup convention lives with the producer
+too, rather than once per feature — `image-<rawKey>` as a `jobId`, and
 `vote-<arc>-<subjectId>-<userId>` as a
 `deduplication.id` for a flush. **A flush must not set a `jobId`**: an explicit one is checked for existence before
 BullMQ's deduplication runs, so it silently drops a vote that arrives while the flush is being processed.
@@ -106,24 +114,28 @@ on purpose: concurrency is per-queue, and one setting cannot serve a twenty-minu
 What both share lives in `common/utils/`: `DEFAULT_JOB_OPTIONS`, `withWorkDir`, `streamToFile`.
 
 Every uploaded image goes through it — avatars, title and season posters, artist photos — and all four share one
-contract and one service in `services/image/`. `IMAGE_TARGETS`, keyed by `ImageKind`, says per kind which raw prefix the
-upload lands on, which column holds the key and how the processed key is laid out. `ImageService` presigns, attaches,
-removes and builds public URLs from that table, and `image.attacher.ts` turns it into one
-`ProcessedImageAttacher` per kind for the worker, built in a factory because the kind is a constructor argument rather
-than something DI resolves. A new kind is one profile, one
-`RawObjectKind`, one `IMAGE_TARGETS` entry and its pair of routes. The processed key is versioned
+contract and one service in `services/image/`. `IMAGE_TARGETS`, keyed by `ImageKind`, is the one table of what differs
+per kind: the conversion profile, which raw prefix the upload lands on, which column holds the key and how the processed
+key is laid out. `ImageService` presigns, attaches, removes and builds public URLs from it, and the image processor
+calls the same service. A new kind is one `ImageKind`, one `RawObjectKind`, one `IMAGE_TARGETS` entry and its pair of
+routes. The processed key is versioned
 (`posters/<titles|seasons|artists>/<id>/<version>.webp`,
 `avatars/<id>/<version>.webp`): a stable key would leave the superseded image in front of any viewer that cached it.
 `S3Service.uploadStream` sets no `Cache-Control` at all today — the versioned key is what would make an `immutable` one
 safe to add, not evidence that one is set.
 
-Over HTTP every kind has the same pair: `POST …/upload-url` with `{ contentType }` and
-`DELETE …`, on `/titles/:id/poster`, `/seasons/:id/poster`, `/artists/:id/photo` and
-`/users/me/avatar`. The PUT URL is signed for that content type, so S3 refuses any other; the worker still runs ffprobe,
+Over HTTP every kind has the same three routes: `POST …/upload-url` with `{ contentType }`,
+`POST …/upload-url/complete` with `{ rawKey }` and `DELETE …`, on `/titles/:id/poster`, `/seasons/:id/poster`,
+`/artists/:id/photo` and `/users/me/avatar`. The PUT URL is signed for that content type, so S3 refuses any other; the worker still runs ffprobe,
 because a header proves nothing about the bytes.
 
-An upload is **asynchronous**: the worker records the key off the S3 event, so creating or updating the owner never
-mentions its image. `posterUploaded` / `photoUploaded` are gone, and `forbidNonWhitelisted` answers 400 to anything
+An upload is **confirmed by the client, then processed asynchronously** (ADR-0018). There is no bucket notification
+and no SQS: the storage is DigitalOcean Spaces, which has neither. After its PUT the client posts the `rawKey` to
+`upload-url/complete`; `ImageService.assertUploaded` refuses a key that is not this owner's and this kind's, or that
+nothing was uploaded to, and only then is the conversion queued — `image-<rawKey>` makes a repeated confirmation queue
+one job. A video confirms itself the same way through `completeUpload`, and `POST …/transcode` re-queues one by hand,
+which also finds a pre-scheme bare-uuid object. An upload whose client never confirms stays an unprocessed raw object:
+nothing sweeps the raw bucket yet. Creating or updating the owner never mentions its image. `posterUploaded` / `photoUploaded` are gone, and `forbidNonWhitelisted` answers 400 to anything
 still sending them. Removing an image clears the column before deleting the object, so a row never points at nothing.
 Cleanup goes **by the stored key** (`deleteStoredImage`), never one derived from the id, because the version exists only
 on the row: a caller that deletes the row hands the key over.
@@ -143,7 +155,7 @@ still processing is client work that has not been done.
   actually emit**. A route documenting only 200 is wrong.
 - **Services log calls through `@Logged()` on each method, and only events through a `Logger`** (never `console.log`). Every
   `async` method of a service carries it, private ones included; sync helpers and mappers do not, unless their call is
-  worth a line (`FfmpegRunner.start`, `S3EventService.parseBody`). It is a method decorator only — there is no class
+  worth a line (`FfmpegRunner.start`, `HlsTranscoder.spawned`). It is a method decorator only — there is no class
   form, so what a class logs is visible method by method. Each line carries the class as `context` and
   `<Class.method>` as `action`. It writes `<Class.method> completed` with its duration at info, the arguments and the
   result at debug, and a failure with its arguments and stack — at `warn` for a 4xx `HttpException`, `error` otherwise.
@@ -151,16 +163,17 @@ still processing is client work that has not been done.
   - There is deliberately no way to take a method out: a noisy one goes to `completedLevel: "debug"`
     (`S3Service.getUploadPartPresignedUrl`, once per part), so its failures still reach the log.
   - A failure that is caught and swallowed is invisible to the aspect, so the operation that can fail goes in a
-    decorated method of its own that throws, and the caller catches it (`queueUrlOf`, `readDlqDepth`,
-    `S3Service.headBucket`). The caller swallows it with a `try` around an `await` and a catch that holds only
+    decorated method of its own that throws, and the caller catches it (`QueueMetricsService.countJobs`,
+    `ReactionDriftService.read`, `S3Service.headBucket`). The caller swallows it with a `try` around an `await` and a catch that holds only
     `// @Logged has already logged this failure` — never `.catch(() => undefined)`. The `try` must sit outside the
     wrapper, around a call to a `@Logged` method: wrapped around a raw client inside a method's own body, the
     aspect sees a success and the failure is gone. Where there is no `await` to put a `try` around (a callback, a
-    fire-and-forget), the call goes in a small async method that does (`reportProgress`, `abortIfGone`,
-    `runPollLoop`), started with `void`.
+    fire-and-forget), the call goes in a small async method that does (`reportProgress`, `abortIfGone`), started
+    with `void`.
   - A `Logger` of the service's own is for the one thing the aspect cannot see: an event that is neither an input, a
-    result nor a failure of a method — a skipped S3 event, repaired counter drift, a watchlist pointing at a deleted
-    title, OMDb having no match, OMDb being unconfigured. Never use it to restate a call, its result or its error, and
+    result nor a failure of a method — repaired counter drift, OMDb having no match, OMDb being
+    unconfigured. A race that ends as expected is not one: a watchlist id whose title was deleted between the two reads
+    is dropped from the page without a line. Never use it to restate a call, its result or its error, and
     never throw just to get a warning written: a rejected Promise swallowed at once reads as a failure and logs a
     stack trace for something that went as expected.
   - `completedLevel: "debug"` for anything per-scrape, per-poll or per-row on a hot path;
@@ -223,8 +236,10 @@ still processing is client work that has not been done.
   `rowVote`, a write wants it only to report a count); and **the cache is never asked for a count** — that is what lets
   it answer about one viewer without ever being complete.
 - **`myReaction` on a read comes from the cache; the counts beside it do not.** A read asks `VoteStateService.forTitles`
-  or `forComments` for the whole page — one `MGET` — and hands each answer to the DTO, which settles it with `resolveVote`: a **present**
-  entry wins over the `reactions` relation and an **absent** one falls back to it. Both halves matter, and the rule
+  or `forComments` for the whole page — one `MGET` — handing it each subject together with the vote Postgres holds
+  (`storedVote`, from the `reactions` relation the read already loaded), and gets back the vote to render: `resolveVote` settles it there, and nowhere else, so a mapper
+  only ever sees the final answer. A **present** cache entry wins over the relation and an **absent** one falls back to
+  it. Both halves matter, and the rule
   lives in one function because getting it backwards is silent: the relation is what the last flush left behind, so
   preferring it renders a vote the viewer's next request contradicts, while a cache miss has a free and correct answer
   already loaded. `readMany` under it is also the one place a Redis failure is swallowed — reads degrade to the
@@ -247,10 +262,24 @@ still processing is client work that has not been done.
   viewer votes again or the TTL sends reads back to the row.
 - A reply is a comment whose parent is a comment. Threads are one level deep because
   `CommentService` refuses the second, not because the schema does.
-- `title/` holds two services. `TitleService` is the catalogue — CRUD and the read assembly. `TitleEngagementService`
-  owns the score and the title-only counters (`rate`, `removeRating`, `readEngagement`, `recomputeWatchlistCounts`), and
-  takes a client so the caller's transaction holds. `WatchlistService` injects the second directly; it used to reach
-  through the first for a counter, which is why they split.
+- `title/` holds two services in one `TitleModule` (ADR-0011). `TitleService` is the catalogue — CRUD and the read
+  assembly. `TitleEngagementService` owns the score and the title-only counters (`rate`, `removeRating`,
+  `readEngagement`, `recomputeWatchlistCounts`) and is the only thing that writes them. The last two take a client so
+  the caller's transaction holds: `WatchlistService.add` and `remove` write the `watchlistItem` row, then recount and
+  read the block back on the same `tx`, so the watchlist's routes, its list read and its writes stay in one service
+  while the counter keeps one writer. Don't bring `title-engagement/` back as a module of its own — the two import
+  each other's shapes, which is what made the directory split a cycle.
+- **`TitleService` never reads the vote cache.** Its reads answer `StoredTitleView`, whose viewer carries
+  `storedReaction` — the vote as Postgres holds it, which is the fallback and nothing more — and the compiler refuses
+  it wherever a response wants `reaction`. Each reader turns it into what it needs: `TitlesService`
+  (`app/endpoints/titles/titles.service.ts`) asks `VoteStateService.forTitles` and answers `TitleView` for the title
+  routes, and `TitleService.findManyByIds` — the watchlist's read — answers `CardTitleView` straight away, with the
+  stored vote dropped by `withoutVote`, because a card shows no vote — `GET /watchlist` has its own `WatchlistTitleResponseDto` without `reaction`, and the client's `CardTitle`
+  matches it. A third reader picks one of those two; it never sends `storedReaction` on as the viewer's vote.
+  Comments follow the same split: `CommentService` answers `StoredCommentView` and never reads the cache, and
+  `CommentsService` (`app/endpoints/comments/comments.service.ts`) asks `forComments` once for the roots and their
+  previewed replies together and answers `CommentView`. `create` settles to no vote directly — a comment nobody has
+  seen yet cannot hold one.
 
 ### Metrics
 
@@ -261,7 +290,7 @@ still processing is client work that has not been done.
   - The cost is shared state: observations carry over from one test to the next, so a spec asserting an exact value
     calls `register.resetMetrics()` in `beforeEach` (it clears values and keeps registrations). Four specs do.
   - Metrics with a `collect` callback are the awkward case, since `collect` runs on the metric and has no instance to
-    read from. `QueueMetricsService` and `S3EventService`
+    read from. `QueueMetricsService` and `VoteDriftMetricsService`
     each set a module-level holder from their constructor, replacing rather than appending so a second construction
     leaves one sampler.
 - **`GET /metrics` on the application port**, served by `MetricsController`, excluded from Swagger and `@SkipThrottle()`
@@ -272,7 +301,7 @@ still processing is client work that has not been done.
     proxy, while ingress-nginx always sets it. The alternative was an nginx `server-snippet` denying the path, which
     ingress-nginx ≥ 1.9 ignores unless `allow-snippet-annotations` is re-enabled — a protection that can silently not
     apply is worse than none.
-  - Collection is not free (it reads Redis, and SQS), and on this port it competes with user traffic. Keep `collect`
+  - Collection is not free (it reads Redis), and on this port it competes with user traffic. Keep `collect`
     callbacks cheap, and never put metrics behind
     `/health`: the probes read that one, so a Redis blip would make kubelet restart the pod.
 - **The worker exposes nothing.** `worker-main.ts` builds an application context with no HTTP server, and it was left
@@ -281,8 +310,9 @@ still processing is client work that has not been done.
   `image_size_ratio` — the metrics register themselves on import — but those numbers have no reader until the worker
   gets a listener of its own.
   - So anything the worker learns that the api should publish goes **through Redis**, like queue depth does.
-    `ReactionReconciler` leaves its repair count under
-    `reactions:drift:<arc>` and `VoteDriftMetricsService` samples it at scrape time. That number is the only evidence
+    `ReactionReconciler` publishes its repair count through `ReactionDriftService` and `VoteDriftMetricsService` reads
+    it back through the same service at scrape time; the key (`reactions:drift:<arc>`) and its parsing live there
+    and nowhere else. That number is the only evidence
     that "drift is rare and self-healing" — the assumption the whole vote cache rests on — is actually true.
   - `bullmq_queue_jobs` samples `completed` for the same reason: the flush processor runs in the worker, so the
     queue's own counts in Redis are how the api can see that votes are landing at all.
@@ -303,19 +333,19 @@ still processing is client work that has not been done.
   (0.25s…30s) are two names rather than one with a `queue` label.
 - **Queue depth is read by the api**, since that is the process with a scrape endpoint. Depth is a property of Redis
   rather than of a process, so the numbers are the same either way. `QueueMetricsService` samples it at scrape time and
-  takes its queues through the `METRICS_QUEUES` token, so it never imports a transcoder's queue name — the same
-  arrangement as the image attachers; `VideoTranscoderModule` and
+  takes its queues through the `METRICS_QUEUES` token, so it never imports a transcoder's queue name;
+  `VideoTranscoderModule` and
   `ImageTranscoderModule` export `BullModule` to make the tokens resolvable, while registration stays with the
   transcoder that owns the queue. In prod the api runs two replicas and both publish these series, so **aggregate with
   `max by (queue, state)`**, never `sum`.
 - **A collector that throws fails the whole scrape.** `registry.metrics()` rejects as a unit, so an unreachable Redis or
-  a denied SQS call would blank out every other metric in the process, including the ones that say it is alive. Anything
+  a failed read would blank out every other metric in the process, including the ones that say it is alive. Anything
   sampling an external system in `collect` swallows and logs its own failure — `QueueMetricsService.sample`
-  and `S3EventService.sampleDlq` both do.
+  and `VoteDriftMetricsService.sample` both do.
 - **"Unknown" must not serialise as a zero**, for the same reason `viewer` is nullable. An unlabelled gauge reports `0`
-  from the moment it is registered, so `sqs_dlq_messages`
-  carries a `queue` label and the series does not exist until a depth has actually been read. Reporting a confident `0`
-  for a dead-letter queue that was never resolved would mean an alert on `> 0` never fires.
+  from the moment it is registered, so `reaction_counter_drift_subjects` carries an `arc` label and the series does not
+  exist until a count has actually been read. Reporting a confident `0` for a drift nobody has measured would mean an
+  alert on `> 0` never fires.
 - An abort is not a failure. `video_transcode_duration_seconds` separates
   `outcome="aborted"` — the entity was deleted mid-transcode, and the job returns rather than throwing, so BullMQ does
   not retry — from `outcome="failed"`. Collapsing them makes routine admin deletions fire the failure-ratio alert.

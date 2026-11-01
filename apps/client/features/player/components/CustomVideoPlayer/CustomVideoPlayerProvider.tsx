@@ -20,28 +20,23 @@ interface CustomVideoPlayerProviderProps {
 export default function CustomVideoPlayerProvider({ children, videoRef, src, onEnded }: CustomVideoPlayerProviderProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Initialize per-instance store once
   // eslint-disable-next-line react-hooks/refs
   const [store] = useState(() => createPlayerStore(videoRef, containerRef));
-  // Retrieve global persistent player settings
   const volume = usePlayerSettingsStore((s) => s.volume);
   const isMuted = usePlayerSettingsStore((s) => s.isMuted);
   const playbackRate = usePlayerSettingsStore((s) => s.playbackRate);
   const volumeStore = usePlayerSettingsStore();
 
-  // Setup video events, HLS, fullscreen, and visibility
   useVideoPlayer(videoRef, src, store, onEnded);
   useFullscreenMode(containerRef, store);
 
   const isPlaying = useStore(store, (s) => s.isPlaying);
   const controlsVisible = useControlsVisibility(containerRef, isPlaying);
 
-  // Synchronize controls visibility to store
   useEffect(() => {
     store.setState({ controlsVisible });
   }, [controlsVisible, store]);
 
-  // Synchronize global settings from store to HTMLVideoElement
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -51,7 +46,6 @@ export default function CustomVideoPlayerProvider({ children, videoRef, src, onE
     video.playbackRate = playbackRate;
   }, [volume, isMuted, playbackRate, videoRef]);
 
-  // Setup keyboard controls
   usePlayerKeyboard({
     videoRef,
     containerRef,

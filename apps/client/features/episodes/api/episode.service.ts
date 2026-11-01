@@ -62,7 +62,6 @@ const EpisodeService = {
     await api.delete(`/${prefix}/${id}/upload-url/${uploadId}`);
   },
 
-  /** Uploads one multipart part and returns the ETag S3 responds with — required to complete the upload. */
   uploadPartToS3: async (url: string, chunk: Blob, onLoaded: (loaded: number) => void): Promise<string> => {
     const response = await axios.put(url, chunk, {
       onUploadProgress: (progressEvent) => onLoaded(progressEvent.loaded),

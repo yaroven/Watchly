@@ -24,7 +24,7 @@ import { WatchlistService } from "../../../services/watchlist/watchlist.service"
 import { PaginatedQueryDto } from "../../dto/paginated-query.dto";
 import { Paginated, PaginatedResponseOf } from "../../dto/paginated-response-of.util";
 import { TitleEngagementDto } from "../titles/dto/response/title-engagement.dto";
-import { TitleResponseDto } from "../titles/dto/response/title-response.dto";
+import { WatchlistTitleResponseDto } from "./dto/response/watchlist-title-response.dto";
 
 @ApiTags("watchlist")
 @Controller("watchlist")
@@ -35,14 +35,14 @@ export class WatchlistController {
     summary: "List the titles on your watchlist",
     description: "Newest addition first. Not sortable or filterable — page and limit only.",
   })
-  @ApiOkResponse({ type: PaginatedResponseOf(TitleResponseDto) })
+  @ApiOkResponse({ type: PaginatedResponseOf(WatchlistTitleResponseDto) })
   @ApiUnauthorizedResponse({ description: "Not signed in" })
   @Auth()
   @Get()
   findAll(
     @Query() query: PaginatedQueryDto,
     @CurrentUserId() userId: string,
-  ): Promise<Paginated<TitleResponseDto>> {
+  ): Promise<Paginated<WatchlistTitleResponseDto>> {
     return this.watchlistService.findAll(userId, query);
   }
 

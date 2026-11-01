@@ -1,10 +1,8 @@
-# S3 and SQS from one process, the same way dev runs them.
+# S3 from one process, the same way dev runs it.
 #
-# The point of this over MinIO is the part MinIO cannot do: bucket
-# notifications into a queue. With it the api bootstraps itself exactly as it
-# does in dev and prod — S3Service creates the buckets, S3EventService
-# creates the queue and wires the notification — so this overlay needs no
-# bucket Job and no S3_EVENTS_ENABLED override.
+# The point of this over MinIO is PutBucketCors, which MinIO does not
+# implement and the browser needs: a multipart upload reads the ETag of each
+# part, and without the exposed header it dies at the last step.
 #
 # It is an AWS emulator rather than a storage system, which is the risk worth
 # watching: a media library is not what it was built to hold. `-persist` is a
@@ -60,7 +58,7 @@ spec:
             # for nothing, and some of them want a container runtime this
             # pod deliberately has no access to.
             - name: SERVICES
-              value: s3,sqs
+              value: s3
             # LocalStack accepts any credentials by default; pinning them to
             # the ones the api signs with keeps the two from drifting.
             - name: PARITY_AWS_ACCESS_KEY_ID

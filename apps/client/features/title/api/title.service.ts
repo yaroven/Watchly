@@ -2,21 +2,32 @@ import { StartMultipartUpload } from "@/shared/api/upload-media";
 import { parseApiDate } from "@/shared/lib/parse-api-date";
 import api from "@shared/api/axios";
 import axios from "axios";
-import { CastCredit, CastCreditInput, CreateTitleDto, ExternalRating, GetAllTitlesDto, Title, UpdateTitleDto } from "../schemas/title";
+import {
+  CardTitle,
+  CastCredit,
+  CastCreditInput,
+  CreateTitleDto,
+  ExternalRating,
+  GetAllTitlesDto,
+  Title,
+  UpdateTitleDto,
+} from "../schemas/title";
 
 const prefix = "titles";
 
-export interface ApiTitle extends Omit<Title, "createdAt" | "updatedAt"> {
+export type ApiOf<T extends CardTitle> = Omit<T, "createdAt" | "updatedAt"> & {
   createdAt: string;
   updatedAt: string;
-}
+};
 
-/** Dates arrive as ISO strings; `Title` declares them as `Date`. Every title read goes through this. */
-export const mapTitle = (title: ApiTitle): Title => ({
-  ...title,
-  createdAt: parseApiDate(title.createdAt),
-  updatedAt: parseApiDate(title.updatedAt),
-});
+export type ApiTitle = ApiOf<Title>;
+
+export const mapTitle = <T extends CardTitle = Title>(title: ApiOf<T>): T =>
+  ({
+    ...title,
+    createdAt: parseApiDate(title.createdAt),
+    updatedAt: parseApiDate(title.updatedAt),
+  }) as T;
 
 type TitleCreatePayload = CreateTitleDto;
 type TitleUpdatePayload = UpdateTitleDto;
@@ -45,19 +56,16 @@ const TitleService = {
     items: Title[];
     totalCount: number;
   }> => {
-    // Backend takes `filter=property:rule:value` (repeatable) instead of one query param per field.
     const filter: string[] = [];
     if (searchString) filter.push(`name:like:${searchString}`);
     if (type) filter.push(`type:eq:${type}`);
     if (transcodingStatus) filter.push(`transcodingStatus:eq:${transcodingStatus}`);
     if (director) filter.push(`director:like:${director}`);
     if (network) filter.push(`network:like:${network}`);
-    // `genres` is a many-to-many relation, filtered by genre id (not a name substring).
     if (genreId) filter.push(`genres:eq:${genreId}`);
 
     const { data } = await api.get<{ items: ApiTitle[]; totalCount: number }>(`/${prefix}`, {
       params: { page, limit, filter: filter.length ? filter : undefined },
-      // Backend expects repeated `filter=a&filter=b`, not axios's default `filter[]=a&filter[]=b`.
       paramsSerializer: { indexes: null },
     });
     return {
@@ -89,7 +97,6 @@ const TitleService = {
     await api.delete(`/${prefix}/${id}/upload-url/${uploadId}`);
   },
 
-  /** Uploads one multipart part and returns the ETag S3 responds with — required to complete the upload. */
   uploadPartToS3: async (url: string, chunk: Blob, onLoaded: (loaded: number) => void): Promise<string> => {
     const response = await axios.put(url, chunk, {
       onUploadProgress: (progressEvent) => onLoaded(progressEvent.loaded),
@@ -99,9 +106,13 @@ const TitleService = {
     return eTag;
   },
 
-  getPosterUploadUrl: async (id: string, contentType: string): Promise<{ uploadUrl: string }> => {
-    const { data } = await api.post<{ uploadUrl: string }>(`/${prefix}/${id}/poster/upload-url`, { contentType });
+  getPosterUploadUrl: async (id: string, contentType: string): Promise<{ uploadUrl: string; rawKey: string }> => {
+    const { data } = await api.post<{ uploadUrl: string; rawKey: string }>(`/${prefix}/${id}/poster/upload-url`, { contentType });
     return data;
+  },
+
+  completePosterUpload: async (id: string, rawKey: string): Promise<void> => {
+    await api.post(`/${prefix}/${id}/poster/upload-url/complete`, { rawKey });
   },
 
   async uploadToS3(url: string, file: File, onProgress: (percent: number) => void): Promise<void> {

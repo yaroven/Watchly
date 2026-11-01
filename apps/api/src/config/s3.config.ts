@@ -12,9 +12,6 @@ export interface S3Config {
   rawBucketName: string;
   internalEndpoint: string;
   publicEndpoint: string;
-  queueName: string;
-  sqsEndpoint?: string;
-  eventsEnabled: boolean;
 }
 
 export default registerAs(S3ConfigName, () => ({
@@ -45,7 +42,4 @@ export default registerAs(S3ConfigName, () => ({
     "S3_ENDPOINT_PUBLIC",
     "http://localhost:4566",
   ),
-  queueName: requireInProduction(process.env.SQS_QUEUE_NAME, "SQS_QUEUE_NAME", "s3-event-queue"),
-  sqsEndpoint: process.env.SQS_ENDPOINT || undefined,
-  eventsEnabled: process.env.S3_EVENTS_ENABLED !== "false",
 }));

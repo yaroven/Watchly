@@ -27,8 +27,6 @@ async function build(queues: FakeQueue[]): Promise<void> {
 }
 
 describe("QueueMetricsService", () => {
-  // Metrics live on the default registry, so values carry over between tests
-  // unless they are cleared. Registrations stay.
   beforeEach(() => register.resetMetrics());
 
   it("samples every queue it was given, labelled by queue and state", async () => {
@@ -44,8 +42,6 @@ describe("QueueMetricsService", () => {
     expect(text).toContain('bullmq_queue_jobs{queue="image-transcode",state="waiting"} 7');
   });
 
-  // Reading Redis on every scrape is the point: a gauge kept in memory would
-  // be one process's partial view and would reset on each rollout.
   it("reads the queue again on each scrape rather than caching", async () => {
     const video = queue("video-transcode", { waiting: 1, active: 0, delayed: 0, failed: 0 });
     await build([video]);
@@ -64,8 +60,6 @@ describe("QueueMetricsService", () => {
     );
   });
 
-  // Building the service again replaces the queues rather than adding to them,
-  // so a second instance does not sample the first one's queues too.
   it("replaces the queues it samples when built again", async () => {
     const first = queue("video-transcode", { waiting: 1 });
     await build([first]);
@@ -76,11 +70,6 @@ describe("QueueMetricsService", () => {
     expect(first.getJobCounts).not.toHaveBeenCalled();
   });
 
-  /**
-   * The one that matters. `register.metrics()` rejects as a whole if any
-   * collector throws, so an unreachable Redis must not blank out every other
-   * metric in the process — including the ones saying it is alive.
-   */
   it("keeps the rest of the registry readable when a queue cannot be reached", async () => {
     unrelated.inc(1);
     await build([queue("video-transcode", new Error("ECONNREFUSED"))]);

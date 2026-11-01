@@ -21,8 +21,6 @@ export default function ProgressBar() {
   const endScrub = () => setScrubTime(null);
 
   return (
-    // CSS custom properties driven by played/buffered percentages are set via `style`
-    // (not `sx`) so the .playedBar/.bufferedBar widths below can reference them with var(...)
     <Box
       style={
         {

@@ -2,10 +2,10 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { Logged } from "../../decorators/logged.decorator";
 import { PrismaService } from "../prisma/prisma.service";
-import titleQuery, { EngagementRelations } from "../title/utils/title.query";
 import { VoteStateService } from "../vote-cache/vote-state.service";
-import { titleEngagementViewFromRelations } from "./title-engagement.mapper";
+import { titleEngagementViewFromRelations, withVote } from "./title-engagement.mapper";
 import { TitleEngagementView } from "./title-engagement.types";
+import titleQuery, { EngagementRelations } from "./utils/title.query";
 
 export type EngagementClient = Pick<
   PrismaService,
@@ -64,9 +64,13 @@ export class TitleEngagementService {
 
     if (!rows) throw new NotFoundException(`Title with id ${titleId} not found`);
 
-    const votes = await this.voteState.forTitles([{ id: titleId }], viewerId);
+    const stored = titleEngagementViewFromRelations(rows, viewerId);
+    const votes = await this.voteState.forTitles(
+      [{ id: titleId, storedVote: stored.viewer?.storedReaction ?? null }],
+      viewerId,
+    );
 
-    return titleEngagementViewFromRelations(rows, viewerId, votes.get(titleId));
+    return withVote(stored, votes.get(titleId) ?? null);
   }
 
   @Logged()

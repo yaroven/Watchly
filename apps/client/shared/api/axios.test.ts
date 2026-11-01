@@ -62,7 +62,6 @@ describe("pre-emptive refresh", () => {
 });
 
 describe("when the refresh fails", () => {
-  // Clearing on any failure signs a viewer out over a dropped packet.
   it("should keep the session and send the stale token on a transient failure", async () => {
     signIn(EXPIRED);
     mock.onPost("/auth/refresh").reply(500);
@@ -95,8 +94,6 @@ describe("when the refresh fails", () => {
     expect(console.error).toHaveBeenCalledWith(expect.stringContaining("Session ended"));
   });
 
-  // Without a cool-off every request fires its own doomed refresh first, which
-  // doubles the request count against one global rate limiter.
   it("should back off instead of retrying the refresh on every subsequent request", async () => {
     signIn(EXPIRED);
     mock.onPost("/auth/refresh").reply(500);
@@ -122,8 +119,6 @@ describe("identity from the refresh response", () => {
     expect(authStore.getState().role).toBe(Role.ADMIN);
   });
 
-  // A role the client does not know would be stored and then match nothing, and the
-  // viewer would be bounced off role-gated pages as if unauthorised.
   it("should fall back to the token's role when the body carries one it does not know", async () => {
     signIn(EXPIRED);
     mock.onPost("/auth/refresh").reply(200, { accessToken: FRESH, userId: "u1", role: "superuser" });
@@ -135,7 +130,6 @@ describe("identity from the refresh response", () => {
     expect(authStore.getState().role).toBe(Role.USER);
   });
 
-  // Falling back wholesale would store a different person than the server named.
   it("should refuse rather than swap the viewer when body and token disagree about who", async () => {
     signIn(EXPIRED);
     mock.onPost("/auth/refresh").reply(200, { accessToken: FRESH, userId: "u2", role: "superuser" });
@@ -147,9 +141,6 @@ describe("identity from the refresh response", () => {
     expect(authStore.getState().token).toBeNull();
   });
 
-  // Neither a refusal nor transient. Storing the token without an identity would
-  // report a signed-in viewer as anonymous everywhere; treating it as transient
-  // pins them with a dead token and never sends them anywhere to fix it.
   it("should end the session when the response carries no usable identity", async () => {
     signIn(EXPIRED);
     mock.onPost("/auth/refresh").reply(200, { accessToken: "opaque-token" });
@@ -160,7 +151,6 @@ describe("identity from the refresh response", () => {
     expect(authStore.getState().token).toBeNull();
   });
 
-  // The message reaches the viewer verbatim through the mutation alerts.
   it("should not put the internal reason in front of the viewer", async () => {
     const detail = new SessionUnusableError("/auth/refresh returned no identity this client can use");
 
@@ -170,8 +160,6 @@ describe("identity from the refresh response", () => {
 });
 
 describe("the backoff window", () => {
-  // Every other case calls the reset seam first, which would hide a module that
-  // ships blocked from the start. This one takes the module as it loads.
   it("should start out allowing pre-emptive refresh", async () => {
     vi.resetModules();
     const [{ default: freshApi }, { authStore: freshStore }] = await Promise.all([import("./axios"), import("@shared/lib/auth-store")]);
@@ -186,8 +174,6 @@ describe("the backoff window", () => {
     freshMock.restore();
   });
 
-  // "For a while" is the whole difference between this and the kill switch the
-  // previous version shipped, and nothing but time control can express it.
   it("should resume pre-emptive refreshing once the cool-off has passed", async () => {
     vi.useFakeTimers();
     signIn(EXPIRED);
@@ -235,14 +221,11 @@ describe("the backoff window", () => {
     authStore.getState().setSession({ token: EXPIRED, userId: "u1", role: Role.USER });
     await api.get("/title");
 
-    // Third refresh attempted immediately: the success wiped the window rather
-    // than leaving it to expire.
     expect(mock.history.post).toHaveLength(3);
   });
 });
 
 describe("a server minting tokens that already read as expired", () => {
-  // Otherwise a refresh per request, forever, rotating the refresh cookie each time.
   it("should stop pre-empting rather than retrying on every request", async () => {
     signIn(EXPIRED);
     mock.onPost("/auth/refresh").reply(200, { accessToken: EXPIRED, userId: "u1", role: Role.USER });
@@ -256,14 +239,7 @@ describe("a server minting tokens that already read as expired", () => {
   });
 });
 
-/**
- * The other half of the file: the branch that clears sessions and navigates the
- * browser. Driven through a 401 on a normal request rather than an expired token,
- * so the request interceptor stays out of the way.
- */
 describe("server-side", () => {
-  // The module is imported by server components, where the store and the backoff
-  // are process-wide and shared across concurrent requests for different people.
   it("should never attach a token or refresh when there is no window", async () => {
     signIn(EXPIRED);
     vi.unstubAllGlobals();
@@ -305,8 +281,6 @@ describe("the reactive 401 path", () => {
     expect(window.location.href).toBe(APP.LOGIN);
   });
 
-  // The rule the request-interceptor cases already pin, on the branch that can
-  // also navigate away: a dropped packet must not sign anyone out.
   it("should keep the session when the refresh fails for a transient reason", async () => {
     signIn(FRESH);
     mock.onGet("/title").reply(401);
@@ -328,8 +302,6 @@ describe("the reactive 401 path", () => {
     expect(mock.history.get).toHaveLength(2);
   });
 
-  // Each concurrent 401 firing its own refresh would rotate the refresh cookie
-  // N times and invalidate the winners.
   it("should coalesce concurrent refreshes into one call", async () => {
     signIn(FRESH);
     mock.onGet("/title").replyOnce(401).onGet("/title").reply(200, []);

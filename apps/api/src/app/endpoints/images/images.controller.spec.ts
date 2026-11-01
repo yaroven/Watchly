@@ -1,12 +1,18 @@
-import { ExecutionContext, INestApplication, ValidationPipe } from "@nestjs/common";
+import {
+  BadRequestException,
+  ExecutionContext,
+  INestApplication,
+  ValidationPipe,
+} from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { JwtAuthGuard } from "../../../guards/jwt-auth.guard";
 import { RolesGuard } from "../../../guards/roles.guard";
 import { ArtistExistsPipe } from "../../../services/artist/utils/artist-exists.pipe";
+import { ImageKind } from "../../../services/image/enums/image-kind.enum";
 import { ImageService } from "../../../services/image/image.service";
 import { PrismaService } from "../../../services/prisma/prisma.service";
-import { ImageKind } from "../../../services/queues/image-transcoder/image-profile.const";
+import { ImageTranscodeScheduler } from "../../../services/queues/image-transcoder/image-transcode-scheduler.service";
 import { SeasonExistsPipe } from "../../../services/season/utils/season-exists.pipe";
 import { TitleExistsPipe } from "../../../services/title/utils/title-exists.pipe";
 import {
@@ -15,13 +21,15 @@ import {
   TitlePosterController,
   UserAvatarController,
 } from "./images.controller";
+import { ImagesService } from "./images.service";
 
 describe("Image routes", () => {
   const OWNER = "11111111-1111-4111-8111-111111111111";
   const VIEWER = "22222222-2222-4222-8222-222222222222";
 
   let app: INestApplication;
-  let images: { createUploadUrl: jest.Mock; remove: jest.Mock };
+  let images: { createUploadUrl: jest.Mock; remove: jest.Mock; assertUploaded: jest.Mock };
+  let scheduler: { schedule: jest.Mock };
   let ownerExists: boolean;
 
   beforeEach(async () => {
@@ -31,7 +39,9 @@ describe("Image routes", () => {
         .fn()
         .mockResolvedValue({ uploadUrl: "https://s3/put", rawKey: "raw/key", maxBytes: 10 }),
       remove: jest.fn().mockResolvedValue(undefined),
+      assertUploaded: jest.fn().mockResolvedValue(undefined),
     };
+    scheduler = { schedule: jest.fn().mockResolvedValue(undefined) };
     const lookup = {
       findUnique: jest.fn(() => Promise.resolve(ownerExists ? { id: OWNER } : null)),
     };
@@ -47,7 +57,9 @@ describe("Image routes", () => {
         TitleExistsPipe,
         SeasonExistsPipe,
         ArtistExistsPipe,
+        ImagesService,
         { provide: ImageService, useValue: images },
+        { provide: ImageTranscodeScheduler, useValue: scheduler },
         { provide: PrismaService, useValue: { title: lookup, season: lookup, artist: lookup } },
       ],
     })
@@ -128,6 +140,33 @@ describe("Image routes", () => {
       expect(images.createUploadUrl).not.toHaveBeenCalled();
     });
 
+    it("queues the conversion of an upload the owner was issued, with 204", async () => {
+      await request(app.getHttpServer())
+        .post(`${base}/upload-url/complete`)
+        .send({ rawKey: "raw/key" })
+        .expect(204);
+
+      expect(images.assertUploaded).toHaveBeenCalledWith(kind, OWNER, "raw/key");
+      expect(scheduler.schedule).toHaveBeenCalledWith({ kind, ownerId: OWNER, rawKey: "raw/key" });
+    });
+
+    it("queues nothing when the upload is not this owner's", async () => {
+      images.assertUploaded.mockRejectedValue(new BadRequestException("not yours"));
+
+      await request(app.getHttpServer())
+        .post(`${base}/upload-url/complete`)
+        .send({ rawKey: "raw/key" })
+        .expect(400);
+
+      expect(scheduler.schedule).not.toHaveBeenCalled();
+    });
+
+    it("refuses a completion without a rawKey", async () => {
+      await request(app.getHttpServer()).post(`${base}/upload-url/complete`).send({}).expect(400);
+
+      expect(images.assertUploaded).not.toHaveBeenCalled();
+    });
+
     it("removes the image with 204", async () => {
       await request(app.getHttpServer()).delete(base).expect(204);
 
@@ -144,6 +183,15 @@ describe("Image routes", () => {
   });
 
   describe("/users/me/avatar", () => {
+    it("completes for the signed-in viewer, never an id from the request", async () => {
+      await request(app.getHttpServer())
+        .post("/users/me/avatar/upload-url/complete")
+        .send({ rawKey: "raw/key" })
+        .expect(204);
+
+      expect(images.assertUploaded).toHaveBeenCalledWith(ImageKind.USER_AVATAR, VIEWER, "raw/key");
+    });
+
     it("uploads for the signed-in viewer, never an id from the request", async () => {
       await request(app.getHttpServer())
         .post("/users/me/avatar/upload-url")

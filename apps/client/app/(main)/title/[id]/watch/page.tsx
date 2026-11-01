@@ -26,7 +26,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
-/** Newest season/episode first — "watch" with no episode picks up the latest release. */
 const byNumberDesc = <T extends { number: number }>(a: T, b: T) => b.number - a.number;
 
 export default async function Page({ params, searchParams }: PageProps) {
@@ -57,17 +56,11 @@ export default async function Page({ params, searchParams }: PageProps) {
           const requestedEpisode = await EpisodeService.getById(episodeParam);
           const matchingSeason = seasons.find((candidate) => candidate.id === requestedEpisode.seasonId);
           if (matchingSeason) season = matchingSeason;
-        } catch {
-          // Unknown episode id — fall back to the latest season.
-        }
+        } catch {}
       }
 
       episodes = await EpisodeService.getAll(season.id);
 
-      // No specific episode was requested and the "latest" season happens to
-      // be empty (e.g. just created in admin, not populated yet) — walk back
-      // through older seasons for the newest one that actually has episodes
-      // instead of 404ing on an empty season nobody asked for.
       if (!episodes.length && !episodeParam) {
         for (const candidate of seasonsByNumberDesc) {
           if (candidate.id === season.id) continue;

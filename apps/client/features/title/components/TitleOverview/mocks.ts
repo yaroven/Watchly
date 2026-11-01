@@ -1,18 +1,3 @@
-/**
- * TEMPORARY: design-file fixtures for the parts of the title, watch and episode
- * surfaces that have no endpoint yet — cast, stream photos, and per-episode
- * score/thumbnail. Same convention as DiscoverScreen/mocks.ts.
- *
- * Importers, all of which break if this file goes before its endpoints land:
- * - TitleInformation (cast)
- * - StreamPhotos (photos)
- * - StreamEpisodesSidebar and, in another feature, episodes/EpisodeList
- *   (getEpisodeScore / getEpisodeThumbnail)
- *
- * Retiring it takes three separate endpoints, not one — drop each fixture as its
- * own lands rather than the file as a whole.
- */
-
 export interface CastMember {
   name: string;
   avatarUrl: string;
@@ -42,7 +27,6 @@ const DEFAULT_FIXTURE: TitleOverviewFixture = {
   },
 };
 
-/** Only the fields the design calls out differently per title live here; everything else falls back to DEFAULT_FIXTURE. */
 const OVERRIDES: Record<string, Partial<TitleOverviewFixture>> = {};
 
 export function getTitleOverviewFixture(titleId: string): TitleOverviewFixture {
@@ -53,12 +37,10 @@ export function getTitleOverviewFixture(titleId: string): TitleOverviewFixture {
 
 const EPISODE_THUMBNAILS: Record<string, string> = {};
 
-/** Falls back to `fallbackPosterUrl` (the season's or title's poster) when the episode has no dedicated thumbnail. */
 export function getEpisodeThumbnail(episodeId: string, fallbackPosterUrl?: string): string | undefined {
   return EPISODE_THUMBNAILS[episodeId] ?? fallbackPosterUrl;
 }
 
-/** Deterministic placeholder score until episode ratings have a real endpoint. */
 export function getEpisodeScore(number: number): number {
   return 7 + ((number * 37) % 23) / 10;
 }

@@ -1,6 +1,5 @@
 import { Comment, ReactionType, User } from "@prisma/client";
 import { PageQuery } from "../../common/pagination/pagination.types";
-import { Vote } from "../reaction/utils/vote.util";
 import { CommentSortMode } from "./utils/comment-sort.const";
 
 export interface CommentPageQuery extends PageQuery {
@@ -10,6 +9,7 @@ export interface CommentPageQuery extends PageQuery {
 export interface CommentInput {
   text: string;
   hasSpoiler?: boolean;
+  parentId?: string;
 }
 
 export type CommentWithAuthor = Comment & {
@@ -27,7 +27,7 @@ export interface CommentAuthorView {
   score: number | null;
 }
 
-export interface CommentView {
+interface CommentViewBase {
   id: string;
   author: CommentAuthorView;
   text: string;
@@ -35,14 +35,20 @@ export interface CommentView {
   createdAt: Date;
   likes: number;
   dislikes: number;
-  myReaction: ReactionType | null;
-  replies: CommentView[];
   replyCount: number;
 }
 
-export interface CommentViewOptions {
-  replies?: CommentView[];
-  authorAvatarUrl?: string | null;
+export interface CommentView extends CommentViewBase {
+  myReaction: ReactionType | null;
+  replies: CommentView[];
+}
 
-  myReaction?: Vote;
+export interface StoredCommentView extends CommentViewBase {
+  storedReaction: ReactionType | null;
+  replies: StoredCommentView[];
+}
+
+export interface CommentViewOptions {
+  replies?: StoredCommentView[];
+  authorAvatarUrl?: string | null;
 }

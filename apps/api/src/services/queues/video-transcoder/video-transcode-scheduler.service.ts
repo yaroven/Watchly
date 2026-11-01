@@ -13,7 +13,7 @@ import { TranscodeVideoJob } from "./video-transcoder.types";
 export class VideoTranscodeScheduler {
   constructor(@InjectQueue(VIDEO_TRANSCODE_QUEUE_NAME) private readonly queue: Queue) {}
 
-  private jobId({ id, type }: TranscodeVideoJob): string {
+  private jobId({ id, type }: Pick<TranscodeVideoJob, "id" | "type">): string {
     return `transcode-${type}-${id}`;
   }
 

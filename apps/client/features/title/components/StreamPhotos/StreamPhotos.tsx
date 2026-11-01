@@ -26,7 +26,6 @@ export default function StreamPhotos({ title }: StreamPhotosProps) {
           <ChevronRightIcon sx={{ color: "text.secondary" }} />
         </Box>
 
-        {/* PLACEHOLDER: no onClick — needs a photo-upload endpoint */}
         <Box
           component="button"
           type="button"

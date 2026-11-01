@@ -15,8 +15,6 @@ export default function Header() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isSearchPage = pathname === APP.SEARCH();
-  // Keyed by the URL's own query string below, so navigating (including
-  // back/forward) resets this to match `?q=` instead of needing an effect.
   const [query, setQuery] = useState(() => (isSearchPage ? (searchParams.get("q") ?? "") : ""));
 
   const submitSearch = () => {
@@ -30,7 +28,6 @@ export default function Header() {
     { label: "Series", href: APP.SERIES_LIST },
     { label: "Genres", href: APP.GENRES },
   ];
-  // Longest match wins, so /discover/movie selects Movies rather than All.
   const activeTab =
     navItems.filter((n) => pathname === n.href || pathname.startsWith(`${n.href}/`)).sort((a, b) => b.href.length - a.href.length)[0]
       ?.href ?? false;
@@ -58,9 +55,7 @@ export default function Header() {
             if (e.key === "Enter") submitSearch();
           }}
         />
-        {/* PLACEHOLDER: no notifications endpoint yet — always renders as read */}
         <Notification hasNotifications={false} />
-        {/* PLACEHOLDER: no auth/session yet — needs a real logged-in user (name + avatarUrl) endpoint */}
         <Avatar src="https://www.svgrepo.com/show/384670/account-avatar-profile-user.svg" alt="User profile" />
       </Box>
     </Box>

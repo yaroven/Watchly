@@ -11,7 +11,6 @@ export interface RegisterPayload {
   password: string;
 }
 
-/** The refresh token never appears here — the backend sets it as an httpOnly cookie only. */
 export interface AuthSession {
   accessToken: string;
   userId: string;

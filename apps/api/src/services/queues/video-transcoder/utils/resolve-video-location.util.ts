@@ -1,17 +1,17 @@
 import { NotFoundException } from "@nestjs/common";
 import { getEpisodeTitleAndSeasonId } from "../../../episode/utils/episode-path.util";
 import { PrismaService } from "../../../prisma/prisma.service";
-import { videoPath } from "../../../s3/processed-key";
+import { VideoLocation } from "../../../s3/processed-key";
 import { VideoType } from "../enums/video-type.enum";
 
-export type VideoPathClient = Pick<PrismaService, "episode">;
+export type VideoLocationClient = Pick<PrismaService, "episode">;
 
-export default async function resolveVideoPath(
-  client: VideoPathClient,
+export default async function resolveVideoLocation(
+  client: VideoLocationClient,
   id: string,
   type: VideoType,
-): Promise<string> {
-  if (type !== VideoType.EPISODE) return videoPath({ type: VideoType.MOVIE, titleId: id });
+): Promise<VideoLocation> {
+  if (type !== VideoType.EPISODE) return { type: VideoType.MOVIE, titleId: id };
 
   const episode = await client.episode.findUnique({ where: { id }, include: { season: true } });
 
@@ -19,5 +19,5 @@ export default async function resolveVideoPath(
 
   const { seasonId, titleId } = getEpisodeTitleAndSeasonId(episode);
 
-  return videoPath({ type, titleId, seasonId, episodeId: episode.id });
+  return { type, titleId, seasonId, episodeId: episode.id };
 }

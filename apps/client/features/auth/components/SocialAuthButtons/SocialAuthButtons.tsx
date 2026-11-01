@@ -4,8 +4,6 @@ import GoogleIcon from "@mui/icons-material/Google";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 
-// PLACEHOLDER: no OAuth provider is wired up yet — these are non-functional
-// until the backend adds Google/Apple/Facebook sign-in.
 const PROVIDERS = [
   { icon: GoogleIcon, label: "Continue with Google" },
   { icon: AppleIcon, label: "Continue with Apple" },

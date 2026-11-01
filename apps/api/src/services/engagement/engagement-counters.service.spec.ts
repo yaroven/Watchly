@@ -56,7 +56,6 @@ describe("EngagementCountersService", () => {
       });
     });
 
-    // Otherwise withdrawing the last like would leave the old number standing.
     it("writes a zero for a type with no rows left", async () => {
       prisma.reaction.groupBy.mockResolvedValue([
         { type: ReactionType.DISLIKE, _count: { _all: 2 } },
@@ -82,11 +81,6 @@ describe("EngagementCountersService", () => {
       );
     });
 
-    /**
-     * A comment's replies are the comments whose parent it is — the same arc
-     * read from the other end, which is why a reply count and a comment count
-     * are one column.
-     */
     it("counts a comment's replies through the parent arc", async () => {
       await service.recomputeComments(commentCounters(commentId), prisma as never);
 
@@ -121,8 +115,6 @@ describe("EngagementCountersService", () => {
       });
     });
 
-    // A row is written the first time something is counted, so a missing row
-    // and an all-zero row are the same answer.
     it("answers zeroes for a subject with no row yet", async () => {
       await expect(
         service.countsForOne(commentCounters(commentId), prisma as never),

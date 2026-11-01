@@ -40,9 +40,6 @@ const baseSx = {
   },
 };
 
-// Collapsed: button pokes out past the (now icon-only) sidebar edge, chevron pointing right.
-// The ::before/::after squares cut a concave notch into the button's top/bottom-left corners,
-// so the sidebar's straight edge appears to curve inward around it.
 const collapsedSx = {
   right: `-${WIDTH}px`,
   width: `${WIDTH}px`,
@@ -62,7 +59,6 @@ const collapsedSx = {
   },
 };
 
-// Expanded: same notch trick, mirrored onto the top/bottom-right corners, chevron pointing left.
 const expandedSx = {
   right: "0px",
   width: `${EXPANDED_WIDTH}px`,

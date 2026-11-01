@@ -1,7 +1,7 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { IsIn } from "class-validator";
 import { ImageUploadInput } from "../../../../../services/image/image.types";
-import { IMAGE_UPLOAD_TYPES } from "../../../../../services/queues/image-transcoder/image-profile.const";
+import { IMAGE_UPLOAD_TYPES } from "../../../../../services/image/utils/image-target.const";
 
 export class CreateImageUploadUrlDto implements ImageUploadInput {
   @ApiProperty({

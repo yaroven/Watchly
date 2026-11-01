@@ -15,8 +15,7 @@ import {
   subjectIdsAfter,
   targetOf,
 } from "../../reaction/utils/reaction-target.const";
-import { RedisService } from "../../redis/redis.service";
-import { driftKey } from "./reaction-drift.const";
+import { ReactionDriftService } from "./reaction-drift.service";
 
 export const RECONCILE_BATCH_SIZE = 1000;
 
@@ -32,7 +31,7 @@ export class ReactionReconciler {
   constructor(
     private readonly prisma: PrismaService,
     private readonly counters: EngagementCountersService,
-    private readonly redis: RedisService,
+    private readonly reactionDrift: ReactionDriftService,
   ) {}
 
   @Logged()
@@ -137,14 +136,9 @@ export class ReactionReconciler {
   @Logged()
   private async publish(arc: ReactionArc, drifted: number): Promise<void> {
     try {
-      await this.writeDrift(arc, drifted);
+      await this.reactionDrift.publish(arc, drifted);
     } catch {
       // @Logged has already logged this failure
     }
-  }
-
-  @Logged({ failedLevel: "warn" })
-  private async writeDrift(arc: ReactionArc, drifted: number): Promise<void> {
-    await this.redis.set(driftKey(arc), drifted);
   }
 }
