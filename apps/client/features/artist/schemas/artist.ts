@@ -1,3 +1,4 @@
+import type { useTranslations } from "next-intl";
 import { z } from "zod";
 
 export interface Artist {
@@ -20,12 +21,13 @@ export interface CreateArtistDto {
 
 export type UpdateArtistDto = CreateArtistDto;
 
-export const ArtistFormSchema = z.object({
-  name: z.string().min(1, "Name is required").max(255),
-  photoFile: z.custom<FileList | undefined>((value) => value === undefined || value instanceof FileList).optional(),
-});
+export const createArtistFormSchema = (t: ReturnType<typeof useTranslations<"artist">>) =>
+  z.object({
+    name: z.string().min(1, t("validation.nameRequired")).max(255),
+    photoFile: z.custom<FileList | undefined>((value) => value === undefined || value instanceof FileList).optional(),
+  });
 
-export type ArtistFormValues = z.infer<typeof ArtistFormSchema>;
+export type ArtistFormValues = z.infer<ReturnType<typeof createArtistFormSchema>>;
 
 export interface ArtistFilmographyItem {
   titleId: string;

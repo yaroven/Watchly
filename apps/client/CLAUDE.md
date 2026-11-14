@@ -16,9 +16,14 @@ say so when you do.
 
 ## Layout
 
-- `app/` — routing only: `(auth)/`, `(main)/discover`, `(main)/title`,
-  `(main)/watchlist`, `(admin)/admin`. Pages compose features and stay thin. An ESLint
-  rule rejects any file here that is not a recognised App Router filename.
+- `app/` — routing only, every route under `[locale]/` (`en`, `uk`): `(auth)/`,
+  `(main)/discover`, `(main)/title`, `(main)/watchlist`, `(admin)/admin`. Pages compose
+  features and stay thin. An ESLint rule rejects any file here that is not a recognised
+  App Router filename.
+- `i18n/` + `messages/{en,uk}.json` — next-intl. User-facing text goes through
+  `useTranslations` / `getTranslations`, never a literal; add the key to both files.
+  Navigate with `Link` / `usePathname` / `useRouter` from `@/i18n/navigation`, which
+  strip and add the locale prefix.
 - `features/<domain>/` — the real code: `api/` (service + query keys + hooks),
   `components/`, `schemas/` (zod), `index.ts` as the public surface. Slices: `admin`
   `artist` `auth` `comment` `episodes` `feature-flags` `genre` `player` `season` `title`

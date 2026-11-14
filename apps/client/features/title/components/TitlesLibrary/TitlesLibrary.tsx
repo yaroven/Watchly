@@ -6,6 +6,7 @@ import { ADMIN } from "@/shared/lib/routes";
 import Pagination from "@/shared/ui/Pagination";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import TitlesFiltersPanel from "./components/TitlesFiltersPanel";
@@ -16,6 +17,7 @@ import { useTitlesFilters } from "./model/useTitlesFilters";
 const LIMIT = 12;
 
 export default function TitlesLibrary() {
+  const t = useTranslations("title.library");
   const router = useRouter();
   const { searchString, typeFilter, statusFilter, page, hasActiveFilters, updateFilters, resetFilters } = useTitlesFilters();
   const [syncResultMessage, setSyncResultMessage] = useState<string | null>(null);
@@ -29,8 +31,8 @@ export default function TitlesLibrary() {
   });
 
   const { mutate: syncAllRatings, isPending: isSyncingAllRatings } = useSyncAllRatings({
-    onSuccess: ({ total, synced }) => setSyncResultMessage(`Synced ratings for ${synced}/${total} titles.`),
-    onError: (error) => setSyncResultMessage(error.message || "Failed to sync ratings."),
+    onSuccess: ({ total, synced }) => setSyncResultMessage(t("syncAllResult", { synced, total })),
+    onError: (error) => setSyncResultMessage(error.message || t("syncAllFailed")),
   });
 
   const titles = data?.items || [];

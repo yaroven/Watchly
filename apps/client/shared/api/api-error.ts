@@ -20,13 +20,17 @@ export class SessionUnusableError extends ApiError {
   }
 }
 
+function readServerMessage(data: unknown): string | undefined {
+  const payload = data as { message?: string | string[]; error?: string } | undefined;
+  return (Array.isArray(payload?.message) ? payload.message.join(", ") : payload?.message || payload?.error) || undefined;
+}
+
 export function toApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error;
 
   if (axios.isAxiosError(error)) {
     const statusCode = error.response?.status;
-    const payload = error.response?.data as { message?: string | string[]; error?: string } | undefined;
-    const message = Array.isArray(payload?.message) ? payload.message.join(", ") : payload?.message || payload?.error || error.message;
+    const message = readServerMessage(error.response?.data) || error.message;
 
     return new ApiError(message, statusCode, error.response?.data);
   }
@@ -36,4 +40,12 @@ export function toApiError(error: unknown): ApiError {
   }
 
   return new ApiError("Unexpected API error");
+}
+
+export type ApiErrorMessageKey = "sessionUnusable" | "unexpected";
+
+export function describeApiError(error: unknown, t: (key: ApiErrorMessageKey) => string): string {
+  if (error instanceof SessionUnusableError) return t("sessionUnusable");
+  if (error instanceof ApiError) return readServerMessage(error.details) ?? t("unexpected");
+  return t("unexpected");
 }

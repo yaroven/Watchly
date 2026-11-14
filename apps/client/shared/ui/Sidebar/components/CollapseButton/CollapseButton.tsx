@@ -2,6 +2,7 @@
 
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import { IconButton } from "@mui/material";
+import { useTranslations } from "next-intl";
 
 const TOP = 110;
 const WIDTH = 18;
@@ -84,10 +85,11 @@ interface CollapseButtonProps {
 }
 
 export default function CollapseButton({ collapsed, onToggle }: CollapseButtonProps) {
+  const t = useTranslations("shared.sidebar");
   return (
     <IconButton
       onClick={onToggle}
-      aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+      aria-label={collapsed ? t("expand") : t("collapse")}
       disableRipple
       sx={[baseSx, collapsed ? collapsedSx : expandedSx]}
     >

@@ -8,6 +8,7 @@ import TitleTabs from "@features/title/components/TitleTabs";
 import type { Title } from "@features/title/schemas/title";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import { useTranslations } from "next-intl";
 import SeriesEpisodeBrowser from "./components/SeriesEpisodeBrowser";
 
 interface SeriesDetailsProps {
@@ -17,18 +18,19 @@ interface SeriesDetailsProps {
   currentSeasonId: string;
 }
 
-const SECTIONS = [
-  { id: "information", label: "Information" },
-  { id: "episodes", label: "Episodes" },
-  { id: "more-like-this", label: "More Like This" },
-  { id: "reviews", label: "Reviews" },
-];
-
 export default function SeriesDetails({ title, seasons, episodes, currentSeasonId }: SeriesDetailsProps) {
+  const t = useTranslations("title.sections");
+  const sections = [
+    { id: "information", label: t("information") },
+    { id: "episodes", label: t("episodes") },
+    { id: "more-like-this", label: t("moreLikeThis") },
+    { id: "reviews", label: t("reviews") },
+  ];
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "48px", pb: "64px" }}>
       <TitleOverview title={title} />
-      <TitleTabs sections={SECTIONS} />
+      <TitleTabs sections={sections} />
 
       <Box id="information">
         <TitleInformation title={title} />
@@ -38,7 +40,7 @@ export default function SeriesDetails({ title, seasons, episodes, currentSeasonI
         {seasons.length ? (
           <SeriesEpisodeBrowser titleId={title.id} seasons={seasons} episodes={episodes} currentSeasonId={currentSeasonId} />
         ) : (
-          <Typography sx={{ color: "text.secondary" }}>No seasons found for this series.</Typography>
+          <Typography sx={{ color: "text.secondary" }}>{t("noSeasons")}</Typography>
         )}
       </Box>
 

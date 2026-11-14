@@ -6,6 +6,7 @@ import TypeSelector from "@/features/title/components/TitleForm/components/TypeS
 import { TitleFormValues, TitleType } from "@/features/title/schemas/title";
 import FormField from "@/shared/ui/FormField";
 import Box from "@mui/material/Box";
+import { useTranslations } from "next-intl";
 import type { UseFormReturn } from "react-hook-form";
 import { Controller } from "react-hook-form";
 
@@ -17,6 +18,7 @@ interface ClassificationFieldsProps {
 }
 
 export default function ClassificationFields({ form, columns, isEditing, selectedType }: ClassificationFieldsProps) {
+  const t = useTranslations("title.form.inputs");
   const {
     register,
     control,
@@ -44,14 +46,20 @@ export default function ClassificationFields({ form, columns, isEditing, selecte
       />
 
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: `repeat(${columns}, minmax(0, 1fr))` }, gap: "18px" }}>
-        <FormField label="Country" placeholder="Country of origin" name="country" register={register} error={errors.country} />
-        <FormField label="Language" placeholder="Language" name="language" register={register} error={errors.language} />
-        <FormField type="date" label="Release Date" name="releaseDate" register={register} error={errors.releaseDate} />
+        <FormField label={t("country")} placeholder={t("countryPlaceholder")} name="country" register={register} error={errors.country} />
+        <FormField
+          label={t("language")}
+          placeholder={t("languagePlaceholder")}
+          name="language"
+          register={register}
+          error={errors.language}
+        />
+        <FormField type="date" label={t("releaseDate")} name="releaseDate" register={register} error={errors.releaseDate} />
         <FormField
           type="number"
           valueAsNumber
-          label={selectedType === TitleType.SERIES ? "Runtime (minutes) — set per episode" : "Runtime (minutes)"}
-          placeholder="Runtime in minutes"
+          label={selectedType === TitleType.SERIES ? t("runtimeSeries") : t("runtime")}
+          placeholder={t("runtimePlaceholder")}
           name="runtime"
           register={register}
           error={errors.runtime}

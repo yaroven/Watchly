@@ -3,6 +3,7 @@
 import { useCreateTitleWithUpload, useUpdateTitle } from "@/features/title/api/use-title-mutations";
 import { Title, TitleFormValues } from "@/features/title/schemas/title";
 import { ApiError } from "@/shared/api/api-error";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 interface UseTitleSubmissionWorkflowProps {
@@ -10,6 +11,7 @@ interface UseTitleSubmissionWorkflowProps {
 }
 
 export function useTitleSubmissionWorkflow({ initialData }: UseTitleSubmissionWorkflowProps) {
+  const t = useTranslations("title.form");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadParts, setUploadParts] = useState<{ completed: number; total: number } | null>(null);
   const [actionError, setActionError] = useState<Error | null>(null);
@@ -39,7 +41,7 @@ export function useTitleSubmissionWorkflow({ initialData }: UseTitleSubmissionWo
       setUploadProgress(100);
       return { createdId: title.id };
     } catch (error: unknown) {
-      const normalizedError = error instanceof Error ? error : new ApiError("Failed to save title");
+      const normalizedError = error instanceof Error ? error : new ApiError(t("saveFailed"));
       setUploadProgress(0);
       setUploadParts(null);
       setActionError(normalizedError);

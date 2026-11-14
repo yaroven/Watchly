@@ -2,6 +2,7 @@ import { CloudUpload as CloudUploadIcon } from "@mui/icons-material";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { tokens } from "@shared/mui/theme";
+import { useTranslations } from "next-intl";
 
 interface UploadDropzoneProps {
   inputId: string;
@@ -11,6 +12,7 @@ interface UploadDropzoneProps {
 }
 
 export default function UploadDropzone({ inputId, hint, hasError = false, disabled = false }: UploadDropzoneProps) {
+  const t = useTranslations("shared.fileInput");
   return (
     <Box
       component="label"
@@ -35,7 +37,7 @@ export default function UploadDropzone({ inputId, hint, hasError = false, disabl
     >
       <CloudUploadIcon sx={{ fontSize: "32px", color: hasError ? tokens.feedback.error : tokens.text.field }} />
       <Box>
-        <Typography sx={{ fontSize: "16px", fontWeight: 400, color: tokens.text.field }}>Upload File</Typography>
+        <Typography sx={{ fontSize: "16px", fontWeight: 400, color: tokens.text.field }}>{t("upload")}</Typography>
         {hint && <Typography sx={{ fontSize: "12px", fontWeight: 400, color: tokens.text.placeholder }}>{hint}</Typography>}
       </Box>
     </Box>

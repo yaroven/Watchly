@@ -1,9 +1,11 @@
 import Box from "@mui/material/Box";
+import { useTranslations } from "next-intl";
 import { CSSProperties, useState } from "react";
 
 import { usePlayerPlayback, usePlayerTimeline } from "../../CustomVideoPlayerContext";
 
 export default function ProgressBar() {
+  const t = useTranslations("player");
   const { current, duration, buffered } = usePlayerTimeline();
   const { seek } = usePlayerPlayback();
   const [scrubTime, setScrubTime] = useState<number | null>(null);
@@ -97,7 +99,7 @@ export default function ProgressBar() {
         onPointerUp={endScrub}
         onPointerCancel={endScrub}
         className="range-input"
-        aria-label="Seek video"
+        aria-label={t("seekVideo")}
         aria-valuemin={0}
         aria-valuemax={safeMax}
         aria-valuenow={displayTime}

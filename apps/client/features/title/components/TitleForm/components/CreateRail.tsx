@@ -1,6 +1,5 @@
 "use client";
 
-import { AGE_RATING_LABELS } from "@/features/title/components/TitleForm/components/AgeRatingPicker";
 import type { TitleReadiness } from "@/features/title/components/TitleForm/model/titleReadiness";
 import { TitleFormValues, TitleType } from "@/features/title/schemas/title";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
@@ -11,6 +10,7 @@ import Typography from "@mui/material/Typography";
 import { tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
 import InvertedCornerBox from "@shared/ui/InvertedCornerBox";
+import { useTranslations } from "next-intl";
 import { useEffect, useMemo } from "react";
 
 interface CreateRailProps {
@@ -41,6 +41,7 @@ export default function CreateRail({
   uploadProgress,
   uploadParts,
 }: CreateRailProps) {
+  const t = useTranslations("title");
   const posterFile = values.posterFile?.[0];
   const posterUrl = useMemo(() => (posterFile ? URL.createObjectURL(posterFile) : null), [posterFile]);
 
@@ -50,17 +51,19 @@ export default function CreateRail({
     };
   }, [posterUrl]);
 
+  const missingFields = readiness.missingKeys.map((key) => t(`fields.${key}`)).join(", ");
+
   const releaseYear = values.releaseDate?.slice(0, 4);
   const chips = [
-    values.type === TitleType.SERIES ? "Series" : "Movie",
+    values.type === TitleType.SERIES ? t("type.SERIES") : t("type.MOVIE"),
     releaseYear || null,
-    values.runtime ? `${values.runtime} min` : null,
+    values.runtime ? t("form.rail.runtime", { minutes: values.runtime }) : null,
   ].filter(Boolean) as string[];
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "20px", position: "sticky", top: "24px" }}>
       <Box sx={PANEL_SX}>
-        <Typography sx={{ ...CAPTION_SX, mb: "16px" }}>CATALOG PREVIEW</Typography>
+        <Typography sx={{ ...CAPTION_SX, mb: "16px" }}>{t("form.rail.catalogPreview")}</Typography>
 
         <InvertedCornerBox
           sx={{
@@ -89,7 +92,7 @@ export default function CreateRail({
                 color: tokens.text.placeholder,
               }}
             >
-              POSTER PREVIEW
+              {t("form.rail.posterPreview")}
             </Typography>
           )}
 
@@ -111,7 +114,7 @@ export default function CreateRail({
                 wordBreak: "break-word",
               }}
             >
-              {values.name?.trim() || "Untitled"}
+              {values.name?.trim() || t("form.rail.untitled")}
             </Typography>
           </Box>
         </InvertedCornerBox>
@@ -143,19 +146,19 @@ export default function CreateRail({
                 color: "primary.main",
               }}
             >
-              {AGE_RATING_LABELS[values.ageRating]}
+              {t(`ageRating.${values.ageRating}`)}
             </Typography>
           )}
         </Box>
 
         <Typography sx={{ mt: "12px", fontSize: "13px", lineHeight: 1.5, color: "text.secondary" }}>
-          {genreNames.length ? genreNames.join(" · ") : "No genres picked yet"}
+          {genreNames.length ? genreNames.join(" · ") : t("form.rail.noGenresPicked")}
         </Typography>
       </Box>
 
       <Box sx={PANEL_SX}>
         <Box sx={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "12px" }}>
-          <Typography sx={CAPTION_SX}>READY TO SAVE</Typography>
+          <Typography sx={CAPTION_SX}>{t("form.rail.readyToSave")}</Typography>
           <Typography sx={{ fontFamily: "var(--font-display)", fontSize: "34px", lineHeight: 0.9, color: "#ffffff" }}>
             {readiness.doneCount}
             <Typography component="span" sx={{ fontSize: "18px", color: tokens.text.placeholder }}>
@@ -188,7 +191,9 @@ export default function CreateRail({
                 ) : (
                   <RadioButtonUncheckedIcon sx={{ fontSize: 16, color: tokens.feedback.warning }} />
                 )}
-                <Typography sx={{ flexGrow: 1, fontSize: "14px", color: tokens.text.field }}>{section.label}</Typography>
+                <Typography sx={{ flexGrow: 1, fontSize: "14px", color: tokens.text.field }}>
+                  {t(`form.sections.${section.key}.title`)}
+                </Typography>
                 <Typography sx={{ fontSize: "13px", color: tokens.text.placeholder }}>
                   {done} / {section.items.length}
                 </Typography>
@@ -197,7 +202,7 @@ export default function CreateRail({
           })}
         </Box>
 
-        {readiness.missingLabels.length > 0 && (
+        {readiness.missingKeys.length > 0 && (
           <Typography
             sx={{
               mt: "18px",
@@ -208,10 +213,14 @@ export default function CreateRail({
               color: "text.secondary",
             }}
           >
-            Missing:{" "}
-            <Box component="span" sx={{ color: tokens.text.field }}>
-              {readiness.missingLabels.join(", ")}
-            </Box>
+            {t.rich("form.rail.missing", {
+              fields: missingFields,
+              value: (chunks) => (
+                <Box component="span" sx={{ color: tokens.text.field }}>
+                  {chunks}
+                </Box>
+              ),
+            })}
           </Typography>
         )}
       </Box>
@@ -220,7 +229,7 @@ export default function CreateRail({
         {isUploading ? (
           <Box>
             <Box sx={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "12px" }}>
-              <Typography sx={{ fontSize: "14px", color: tokens.text.field }}>Uploading video</Typography>
+              <Typography sx={{ fontSize: "14px", color: tokens.text.field }}>{t("form.rail.uploadingVideo")}</Typography>
               <Typography sx={{ fontFamily: "var(--font-display)", fontSize: "26px", lineHeight: 1, color: "primary.main" }}>
                 {uploadProgress}%
               </Typography>
@@ -240,7 +249,7 @@ export default function CreateRail({
 
             {uploadParts && uploadParts.total > 0 && (
               <Typography sx={{ mt: "10px", fontSize: "12px", color: "text.secondary" }}>
-                part {uploadParts.completed} of {uploadParts.total}
+                {t("form.rail.uploadPart", { completed: uploadParts.completed, total: uploadParts.total })}
               </Typography>
             )}
           </Box>
@@ -248,18 +257,15 @@ export default function CreateRail({
           <>
             <Box sx={{ display: "flex", alignItems: "center", gap: "10px", mb: "14px" }}>
               <Box sx={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: tokens.feedback.warning }} />
-              <Typography sx={{ fontSize: "13px", color: "text.secondary" }}>Draft — not saved yet</Typography>
+              <Typography sx={{ fontSize: "13px", color: "text.secondary" }}>{t("form.rail.draft")}</Typography>
             </Box>
             <Button type="submit" disabled={isPending} sx={{ width: "100%" }}>
-              {isPending ? "Saving Title..." : "Create Title"}
+              {isPending ? t("form.saving") : t("form.create")}
             </Button>
           </>
         )}
 
-        <Typography sx={{ mt: "14px", fontSize: "12px", lineHeight: 1.55, color: "text.secondary" }}>
-          The record saves first, then the video uploads. If the upload fails the record is rolled back, so nothing half-made is left
-          behind.
-        </Typography>
+        <Typography sx={{ mt: "14px", fontSize: "12px", lineHeight: 1.55, color: "text.secondary" }}>{t("form.rail.saveOrder")}</Typography>
       </Box>
     </Box>
   );

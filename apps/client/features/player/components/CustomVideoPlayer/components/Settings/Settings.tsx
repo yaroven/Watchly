@@ -1,5 +1,6 @@
 import SettingsIcon from "@mui/icons-material/Settings";
 import Box from "@mui/material/Box";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { usePlayerPlaybackRate, usePlayerQuality } from "../../CustomVideoPlayerContext";
@@ -10,10 +11,7 @@ import SpeedMenu from "./SpeedMenu";
 
 type SettingsTab = "quality" | "speed";
 
-const TABS: { id: SettingsTab; label: string }[] = [
-  { id: "quality", label: "Quality" },
-  { id: "speed", label: "Speed" },
-];
+const TABS: SettingsTab[] = ["quality", "speed"];
 
 const tabPanelSx = {
   display: "flex",
@@ -24,6 +22,7 @@ const tabPanelSx = {
 };
 
 export default function Settings() {
+  const t = useTranslations("player");
   const { ref: panelRef, isOpen: isPanelOpen, toggle: togglePanel, close: closePanel } = useDismissiblePanel();
   const { set: setQuality } = usePlayerQuality();
   const { value: playbackRate } = usePlayerPlaybackRate();
@@ -41,8 +40,8 @@ export default function Settings() {
         type="button"
         onClick={togglePanel}
         aria-expanded={isPanelOpen}
-        aria-label="Video settings"
-        title={`Settings (${formatPlaybackRate(playbackRate)})`}
+        aria-label={t("settings.label")}
+        title={t("settings.title", { rate: formatPlaybackRate(playbackRate) })}
         sx={{
           display: "inline-flex",
           alignItems: "center",
@@ -84,19 +83,19 @@ export default function Settings() {
         >
           <Box
             role="tablist"
-            aria-label="Video settings"
+            aria-label={t("settings.label")}
             sx={{ display: "flex", gap: "4px", padding: "2px", borderRadius: "8px", background: "rgba(255, 255, 255, 0.06)" }}
           >
             {TABS.map((tab) => (
               <Box
-                key={tab.id}
+                key={tab}
                 component="button"
                 type="button"
                 role="tab"
-                id={`settings-tab-${tab.id}`}
-                aria-selected={activeTab === tab.id}
-                aria-controls={`settings-panel-${tab.id}`}
-                onClick={() => setActiveTab(tab.id)}
+                id={`settings-tab-${tab}`}
+                aria-selected={activeTab === tab}
+                aria-controls={`settings-panel-${tab}`}
+                onClick={() => setActiveTab(tab)}
                 sx={[
                   {
                     flex: 1,
@@ -112,10 +111,10 @@ export default function Settings() {
                     "&:hover": { color: "#fff" },
                     "&:focus-visible": { outline: "2px solid #e7bc0f", outlineOffset: "-2px" },
                   },
-                  activeTab === tab.id && { color: "#fff", background: "rgba(231, 188, 15, 0.35)" },
+                  activeTab === tab && { color: "#fff", background: "rgba(231, 188, 15, 0.35)" },
                 ]}
               >
-                {tab.label}
+                {t(`settings.tabs.${tab}`)}
               </Box>
             ))}
           </Box>

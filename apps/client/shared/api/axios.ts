@@ -1,6 +1,7 @@
 import Role from "@/types/role";
 import { authStore } from "@shared/lib/auth-store";
 import { decodeAccessToken, isAccessTokenExpired } from "@shared/lib/decode-jwt";
+import { resolveRequestLocale } from "@shared/lib/request-locale";
 import { APP } from "@shared/lib/routes";
 import { recordServerTime } from "@shared/lib/server-time";
 import axios, { type InternalAxiosRequestConfig } from "axios";
@@ -40,6 +41,12 @@ function mayRefreshProactively(): boolean {
 function isSessionRejection(error: unknown): boolean {
   return error instanceof SessionUnusableError || toApiError(error).statusCode === 401;
 }
+
+api.interceptors.request.use(async (config: TrackedConfig) => {
+  const locale = await resolveRequestLocale();
+  if (locale) config.headers["Accept-Language"] = locale;
+  return config;
+});
 
 api.interceptors.request.use(async (config: TrackedConfig) => {
   if (isServerRuntime()) return config;

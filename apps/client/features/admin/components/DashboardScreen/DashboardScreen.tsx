@@ -7,11 +7,13 @@ import TheatersIcon from "@mui/icons-material/Theaters";
 import TvIcon from "@mui/icons-material/Tv";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import { useTranslations } from "next-intl";
 import QuickActions from "./components/QuickActions";
 import RecentAdditions from "./components/RecentAdditions";
 import StatCard from "./components/StatCard";
 
 export default function DashboardScreen() {
+  const t = useTranslations("admin");
   const { data: allTitles, isPending: isAllTitlesPending } = useTitles({ limit: 1 });
 
   const { data: movies, isPending: isMoviesPending } = useTitles({ limit: 1, type: TitleType.MOVIE });
@@ -20,13 +22,23 @@ export default function DashboardScreen() {
 
   const stats = [
     {
-      label: "Total Titles",
+      label: t("dashboard.stats.totalTitles"),
       value: allTitles?.totalCount || 0,
       icon: <TheatersIcon sx={{ fontSize: 24 }} />,
       loading: isAllTitlesPending,
     },
-    { label: "Movies", value: movies?.totalCount || 0, icon: <MovieIcon sx={{ fontSize: 24 }} />, loading: isMoviesPending },
-    { label: "Series", value: series?.totalCount || 0, icon: <TvIcon sx={{ fontSize: 24 }} />, loading: isSeriesPending },
+    {
+      label: t("dashboard.stats.movies"),
+      value: movies?.totalCount || 0,
+      icon: <MovieIcon sx={{ fontSize: 24 }} />,
+      loading: isMoviesPending,
+    },
+    {
+      label: t("dashboard.stats.series"),
+      value: series?.totalCount || 0,
+      icon: <TvIcon sx={{ fontSize: 24 }} />,
+      loading: isSeriesPending,
+    },
   ];
 
   return (
@@ -40,11 +52,9 @@ export default function DashboardScreen() {
     >
       <Box sx={{ paddingBottom: "28px", borderBottom: "1px solid #333333" }}>
         <Typography component="h1" variant="h1" sx={{ color: "text.primary" }}>
-          Admin Overview
+          {t("dashboard.title")}
         </Typography>
-        <Typography sx={{ marginTop: "14px", maxWidth: "680px", color: "text.secondary" }}>
-          Monitor your catalog, jump into common tasks, and keep the content pipeline moving.
-        </Typography>
+        <Typography sx={{ marginTop: "14px", maxWidth: "680px", color: "text.secondary" }}>{t("dashboard.subtitle")}</Typography>
       </Box>
 
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(auto-fit, minmax(240px, 1fr))" }, gap: "22px" }}>

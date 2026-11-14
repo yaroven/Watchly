@@ -13,6 +13,7 @@ import type { Title } from "@features/title/schemas/title";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { APP } from "@shared/lib/routes";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useQueryState } from "nuqs";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -26,6 +27,7 @@ interface SeriesStreamProps {
 }
 
 export default function SeriesStream({ title, season, episodes, initialEpisodeUrl, initialEpisodeId }: SeriesStreamProps) {
+  const t = useTranslations("title.episodes");
   const router = useRouter();
   const [episodeId, setEpisodeId] = useQueryState("episode", { history: "replace", shallow: true });
 
@@ -96,7 +98,7 @@ export default function SeriesStream({ title, season, episodes, initialEpisodeUr
           ) : streamUrl && isEpisodeAvailable ? (
             <CustomVideoPlayer key={activeEpisodeId} src={streamUrl} onEnded={handleEpisodeEnded} />
           ) : (
-            <Typography sx={{ color: "text.secondary", p: "24px" }}>Video stream is not available for the selected episode yet.</Typography>
+            <Typography sx={{ color: "text.secondary", p: "24px" }}>{t("streamUnavailable")}</Typography>
           )}
         </Box>
 
@@ -114,7 +116,7 @@ export default function SeriesStream({ title, season, episodes, initialEpisodeUr
 
       <StreamFilmInfo
         title={title}
-        episodeLabel={activeEpisode ? `(Season ${season.number}, Episode ${activeEpisode.number})` : undefined}
+        episodeLabel={activeEpisode ? t("streamLabel", { season: season.number, episode: activeEpisode.number }) : undefined}
       />
       <StreamPhotos title={title} />
       <TitleReviews title={title} />

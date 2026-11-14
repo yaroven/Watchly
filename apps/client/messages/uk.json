@@ -1,0 +1,846 @@
+{
+  "auth": {
+    "fields": {
+      "name": "Ім'я",
+      "email": "Email",
+      "password": "Пароль",
+      "confirmPassword": "Підтвердіть пароль"
+    },
+    "validation": {
+      "emailInvalid": "Введіть коректний email",
+      "passwordMin": "Пароль має містити щонайменше {min, plural, one {# символ} few {# символи} many {# символів} other {# символу}}",
+      "nameRequired": "Ім'я обов'язкове",
+      "passwordsMismatch": "Паролі не збігаються"
+    },
+    "login": {
+      "heading": "вхід",
+      "rememberMe": "Запам'ятати мене",
+      "forgotPassword": "Забули пароль?",
+      "submit": "Увійти",
+      "submitting": "Вхід…",
+      "noAccount": "Немає акаунта? <link>Створіть його!</link>"
+    },
+    "register": {
+      "heading": "реєстрація",
+      "submit": "Зареєструватися",
+      "submitting": "Створюємо акаунт…",
+      "haveAccount": "Вже маєте акаунт? <link>Увійдіть!</link>"
+    },
+    "social": {
+      "divider": "Або через",
+      "provider": {
+        "google": "Продовжити з Google",
+        "apple": "Продовжити з Apple",
+        "facebook": "Продовжити з Facebook"
+      }
+    }
+  },
+  "common": {
+    "confirm": "Підтвердити",
+    "cancel": "Скасувати",
+    "goHome": "На головну",
+    "tryAgain": "Спробувати ще раз"
+  },
+  "shared": {
+    "header": {
+      "nav": {
+        "all": "Усе",
+        "movies": "Фільми",
+        "series": "Серіали",
+        "genres": "Жанри"
+      },
+      "profileAlt": "Профіль користувача",
+      "searchPlaceholder": "Шукайте серіали, фільми ..."
+    },
+    "sidebar": {
+      "menu": "Меню",
+      "nav": {
+        "discover": "Огляд",
+        "watchlist": "Мій список",
+        "admin": "Адмінка"
+      },
+      "expand": "Розгорнути бічну панель",
+      "collapse": "Згорнути бічну панель"
+    },
+    "sliderArrows": {
+      "previous": {
+        "item": "Попередній елемент",
+        "title": "Попередній тайтл",
+        "story": "Попередня новина",
+        "episode": "Попередній епізод"
+      },
+      "next": {
+        "item": "Наступний елемент",
+        "title": "Наступний тайтл",
+        "story": "Наступна новина",
+        "episode": "Наступний епізод"
+      }
+    },
+    "heroSlider": {
+      "watch": "Дивитися",
+      "trailer": "Трейлер"
+    },
+    "hotNews": {
+      "heading": "Гарячі новини",
+      "position": "{current}/{total}"
+    },
+    "pagination": {
+      "previous": "Попередня сторінка",
+      "next": "Наступна сторінка"
+    },
+    "modal": {
+      "close": "Закрити вікно"
+    },
+    "select": {
+      "placeholder": "Оберіть"
+    },
+    "fileInput": {
+      "upload": "Завантажити файл",
+      "invalidFile": "Некоректний файл",
+      "previewAlt": "Попередній перегляд вибраного файлу",
+      "replace": "Замінити файл",
+      "remove": "Видалити файл"
+    }
+  },
+  "pages": {
+    "metadata": {
+      "description": "Дивіться фільми та серіали онлайн з комфортом на Watchly",
+      "title": "{name} | Watchly",
+      "login": "Вхід | Watchly",
+      "register": "Реєстрація | Watchly",
+      "watchlist": "Мій список | Watchly",
+      "search": "Пошук | Watchly"
+    },
+    "notFound": {
+      "message": "Ой! Сторінку, яку ви шукаєте, не знайдено."
+    },
+    "error": {
+      "heading": "Щось пішло не так",
+      "description": "Не вдалося завантажити сторінку. Спробуйте ще раз або поверніться до каталогу."
+    },
+    "authLayout": {
+      "nav": {
+        "home": "Головна",
+        "about": "Про нас",
+        "contact": "Контакти"
+      },
+      "language": "Українська"
+    }
+  },
+  "errors": {
+    "sessionUnusable": "Не вдалося відновити сесію. Будь ласка, увійдіть знову.",
+    "unexpected": "Щось пішло не так"
+  },
+  "title": {
+    "cast": {
+      "updated": "Акторський склад оновлено.",
+      "updateFailed": "Не вдалося оновити акторський склад.",
+      "empty": "Акторів ще не додано.",
+      "characterPlaceholder": "Персонаж (необов'язково)",
+      "moveUp": "Перемістити вгору",
+      "moveDown": "Перемістити вниз",
+      "remove": "Прибрати",
+      "noActorsFound": "Акторів не знайдено",
+      "typeToSearch": "Почніть вводити, щоб знайти актора",
+      "addActorPlaceholder": "Додайте актора до складу...",
+      "saving": "Збереження...",
+      "save": "Зберегти склад"
+    },
+    "admin": {
+      "open": "Відкрити",
+      "delete": "Видалити",
+      "status": {
+        "COMPLETED": "Опубліковано",
+        "PROCESSING": "Обробляється",
+        "FAILED": "Помилка",
+        "PENDING": "Очікує"
+      }
+    },
+    "create": {
+      "breadcrumbTitles": "Тайтли",
+      "breadcrumbNew": "Новий тайтл",
+      "heading": "Створити тайтл",
+      "subheading": "Додайте фільм або серіал до бібліотеки. Спершу зберігаються метадані, потім відео завантажується у фоні."
+    },
+    "details": {
+      "deleteModal": {
+        "confirm": "Підтвердити видалення",
+        "pending": "Видалення...",
+        "title": "Видалити тайтл",
+        "description": "Ви впевнені, що хочете видалити <strong>{name}</strong>? Цю дію неможливо скасувати."
+      },
+      "ratingsSynced": "{count, plural, one {Синхронізовано # рейтинг.} few {Синхронізовано # рейтинги.} many {Синхронізовано # рейтингів.} other {Синхронізовано # рейтингу.}}",
+      "ratingsNone": "Для цього тайтлу ще немає рейтингів.",
+      "ratingsSyncFailed": "Не вдалося синхронізувати рейтинги.",
+      "heading": "Керування тайтлом",
+      "subheading": "Оновлюйте метадані, переглядайте стрім і керуйте сезонами та епізодами з одного екрана.",
+      "sections": {
+        "details": {
+          "title": "Деталі",
+          "description": "Редагуйте основні метадані цього тайтлу."
+        },
+        "cast": {
+          "title": "Акторський склад",
+          "description": "Призначте акторів та їхніх персонажів у порядку показу."
+        },
+        "seasons": {
+          "title": "Сезони",
+          "description": "Упорядкуйте структуру серіалу, перш ніж керувати епізодами."
+        },
+        "episodes": {
+          "title": "Епізоди",
+          "description": "Керуйте списком епізодів і завантаженнями для вибраного сезону."
+        }
+      },
+      "restarting": "Перезапуск...",
+      "restartTranscoding": "Перезапустити транскодування",
+      "preview": "Попередній перегляд",
+      "syncingRatings": "Синхронізація рейтингів...",
+      "syncRatings": "Синхронізувати рейтинги",
+      "deleteTitle": "Видалити тайтл"
+    },
+    "catalog": {
+      "viewAll": "Дивитися всі"
+    },
+    "discover": {
+      "noScore": "Н/Д",
+      "recommended": "Рекомендовано для вас",
+      "trendingMovies": "Популярні фільми",
+      "trendingSeries": "Популярні серіали",
+      "genres": "Жанри",
+      "imdbTopMovies": "Топ фільмів IMDB",
+      "imdbTopSeries": "Топ серіалів IMDB",
+      "trendingTvShows": "Популярні телешоу",
+      "myWatchlist": "Мій список",
+      "watchlistError": "Зараз не вдалося завантажити ваш список."
+    },
+    "sections": {
+      "information": "Інформація",
+      "moreLikeThis": "Схожі",
+      "reviews": "Відгуки",
+      "episodes": "Епізоди",
+      "noSeasons": "Для цього серіалу сезонів не знайдено."
+    },
+    "episodes": {
+      "shortCode": "С{season}.Е{episode}",
+      "seeAll": "Усі →",
+      "heading": "Епізоди",
+      "count": "{count, plural, one {# епізод} few {# епізоди} many {# епізодів} other {# епізоду}}",
+      "emptySeason": "Епізоди цього сезону ще не додано.",
+      "streamUnavailable": "Відеострім для вибраного епізоду ще недоступний.",
+      "streamLabel": "(Сезон {season}, епізод {episode})"
+    },
+    "photos": {
+      "heading": "Фото",
+      "add": "Додати фото"
+    },
+    "engagement": {
+      "copied": "Скопійовано",
+      "copyFailed": "Не вдалося скопіювати",
+      "share": "Поділитися",
+      "descriptionPlaceholder": "Опис з'явиться тут, щойно його додадуть.",
+      "removeLike": "Прибрати вподобання",
+      "like": "Подобається",
+      "removeDislike": "Прибрати дизлайк",
+      "dislike": "Не подобається",
+      "copyLink": "Скопіювати посилання на цей тайтл",
+      "inWatchlist": "У моєму списку",
+      "addToWatchlist": "Додати до списку",
+      "watchlist": "Мій список",
+      "addedBy": "{count, plural, one {Додав {formatted} користувач} few {Додали {formatted} користувачі} many {Додали {formatted} користувачів} other {Додали {formatted} користувача}}",
+      "retry": "Повторити",
+      "writeError": "Не вдалося зберегти: {message}",
+      "viewerStateUnknown": "Ми не змогли визначити, чи ви вподобали або зберегли цей тайтл, тому ці кнопки вимкнено. Лічильники нижче також можуть бути застарілими.",
+      "refreshFailed": "Не вдалося оновити кількість вподобань і додавань до списку для цього тайтлу, тож вони можуть бути застарілими.",
+      "storyline": "Сюжет:",
+      "showLess": "Згорнути",
+      "readMore": "Читати далі"
+    },
+    "overview": {
+      "tvSeries": "Серіал",
+      "runtime": "{minutes} хв",
+      "playLastEpisode": "Дивитися останній епізод",
+      "play": "Дивитися",
+      "watchTrailer": "Дивитися трейлер"
+    },
+    "card": {
+      "watchlistFailed": "Не вдалося оновити ваш список — спробуйте ще раз",
+      "watchlistPending": "Мій список — ще виконуємо вхід",
+      "watchlistUnknown": "Мій список — не вдалося визначити, чи збережено",
+      "signInToAdd": "Увійдіть, щоб додати до списку",
+      "removeFromWatchlist": "Прибрати зі списку",
+      "addToWatchlist": "Додати до списку",
+      "saveFailed": "Не вдалося зберегти — натисніть, щоб повторити"
+    },
+    "spotlight": {
+      "watchNow": "Дивитися зараз"
+    },
+    "form": {
+      "sectionLeft": "{count, plural, one {ЗАЛИШИЛОСЬ #} few {ЗАЛИШИЛОСЬ #} many {ЗАЛИШИЛОСЬ #} other {ЗАЛИШИЛОСЬ #}}",
+      "sectionComplete": "ГОТОВО",
+      "error": "Помилка: {message}",
+      "createError": "Помилка: {message} — нічого не збережено. Введені дані залишилися.",
+      "saving": "Збереження тайтлу...",
+      "update": "Оновити тайтл",
+      "create": "Створити тайтл",
+      "updatedSuccess": "Тайтл успішно оновлено!",
+      "viewAllTitles": "Усі тайтли",
+      "keepEditing": "Продовжити редагування",
+      "sections": {
+        "identity": {
+          "title": "Ідентифікація",
+          "description": "Як називається тайтл і хто його створив."
+        },
+        "classification": {
+          "title": "Формат і класифікація",
+          "description": "Тип визначає решту форми. Оберіть його першим."
+        },
+        "media": {
+          "title": "Медіа",
+          "descriptionWithVideo": "Постер, посилання на трейлер і вихідне відео.",
+          "descriptionWithoutVideo": "Лише постер і трейлер — відео епізодів додається до самих епізодів."
+        },
+        "accessibility": {
+          "title": "Доступність",
+          "description": "Що глядачі отримують, окрім зображення."
+        }
+      },
+      "typeHint": {
+        "MOVIE": "Один відеофайл. Завантажується й транскодується з цього екрана.",
+        "SERIES": "Сезони та епізоди додаються після створення тайтлу."
+      },
+      "manageGenres": "Керувати жанрами",
+      "noGenres": "Жанрів ще немає — спершу додайте їх на екрані «Жанри».",
+      "validationSummary": "{count, plural, one {# поле потребує уваги, перш ніж можна буде зберегти} few {# поля потребують уваги, перш ніж можна буде зберегти} many {# полів потребують уваги, перш ніж можна буде зберегти} other {# поля потребують уваги, перш ніж можна буде зберегти}}",
+      "rail": {
+        "runtime": "{minutes} хв",
+        "catalogPreview": "ПЕРЕГЛЯД У КАТАЛОЗІ",
+        "posterPreview": "ПЕРЕГЛЯД ПОСТЕРА",
+        "untitled": "Без назви",
+        "noGenresPicked": "Жанри ще не вибрано",
+        "readyToSave": "ГОТОВО ДО ЗБЕРЕЖЕННЯ",
+        "missing": "Бракує: <value>{fields}</value>",
+        "uploadingVideo": "Завантаження відео",
+        "uploadPart": "частина {completed} з {total}",
+        "draft": "Чернетка — ще не збережено",
+        "saveOrder": "Спершу зберігається запис, потім завантажується відео. Якщо завантаження не вдасться, запис буде відкочено, тож нічого недоробленого не залишиться."
+      },
+      "inputs": {
+        "closedCaption": "Доступні субтитри",
+        "country": "Країна",
+        "countryPlaceholder": "Країна походження",
+        "language": "Мова",
+        "languagePlaceholder": "Мова",
+        "releaseDate": "Дата виходу",
+        "runtime": "Тривалість (хвилини)",
+        "runtimeSeries": "Тривалість (хвилини) — задається для кожного епізоду",
+        "runtimePlaceholder": "Тривалість у хвилинах",
+        "name": "Назва",
+        "namePlaceholder": "Назва",
+        "description": "Опис",
+        "descriptionPlaceholder": "Про що цей тайтл",
+        "director": "Режисер",
+        "directorPlaceholder": "Режисер",
+        "network": "Мережа",
+        "networkPlaceholder": "Телемережа або стримінгова платформа",
+        "poster": "Постер",
+        "posterHint": "Будь-який формат зображення",
+        "trailerUrl": "URL трейлера",
+        "videoFile": "Відеофайл",
+        "videoHint": "Будь-який формат відео",
+        "videoNote": "Великі файли завантажуються частинами й переживають обрив з'єднання. Транскодування почнеться саме, щойно завантаження завершиться."
+      },
+      "saveFailed": "Не вдалося зберегти тайтл"
+    },
+    "ageRating": {
+      "AGE_0": "Для всіх",
+      "AGE_12": "12+",
+      "AGE_16": "16+",
+      "AGE_18": "18+"
+    },
+    "type": {
+      "MOVIE": "Фільм",
+      "SERIES": "Серіал"
+    },
+    "created": {
+      "heading": "{name} додано до бібліотеки",
+      "stillToDo": "ЩЕ ЗАЛИШИЛОСЬ",
+      "noCast": {
+        "title": "Акторів не призначено",
+        "description": "Актори та їхні персонажі в порядку показу.",
+        "action": "Додати акторів"
+      },
+      "noSeasons": {
+        "title": "Сезонів ще немає",
+        "description": "Додайте сезон 1, потім завантажте його епізоди по одному.",
+        "action": "Додати сезони"
+      },
+      "transcoding": {
+        "ready": "Відео готове до перегляду",
+        "pending": "Транскодування — ще не можна дивитися",
+        "description": "Картка в бібліотеці показує «Очікує», доки це не завершиться.",
+        "automatic": "Автоматично"
+      },
+      "noRatings": {
+        "title": "Зовнішніх рейтингів ще немає",
+        "description": "IMDb, Rotten Tomatoes і Metacritic підтягуються на вимогу.",
+        "action": "Синхронізувати рейтинги"
+      },
+      "openTitlePage": "Відкрити сторінку тайтлу",
+      "createAnother": "Створити ще один",
+      "backToLibrary": "Назад до бібліотеки"
+    },
+    "information": {
+      "heading": "Інформація",
+      "stars": "У ролях",
+      "country": "Країна",
+      "releaseDate": "Дата виходу",
+      "language": "Мова",
+      "network": "Мережа",
+      "director": "Режисер",
+      "runtime": "Тривалість",
+      "runtimeValue": "{minutes} хв",
+      "closedCaption": "Субтитри",
+      "available": "Доступні",
+      "notAvailable": "Недоступні"
+    },
+    "moreLikeThis": {
+      "heading": "Схожі",
+      "viewAll": "Дивитися всі"
+    },
+    "tabs": {
+      "ariaLabel": "Розділи тайтлу"
+    },
+    "watchlist": {
+      "signInPrompt": "Увійдіть, щоб вести свій список.",
+      "signIn": "Увійти",
+      "heading": "Мій список",
+      "count": "{count, plural, one {{formatted} тайтл} few {{formatted} тайтли} many {{formatted} тайтлів} other {{formatted} тайтлу}}",
+      "loadError": "Не вдалося завантажити ваш список: {message}",
+      "tryAgain": "Спробувати ще раз",
+      "empty": "Тут ще нічого немає. Закладка на будь-якому постері додає тайтл сюди.",
+      "browse": "Переглянути тайтли"
+    },
+    "library": {
+      "syncAllResult": "Синхронізовано рейтинги для {synced}/{total} тайтлів.",
+      "syncAllFailed": "Не вдалося синхронізувати рейтинги.",
+      "hero": {
+        "heading": "Бібліотека контенту",
+        "subheading": "Керуйте фільмами, серіалами та публікацією з одного місця.",
+        "syncing": "Синхронізація рейтингів...",
+        "syncAll": "Синхронізувати всі рейтинги",
+        "addNew": "Додати"
+      },
+      "table": {
+        "title": "Назва",
+        "year": "Рік",
+        "type": "Тип",
+        "status": "Статус",
+        "actions": "Дії",
+        "emptyTitle": "Тайтлів не знайдено",
+        "emptyDescription": "Спробуйте змінити пошуковий запит або скинути активні фільтри."
+      },
+      "filters": {
+        "heading": "Фільтри",
+        "reset": "Скинути фільтри",
+        "search": "Пошук",
+        "searchPlaceholder": "Пошук за назвою...",
+        "type": "Тип",
+        "allTypes": "Усі типи",
+        "movies": "Фільми",
+        "series": "Серіали",
+        "genre": "Жанр",
+        "allGenres": "Усі жанри",
+        "status": "Статус",
+        "allStatuses": "Усі статуси",
+        "found": "{count, plural, one {Знайдено # тайтл} few {Знайдено # тайтли} many {Знайдено # тайтлів} other {Знайдено # тайтлу}}",
+        "hint": "Звузьте список фільтрами, щоб швидко знайти потрібний контент."
+      }
+    },
+    "reviews": {
+      "heading": "Відгуки",
+      "notRated": "Ще не оцінено",
+      "averageScore": "{count, plural, one {{score}/10 від {formatted} глядача} few {{score}/10 від {formatted} глядачів} many {{score}/10 від {formatted} глядачів} other {{score}/10 від {formatted} глядача}}",
+      "yourScore": "Ваша оцінка",
+      "rate": "Оцінити",
+      "update": "Оновити",
+      "clear": "Очистити",
+      "postPrompt": "Залиште коментар до цього тайтлу:",
+      "signInPrompt": "Увійдіть, щоб залишити коментар.",
+      "containsSpoilers": "Містить спойлери",
+      "commentPlaceholder": "Текст коментаря ...",
+      "postComment": "Опублікувати",
+      "sortBy": "Сортувати:",
+      "sort": {
+        "newest": "Нові",
+        "oldest": "Старі",
+        "hottest": "Популярні"
+      },
+      "loading": "Завантаження коментарів ...",
+      "empty": "Коментарів ще немає — будьте першим.",
+      "showMore": "Показати більше",
+      "comment": {
+        "spoilerWarning": "Цей коментар містить спойлери!",
+        "view": "Показати",
+        "removeLike": "Прибрати вподобання",
+        "like": "Подобається",
+        "removeDislike": "Прибрати дизлайк",
+        "dislike": "Не подобається",
+        "hideReplies": "Сховати відповіді",
+        "showReplies": "Показати відповіді",
+        "reply": "Відповісти",
+        "delete": "Видалити",
+        "reported": "Скаргу надіслано",
+        "report": "Поскаржитися",
+        "replyPlaceholder": "Відповідь для {name} ...",
+        "send": "Надіслати"
+      }
+    },
+    "search": {
+      "headingQuery": "Результати пошуку за запитом «{query}»",
+      "headingMovies": "Усі фільми",
+      "headingSeries": "Усі серіали",
+      "headingAll": "Усі тайтли",
+      "more": "Більше",
+      "emptyQuery": "За запитом «{query}» не знайдено жодного фільму чи серіалу. Спробуйте іншу назву.",
+      "empty": "Тут поки нічого немає. Загляньте пізніше.",
+      "filters": {
+        "all": "Усі",
+        "genre": "Жанр",
+        "director": "Режисер",
+        "network": "Мережа",
+        "ageRating": "Вікове обмеження",
+        "artist": "Актор",
+        "country": "Країна",
+        "order": "Порядок",
+        "quality": "Якість"
+      }
+    },
+    "validation": {
+      "nameRequired": "Назва обов'язкова",
+      "ageRatingRequired": "Вікове обмеження обов'язкове",
+      "countryRequired": "Країна обов'язкова",
+      "releaseDateRequired": "Дата виходу обов'язкова",
+      "languageRequired": "Мова обов'язкова",
+      "trailerUrlInvalid": "URL трейлера має бути коректним посиланням",
+      "runtimeRequired": "Тривалість обов'язкова",
+      "runtimeWhole": "Тривалість має бути цілим числом",
+      "runtimeMin": "Тривалість має бути 0 або більше",
+      "networkRequired": "Мережа обов'язкова",
+      "directorRequired": "Режисер обов'язковий",
+      "posterImageOnly": "Для постерів підтримуються лише зображення",
+      "videoRequiredForMovies": "Для фільмів відеофайл обов'язковий",
+      "videoOnly": "Підтримуються лише відеофайли"
+    },
+    "fields": {
+      "name": "Назва",
+      "description": "Опис",
+      "director": "Режисер",
+      "network": "Мережа",
+      "type": "Тип",
+      "ageRating": "Вікове обмеження",
+      "country": "Країна",
+      "language": "Мова",
+      "releaseDate": "Дата виходу",
+      "runtime": "Тривалість",
+      "trailerUrl": "URL трейлера",
+      "posterFile": "Постер",
+      "videoFile": "Відеофайл",
+      "genreIds": "Жанри"
+    }
+  },
+  "player": {
+    "videoPlayer": "Відеоплеєр",
+    "play": "Відтворити",
+    "pause": "Пауза",
+    "playVideo": "Відтворити відео",
+    "pauseVideo": "Призупинити відео",
+    "mute": "Вимкнути звук",
+    "unmute": "Увімкнути звук",
+    "muteVideo": "Вимкнути звук відео",
+    "unmuteVideo": "Увімкнути звук відео",
+    "volume": "Гучність",
+    "fullscreen": "Повний екран",
+    "enterFullscreen": "Увімкнути повноекранний режим",
+    "exitFullscreen": "Вийти з повноекранного режиму",
+    "buffering": "Буферизація",
+    "seekVideo": "Перемотати відео",
+    "settings": {
+      "label": "Налаштування відео",
+      "title": "Налаштування ({rate})",
+      "tabs": {
+        "quality": "Якість",
+        "speed": "Швидкість"
+      }
+    },
+    "quality": {
+      "auto": "Авто",
+      "autoWith": "Авто ({label})",
+      "numbered": "Якість {number}"
+    },
+    "errors": {
+      "networkRetrying": "Помилка мережі під час завантаження відео. Повторюємо спробу...",
+      "playbackRecovering": "Помилка відтворення. Відновлюємо...",
+      "streamUnavailable": "Відеострім недоступний"
+    },
+    "preview": {
+      "title": "Попередній перегляд",
+      "loading": "Отримуємо посилання на стрім...",
+      "error": "Не вдалося завантажити відеострім"
+    }
+  },
+  "episodes": {
+    "episodeTitle": "Епізод {number}: {name}",
+    "status": {
+      "pending": "Очікує",
+      "processing": "Обробляється",
+      "failed": "Помилка"
+    },
+    "manager": {
+      "heading": "Епізоди",
+      "add": "Додати епізод",
+      "empty": "Епізодів ще немає. Додайте перший, щоб почати."
+    },
+    "form": {
+      "addTitle": "Додати епізод",
+      "editTitle": "Редагувати епізод",
+      "number": "Номер епізоду",
+      "name": "Назва",
+      "description": "Опис",
+      "videoFile": "Відеофайл",
+      "uploading": "Завантаження...",
+      "create": "Створити",
+      "update": "Оновити"
+    },
+    "delete": {
+      "title": "Видалити епізод",
+      "confirm": "Підтвердити видалення",
+      "pending": "Видалення...",
+      "description": "Ви впевнені, що хочете видалити <strong>{title}</strong>? Цю дію неможливо скасувати."
+    },
+    "validation": {
+      "numberRequired": "Номер епізоду обов'язковий",
+      "numberInteger": "Номер епізоду має бути цілим числом",
+      "numberPositive": "Номер епізоду має бути більшим за 0",
+      "nameRequired": "Назва обов'язкова",
+      "descriptionTooLong": "Опис задовгий",
+      "videoRequired": "Відеофайл обов'язковий",
+      "videoType": "Підтримуються лише відеофайли"
+    }
+  },
+  "season": {
+    "tab": "Сезон {number}",
+    "seasonTitle": "Сезон {number}: {name}",
+    "manager": {
+      "heading": "Сезони",
+      "add": "Додати сезон",
+      "empty": "Сезонів ще немає. Додайте перший, щоб почати."
+    },
+    "form": {
+      "addTitle": "Додати сезон",
+      "editTitle": "Редагувати сезон",
+      "number": "Номер сезону",
+      "name": "Назва",
+      "description": "Опис",
+      "banner": "Банер",
+      "saving": "Збереження...",
+      "create": "Створити",
+      "update": "Оновити"
+    },
+    "delete": {
+      "title": "Видалити сезон",
+      "confirm": "Підтвердити видалення",
+      "pending": "Видалення...",
+      "description": "Ви впевнені, що хочете видалити <strong>{title}</strong>? Цю дію неможливо скасувати. Усі епізоди цього сезону також буде видалено."
+    },
+    "validation": {
+      "numberRequired": "Номер сезону обов'язковий",
+      "numberInteger": "Номер сезону має бути цілим числом",
+      "numberPositive": "Номер сезону має бути більшим за 0",
+      "nameRequired": "Назва обов'язкова",
+      "descriptionTooLong": "Опис задовгий",
+      "posterType": "Для постерів підтримуються лише зображення"
+    }
+  },
+  "admin": {
+    "meta": {
+      "title": "Watchly Admin",
+      "description": "Адмін-панель Watchly"
+    },
+    "pages": {
+      "actors": "Актори | Watchly Admin",
+      "dashboard": "Панель керування | Watchly Admin",
+      "genres": "Жанри | Watchly Admin",
+      "titles": "Бібліотека контенту | Watchly Admin",
+      "users": "Користувачі | Watchly Admin",
+      "createTitle": "Створити тайтл | Watchly Admin"
+    },
+    "notFound": {
+      "title": "Цієї сторінки адмінки не існує",
+      "description": "Запис міг бути видалений, маршрут може бути неправильним, або такої сторінки немає в цьому розділі адмінки.",
+      "backToDashboard": "Назад до панелі керування"
+    },
+    "header": {
+      "panel": "Адмін-панель",
+      "sections": {
+        "dashboard": "Панель керування",
+        "titles": "Керування контентом",
+        "fallback": "Адмінка"
+      },
+      "searchPlaceholder": "Пошук тайтлів...",
+      "avatarAlt": "Адміністратор",
+      "userName": "Адміністратор",
+      "userRole": "Суперадмін"
+    },
+    "sidebar": {
+      "badge": "Адмін",
+      "menu": "Меню",
+      "dashboard": "Панель керування",
+      "titles": "Тайтли",
+      "users": "Користувачі",
+      "actors": "Актори",
+      "genres": "Жанри",
+      "backToSite": "Назад на сайт"
+    },
+    "dashboard": {
+      "title": "Огляд адмінки",
+      "subtitle": "Стежте за каталогом, швидко переходьте до типових завдань і підтримуйте роботу контент-пайплайну.",
+      "stats": {
+        "totalTitles": "Усього тайтлів",
+        "movies": "Фільми",
+        "series": "Серіали"
+      },
+      "quickActions": {
+        "title": "Швидкі дії",
+        "addTitle": "Додати новий тайтл",
+        "manageTitles": "Керувати всіма тайтлами",
+        "overview": "Огляд"
+      },
+      "recentAdditions": {
+        "title": "Нещодавно додані",
+        "empty": "Нещодавніх тайтлів не знайдено."
+      },
+      "titleType": {
+        "MOVIE": "Фільм",
+        "SERIES": "Серіал"
+      }
+    }
+  },
+  "artist": {
+    "validation": {
+      "nameRequired": "Ім'я обов'язкове"
+    },
+    "form": {
+      "addTitle": "Додати актора",
+      "editTitle": "Редагувати актора",
+      "nameLabel": "Ім'я",
+      "namePlaceholder": "Ім'я актора",
+      "photoLabel": "Фото",
+      "photoHint": "Будь-який формат зображення",
+      "error": "Помилка: {message}",
+      "uploadingPhoto": "Завантаження фото...",
+      "saving": "Збереження актора...",
+      "saveChanges": "Зберегти зміни",
+      "submitAdd": "Додати актора",
+      "saveFailed": "Не вдалося зберегти актора"
+    },
+    "card": {
+      "edit": "Редагувати {name}",
+      "delete": "Видалити {name}"
+    },
+    "detail": {
+      "creditedOn": "{count, plural, one {Знімався в # тайтлі.} few {Знімався в # тайтлах.} many {Знімався в # тайтлах.} other {Знімався в # тайтлу.}}",
+      "noCredits": "Ролей ще немає.",
+      "edit": "Редагувати актора",
+      "filmography": "Фільмографія",
+      "asCharacter": "у ролі {character}",
+      "emptyFilmography": "Цей актор ще не знімався в жодному тайтлі."
+    },
+    "library": {
+      "title": "Актори",
+      "subtitle": "Керуйте каталогом акторів, з якого формується акторський склад.",
+      "add": "Додати актора",
+      "searchPlaceholder": "Пошук акторів...",
+      "emptyTitle": "Акторів не знайдено",
+      "emptyDescription": "Спробуйте інший запит або додайте нового актора."
+    },
+    "delete": {
+      "title": "Видалити актора",
+      "confirm": "Підтвердити видалення",
+      "pending": "Видалення...",
+      "description": "Ви впевнені, що хочете видалити <strong>{name}</strong>? Це також прибере всі його ролі. Цю дію неможливо скасувати."
+    }
+  },
+  "genre": {
+    "library": {
+      "title": "Жанри",
+      "subtitle": "Керуйте жанрами, за якими впорядковано тайтли.",
+      "count": "{count, plural, one {# жанр} few {# жанри} many {# жанрів} other {# жанру}}",
+      "newPlaceholder": "Назва нового жанру",
+      "add": "Додати жанр",
+      "save": "Зберегти",
+      "cancel": "Скасувати",
+      "titleCount": "{count, plural, one {# тайтл} few {# тайтли} many {# тайтлів} other {# тайтлу}}",
+      "rename": "Перейменувати {name}",
+      "deleteLabel": "Видалити {name}",
+      "stillAssigned": "{count, plural, one {Досі призначено # тайтлу — спершу приберіть його з усіх тайтлів} few {Досі призначено # тайтлам — спершу приберіть його з усіх тайтлів} many {Досі призначено # тайтлам — спершу приберіть його з усіх тайтлів} other {Досі призначено # тайтлу — спершу приберіть його з усіх тайтлів}}",
+      "empty": "Жанрів ще немає."
+    },
+    "delete": {
+      "title": "Видалити жанр",
+      "confirm": "Підтвердити видалення",
+      "pending": "Видалення...",
+      "description": "Ви впевнені, що хочете видалити <strong>{name}</strong>? Цю дію неможливо скасувати."
+    }
+  },
+  "user": {
+    "role": {
+      "ADMIN": "Адміністратор",
+      "USER": "Користувач"
+    },
+    "fields": {
+      "email": "Email",
+      "userId": "ID користувача",
+      "joined": "Приєднався",
+      "role": "Роль"
+    },
+    "library": {
+      "title": "Користувачі",
+      "subtitle": "Переглядайте акаунти й керуйте правами адміністратора.",
+      "total": "Усього користувачів"
+    },
+    "filters": {
+      "title": "Фільтри",
+      "reset": "Скинути фільтри",
+      "searchLabel": "Пошук",
+      "searchPlaceholder": "Пошук за email...",
+      "roleLabel": "Роль",
+      "allRoles": "Усі ролі",
+      "found": "{count, plural, one {Знайдено # користувача} few {Знайдено # користувачів} many {Знайдено # користувачів} other {Знайдено # користувача}}",
+      "hint": "Звузьте список, щоб швидко знайти потрібний акаунт."
+    },
+    "table": {
+      "actions": "Дії",
+      "open": "Відкрити {email}",
+      "emptyTitle": "Користувачів не знайдено",
+      "emptyDescription": "Спробуйте змінити пошуковий запит або скинути активні фільтри."
+    },
+    "detail": {
+      "notFoundTitle": "Користувача не знайдено",
+      "notFoundDescription": "Можливо, акаунт видалено або посилання неправильне.",
+      "backToUsers": "Назад до користувачів",
+      "subtitle": "Переглядайте дані акаунта й керуйте роллю цього користувача.",
+      "accountInfoTitle": "Дані акаунта",
+      "accountInfoDescription": "Ідентифікаційні дані акаунта лише для перегляду.",
+      "roleTitle": "Роль",
+      "roleDescription": "Адміністратори можуть керувати тайтлами, користувачами та акторами. Користувачі мають стандартний доступ.",
+      "cannotChangeOwnRole": "Ви не можете змінити власну роль."
+    },
+    "changeRole": {
+      "title": "Змінити роль",
+      "confirm": "Змінити роль",
+      "pending": "Оновлення...",
+      "description": "Змінити роль <strong>{email}</strong> на <strong>{role}</strong>? Це одразу змінить доступ цього користувача."
+    }
+  }
+}

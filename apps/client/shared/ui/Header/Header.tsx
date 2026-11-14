@@ -1,16 +1,18 @@
 "use client";
 
+import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { APP } from "@/shared/lib/routes";
 import { Box, Tab } from "@mui/material";
 import Tabs from "@mui/material/Tabs";
 import Avatar from "@shared/ui/Avatar";
-import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import Notification from "./components/Notification";
 import SearchBar from "./components/SearchBar";
 
 export default function Header() {
+  const t = useTranslations("shared.header");
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -23,10 +25,10 @@ export default function Header() {
   };
 
   const navItems = [
-    { label: "All", href: APP.DISCOVER },
-    { label: "Movies", href: APP.MOVIES },
-    { label: "Series", href: APP.SERIES_LIST },
-    { label: "Genres", href: APP.GENRES },
+    { label: t("nav.all"), href: APP.DISCOVER },
+    { label: t("nav.movies"), href: APP.MOVIES },
+    { label: t("nav.series"), href: APP.SERIES_LIST },
+    { label: t("nav.genres"), href: APP.GENRES },
   ];
   const activeTab =
     navItems.filter((n) => pathname === n.href || pathname.startsWith(`${n.href}/`)).sort((a, b) => b.href.length - a.href.length)[0]
@@ -56,7 +58,7 @@ export default function Header() {
           }}
         />
         <Notification hasNotifications={false} />
-        <Avatar src="https://www.svgrepo.com/show/384670/account-avatar-profile-user.svg" alt="User profile" />
+        <Avatar src="https://www.svgrepo.com/show/384670/account-avatar-profile-user.svg" alt={t("profileAlt")} />
       </Box>
     </Box>
   );

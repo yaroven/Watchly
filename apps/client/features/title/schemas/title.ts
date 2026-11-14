@@ -91,70 +91,76 @@ export interface GetAllTitlesDto {
 
 const PosterFileSchema = z.custom<FileList | undefined>((value) => value === undefined || value instanceof FileList).optional();
 
-export const BaseTitleSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  description: z.string().max(500),
-  type: z.enum(TitleType),
-  ageRating: z.enum(AgeRating, { error: "Age rating is required" }),
-  country: z.string().min(1, "Country is required").max(100),
-  releaseDate: z.iso.date({ error: "Release date is required" }),
-  language: z.string().min(1, "Language is required").max(100),
-  trailerUrl: z.url({ error: "Trailer URL must be a valid URL" }),
-  runtime: z.number("Runtime is required").int("Runtime must be a whole number").min(0, "Runtime must be 0 or greater"),
-  network: z.string().min(1, "Network is required").max(100),
-  director: z.string().min(1, "Director is required").max(255),
-  closedCaption: z.boolean(),
-  genreIds: z.array(z.string()),
-});
+type SchemaTranslator = (key: string) => string;
 
-export const CreateTitleSchema = BaseTitleSchema.extend({
-  videoFile: z.custom<FileList>().optional(),
-  posterFile: PosterFileSchema,
-})
-  .refine(
-    (data) => {
-      if (!data.posterFile?.[0]) {
+export const createBaseTitleSchema = (t: SchemaTranslator) =>
+  z.object({
+    name: z.string().min(1, t("nameRequired")),
+    description: z.string().max(500),
+    type: z.enum(TitleType),
+    ageRating: z.enum(AgeRating, { error: t("ageRatingRequired") }),
+    country: z.string().min(1, t("countryRequired")).max(100),
+    releaseDate: z.iso.date({ error: t("releaseDateRequired") }),
+    language: z.string().min(1, t("languageRequired")).max(100),
+    trailerUrl: z.url({ error: t("trailerUrlInvalid") }),
+    runtime: z.number(t("runtimeRequired")).int(t("runtimeWhole")).min(0, t("runtimeMin")),
+    network: z.string().min(1, t("networkRequired")).max(100),
+    director: z.string().min(1, t("directorRequired")).max(255),
+    closedCaption: z.boolean(),
+    genreIds: z.array(z.string()),
+  });
+
+export const createCreateTitleSchema = (t: SchemaTranslator) =>
+  createBaseTitleSchema(t)
+    .extend({
+      videoFile: z.custom<FileList>().optional(),
+      posterFile: PosterFileSchema,
+    })
+    .refine(
+      (data) => {
+        if (!data.posterFile?.[0]) {
+          return true;
+        }
+
+        return data.posterFile[0].type.startsWith("image/");
+      },
+      {
+        message: t("posterImageOnly"),
+        path: ["posterFile"],
+      },
+    )
+    .refine(
+      (data) => {
+        if (data.type === TitleType.MOVIE) {
+          return data.videoFile && data.videoFile.length > 0;
+        }
         return true;
-      }
+      },
+      {
+        message: t("videoRequiredForMovies"),
+        path: ["videoFile"],
+      },
+    )
+    .refine(
+      (data) => {
+        if (data.videoFile && data.videoFile.length > 0) {
+          return data.videoFile[0].type.startsWith("video/");
+        }
+        return true;
+      },
+      {
+        message: t("videoOnly"),
+        path: ["videoFile"],
+      },
+    );
 
-      return data.posterFile[0].type.startsWith("image/");
-    },
-    {
-      message: "Only image files are supported for posters",
-      path: ["posterFile"],
-    },
-  )
-  .refine(
-    (data) => {
-      if (data.type === TitleType.MOVIE) {
-        return data.videoFile && data.videoFile.length > 0;
-      }
-      return true;
-    },
-    {
-      message: "Video file is required for Movies",
-      path: ["videoFile"],
-    },
-  )
-  .refine(
-    (data) => {
-      if (data.videoFile && data.videoFile.length > 0) {
-        return data.videoFile[0].type.startsWith("video/");
-      }
-      return true;
-    },
-    {
-      message: "Only video files are supported",
-      path: ["videoFile"],
-    },
-  );
+export const createUpdateTitleSchema = (t: SchemaTranslator) =>
+  createBaseTitleSchema(t).extend({
+    videoFile: z.custom<FileList>().optional(),
+    posterFile: PosterFileSchema,
+  });
 
-export const UpdateTitleSchema = BaseTitleSchema.extend({
-  videoFile: z.custom<FileList>().optional(),
-  posterFile: PosterFileSchema,
-});
-
-export type TitleFormValues = z.infer<typeof CreateTitleSchema>;
+export type TitleFormValues = z.infer<ReturnType<typeof createCreateTitleSchema>>;
 
 export interface CreateTitleDto {
   name: string;

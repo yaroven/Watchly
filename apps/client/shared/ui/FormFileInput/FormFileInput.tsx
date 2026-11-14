@@ -2,6 +2,7 @@
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { tokens } from "@shared/mui/theme";
+import { useTranslations } from "next-intl";
 import { ChangeEvent, useEffect, useMemo, useRef } from "react";
 import { FieldError, FieldValues, Path, PathValue, UseFormRegister, UseFormSetValue } from "react-hook-form";
 import FilePreviewCard from "./components/FilePreviewCard";
@@ -36,6 +37,7 @@ export default function FormFileInput<T extends FieldValues>({
   hint,
   disabled = false,
 }: FormFileInputProps<T>) {
+  const t = useTranslations("shared.fileInput");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const file = selectedFile?.[0] ?? null;
   const fileName = file?.name ?? "";
@@ -128,7 +130,7 @@ export default function FormFileInput<T extends FieldValues>({
 
       {error && (
         <Typography id={errorId} role="alert" sx={{ fontSize: "12px", color: tokens.feedback.error }}>
-          {error.message || "Invalid file"}
+          {error.message || t("invalidFile")}
         </Typography>
       )}
     </Box>

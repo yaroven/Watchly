@@ -8,6 +8,7 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { alpha } from "@mui/material/styles";
 import { tokens } from "@shared/mui/theme";
+import { useTranslations } from "next-intl";
 import { Activity } from "react";
 import type { UseFormReturn } from "react-hook-form";
 
@@ -18,6 +19,7 @@ interface MediaFieldsProps {
 }
 
 export default function MediaFields({ form, showVideoField, disabled }: MediaFieldsProps) {
+  const t = useTranslations("title.form.inputs");
   const {
     register,
     setValue,
@@ -28,30 +30,37 @@ export default function MediaFields({ form, showVideoField, disabled }: MediaFie
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "20px" }}>
       <FormFileInput
-        label="Poster"
+        label={t("poster")}
         register={register}
         setValue={setValue}
         selectedFile={watch("posterFile")}
         name="posterFile"
         accept="image/*"
-        hint="Any image format"
+        hint={t("posterHint")}
         disabled={disabled}
         error={errors.posterFile}
         id="title-poster-file"
       />
 
-      <FormField type="url" label="Trailer URL" placeholder="https://..." name="trailerUrl" register={register} error={errors.trailerUrl} />
+      <FormField
+        type="url"
+        label={t("trailerUrl")}
+        placeholder="https://..."
+        name="trailerUrl"
+        register={register}
+        error={errors.trailerUrl}
+      />
 
       <Activity mode={showVideoField ? "visible" : "hidden"}>
         <Box sx={{ display: "flex", flexDirection: "column", gap: "12px" }}>
           <FormFileInput
-            label="Video File"
+            label={t("videoFile")}
             register={register}
             setValue={setValue}
             selectedFile={watch("videoFile")}
             name="videoFile"
             accept="video/*"
-            hint="Any video format"
+            hint={t("videoHint")}
             disabled={disabled}
             error={errors.videoFile}
             id="title-video-file"
@@ -69,9 +78,7 @@ export default function MediaFields({ form, showVideoField, disabled }: MediaFie
             }}
           >
             <InfoOutlinedIcon sx={{ fontSize: 16, color: "#7aa2f7", flexShrink: 0, mt: "1px" }} />
-            <Typography sx={{ fontSize: "12px", lineHeight: 1.5, color: "#b9c6e3" }}>
-              Large files upload in parts and survive a dropped connection. Transcoding starts on its own once the upload lands.
-            </Typography>
+            <Typography sx={{ fontSize: "12px", lineHeight: 1.5, color: "#b9c6e3" }}>{t("videoNote")}</Typography>
           </Box>
         </Box>
       </Activity>

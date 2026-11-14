@@ -3,6 +3,7 @@ import TranscodingStatus from "@/types/transcoding-status";
 import StarIcon from "@mui/icons-material/Star";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import { useFormatter, useTranslations } from "next-intl";
 import Image from "next/image";
 
 interface EpisodeItemProps {
@@ -15,22 +16,25 @@ interface EpisodeItemProps {
   score?: number;
 }
 
-function getStatusLabel(status: TranscodingStatus) {
+function getStatusLabelKey(status: TranscodingStatus) {
   switch (status) {
     case TranscodingStatus.PROCESSING:
-      return "Processing";
+      return "status.processing";
     case TranscodingStatus.PENDING:
-      return "Pending";
+      return "status.pending";
     case TranscodingStatus.FAILED:
-      return "Failed";
+      return "status.failed";
     default:
       return null;
   }
 }
 
 export default function EpisodeItem({ number, name, transcodingStatus, isActive, onClick, thumbnailUrl, score }: EpisodeItemProps) {
+  const t = useTranslations("episodes");
+  const format = useFormatter();
   const isAvailable = transcodingStatus === TranscodingStatus.COMPLETED;
-  const statusLabel = isAvailable ? null : getStatusLabel(transcodingStatus);
+  const statusLabelKey = isAvailable ? null : getStatusLabelKey(transcodingStatus);
+  const statusLabel = statusLabelKey ? t(statusLabelKey) : null;
   const thumbnailSrc = getOptimizedImageSrc(thumbnailUrl);
 
   return (
@@ -39,7 +43,7 @@ export default function EpisodeItem({ number, name, transcodingStatus, isActive,
       type="button"
       onClick={onClick}
       disabled={!isAvailable}
-      aria-label={`Episode ${number}: ${name}`}
+      aria-label={t("episodeTitle", { number, name })}
       aria-current={isActive ? "true" : undefined}
       sx={{
         position: "relative",
@@ -76,7 +80,7 @@ export default function EpisodeItem({ number, name, transcodingStatus, isActive,
         >
           <StarIcon sx={{ fontSize: "14px", color: "primary.main" }} />
           <Typography component="span" sx={{ fontSize: "12px", fontWeight: 600, color: "#ffffff" }}>
-            {score.toFixed(1)}
+            {format.number(score, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
           </Typography>
           <Typography component="span" sx={{ fontSize: "10px", color: "text.secondary" }}>
             /10

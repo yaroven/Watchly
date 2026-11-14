@@ -1,9 +1,15 @@
 "use client";
 
 import { useDeleteEpisode } from "@/features/episodes/api/use-episode-mutations";
-import { CreateEpisodeFormSchema, CreateEpisodeFormValues, Episode, UpdateEpisodeFormSchema } from "@/features/episodes/schemas/episode";
+import {
+  createCreateEpisodeFormSchema,
+  CreateEpisodeFormValues,
+  createUpdateEpisodeFormSchema,
+  Episode,
+} from "@/features/episodes/schemas/episode";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { useTranslations } from "next-intl";
+import { useMemo, useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
 import { useEpisodeSubmissionWorkflow } from "./useEpisodeSubmissionWorkflow";
 
@@ -17,6 +23,9 @@ export const useEpisodeManager = ({ seasonId, episodes }: UseEpisodeManagerProps
   const [editingEpisode, setEditingEpisode] = useState<Episode | null>(null);
   const [episodeToDelete, setEpisodeToDelete] = useState<Episode | null>(null);
   const [previewEpisode, setPreviewEpisode] = useState<Episode | null>(null);
+  const t = useTranslations("episodes");
+  const createSchema = useMemo(() => createCreateEpisodeFormSchema(t), [t]);
+  const updateSchema = useMemo(() => createUpdateEpisodeFormSchema(t), [t]);
 
   const {
     register,
@@ -26,7 +35,7 @@ export const useEpisodeManager = ({ seasonId, episodes }: UseEpisodeManagerProps
     setValue,
     formState: { errors },
   } = useForm<CreateEpisodeFormValues>({
-    resolver: zodResolver(editingEpisode ? UpdateEpisodeFormSchema : CreateEpisodeFormSchema) as Resolver<CreateEpisodeFormValues>,
+    resolver: zodResolver(editingEpisode ? updateSchema : createSchema) as Resolver<CreateEpisodeFormValues>,
     mode: "onBlur",
   });
 

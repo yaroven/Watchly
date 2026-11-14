@@ -1,13 +1,13 @@
 "use client";
 
+import { Link, usePathname } from "@/i18n/navigation";
 import { ADMIN, APP } from "@/shared/lib/routes";
 import Role from "@/types/role";
 import { AdminPanelSettings as AdminPanelSettingsIcon, Bookmark as BookmarkIcon, Explore as ExploreIcon } from "@mui/icons-material";
 import { Box, Drawer, List, Typography } from "@mui/material";
 import { useAuthStore } from "@shared/lib/auth-store";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { ReactNode, useMemo, useRef } from "react";
 import CollapseButton from "./components/CollapseButton";
 import NavItem from "./components/NavItem";
@@ -18,19 +18,20 @@ const INDICATOR_HEIGHT = 32;
 const BORDER_GRADIENT = `linear-gradient(180deg, #6e6e6e 0%, rgba(178, 178, 178, 0.12) 100%)`;
 
 interface MenuItemConfig {
-  text: string;
+  key: "discover" | "watchlist" | "admin";
   href: string;
   icon: ReactNode;
   roles?: Role[];
 }
 
 const menuItems: MenuItemConfig[] = [
-  { text: "Discover", href: APP.DISCOVER, icon: <ExploreIcon /> },
-  { text: "Watchlist", href: APP.WATCHLIST, icon: <BookmarkIcon />, roles: [Role.USER, Role.ADMIN] },
-  { text: "Admin", href: ADMIN.ROOT, icon: <AdminPanelSettingsIcon />, roles: [Role.ADMIN] },
+  { key: "discover", href: APP.DISCOVER, icon: <ExploreIcon /> },
+  { key: "watchlist", href: APP.WATCHLIST, icon: <BookmarkIcon />, roles: [Role.USER, Role.ADMIN] },
+  { key: "admin", href: ADMIN.ROOT, icon: <AdminPanelSettingsIcon />, roles: [Role.ADMIN] },
 ];
 
 export default function Sidebar() {
+  const t = useTranslations("shared.sidebar");
   const pathname = usePathname();
   const userRole = useAuthStore((state) => state.role);
 
@@ -110,7 +111,7 @@ export default function Sidebar() {
           transition: "opacity 0.2s ease, max-height 0.3s ease",
         }}
       >
-        Menu
+        {t("menu")}
       </Typography>
 
       <List ref={listRef} sx={{ py: 0, position: "relative" }}>
@@ -130,9 +131,9 @@ export default function Sidebar() {
         />
         {visibleItems.map((item, index) => (
           <NavItem
-            key={item.text}
+            key={item.key}
             href={item.href}
-            text={item.text}
+            text={t(`nav.${item.key}`)}
             icon={item.icon}
             isActive={index === activeIndex}
             collapsed={collapsed}

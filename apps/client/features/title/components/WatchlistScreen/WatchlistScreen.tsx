@@ -11,6 +11,7 @@ import { formatCount } from "@shared/lib/format-count";
 import { useViewer } from "@shared/lib/use-viewer";
 import Button from "@shared/ui/Button";
 import Pagination from "@shared/ui/Pagination";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import TitleCard from "../TitleCard";
@@ -27,6 +28,7 @@ const gridSx = {
 } as const;
 
 export default function WatchlistScreen() {
+  const t = useTranslations("title.watchlist");
   const router = useRouter();
   const viewer = useViewer();
   const [page, setPage] = useState(1);
@@ -38,9 +40,9 @@ export default function WatchlistScreen() {
 
   if (viewer.status === "anonymous") {
     return (
-      <EmptyState message="Sign in to keep a watchlist.">
+      <EmptyState message={t("signInPrompt")}>
         <Button variant="contained" onClick={() => router.push(APP.LOGIN)}>
-          Sign in
+          {t("signIn")}
         </Button>
       </EmptyState>
     );
@@ -49,10 +51,10 @@ export default function WatchlistScreen() {
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "32px", pb: "64px" }}>
       <Box sx={{ display: "flex", alignItems: "baseline", gap: "16px", flexWrap: "wrap" }}>
-        <Typography variant="h3">My Watchlist</Typography>
+        <Typography variant="h3">{t("heading")}</Typography>
         {totalCount > 0 && (
           <Typography sx={{ fontSize: "15px", color: "text.secondary" }}>
-            {formatCount(totalCount)} {totalCount === 1 ? "title" : "titles"}
+            {t("count", { count: totalCount, formatted: formatCount(totalCount) })}
           </Typography>
         )}
       </Box>
@@ -70,17 +72,17 @@ export default function WatchlistScreen() {
       )}
 
       {isError && (
-        <EmptyState message={`Could not load your watchlist: ${error.message}`} icon={<ErrorOutlineIcon sx={iconSx} />}>
+        <EmptyState message={t("loadError", { message: error.message })} icon={<ErrorOutlineIcon sx={iconSx} />}>
           <Button variant="outlined" disabled={isFetching} onClick={() => void refetch()}>
-            Try again
+            {t("tryAgain")}
           </Button>
         </EmptyState>
       )}
 
       {!isPending && !isError && items.length === 0 && (
-        <EmptyState message="Nothing saved yet. The bookmark on any poster puts it here.">
+        <EmptyState message={t("empty")}>
           <Button variant="outlined" onClick={() => router.push(APP.DISCOVER)}>
-            Browse titles
+            {t("browse")}
           </Button>
         </EmptyState>
       )}
