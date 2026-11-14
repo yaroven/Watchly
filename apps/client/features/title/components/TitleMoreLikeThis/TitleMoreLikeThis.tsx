@@ -8,6 +8,7 @@ import ArrowForward from "@mui/icons-material/ArrowForward";
 import StarIcon from "@mui/icons-material/Star";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
@@ -18,6 +19,7 @@ interface TitleMoreLikeThisProps {
 }
 
 export default function TitleMoreLikeThis({ title }: TitleMoreLikeThisProps) {
+  const t = useTranslations("title.moreLikeThis");
   const router = useRouter();
   const { data } = useTitles({ genreId: title.genres[0]?.id, limit: RESULT_LIMIT + 1 });
   const items = (data?.items ?? []).filter((item) => item.id !== title.id).slice(0, RESULT_LIMIT);
@@ -27,7 +29,7 @@ export default function TitleMoreLikeThis({ title }: TitleMoreLikeThisProps) {
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
-        <Typography variant="h3">More Like This</Typography>
+        <Typography variant="h3">{t("heading")}</Typography>
         <Box
           component="button"
           type="button"
@@ -45,7 +47,7 @@ export default function TitleMoreLikeThis({ title }: TitleMoreLikeThisProps) {
             ":hover": { color: "primary.main" },
           }}
         >
-          View All
+          {t("viewAll")}
           <ArrowForward sx={{ fontSize: "20px", color: "primary.main" }} />
         </Box>
       </Box>

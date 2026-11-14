@@ -6,10 +6,12 @@ import Modal from "@/shared/ui/Modal/Modal";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import Button from "@shared/ui/Button";
+import { useTranslations } from "next-intl";
 import { useWatch } from "react-hook-form";
 import { useSeasonManagerContext } from "../../context/SeasonManagerContext";
 
 export default function SeasonModal() {
+  const t = useTranslations("season");
   const {
     isModalOpen,
     closeEditor,
@@ -32,21 +34,27 @@ export default function SeasonModal() {
     <Modal isOpen={isModalOpen} onClose={closeEditor}>
       <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ display: "flex", flexDirection: "column", gap: "20px", minWidth: 300 }}>
         <Typography sx={{ fontSize: "24px", fontWeight: 700, color: "#ffffff", pr: "44px" }}>
-          {editingSeason ? "Edit Season" : "Add Season"}
+          {editingSeason ? t("form.editTitle") : t("form.addTitle")}
         </Typography>
         <FormField
-          label="Season Number"
+          label={t("form.number")}
           type="number"
-          placeholder="Season Number"
+          placeholder={t("form.number")}
           name="number"
           register={register}
           error={errors.number}
           valueAsNumber
         />
-        <FormField label="Name" placeholder="Name" name="name" register={register} error={errors.name} />
-        <FormField label="Description" placeholder="Description" name="description" register={register} error={errors.description} />
+        <FormField label={t("form.name")} placeholder={t("form.name")} name="name" register={register} error={errors.name} />
+        <FormField
+          label={t("form.description")}
+          placeholder={t("form.description")}
+          name="description"
+          register={register}
+          error={errors.description}
+        />
         <FormFileInput
-          label="Banner"
+          label={t("form.banner")}
           register={register}
           setValue={setValue}
           selectedFile={selectedPosterFile}
@@ -56,7 +64,7 @@ export default function SeasonModal() {
           id="season-poster-file"
         />
         <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-          {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingSeason ? "Update" : "Create"}
+          {createMutation.isPending || updateMutation.isPending ? t("form.saving") : editingSeason ? t("form.update") : t("form.create")}
         </Button>
       </Box>
     </Modal>

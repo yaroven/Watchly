@@ -17,6 +17,7 @@ import { formatCount } from "@shared/lib/format-count";
 import { APP } from "@shared/lib/routes";
 import { useViewer } from "@shared/lib/use-viewer";
 import Button from "@shared/ui/Button";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -28,6 +29,7 @@ interface StreamFilmInfoProps {
 }
 
 export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFilmInfoProps) {
+  const t = useTranslations("title.engagement");
   const router = useRouter();
   const viewer = useViewer();
   const [expanded, setExpanded] = useState(false);
@@ -77,9 +79,9 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
     flashShareState("copied");
   };
 
-  const shareLabel = shareState === "copied" ? "Copied" : shareState === "failed" ? "Copy failed" : "Share";
+  const shareLabel = shareState === "copied" ? t("copied") : shareState === "failed" ? t("copyFailed") : t("share");
 
-  const storyline = title.description || "Description will appear here once added.";
+  const storyline = title.description || t("descriptionPlaceholder");
   const isLong = storyline.length > 220;
   const displayedStoryline = expanded || !isLong ? storyline : `${storyline.slice(0, 220)}…`;
 
@@ -103,7 +105,7 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
             <Box
               component="button"
               type="button"
-              aria-label={viewerEngagement?.reaction === ReactionType.LIKE ? "Remove like" : "Like"}
+              aria-label={viewerEngagement?.reaction === ReactionType.LIKE ? t("removeLike") : t("like")}
               aria-pressed={viewerEngagement ? viewerEngagement.reaction === ReactionType.LIKE : undefined}
               disabled={viewerStateUnknown || viewer.status === "pending" || react.isPending}
               onClick={() => handleReact(ReactionType.LIKE)}
@@ -117,7 +119,7 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
             <Box
               component="button"
               type="button"
-              aria-label={viewerEngagement?.reaction === ReactionType.DISLIKE ? "Remove dislike" : "Dislike"}
+              aria-label={viewerEngagement?.reaction === ReactionType.DISLIKE ? t("removeDislike") : t("dislike")}
               aria-pressed={viewerEngagement ? viewerEngagement.reaction === ReactionType.DISLIKE : undefined}
               disabled={viewerStateUnknown || viewer.status === "pending" || react.isPending}
               onClick={() => handleReact(ReactionType.DISLIKE)}
@@ -126,7 +128,7 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
               <ThumbDownIcon sx={{ fontSize: "18px" }} />
             </Box>
           </FeatureGate>
-          <Box component="button" type="button" aria-label="Copy link to this title" onClick={handleShare} sx={actionButtonSx}>
+          <Box component="button" type="button" aria-label={t("copyLink")} onClick={handleShare} sx={actionButtonSx}>
             <IosShareIcon sx={{ fontSize: "18px" }} />
             <Typography component="span" sx={{ fontSize: "13px", color: shareState === "failed" ? "error.main" : "inherit" }}>
               {shareLabel}
@@ -200,10 +202,10 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
           </Box>
           <Box sx={{ textAlign: "left" }}>
             <Typography sx={{ fontSize: "14px", fontWeight: 700, color: "#191919", lineHeight: 1.2 }}>
-              {viewerEngagement ? (viewerEngagement.inWatchlist ? "In Watchlist" : "Add to Watchlist") : "Watchlist"}
+              {viewerEngagement ? (viewerEngagement.inWatchlist ? t("inWatchlist") : t("addToWatchlist")) : t("watchlist")}
             </Typography>
             <Typography sx={{ fontSize: "11px", color: "#191919", opacity: 0.75, lineHeight: 1.2 }}>
-              Added by {formatCount(engagement.watchlistCount)} {engagement.watchlistCount === 1 ? "User" : "Users"}
+              {t("addedBy", { count: engagement.watchlistCount, formatted: formatCount(engagement.watchlistCount) })}
             </Typography>
           </Box>
         </Box>
@@ -217,23 +219,23 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
           action={
             viewerStateUnknown || engagementFailed ? (
               <Button variant="outlined" onClick={() => void refetch()} sx={{ paddingBlock: "4px", minHeight: "unset" }}>
-                Retry
+                {t("retry")}
               </Button>
             ) : undefined
           }
         >
           {writeError
-            ? `Could not save that: ${writeError.message}`
+            ? t("writeError", { message: writeError.message })
             : viewerStateUnknown
-              ? "We could not tell whether you have liked or saved this title, so those controls are disabled. The counts below may also be out of date."
-              : "Could not refresh the likes and watchlist counts for this title, so they may be out of date."}
+              ? t("viewerStateUnknown")
+              : t("refreshFailed")}
         </Alert>
       )}
 
       <Divider sx={{ borderColor: "divider" }} />
 
       <Box sx={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-        <Typography sx={{ color: "text.secondary", fontSize: "16px" }}>Story line:</Typography>
+        <Typography sx={{ color: "text.secondary", fontSize: "16px" }}>{t("storyline")}</Typography>
         <Typography sx={{ color: "text.secondary", fontSize: "15px", lineHeight: 1.7 }}>
           {displayedStoryline}
           {isLong && (
@@ -253,7 +255,7 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
                 ml: "4px",
               }}
             >
-              {expanded ? "Show Less" : "Read More"}
+              {expanded ? t("showLess") : t("readMore")}
             </Typography>
           )}
         </Typography>

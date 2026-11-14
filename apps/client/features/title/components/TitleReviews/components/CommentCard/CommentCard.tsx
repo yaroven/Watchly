@@ -21,6 +21,7 @@ import { formatCount } from "@shared/lib/format-count";
 import { tokens } from "@shared/mui/theme";
 import Avatar from "@shared/ui/Avatar";
 import Button from "@shared/ui/Button";
+import { useFormatter, useTranslations } from "next-intl";
 import { useState } from "react";
 
 interface CommentCardProps {
@@ -31,17 +32,20 @@ interface CommentCardProps {
 
 const FALLBACK_AVATAR = "https://picsum.photos/id/1074/120/120";
 
-function formatRelativeTime(postedAt: Date) {
-  const diffMs = Date.now() - postedAt.getTime();
+function relativeTimeArgs(postedAt: Date): [Date, { now: Date; unit: "minute" | "hour" | "day" }] {
+  const now = new Date();
+  const diffMs = now.getTime() - postedAt.getTime();
   const minutes = Math.max(1, Math.round(diffMs / 60000));
-  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const at = new Date(now.getTime() - minutes * 60000);
+  if (minutes < 60) return [at, { now, unit: "minute" }];
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
-  const days = Math.round(hours / 24);
-  return `${days} day${days === 1 ? "" : "s"} ago`;
+  if (hours < 24) return [at, { now, unit: "hour" }];
+  return [at, { now, unit: "day" }];
 }
 
 export default function CommentCard({ comment, titleId, depth = 0 }: CommentCardProps) {
+  const t = useTranslations("title.reviews.comment");
+  const format = useFormatter();
   const userId = useAuthStore((state) => state.userId);
   const role = useAuthStore((state) => state.role);
   const status = useAuthStore((state) => state.status);
@@ -107,9 +111,9 @@ export default function CommentCard({ comment, titleId, depth = 0 }: CommentCard
             }}
           >
             <WarningAmberIcon sx={{ color: "primary.main", fontSize: "24px" }} />
-            <Typography sx={{ fontSize: "14px", fontWeight: 600, color: "primary.main" }}>This comment contains spoilers!</Typography>
+            <Typography sx={{ fontSize: "14px", fontWeight: 600, color: "primary.main" }}>{t("spoilerWarning")}</Typography>
             <Button variant="outlined" onClick={() => setSpoilerRevealed(true)} sx={{ paddingBlock: "6px", minHeight: "unset" }}>
-              View
+              {t("view")}
             </Button>
           </Box>
         )}
@@ -126,7 +130,7 @@ export default function CommentCard({ comment, titleId, depth = 0 }: CommentCard
               </Box>
             )}
             <Typography sx={{ fontSize: "13px", color: "text.secondary", whiteSpace: "nowrap", ml: "auto" }}>
-              {formatRelativeTime(comment.createdAt)}
+              {format.relativeTime(...relativeTimeArgs(comment.createdAt))}
             </Typography>
           </Box>
 
@@ -139,7 +143,7 @@ export default function CommentCard({ comment, titleId, depth = 0 }: CommentCard
               <Box
                 component="button"
                 type="button"
-                aria-label={comment.myReaction === ReactionType.LIKE ? "Remove like" : "Like"}
+                aria-label={comment.myReaction === ReactionType.LIKE ? t("removeLike") : t("like")}
                 aria-pressed={comment.myReaction === ReactionType.LIKE}
                 disabled={!isSignedIn || react.isPending}
                 onClick={() => handleReact(ReactionType.LIKE)}
@@ -153,7 +157,7 @@ export default function CommentCard({ comment, titleId, depth = 0 }: CommentCard
               <Box
                 component="button"
                 type="button"
-                aria-label={comment.myReaction === ReactionType.DISLIKE ? "Remove dislike" : "Dislike"}
+                aria-label={comment.myReaction === ReactionType.DISLIKE ? t("removeDislike") : t("dislike")}
                 aria-pressed={comment.myReaction === ReactionType.DISLIKE}
                 disabled={!isSignedIn || react.isPending}
                 onClick={() => handleReact(ReactionType.DISLIKE)}
@@ -169,7 +173,7 @@ export default function CommentCard({ comment, titleId, depth = 0 }: CommentCard
               <Box
                 component="button"
                 type="button"
-                aria-label={expanded ? "Hide replies" : "Show replies"}
+                aria-label={expanded ? t("hideReplies") : t("showReplies")}
                 aria-expanded={expanded}
                 onClick={() => setExpanded((value) => !value)}
                 sx={reactionButtonSx}
@@ -183,7 +187,7 @@ export default function CommentCard({ comment, titleId, depth = 0 }: CommentCard
             {depth === 0 && isSignedIn && (
               <Box component="button" type="button" onClick={() => setReplyOpen((value) => !value)} sx={reactionButtonSx}>
                 <Typography component="span" sx={{ fontSize: "13px" }}>
-                  Reply
+                  {t("reply")}
                 </Typography>
               </Box>
             )}
@@ -199,7 +203,7 @@ export default function CommentCard({ comment, titleId, depth = 0 }: CommentCard
                 >
                   <DeleteOutlineIcon sx={{ fontSize: "18px" }} />
                   <Typography component="span" sx={{ fontSize: "13px" }}>
-                    Delete
+                    {t("delete")}
                   </Typography>
                 </Box>
               )}
@@ -211,7 +215,7 @@ export default function CommentCard({ comment, titleId, depth = 0 }: CommentCard
                 sx={reactionButtonSx}
               >
                 <Typography component="span" sx={{ fontSize: "13px" }}>
-                  {reported ? "Reported" : "Report"}
+                  {reported ? t("reported") : t("report")}
                 </Typography>
               </Box>
             </Box>
@@ -223,7 +227,7 @@ export default function CommentCard({ comment, titleId, depth = 0 }: CommentCard
                 component="textarea"
                 value={replyText}
                 onChange={(e) => setReplyText((e.target as HTMLTextAreaElement).value)}
-                placeholder={`Reply to ${comment.author.name} ...`}
+                placeholder={t("replyPlaceholder", { name: comment.author.name })}
                 sx={{
                   flex: 1,
                   minHeight: "64px",
@@ -244,7 +248,7 @@ export default function CommentCard({ comment, titleId, depth = 0 }: CommentCard
                 disabled={!replyText.trim() || createReply.isPending}
                 onClick={() => createReply.mutate({ text: replyText.trim(), parentId: comment.id })}
               >
-                Send
+                {t("send")}
               </Button>
             </Box>
           )}

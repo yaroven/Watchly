@@ -3,6 +3,7 @@ import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import Box from "@mui/material/Box";
 import type { SvgIconProps } from "@mui/material/SvgIcon";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { usePlayerVolume } from "../../CustomVideoPlayerContext";
@@ -14,6 +15,7 @@ const volumeIconSx = {
 };
 
 export default function Volume() {
+  const t = useTranslations("player");
   const { value, isMuted, seek, toggleMute } = usePlayerVolume();
   const [isOver, setIsOver] = useState(false);
   const displayVolume = isMuted ? 0 : value;
@@ -30,8 +32,8 @@ export default function Volume() {
         component="button"
         type="button"
         onClick={toggleMute}
-        aria-label={displayVolume === 0 ? "Unmute video" : "Mute video"}
-        title={displayVolume === 0 ? "Unmute" : "Mute"}
+        aria-label={displayVolume === 0 ? t("unmuteVideo") : t("muteVideo")}
+        title={displayVolume === 0 ? t("unmute") : t("mute")}
         sx={{
           all: "unset",
           display: "inline-flex",
@@ -52,7 +54,7 @@ export default function Volume() {
         max={1}
         onChange={seek}
         type="range"
-        aria-label="Volume"
+        aria-label={t("volume")}
         sx={[
           { width: "86px", accentColor: "#fff", transition: "width 0.16s ease, opacity 0.16s ease" },
           !isOver && { width: 0, opacity: 0, pointerEvents: "none" },

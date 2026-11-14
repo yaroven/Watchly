@@ -4,11 +4,14 @@ import { KeyboardArrowLeft as KeyboardArrowLeftIcon, KeyboardArrowRight as Keybo
 import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
 import type { SxProps, Theme } from "@mui/material/styles";
+import { useTranslations } from "next-intl";
+
+export type SliderItemLabel = "item" | "title" | "story" | "episode";
 
 interface SliderArrowsProps {
   onPrev: () => void;
   onNext: () => void;
-  itemLabel?: string;
+  itemLabel?: SliderItemLabel;
   disablePrev?: boolean;
   disableNext?: boolean;
   size?: number;
@@ -26,12 +29,14 @@ export default function SliderArrows({
   shape = "circle",
   sx,
 }: SliderArrowsProps) {
+  const t = useTranslations("shared.sliderArrows");
+
   return (
     <Box sx={[{ display: "flex", alignItems: "center", gap: "24px" }, ...(Array.isArray(sx) ? sx : [sx])]}>
-      <IconButton onClick={onPrev} disabled={disablePrev} aria-label={`Previous ${itemLabel}`} sx={arrowButtonSx(-1, size, shape)}>
+      <IconButton onClick={onPrev} disabled={disablePrev} aria-label={t(`previous.${itemLabel}`)} sx={arrowButtonSx(-1, size, shape)}>
         <KeyboardArrowLeftIcon sx={{ fontSize: size * 0.85, color: shape === "square" && disablePrev ? "#666666" : "#000000" }} />
       </IconButton>
-      <IconButton onClick={onNext} disabled={disableNext} aria-label={`Next ${itemLabel}`} sx={arrowButtonSx(1, size, shape)}>
+      <IconButton onClick={onNext} disabled={disableNext} aria-label={t(`next.${itemLabel}`)} sx={arrowButtonSx(1, size, shape)}>
         <KeyboardArrowRightIcon sx={{ fontSize: size * 0.85, color: shape === "square" && disableNext ? "#666666" : "#000000" }} />
       </IconButton>
     </Box>

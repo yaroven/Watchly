@@ -16,6 +16,7 @@ import Button from "@shared/ui/Button";
 import ConfirmDialog from "@shared/ui/ConfirmDialog";
 import GradientCard from "@shared/ui/GradientCard";
 import Loader from "@shared/ui/Loader";
+import { useFormatter, useTranslations } from "next-intl";
 import { type ReactNode, useState } from "react";
 
 interface UserDetailProps {
@@ -47,6 +48,8 @@ const menuProps = {
 };
 
 export default function UserDetail({ id }: UserDetailProps) {
+  const t = useTranslations("user");
+  const format = useFormatter();
   const currentUserId = useAuthStore((s) => s.userId);
   const { data: user, isPending: isLoadingUser, isError } = useUser(id);
 
@@ -66,19 +69,17 @@ export default function UserDetail({ id }: UserDetailProps) {
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh", padding: "40px" }}>
         <GradientCard sx={{ p: "48px", display: "flex", flexDirection: "column", alignItems: "center", gap: "20px", textAlign: "center" }}>
           <Typography component="h1" variant="h4" sx={{ color: "#ffffff" }}>
-            User not found
+            {t("detail.notFoundTitle")}
           </Typography>
-          <Typography sx={{ color: "text.secondary", maxWidth: "420px" }}>
-            This account may have been deleted, or the link is incorrect.
-          </Typography>
-          <Button href={ADMIN.USERS}>Back to Users</Button>
+          <Typography sx={{ color: "text.secondary", maxWidth: "420px" }}>{t("detail.notFoundDescription")}</Typography>
+          <Button href={ADMIN.USERS}>{t("detail.backToUsers")}</Button>
         </GradientCard>
       </Box>
     );
   }
 
   const isSelf = currentUserId === user.id;
-  const createdLabel = new Date(user.createdAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+  const createdLabel = format.dateTime(new Date(user.createdAt), { year: "numeric", month: "long", day: "numeric" });
 
   const handleRoleChange = (event: SelectChangeEvent<unknown>) => {
     const nextRole = event.target.value as Role;
@@ -92,9 +93,7 @@ export default function UserDetail({ id }: UserDetailProps) {
         <Typography component="h1" variant="h2" sx={{ color: "#ffffff" }}>
           {user.email}
         </Typography>
-        <Typography sx={{ mt: "14px", maxWidth: "680px", color: "text.secondary" }}>
-          Review account details and manage this user&apos;s role.
-        </Typography>
+        <Typography sx={{ mt: "14px", maxWidth: "680px", color: "text.secondary" }}>{t("detail.subtitle")}</Typography>
       </Box>
 
       <Box
@@ -105,26 +104,26 @@ export default function UserDetail({ id }: UserDetailProps) {
           alignItems: "start",
         }}
       >
-        <SectionCard title="Account Info" description="Read-only identity details for this account.">
-          <InfoRow label="Email" value={user.email} />
-          <InfoRow label="User ID" value={user.id} mono />
-          <InfoRow label="Joined" value={createdLabel} />
+        <SectionCard title={t("detail.accountInfoTitle")} description={t("detail.accountInfoDescription")}>
+          <InfoRow label={t("fields.email")} value={user.email} />
+          <InfoRow label={t("fields.userId")} value={user.id} mono />
+          <InfoRow label={t("fields.joined")} value={createdLabel} />
         </SectionCard>
 
-        <SectionCard title="Role" description="Admins can manage titles, users, and actors. Users have standard access.">
+        <SectionCard title={t("detail.roleTitle")} description={t("detail.roleDescription")}>
           <Box sx={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
-            <Tooltip title={isSelf ? "You can't change your own role." : ""} disableHoverListener={!isSelf}>
+            <Tooltip title={isSelf ? t("detail.cannotChangeOwnRole") : ""} disableHoverListener={!isSelf}>
               <Box>
                 <MuiSelect value={user.role} onChange={handleRoleChange} disabled={isSelf || isPending} MenuProps={menuProps} sx={selectSx}>
-                  <MenuItem value={Role.ADMIN}>Admin</MenuItem>
-                  <MenuItem value={Role.USER}>User</MenuItem>
+                  <MenuItem value={Role.ADMIN}>{t(`role.${Role.ADMIN}`)}</MenuItem>
+                  <MenuItem value={Role.USER}>{t(`role.${Role.USER}`)}</MenuItem>
                 </MuiSelect>
               </Box>
             </Tooltip>
 
             <Chip
               size="small"
-              label={user.role === Role.ADMIN ? "Admin" : "User"}
+              label={t(`role.${user.role}`)}
               sx={
                 user.role === Role.ADMIN
                   ? { backgroundColor: "rgba(231,188,15,0.16)", color: "primary.main", fontWeight: 700 }
@@ -141,16 +140,14 @@ export default function UserDetail({ id }: UserDetailProps) {
         onConfirm={() => pendingRole && updateRole({ id: user.id, data: { role: pendingRole } })}
         isPending={isPending}
         tone="warning"
-        confirmLabel="Change Role"
-        pendingLabel="Updating..."
-        title="Change Role"
-        description={
-          <>
-            Change <Typography component="strong">{user.email}</Typography>&apos;s role to{" "}
-            <Typography component="strong">{pendingRole === Role.ADMIN ? "Admin" : "User"}</Typography>? This changes what they can access
-            immediately.
-          </>
-        }
+        confirmLabel={t("changeRole.confirm")}
+        pendingLabel={t("changeRole.pending")}
+        title={t("changeRole.title")}
+        description={t.rich("changeRole.description", {
+          email: user.email,
+          role: pendingRole ? t(`role.${pendingRole}`) : "",
+          strong: (chunks) => <Typography component="strong">{chunks}</Typography>,
+        })}
       />
     </Box>
   );

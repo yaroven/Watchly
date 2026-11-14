@@ -1,7 +1,7 @@
 "use client";
 
 import { useTitleEngagement } from "@/features/title-engagement";
-import { AgeRating, ExternalRatingSource, type Title, TitleType } from "@/features/title/schemas/title";
+import { ExternalRatingSource, type Title, TitleType } from "@/features/title/schemas/title";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
@@ -11,19 +11,13 @@ import { APP } from "@shared/lib/routes";
 import Button from "@shared/ui/Button";
 import CustomIcon from "@shared/ui/CustomIcon";
 import InvertedCornerBox from "@shared/ui/InvertedCornerBox";
+import { useFormatter, useTranslations } from "next-intl";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 interface TitleOverviewProps {
   title: Title;
 }
-
-const AGE_RATING_LABELS: Record<AgeRating, string> = {
-  [AgeRating.AGE_0]: "All Ages",
-  [AgeRating.AGE_12]: "12+",
-  [AgeRating.AGE_16]: "16+",
-  [AgeRating.AGE_18]: "18+",
-};
 
 const SCORE_ROWS: { key: "imdb" | "rottenTomatoes" | "metacritic" | "tmovie"; icon: typeof IMDB; source: ExternalRatingSource | null }[] = [
   { key: "imdb", icon: IMDB, source: ExternalRatingSource.IMDB },
@@ -33,6 +27,7 @@ const SCORE_ROWS: { key: "imdb" | "rottenTomatoes" | "metacritic" | "tmovie"; ic
 ];
 
 export default function TitleOverview({ title }: TitleOverviewProps) {
+  const t = useTranslations("title");
   const router = useRouter();
   const { data: liveEngagement } = useTitleEngagement(title.id);
   const ratingSummary = liveEngagement ?? title.engagement;
@@ -40,8 +35,11 @@ export default function TitleOverview({ title }: TitleOverviewProps) {
   const isSeries = title.type === TitleType.SERIES;
   const posterSrc = getOptimizedImageSrc(title.posterUrl);
   const handlePlay = () => router.push(APP.WATCH(title.id));
+  const format = useFormatter();
   const releaseYear =
-    title.createdAt && !Number.isNaN(new Date(title.createdAt).getTime()) ? new Date(title.createdAt).getFullYear() : undefined;
+    title.createdAt && !Number.isNaN(new Date(title.createdAt).getTime())
+      ? format.dateTime(new Date(title.createdAt), { year: "numeric" })
+      : undefined;
   return (
     <Box sx={{ display: "flex", gap: "0px" }}>
       <InvertedCornerBox
@@ -93,15 +91,15 @@ export default function TitleOverview({ title }: TitleOverviewProps) {
 
             <Box sx={{ display: "flex", alignItems: "center", gap: "10px", color: "text.secondary", fontSize: "14px" }}>
               <Typography component="span" sx={{ fontSize: "inherit" }}>
-                {isSeries ? "TV Series" : "Movie"}
+                {isSeries ? t("overview.tvSeries") : t("type.MOVIE")}
               </Typography>
               <Box component="span" sx={{ width: "4px", height: "4px", borderRadius: "50%", bgcolor: "text.secondary" }} />
               <Typography component="span" sx={{ fontSize: "inherit" }}>
-                {title.runtime}m
+                {t("overview.runtime", { minutes: title.runtime })}
               </Typography>
               <Box component="span" sx={{ width: "4px", height: "4px", borderRadius: "50%", bgcolor: "text.secondary" }} />
               <Typography component="span" sx={{ fontSize: "inherit" }}>
-                {AGE_RATING_LABELS[title.ageRating]}
+                {t(`ageRating.${title.ageRating}`)}
               </Typography>
             </Box>
           </Box>
@@ -114,7 +112,7 @@ export default function TitleOverview({ title }: TitleOverviewProps) {
               </Box>
 
               <Typography sx={{ color: "text.secondary", fontSize: "16px", lineHeight: 1.6, maxWidth: "560px" }}>
-                {title.description || "Description will appear here once added."}
+                {title.description || t("engagement.descriptionPlaceholder")}
               </Typography>
             </Box>
 
@@ -145,10 +143,10 @@ export default function TitleOverview({ title }: TitleOverviewProps) {
           </Box>
           <Box sx={{ display: "flex", gap: "12px" }}>
             <Button variant="contained" onClick={handlePlay}>
-              {isSeries ? "Play Last Episode" : "Play"}
+              {isSeries ? t("overview.playLastEpisode") : t("overview.play")}
             </Button>
             <Button variant="outlined" href={title.trailerUrl} target="_blank" rel="noopener noreferrer">
-              Watch Trailer
+              {t("overview.watchTrailer")}
             </Button>
           </Box>
         </Box>

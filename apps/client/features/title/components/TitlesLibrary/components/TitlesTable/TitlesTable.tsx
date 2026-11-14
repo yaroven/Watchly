@@ -12,6 +12,7 @@ import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
 import GradientCard from "@shared/ui/GradientCard";
+import { useTranslations } from "next-intl";
 
 interface TitlesTableProps {
   titles: Title[];
@@ -29,17 +30,19 @@ const HEAD_CELL_SX = {
 const SKELETON_ROWS = Array.from({ length: 6 }, (_, index) => index);
 
 export default function TitlesTable({ titles, loading }: TitlesTableProps) {
+  const t = useTranslations("title.library.table");
+
   return (
     <GradientCard radius={24} sx={{ width: "100%", overflow: "hidden" }}>
       <TableContainer sx={{ backgroundColor: "transparent" }}>
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell sx={HEAD_CELL_SX}>Title</TableCell>
-              <TableCell sx={HEAD_CELL_SX}>Year</TableCell>
-              <TableCell sx={HEAD_CELL_SX}>Type</TableCell>
-              <TableCell sx={HEAD_CELL_SX}>Status</TableCell>
-              <TableCell sx={HEAD_CELL_SX}>Actions</TableCell>
+              <TableCell sx={HEAD_CELL_SX}>{t("title")}</TableCell>
+              <TableCell sx={HEAD_CELL_SX}>{t("year")}</TableCell>
+              <TableCell sx={HEAD_CELL_SX}>{t("type")}</TableCell>
+              <TableCell sx={HEAD_CELL_SX}>{t("status")}</TableCell>
+              <TableCell sx={HEAD_CELL_SX}>{t("actions")}</TableCell>
             </TableRow>
           </TableHead>
 
@@ -76,9 +79,9 @@ export default function TitlesTable({ titles, loading }: TitlesTableProps) {
               <TableRow>
                 <TableCell colSpan={5} sx={{ textAlign: "center", py: "56px", border: "none" }}>
                   <Typography variant="h4" sx={{ color: "#ffffff", mb: "10px" }}>
-                    No titles found
+                    {t("emptyTitle")}
                   </Typography>
-                  <Typography sx={{ color: "text.secondary" }}>Try changing your search query or clearing the active filters.</Typography>
+                  <Typography sx={{ color: "text.secondary" }}>{t("emptyDescription")}</Typography>
                 </TableCell>
               </TableRow>
             )}

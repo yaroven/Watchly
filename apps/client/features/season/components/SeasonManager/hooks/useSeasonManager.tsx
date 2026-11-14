@@ -1,9 +1,10 @@
 "use client";
 
 import { useCreateSeason, useDeleteSeason, useUpdateSeason } from "@/features/season/api/use-season-mutations";
-import { Season, SeasonFormSchema, SeasonFormValues } from "@/features/season/schemas/season";
+import { createSeasonFormSchema, Season, SeasonFormValues } from "@/features/season/schemas/season";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { useTranslations } from "next-intl";
+import { useMemo, useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
 
 interface UseSeasonManagerProps {
@@ -15,6 +16,8 @@ export const useSeasonManager = ({ seasons, titleId }: UseSeasonManagerProps) =>
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSeason, setEditingSeason] = useState<Season | null>(null);
   const [seasonToDelete, setSeasonToDelete] = useState<Season | null>(null);
+  const t = useTranslations("season");
+  const seasonFormSchema = useMemo(() => createSeasonFormSchema(t), [t]);
 
   const {
     register,
@@ -24,7 +27,7 @@ export const useSeasonManager = ({ seasons, titleId }: UseSeasonManagerProps) =>
     setValue,
     formState: { errors },
   } = useForm<SeasonFormValues>({
-    resolver: zodResolver(SeasonFormSchema) as Resolver<SeasonFormValues>,
+    resolver: zodResolver(seasonFormSchema) as Resolver<SeasonFormValues>,
     mode: "onBlur",
   });
 

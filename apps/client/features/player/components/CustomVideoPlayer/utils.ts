@@ -1,4 +1,5 @@
 import type { Level } from "hls.js";
+import type { useTranslations } from "next-intl";
 
 import { VideoQuality } from "./types";
 
@@ -25,11 +26,18 @@ export function formatPlayerTime(time: number) {
   return [minutes, seconds].map((value) => value.toString().padStart(2, "0")).join(":");
 }
 
-export function getQualityOptionLabel(option: VideoQuality, options: VideoQuality[], currentLevel: number) {
-  if (option.level !== -1 || currentLevel === -1) return option.label;
+type PlayerTranslator = ReturnType<typeof useTranslations<"player">>;
+
+function getManualQualityLabel(option: VideoQuality, t: PlayerTranslator) {
+  return option.label ?? t("quality.numbered", { number: option.level + 1 });
+}
+
+export function getQualityOptionLabel(option: VideoQuality, options: VideoQuality[], currentLevel: number, t: PlayerTranslator) {
+  if (option.level !== -1) return getManualQualityLabel(option, t);
+  if (currentLevel === -1) return t("quality.auto");
 
   const activeOption = options.find((item) => item.level === currentLevel);
-  return activeOption ? `Auto (${activeOption.label})` : option.label;
+  return activeOption ? t("quality.autoWith", { label: getManualQualityLabel(activeOption, t) }) : t("quality.auto");
 }
 
 export function createQualityOptions(levels: Level[]): VideoQuality[] {
@@ -37,7 +45,7 @@ export function createQualityOptions(levels: Level[]): VideoQuality[] {
     .map((level, index) => {
       const parsedHeight = getLevelHeight(level);
       const bitrate = level.bitrate || getAverageBitrate(level) || 0;
-      const label = getQualityLabel(level, parsedHeight, bitrate, index);
+      const label = getQualityLabel(level, parsedHeight, bitrate);
 
       return {
         level: index,
@@ -53,7 +61,7 @@ export function createQualityOptions(levels: Level[]): VideoQuality[] {
       label: level.label,
     }));
 
-  return [{ level: -1, height: 0, label: "Auto" }, ...manualLevels];
+  return [{ level: -1, height: 0, label: null }, ...manualLevels];
 }
 
 function getAverageBitrate(level: Level) {
@@ -79,7 +87,7 @@ function getLevelHeight(level: Level) {
   return 0;
 }
 
-function getQualityLabel(level: Level, height: number, bitrate: number, index: number) {
+function getQualityLabel(level: Level, height: number, bitrate: number): string | null {
   if (height > 0) {
     return `${height}p`;
   }
@@ -92,7 +100,7 @@ function getQualityLabel(level: Level, height: number, bitrate: number, index: n
     return level.name;
   }
 
-  return `Quality ${index + 1}`;
+  return null;
 }
 
 export function getBufferedTime(video: HTMLVideoElement) {

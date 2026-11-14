@@ -12,6 +12,7 @@ import Skeleton from "@mui/material/Skeleton";
 import Typography from "@mui/material/Typography";
 import Button from "@shared/ui/Button";
 import InvertedCornerBox from "@shared/ui/InvertedCornerBox";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
@@ -21,6 +22,7 @@ interface ArtistDetailProps {
 }
 
 export default function ArtistDetail({ artist: initialArtist }: ArtistDetailProps) {
+  const t = useTranslations("artist");
   const [isEditOpen, setIsEditOpen] = useState(false);
   const { data: artist = initialArtist } = useArtist(initialArtist.id, { initialData: initialArtist });
   const { data: filmography, isPending } = useArtistFilmography(artist.id);
@@ -81,12 +83,12 @@ export default function ArtistDetail({ artist: initialArtist }: ArtistDetailProp
           </Typography>
 
           <Typography sx={{ color: "text.secondary" }}>
-            {filmography?.length ? `Credited on ${filmography.length} title(s).` : "No cast credits yet."}
+            {filmography?.length ? t("detail.creditedOn", { count: filmography.length }) : t("detail.noCredits")}
           </Typography>
 
           <Box>
             <Button variant="outlined" onClick={() => setIsEditOpen(true)} startIcon={<EditIcon sx={{ fontSize: 16 }} />}>
-              Edit Actor
+              {t("detail.edit")}
             </Button>
           </Box>
         </InvertedCornerBox>
@@ -94,7 +96,7 @@ export default function ArtistDetail({ artist: initialArtist }: ArtistDetailProp
 
       <Box>
         <Typography component="h2" variant="h4" sx={{ color: "#ffffff", mb: "20px" }}>
-          Filmography
+          {t("detail.filmography")}
         </Typography>
 
         {isPending ? (
@@ -145,7 +147,7 @@ export default function ArtistDetail({ artist: initialArtist }: ArtistDetailProp
                     </Typography>
                     {credit.character && (
                       <Typography sx={{ fontSize: 12, color: "#e5e5e5", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        as {credit.character}
+                        {t("detail.asCharacter", { character: credit.character })}
                       </Typography>
                     )}
                   </Box>
@@ -154,7 +156,7 @@ export default function ArtistDetail({ artist: initialArtist }: ArtistDetailProp
             ))}
           </Box>
         ) : (
-          <Typography sx={{ color: "text.secondary" }}>This actor hasn&apos;t been credited on any titles yet.</Typography>
+          <Typography sx={{ color: "text.secondary" }}>{t("detail.emptyFilmography")}</Typography>
         )}
       </Box>
 

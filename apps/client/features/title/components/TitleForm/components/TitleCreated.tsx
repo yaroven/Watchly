@@ -1,6 +1,5 @@
 "use client";
 
-import { AGE_RATING_LABELS } from "@/features/title/components/TitleForm/components/AgeRatingPicker";
 import { Title, TitleType } from "@/features/title/schemas/title";
 import { ADMIN } from "@/shared/lib/routes";
 import TranscodingStatus from "@/types/transcoding-status";
@@ -15,6 +14,7 @@ import { alpha } from "@mui/material/styles";
 import { tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
 import InvertedCornerBox from "@shared/ui/InvertedCornerBox";
+import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 
 interface TitleCreatedProps {
@@ -23,10 +23,15 @@ interface TitleCreatedProps {
 }
 
 export default function TitleCreated({ title, onCreateAnother }: TitleCreatedProps) {
+  const t = useTranslations("title");
   const isSeries = title.type === TitleType.SERIES;
   const releaseYear = title.releaseDate?.slice(0, 4);
 
-  const chips = [isSeries ? "Series" : "Movie", releaseYear, title.runtime ? `${title.runtime} min` : null].filter(Boolean) as string[];
+  const chips = [
+    isSeries ? t("type.SERIES") : t("type.MOVIE"),
+    releaseYear,
+    title.runtime ? t("form.rail.runtime", { minutes: title.runtime }) : null,
+  ].filter(Boolean) as string[];
 
   return (
     <Box
@@ -88,7 +93,7 @@ export default function TitleCreated({ title, onCreateAnother }: TitleCreatedPro
             <CheckIcon sx={{ fontSize: 20, color: tokens.feedback.success }} />
           </Box>
           <Typography component="h2" variant="h3" sx={{ color: "#ffffff" }}>
-            {title.name} is in the library
+            {t("created.heading", { name: title.name })}
           </Typography>
         </Box>
 
@@ -119,23 +124,23 @@ export default function TitleCreated({ title, onCreateAnother }: TitleCreatedPro
                 color: "primary.main",
               }}
             >
-              {AGE_RATING_LABELS[title.ageRating]}
+              {t(`ageRating.${title.ageRating}`)}
             </Typography>
           )}
         </Box>
 
         <Typography sx={{ mt: "26px", fontSize: "12px", fontWeight: 700, letterSpacing: "0.10em", color: tokens.text.placeholder }}>
-          STILL TO DO
+          {t("created.stillToDo")}
         </Typography>
 
         <Box sx={{ mt: "14px", display: "flex", flexDirection: "column", gap: "10px" }}>
           <TodoRow
             icon={<GroupsIcon sx={{ fontSize: 20, color: "primary.main" }} />}
-            title="No cast assigned"
-            description="Actors and their characters, in display order."
+            title={t("created.noCast.title")}
+            description={t("created.noCast.description")}
             action={
               <Button href={ADMIN.TITLES_EDIT(title.id)} variant="outlined">
-                Add cast
+                {t("created.noCast.action")}
               </Button>
             }
           />
@@ -143,30 +148,34 @@ export default function TitleCreated({ title, onCreateAnother }: TitleCreatedPro
           {isSeries ? (
             <TodoRow
               icon={<VideoLibraryIcon sx={{ fontSize: 20, color: "primary.main" }} />}
-              title="No seasons yet"
-              description="Add season 1, then upload its episodes one by one."
+              title={t("created.noSeasons.title")}
+              description={t("created.noSeasons.description")}
               action={
                 <Button href={ADMIN.TITLES_EDIT(title.id)} variant="outlined">
-                  Add seasons
+                  {t("created.noSeasons.action")}
                 </Button>
               }
             />
           ) : (
             <TodoRow
               icon={<HourglassTopIcon sx={{ fontSize: 20, color: tokens.feedback.warning }} />}
-              title={title.transcodingStatus === TranscodingStatus.COMPLETED ? "Video ready to play" : "Transcoding — not playable yet"}
-              description="The library card shows Pending until this finishes."
-              action={<Typography sx={{ fontSize: "13px", color: tokens.text.placeholder }}>Automatic</Typography>}
+              title={
+                title.transcodingStatus === TranscodingStatus.COMPLETED ? t("created.transcoding.ready") : t("created.transcoding.pending")
+              }
+              description={t("created.transcoding.description")}
+              action={
+                <Typography sx={{ fontSize: "13px", color: tokens.text.placeholder }}>{t("created.transcoding.automatic")}</Typography>
+              }
             />
           )}
 
           <TodoRow
             icon={<StarBorderIcon sx={{ fontSize: 20, color: "primary.main" }} />}
-            title="No external ratings yet"
-            description="IMDb, Rotten Tomatoes and Metacritic pull on demand."
+            title={t("created.noRatings.title")}
+            description={t("created.noRatings.description")}
             action={
               <Button href={ADMIN.TITLES_EDIT(title.id)} variant="outlined">
-                Sync ratings
+                {t("created.noRatings.action")}
               </Button>
             }
           />
@@ -175,12 +184,12 @@ export default function TitleCreated({ title, onCreateAnother }: TitleCreatedPro
         <Box
           sx={{ mt: "26px", pt: "20px", borderTop: `1px dashed ${tokens.border.subtle}`, display: "flex", flexWrap: "wrap", gap: "12px" }}
         >
-          <Button href={ADMIN.TITLES_EDIT(title.id)}>Open the title page</Button>
+          <Button href={ADMIN.TITLES_EDIT(title.id)}>{t("created.openTitlePage")}</Button>
           <Button variant="outlined" onClick={onCreateAnother}>
-            Create another
+            {t("created.createAnother")}
           </Button>
           <Button href={ADMIN.TITLES} variant="outlined">
-            Back to library
+            {t("created.backToLibrary")}
           </Button>
         </Box>
       </Box>

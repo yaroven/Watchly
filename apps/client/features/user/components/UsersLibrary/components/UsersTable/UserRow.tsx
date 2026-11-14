@@ -10,6 +10,7 @@ import TableCell from "@mui/material/TableCell";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
 import { tokens } from "@shared/mui/theme";
+import { useFormatter, useTranslations } from "next-intl";
 import Link from "next/link";
 
 interface UserRowProps extends User {
@@ -17,7 +18,9 @@ interface UserRowProps extends User {
 }
 
 export default function UserRow({ id, email, role, createdAt, to }: UserRowProps) {
-  const createdLabel = new Date(createdAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  const t = useTranslations("user");
+  const format = useFormatter();
+  const createdLabel = format.dateTime(new Date(createdAt), { year: "numeric", month: "short", day: "numeric" });
 
   return (
     <TableRow
@@ -42,7 +45,7 @@ export default function UserRow({ id, email, role, createdAt, to }: UserRowProps
       <TableCell>
         <Chip
           size="small"
-          label={role === Role.ADMIN ? "Admin" : "User"}
+          label={t(`role.${role}`)}
           sx={
             role === Role.ADMIN
               ? { backgroundColor: "rgba(231,188,15,0.16)", color: "primary.main", fontWeight: 700 }
@@ -65,7 +68,7 @@ export default function UserRow({ id, email, role, createdAt, to }: UserRowProps
             overflow: "hidden",
           }}
         >
-          <IconButton component={Link} href={to} aria-label="Open" sx={{ color: "#ffffff", borderRadius: 0 }}>
+          <IconButton component={Link} href={to} aria-label={t("table.open", { email })} sx={{ color: "#ffffff", borderRadius: 0 }}>
             <ArrowOutwardIcon sx={{ fontSize: 18 }} />
           </IconButton>
         </Box>

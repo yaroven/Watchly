@@ -3,6 +3,8 @@ import { createStore } from "zustand";
 import { VideoQuality } from "../types";
 import { clampTime } from "../utils";
 
+export type PlayerErrorKey = "networkRetrying" | "playbackRecovering" | "streamUnavailable";
+
 export interface PlayerStoreState {
   isPlaying: boolean;
   isInitialLoading: boolean;
@@ -10,7 +12,7 @@ export interface PlayerStoreState {
   timeline: number;
   duration: number;
   buffered: number;
-  errorMessage: string | null;
+  errorKey: PlayerErrorKey | null;
   isFullscreen: boolean;
   controlsVisible: boolean;
   quality: number;
@@ -35,7 +37,7 @@ export const createPlayerStore = (videoRef: RefObject<HTMLVideoElement | null>, 
     timeline: 0,
     duration: 0,
     buffered: 0,
-    errorMessage: null,
+    errorKey: null,
     isFullscreen: false,
     controlsVisible: true,
     quality: -1,

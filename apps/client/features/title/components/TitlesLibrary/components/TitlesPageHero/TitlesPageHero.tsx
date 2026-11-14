@@ -6,6 +6,7 @@ import Box from "@mui/material/Box";
 import { keyframes } from "@mui/material/styles";
 import Typography from "@mui/material/Typography";
 import Button from "@shared/ui/Button";
+import { useTranslations } from "next-intl";
 
 const spin = keyframes`
   from { transform: rotate(0deg); }
@@ -19,6 +20,8 @@ interface TitlesPageHeroProps {
 }
 
 export default function TitlesPageHero({ onCreate, onSyncAllRatings, isSyncingAllRatings }: TitlesPageHeroProps) {
+  const t = useTranslations("title.library.hero");
+
   return (
     <Box
       sx={{
@@ -34,11 +37,9 @@ export default function TitlesPageHero({ onCreate, onSyncAllRatings, isSyncingAl
     >
       <Box>
         <Typography component="h1" variant="h2" sx={{ color: "#ffffff" }}>
-          Content Library
+          {t("heading")}
         </Typography>
-        <Typography sx={{ mt: "14px", maxWidth: "640px", color: "text.secondary" }}>
-          Manage movies, series, and publishing workflow from one place.
-        </Typography>
+        <Typography sx={{ mt: "14px", maxWidth: "640px", color: "text.secondary" }}>{t("subheading")}</Typography>
       </Box>
 
       <Box sx={{ display: "flex", gap: "12px" }}>
@@ -48,11 +49,11 @@ export default function TitlesPageHero({ onCreate, onSyncAllRatings, isSyncingAl
           disabled={isSyncingAllRatings}
           startIcon={<SyncIcon sx={{ fontSize: 20, animation: isSyncingAllRatings ? `${spin} 1s linear infinite` : "none" }} />}
         >
-          {isSyncingAllRatings ? "Syncing Ratings..." : "Sync All Ratings"}
+          {isSyncingAllRatings ? t("syncing") : t("syncAll")}
         </Button>
 
         <Button variant="contained" onClick={onCreate} startIcon={<AddIcon sx={{ fontSize: 22 }} />}>
-          Add New
+          {t("addNew")}
         </Button>
       </Box>
     </Box>

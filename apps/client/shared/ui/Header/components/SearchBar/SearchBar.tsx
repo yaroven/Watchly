@@ -4,16 +4,18 @@ import { Search as SearchIcon, Tune as TuneIcon } from "@mui/icons-material";
 import Input, { InputProps } from "@mui/material/Input";
 import InputAdornment from "@mui/material/InputAdornment";
 import { inputVariants } from "@shared/mui/theme";
+import { useTranslations } from "next-intl";
 
 interface SearchBarProps extends Pick<InputProps, "value" | "onChange" | "onKeyDown"> {
   placeholder?: string;
 }
 
-export default function SearchBar({ placeholder = "Search the series, movies ...", ...rest }: SearchBarProps) {
+export default function SearchBar({ placeholder, ...rest }: SearchBarProps) {
+  const t = useTranslations("shared.header");
   return (
     <Input
       disableUnderline
-      placeholder={placeholder}
+      placeholder={placeholder ?? t("searchPlaceholder")}
       startAdornment={
         <InputAdornment position="start">
           <SearchIcon sx={{ color: "#999999" }} />

@@ -3,6 +3,7 @@
 import Close from "@mui/icons-material/Close";
 import Box from "@mui/material/Box";
 import Dialog from "@mui/material/Dialog";
+import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 
 interface ModalProps {
@@ -13,6 +14,7 @@ interface ModalProps {
 }
 
 export default function Modal({ children, isOpen, onClose, size = "md" }: ModalProps) {
+  const t = useTranslations("shared.modal");
   return (
     <Dialog
       open={isOpen}
@@ -38,7 +40,7 @@ export default function Modal({ children, isOpen, onClose, size = "md" }: ModalP
         component="button"
         type="button"
         onClick={onClose}
-        aria-label="Close modal"
+        aria-label={t("close")}
         sx={{
           position: "absolute",
           top: "16px",

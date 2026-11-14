@@ -1,4 +1,5 @@
 import Box from "@mui/material/Box";
+import { useFormatter } from "next-intl";
 
 interface ProgressBarProps {
   bgColor?: string;
@@ -6,6 +7,8 @@ interface ProgressBarProps {
 }
 
 export default function ProgressBar({ bgColor, progress }: ProgressBarProps) {
+  const format = useFormatter();
+
   return (
     <Box sx={{ height: "20px", width: "100%", backgroundColor: "#e0e0de", borderRadius: "50px" }}>
       <Box
@@ -19,7 +22,7 @@ export default function ProgressBar({ bgColor, progress }: ProgressBarProps) {
         }}
       >
         <Box component="span" sx={{ padding: "5px", color: "#ffffff", fontWeight: "bold" }}>
-          {progress}%
+          {format.number(progress / 100, { style: "percent", maximumFractionDigits: 0 })}
         </Box>
       </Box>
     </Box>

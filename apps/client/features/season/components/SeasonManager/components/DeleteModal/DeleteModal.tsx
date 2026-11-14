@@ -1,6 +1,7 @@
 "use client";
 
 import ConfirmDialog from "@/shared/ui/ConfirmDialog";
+import { useTranslations } from "next-intl";
 
 interface DeleteModalProps {
   isOpen: boolean;
@@ -11,21 +12,21 @@ interface DeleteModalProps {
 }
 
 export default function DeleteModal({ isOpen, onClose, title, isDeleting, onConfirm }: DeleteModalProps) {
+  const t = useTranslations("season");
+
   return (
     <ConfirmDialog
       isOpen={isOpen}
       onClose={onClose}
       onConfirm={onConfirm}
       isPending={isDeleting}
-      confirmLabel="Confirm Delete"
-      pendingLabel="Deleting..."
-      title="Delete Season"
-      description={
-        <>
-          Are you sure you want to delete <strong>{title}</strong>? This action cannot be undone. All episodes in this season will also be
-          deleted.
-        </>
-      }
+      confirmLabel={t("delete.confirm")}
+      pendingLabel={t("delete.pending")}
+      title={t("delete.title")}
+      description={t.rich("delete.description", {
+        title,
+        strong: (chunks) => <strong>{chunks}</strong>,
+      })}
     />
   );
 }

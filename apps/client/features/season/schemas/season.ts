@@ -1,3 +1,4 @@
+import type { useTranslations } from "next-intl";
 import { z } from "zod";
 
 export interface Season {
@@ -12,24 +13,27 @@ export interface Season {
   episodes: string[];
 }
 
-export const SeasonFormSchema = z.object({
-  number: z
-    .number({
-      error: "Season number is required",
-    })
-    .int("Season number must be an integer")
-    .positive("Season number must be greater than 0"),
-  name: z.string().trim().min(1, "Name is required"),
-  description: z.string().trim().max(500, "Description is too long"),
-  posterFile: z
-    .custom<FileList | undefined>((value) => value === undefined || value instanceof FileList)
-    .optional()
-    .refine((fileList) => !fileList?.[0] || fileList[0].type.startsWith("image/"), {
-      message: "Only image files are supported for posters",
-    }),
-});
+type SeasonTranslator = ReturnType<typeof useTranslations<"season">>;
 
-export type SeasonFormValues = z.infer<typeof SeasonFormSchema>;
+export const createSeasonFormSchema = (t: SeasonTranslator) =>
+  z.object({
+    number: z
+      .number({
+        error: t("validation.numberRequired"),
+      })
+      .int(t("validation.numberInteger"))
+      .positive(t("validation.numberPositive")),
+    name: z.string().trim().min(1, t("validation.nameRequired")),
+    description: z.string().trim().max(500, t("validation.descriptionTooLong")),
+    posterFile: z
+      .custom<FileList | undefined>((value) => value === undefined || value instanceof FileList)
+      .optional()
+      .refine((fileList) => !fileList?.[0] || fileList[0].type.startsWith("image/"), {
+        message: t("validation.posterType"),
+      }),
+  });
+
+export type SeasonFormValues = z.infer<ReturnType<typeof createSeasonFormSchema>>;
 
 export interface CreateSeasonDto {
   number: number;

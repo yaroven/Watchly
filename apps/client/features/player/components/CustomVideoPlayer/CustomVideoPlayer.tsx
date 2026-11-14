@@ -1,6 +1,7 @@
 "use client";
 
 import Box from "@mui/material/Box";
+import { useTranslations } from "next-intl";
 import { forwardRef, useImperativeHandle, useRef } from "react";
 
 import PlayerControls from "./components/PlayerControls";
@@ -12,7 +13,8 @@ import ShortcutProvider from "./ShortcutsProvider";
 
 function CustomVideoPlayerContent() {
   const { video, container } = usePlayerRefs();
-  const { isPlaying, isInitialLoading, errorMessage, toggle, skip } = usePlayerPlayback();
+  const t = useTranslations("player");
+  const { isPlaying, isInitialLoading, errorKey, toggle, skip } = usePlayerPlayback();
   const { toggle: toggleFullscreen } = usePlayerFullscreen();
   const { controlsVisible } = usePlayerUI();
 
@@ -20,7 +22,7 @@ function CustomVideoPlayerContent() {
     <Box
       ref={container}
       tabIndex={0}
-      aria-label="Video player"
+      aria-label={t("videoPlayer")}
       sx={[
         {
           backgroundColor: "#000",
@@ -56,7 +58,7 @@ function CustomVideoPlayerContent() {
         sx={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
       />
       <VideoTapZones onTap={toggle} onSkip={skip} onFullscreen={toggleFullscreen} />
-      <PlayerOverlay isPlaying={isPlaying} isInitialLoading={isInitialLoading} errorMessage={errorMessage} onPlay={toggle} />
+      <PlayerOverlay isPlaying={isPlaying} isInitialLoading={isInitialLoading} errorKey={errorKey} onPlay={toggle} />
       <PlayerControls />
     </Box>
   );

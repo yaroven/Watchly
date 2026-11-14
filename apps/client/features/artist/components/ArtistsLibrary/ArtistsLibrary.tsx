@@ -18,12 +18,14 @@ import { inputVariants, tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
 import ConfirmDialog from "@shared/ui/ConfirmDialog";
 import GradientCard from "@shared/ui/GradientCard";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 const LIMIT = 18;
 
 export default function ArtistsLibrary() {
+  const t = useTranslations("artist");
   const router = useRouter();
   const [searchString, setSearchString] = useState("");
   const [page, setPage] = useState(1);
@@ -54,22 +56,20 @@ export default function ArtistsLibrary() {
       >
         <Box>
           <Typography component="h1" variant="h2" sx={{ color: "#ffffff" }}>
-            Actors
+            {t("library.title")}
           </Typography>
-          <Typography sx={{ mt: "14px", maxWidth: "640px", color: "text.secondary" }}>
-            Manage the cast catalog actors are drawn from.
-          </Typography>
+          <Typography sx={{ mt: "14px", maxWidth: "640px", color: "text.secondary" }}>{t("library.subtitle")}</Typography>
         </Box>
 
         <Button variant="contained" onClick={() => setModalArtist("new")} startIcon={<AddIcon sx={{ fontSize: 22 }} />}>
-          Add Actor
+          {t("library.add")}
         </Button>
       </Box>
 
       <Box sx={{ display: "flex", flexDirection: "column", gap: "24px" }}>
         <TextField
           variant="standard"
-          placeholder="Search actors..."
+          placeholder={t("library.searchPlaceholder")}
           value={searchString}
           onChange={(e) => {
             setSearchString(e.target.value);
@@ -111,9 +111,9 @@ export default function ArtistsLibrary() {
           ) : (
             <Box sx={{ textAlign: "center", py: "56px" }}>
               <Typography variant="h4" sx={{ color: "#ffffff", mb: "10px" }}>
-                No actors found
+                {t("library.emptyTitle")}
               </Typography>
-              <Typography sx={{ color: "text.secondary" }}>Try a different search or add a new actor.</Typography>
+              <Typography sx={{ color: "text.secondary" }}>{t("library.emptyDescription")}</Typography>
             </Box>
           )}
         </GradientCard>
@@ -134,15 +134,13 @@ export default function ArtistsLibrary() {
         onClose={() => setPendingDelete(null)}
         onConfirm={() => pendingDelete && deleteArtist(pendingDelete.id)}
         isPending={isDeleting}
-        confirmLabel="Confirm Delete"
-        pendingLabel="Deleting..."
-        title="Delete Actor"
-        description={
-          <>
-            Are you sure you want to delete <Typography component="strong">{pendingDelete?.name}</Typography>? This will also remove their
-            cast credits. This action cannot be undone.
-          </>
-        }
+        confirmLabel={t("delete.confirm")}
+        pendingLabel={t("delete.pending")}
+        title={t("delete.title")}
+        description={t.rich("delete.description", {
+          name: pendingDelete?.name ?? "",
+          strong: (chunks) => <Typography component="strong">{chunks}</Typography>,
+        })}
       />
     </Box>
   );

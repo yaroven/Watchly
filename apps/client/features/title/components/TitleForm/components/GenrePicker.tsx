@@ -7,6 +7,7 @@ import Skeleton from "@mui/material/Skeleton";
 import Typography from "@mui/material/Typography";
 import { alpha } from "@mui/material/styles";
 import { tokens } from "@shared/mui/theme";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 
 interface GenrePickerProps {
@@ -15,6 +16,7 @@ interface GenrePickerProps {
 }
 
 export default function GenrePicker({ value, onChange }: GenrePickerProps) {
+  const t = useTranslations("title");
   const { data, isPending } = useGenres({ limit: 100 });
   const genres = data?.items ?? [];
 
@@ -24,10 +26,10 @@ export default function GenrePicker({ value, onChange }: GenrePickerProps) {
     <Box sx={{ display: "flex", flexDirection: "column", gap: "10px" }}>
       <Box sx={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "12px" }}>
         <Typography component="span" sx={{ fontSize: "14px", color: "text.secondary" }}>
-          Genres
+          {t("fields.genreIds")}
         </Typography>
         <Typography component={Link} href={ADMIN.GENRES} sx={{ fontSize: "12px", color: "primary.main" }}>
-          Manage genres
+          {t("form.manageGenres")}
         </Typography>
       </Box>
 
@@ -67,7 +69,7 @@ export default function GenrePicker({ value, onChange }: GenrePickerProps) {
             );
           })
         ) : (
-          <Typography sx={{ fontSize: "13px", color: "text.secondary" }}>No genres yet — add them on the Genres screen first.</Typography>
+          <Typography sx={{ fontSize: "13px", color: "text.secondary" }}>{t("form.noGenres")}</Typography>
         )}
       </Box>
     </Box>

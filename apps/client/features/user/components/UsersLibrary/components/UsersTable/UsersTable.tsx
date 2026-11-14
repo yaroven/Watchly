@@ -11,6 +11,7 @@ import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
 import GradientCard from "@shared/ui/GradientCard";
+import { useTranslations } from "next-intl";
 import UserRow from "./UserRow";
 
 interface UsersTableProps {
@@ -29,16 +30,18 @@ const HEAD_CELL_SX = {
 const SKELETON_ROWS = Array.from({ length: 6 }, (_, index) => index);
 
 export default function UsersTable({ users, loading }: UsersTableProps) {
+  const t = useTranslations("user");
+
   return (
     <GradientCard radius={24} sx={{ width: "100%", overflow: "hidden" }}>
       <TableContainer sx={{ backgroundColor: "transparent" }}>
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell sx={HEAD_CELL_SX}>Email</TableCell>
-              <TableCell sx={HEAD_CELL_SX}>Role</TableCell>
-              <TableCell sx={HEAD_CELL_SX}>Joined</TableCell>
-              <TableCell sx={HEAD_CELL_SX}>Actions</TableCell>
+              <TableCell sx={HEAD_CELL_SX}>{t("fields.email")}</TableCell>
+              <TableCell sx={HEAD_CELL_SX}>{t("fields.role")}</TableCell>
+              <TableCell sx={HEAD_CELL_SX}>{t("fields.joined")}</TableCell>
+              <TableCell sx={HEAD_CELL_SX}>{t("table.actions")}</TableCell>
             </TableRow>
           </TableHead>
 
@@ -67,9 +70,9 @@ export default function UsersTable({ users, loading }: UsersTableProps) {
               <TableRow>
                 <TableCell colSpan={4} sx={{ textAlign: "center", py: "56px", border: "none" }}>
                   <Typography variant="h4" sx={{ color: "#ffffff", mb: "10px" }}>
-                    No users found
+                    {t("table.emptyTitle")}
                   </Typography>
-                  <Typography sx={{ color: "text.secondary" }}>Try changing your search query or clearing the active filters.</Typography>
+                  <Typography sx={{ color: "text.secondary" }}>{t("table.emptyDescription")}</Typography>
                 </TableCell>
               </TableRow>
             )}

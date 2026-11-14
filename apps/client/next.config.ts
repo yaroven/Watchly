@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import createNextIntlPlugin from "next-intl/plugin";
 
 const s3ImageProtocol = process.env.NEXT_PUBLIC_S3_IMAGE_PROTOCOL === "https" ? "https" : "http";
 const s3ImagePort = process.env.NEXT_PUBLIC_S3_IMAGE_PORT || "4566";
@@ -10,8 +11,9 @@ const s3InternalOrigin = process.env.NEXT_PUBLIC_S3_IMAGE_INTERNAL_ORIGIN
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  // SVGR turns .svg imports into React components, so icons inherit
-  // currentColor and can be recoloured through sx/CSS.
+  experimental: {
+    rootParams: true,
+  },
   turbopack: {
     rules: {
       "*.svg": {
@@ -32,9 +34,6 @@ const nextConfig: NextConfig = {
     implementation: "sass-embedded",
   },
   images: {
-    // The optimizer refuses private IPs (SSRF guard). In Docker the S3 host
-    // resolves to the compose network, so the guard has to be lifted there —
-    // never in production, where upstreams are public.
     dangerouslyAllowLocalIP: Boolean(s3InternalOrigin) && process.env.NODE_ENV !== "production",
     remotePatterns: [
       {
@@ -45,8 +44,6 @@ const nextConfig: NextConfig = {
         protocol: "http",
         hostname: "localhost",
       },
-      // TEMPORARY: placeholder images for the mocked news feed. Drop this once
-      // the news endpoint returns real image URLs.
       {
         protocol: "https",
         hostname: "picsum.photos",
@@ -57,7 +54,6 @@ const nextConfig: NextConfig = {
         port: s3ImagePort,
         pathname: `/${s3ImageBucket}/**`,
       },
-      // Host the optimizer fetches bucket assets from; see get-optimized-image-src.
       ...(s3InternalOrigin
         ? [
             {
@@ -72,4 +68,5 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+const withNextIntl = createNextIntlPlugin();
+export default withNextIntl(nextConfig);

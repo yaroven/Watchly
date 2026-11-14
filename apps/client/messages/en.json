@@ -1,0 +1,846 @@
+{
+  "auth": {
+    "fields": {
+      "name": "Name",
+      "email": "Email",
+      "password": "Password",
+      "confirmPassword": "Confirm Password"
+    },
+    "validation": {
+      "emailInvalid": "Enter a valid email",
+      "passwordMin": "Password must be at least {min, plural, one {# character} other {# characters}}",
+      "nameRequired": "Name is required",
+      "passwordsMismatch": "Passwords don't match"
+    },
+    "login": {
+      "heading": "login",
+      "rememberMe": "Remember Me",
+      "forgotPassword": "Forgot Password?",
+      "submit": "Login",
+      "submitting": "Logging in…",
+      "noAccount": "Don't have an account? <link>Create Account!</link>"
+    },
+    "register": {
+      "heading": "register",
+      "submit": "Register",
+      "submitting": "Creating account…",
+      "haveAccount": "Already have an account? <link>Login!</link>"
+    },
+    "social": {
+      "divider": "Continue With",
+      "provider": {
+        "google": "Continue with Google",
+        "apple": "Continue with Apple",
+        "facebook": "Continue with Facebook"
+      }
+    }
+  },
+  "common": {
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "goHome": "Go Home",
+    "tryAgain": "Try Again"
+  },
+  "shared": {
+    "header": {
+      "nav": {
+        "all": "All",
+        "movies": "Movies",
+        "series": "Series",
+        "genres": "Genres"
+      },
+      "profileAlt": "User profile",
+      "searchPlaceholder": "Search the series, movies ..."
+    },
+    "sidebar": {
+      "menu": "Menu",
+      "nav": {
+        "discover": "Discover",
+        "watchlist": "Watchlist",
+        "admin": "Admin"
+      },
+      "expand": "Expand sidebar",
+      "collapse": "Collapse sidebar"
+    },
+    "sliderArrows": {
+      "previous": {
+        "item": "Previous item",
+        "title": "Previous title",
+        "story": "Previous story",
+        "episode": "Previous episode"
+      },
+      "next": {
+        "item": "Next item",
+        "title": "Next title",
+        "story": "Next story",
+        "episode": "Next episode"
+      }
+    },
+    "heroSlider": {
+      "watch": "Watch",
+      "trailer": "Trailer"
+    },
+    "hotNews": {
+      "heading": "Hot News",
+      "position": "{current}/{total}"
+    },
+    "pagination": {
+      "previous": "Previous page",
+      "next": "Next page"
+    },
+    "modal": {
+      "close": "Close modal"
+    },
+    "select": {
+      "placeholder": "Select"
+    },
+    "fileInput": {
+      "upload": "Upload File",
+      "invalidFile": "Invalid file",
+      "previewAlt": "Selected file preview",
+      "replace": "Replace file",
+      "remove": "Remove file"
+    }
+  },
+  "pages": {
+    "metadata": {
+      "description": "Watch movies and series online with comfort on Watchly",
+      "title": "{name} | Watchly",
+      "login": "Login | Watchly",
+      "register": "Register | Watchly",
+      "watchlist": "My Watchlist | Watchly",
+      "search": "Search | Watchly"
+    },
+    "notFound": {
+      "message": "Oops! The page you're looking for cannot be found."
+    },
+    "error": {
+      "heading": "Something went wrong",
+      "description": "This page could not be loaded. You can try again, or head back to the catalog."
+    },
+    "authLayout": {
+      "nav": {
+        "home": "Home",
+        "about": "About",
+        "contact": "Contact"
+      },
+      "language": "English"
+    }
+  },
+  "errors": {
+    "sessionUnusable": "Your session could not be restored. Please sign in again.",
+    "unexpected": "Something went wrong"
+  },
+  "title": {
+    "cast": {
+      "updated": "Cast updated.",
+      "updateFailed": "Failed to update cast.",
+      "empty": "No cast members added yet.",
+      "characterPlaceholder": "Character (optional)",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "remove": "Remove",
+      "noActorsFound": "No actors found",
+      "typeToSearch": "Type to search actors",
+      "addActorPlaceholder": "Add an actor to the cast...",
+      "saving": "Saving...",
+      "save": "Save Cast"
+    },
+    "admin": {
+      "open": "Open",
+      "delete": "Delete",
+      "status": {
+        "COMPLETED": "Published",
+        "PROCESSING": "Processing",
+        "FAILED": "Failed",
+        "PENDING": "Pending"
+      }
+    },
+    "create": {
+      "breadcrumbTitles": "Titles",
+      "breadcrumbNew": "New title",
+      "heading": "Create Title",
+      "subheading": "Add a movie or series to the library. Metadata saves first, then the video uploads in the background."
+    },
+    "details": {
+      "deleteModal": {
+        "confirm": "Confirm Delete",
+        "pending": "Deleting...",
+        "title": "Delete Title",
+        "description": "Are you sure you want to delete <strong>{name}</strong>? This action cannot be undone."
+      },
+      "ratingsSynced": "{count, plural, one {Synced # rating.} other {Synced # ratings.}}",
+      "ratingsNone": "No ratings found for this title yet.",
+      "ratingsSyncFailed": "Failed to sync ratings.",
+      "heading": "Manage Title",
+      "subheading": "Update metadata, review the stream, and manage seasons or episodes from one screen.",
+      "sections": {
+        "details": {
+          "title": "Details",
+          "description": "Edit the primary metadata for this title."
+        },
+        "cast": {
+          "title": "Cast",
+          "description": "Assign actors and their characters, in display order."
+        },
+        "seasons": {
+          "title": "Seasons",
+          "description": "Organize the structure of your series before managing episodes."
+        },
+        "episodes": {
+          "title": "Episodes",
+          "description": "Manage the episode list and uploads for the selected season."
+        }
+      },
+      "restarting": "Restarting...",
+      "restartTranscoding": "Restart Transcoding",
+      "preview": "Preview",
+      "syncingRatings": "Syncing Ratings...",
+      "syncRatings": "Sync Ratings",
+      "deleteTitle": "Delete Title"
+    },
+    "catalog": {
+      "viewAll": "View All"
+    },
+    "discover": {
+      "noScore": "N/A",
+      "recommended": "Recommended for you",
+      "trendingMovies": "Trending movies",
+      "trendingSeries": "Trending series",
+      "genres": "Genres",
+      "imdbTopMovies": "IMDB Top Movies",
+      "imdbTopSeries": "IMDB Top Series",
+      "trendingTvShows": "Trending TV Shows",
+      "myWatchlist": "My Watchlist",
+      "watchlistError": "Could not load your watchlist right now."
+    },
+    "sections": {
+      "information": "Information",
+      "moreLikeThis": "More Like This",
+      "reviews": "Reviews",
+      "episodes": "Episodes",
+      "noSeasons": "No seasons found for this series."
+    },
+    "episodes": {
+      "shortCode": "S{season}.E{episode}",
+      "seeAll": "See All →",
+      "heading": "Episodes",
+      "count": "{count, plural, one {# Episode} other {# Episodes}}",
+      "emptySeason": "Episodes for this season have not been added yet.",
+      "streamUnavailable": "Video stream is not available for the selected episode yet.",
+      "streamLabel": "(Season {season}, Episode {episode})"
+    },
+    "photos": {
+      "heading": "Photos",
+      "add": "Add Photo"
+    },
+    "engagement": {
+      "copied": "Copied",
+      "copyFailed": "Copy failed",
+      "share": "Share",
+      "descriptionPlaceholder": "Description will appear here once added.",
+      "removeLike": "Remove like",
+      "like": "Like",
+      "removeDislike": "Remove dislike",
+      "dislike": "Dislike",
+      "copyLink": "Copy link to this title",
+      "inWatchlist": "In Watchlist",
+      "addToWatchlist": "Add to Watchlist",
+      "watchlist": "Watchlist",
+      "addedBy": "{count, plural, one {Added by {formatted} User} other {Added by {formatted} Users}}",
+      "retry": "Retry",
+      "writeError": "Could not save that: {message}",
+      "viewerStateUnknown": "We could not tell whether you have liked or saved this title, so those controls are disabled. The counts below may also be out of date.",
+      "refreshFailed": "Could not refresh the likes and watchlist counts for this title, so they may be out of date.",
+      "storyline": "Story line:",
+      "showLess": "Show Less",
+      "readMore": "Read More"
+    },
+    "overview": {
+      "tvSeries": "TV Series",
+      "runtime": "{minutes}m",
+      "playLastEpisode": "Play Last Episode",
+      "play": "Play",
+      "watchTrailer": "Watch Trailer"
+    },
+    "card": {
+      "watchlistFailed": "Could not update your watchlist — try again",
+      "watchlistPending": "Watchlist — still signing you in",
+      "watchlistUnknown": "Watchlist — could not tell whether this is saved",
+      "signInToAdd": "Sign in to add to your watchlist",
+      "removeFromWatchlist": "Remove from watchlist",
+      "addToWatchlist": "Add to watchlist",
+      "saveFailed": "Could not save — tap to retry"
+    },
+    "spotlight": {
+      "watchNow": "Watch now"
+    },
+    "form": {
+      "sectionLeft": "{count, plural, one {# LEFT} other {# LEFT}}",
+      "sectionComplete": "COMPLETE",
+      "error": "Error: {message}",
+      "createError": "Error: {message} — nothing was kept. Your entries are still here.",
+      "saving": "Saving Title...",
+      "update": "Update Title",
+      "create": "Create Title",
+      "updatedSuccess": "Title updated successfully!",
+      "viewAllTitles": "View All Titles",
+      "keepEditing": "Keep editing",
+      "sections": {
+        "identity": {
+          "title": "Identity",
+          "description": "What the title is called and who made it."
+        },
+        "classification": {
+          "title": "Format & classification",
+          "description": "Type decides the rest of the form. Pick it first."
+        },
+        "media": {
+          "title": "Media",
+          "descriptionWithVideo": "Poster, trailer link, and the source video.",
+          "descriptionWithoutVideo": "Poster and trailer only — episode video lives with the episode."
+        },
+        "accessibility": {
+          "title": "Accessibility",
+          "description": "What viewers get beyond the picture."
+        }
+      },
+      "typeHint": {
+        "MOVIE": "One video file. Uploads and transcodes from this screen.",
+        "SERIES": "Seasons and episodes are added after the title exists."
+      },
+      "manageGenres": "Manage genres",
+      "noGenres": "No genres yet — add them on the Genres screen first.",
+      "validationSummary": "{count, plural, one {# field needs attention before this can save} other {# fields need attention before this can save}}",
+      "rail": {
+        "runtime": "{minutes} min",
+        "catalogPreview": "CATALOG PREVIEW",
+        "posterPreview": "POSTER PREVIEW",
+        "untitled": "Untitled",
+        "noGenresPicked": "No genres picked yet",
+        "readyToSave": "READY TO SAVE",
+        "missing": "Missing: <value>{fields}</value>",
+        "uploadingVideo": "Uploading video",
+        "uploadPart": "part {completed} of {total}",
+        "draft": "Draft — not saved yet",
+        "saveOrder": "The record saves first, then the video uploads. If the upload fails the record is rolled back, so nothing half-made is left behind."
+      },
+      "inputs": {
+        "closedCaption": "Closed captions available",
+        "country": "Country",
+        "countryPlaceholder": "Country of origin",
+        "language": "Language",
+        "languagePlaceholder": "Language",
+        "releaseDate": "Release Date",
+        "runtime": "Runtime (minutes)",
+        "runtimeSeries": "Runtime (minutes) — set per episode",
+        "runtimePlaceholder": "Runtime in minutes",
+        "name": "Name",
+        "namePlaceholder": "Name",
+        "description": "Description",
+        "descriptionPlaceholder": "What the title is about",
+        "director": "Director",
+        "directorPlaceholder": "Director",
+        "network": "Network",
+        "networkPlaceholder": "Broadcast network or streaming platform",
+        "poster": "Poster",
+        "posterHint": "Any image format",
+        "trailerUrl": "Trailer URL",
+        "videoFile": "Video File",
+        "videoHint": "Any video format",
+        "videoNote": "Large files upload in parts and survive a dropped connection. Transcoding starts on its own once the upload lands."
+      },
+      "saveFailed": "Failed to save title"
+    },
+    "ageRating": {
+      "AGE_0": "All ages",
+      "AGE_12": "12+",
+      "AGE_16": "16+",
+      "AGE_18": "18+"
+    },
+    "type": {
+      "MOVIE": "Movie",
+      "SERIES": "Series"
+    },
+    "created": {
+      "heading": "{name} is in the library",
+      "stillToDo": "STILL TO DO",
+      "noCast": {
+        "title": "No cast assigned",
+        "description": "Actors and their characters, in display order.",
+        "action": "Add cast"
+      },
+      "noSeasons": {
+        "title": "No seasons yet",
+        "description": "Add season 1, then upload its episodes one by one.",
+        "action": "Add seasons"
+      },
+      "transcoding": {
+        "ready": "Video ready to play",
+        "pending": "Transcoding — not playable yet",
+        "description": "The library card shows Pending until this finishes.",
+        "automatic": "Automatic"
+      },
+      "noRatings": {
+        "title": "No external ratings yet",
+        "description": "IMDb, Rotten Tomatoes and Metacritic pull on demand.",
+        "action": "Sync ratings"
+      },
+      "openTitlePage": "Open the title page",
+      "createAnother": "Create another",
+      "backToLibrary": "Back to library"
+    },
+    "information": {
+      "heading": "Information",
+      "stars": "Stars",
+      "country": "Country",
+      "releaseDate": "Release Date",
+      "language": "Language",
+      "network": "Network",
+      "director": "Director",
+      "runtime": "Runtime",
+      "runtimeValue": "{minutes}m",
+      "closedCaption": "Closed Caption",
+      "available": "Available",
+      "notAvailable": "Not Available"
+    },
+    "moreLikeThis": {
+      "heading": "More Like This",
+      "viewAll": "View All"
+    },
+    "tabs": {
+      "ariaLabel": "Title sections"
+    },
+    "watchlist": {
+      "signInPrompt": "Sign in to keep a watchlist.",
+      "signIn": "Sign in",
+      "heading": "My Watchlist",
+      "count": "{count, plural, one {{formatted} title} other {{formatted} titles}}",
+      "loadError": "Could not load your watchlist: {message}",
+      "tryAgain": "Try again",
+      "empty": "Nothing saved yet. The bookmark on any poster puts it here.",
+      "browse": "Browse titles"
+    },
+    "library": {
+      "syncAllResult": "Synced ratings for {synced}/{total} titles.",
+      "syncAllFailed": "Failed to sync ratings.",
+      "hero": {
+        "heading": "Content Library",
+        "subheading": "Manage movies, series, and publishing workflow from one place.",
+        "syncing": "Syncing Ratings...",
+        "syncAll": "Sync All Ratings",
+        "addNew": "Add New"
+      },
+      "table": {
+        "title": "Title",
+        "year": "Year",
+        "type": "Type",
+        "status": "Status",
+        "actions": "Actions",
+        "emptyTitle": "No titles found",
+        "emptyDescription": "Try changing your search query or clearing the active filters."
+      },
+      "filters": {
+        "heading": "Filters",
+        "reset": "Reset Filters",
+        "search": "Search",
+        "searchPlaceholder": "Search by title...",
+        "type": "Type",
+        "allTypes": "All Types",
+        "movies": "Movies",
+        "series": "Series",
+        "genre": "Genre",
+        "allGenres": "All Genres",
+        "status": "Status",
+        "allStatuses": "All Statuses",
+        "found": "{count, plural, one {Found titles number: #} other {Found titles number: #}}",
+        "hint": "Refine the list with filters to quickly find the content you need."
+      }
+    },
+    "reviews": {
+      "heading": "Reviews",
+      "notRated": "Not rated yet",
+      "averageScore": "{count, plural, one {{score}/10 from {formatted} viewer} other {{score}/10 from {formatted} viewers}}",
+      "yourScore": "Your Score",
+      "rate": "Rate",
+      "update": "Update",
+      "clear": "Clear",
+      "postPrompt": "Post a comment for this title:",
+      "signInPrompt": "Sign in to leave a comment.",
+      "containsSpoilers": "Contains spoilers",
+      "commentPlaceholder": "Comment Text ...",
+      "postComment": "Post Comment",
+      "sortBy": "Sort by:",
+      "sort": {
+        "newest": "Newest",
+        "oldest": "Oldest",
+        "hottest": "Hottest"
+      },
+      "loading": "Loading comments ...",
+      "empty": "No comments yet — be the first.",
+      "showMore": "Show more",
+      "comment": {
+        "spoilerWarning": "This comment contains spoilers!",
+        "view": "View",
+        "removeLike": "Remove like",
+        "like": "Like",
+        "removeDislike": "Remove dislike",
+        "dislike": "Dislike",
+        "hideReplies": "Hide replies",
+        "showReplies": "Show replies",
+        "reply": "Reply",
+        "delete": "Delete",
+        "reported": "Reported",
+        "report": "Report",
+        "replyPlaceholder": "Reply to {name} ...",
+        "send": "Send"
+      }
+    },
+    "search": {
+      "headingQuery": "The search results for \"{query}\"",
+      "headingMovies": "All Movies",
+      "headingSeries": "All Series",
+      "headingAll": "All Titles",
+      "more": "More",
+      "emptyQuery": "No movies or series matched \"{query}\". Try a different title.",
+      "empty": "Nothing here yet. Check back later.",
+      "filters": {
+        "all": "All",
+        "genre": "Genre",
+        "director": "Director",
+        "network": "Network",
+        "ageRating": "Age rating",
+        "artist": "Artist",
+        "country": "Country",
+        "order": "Order",
+        "quality": "Quality"
+      }
+    },
+    "validation": {
+      "nameRequired": "Name is required",
+      "ageRatingRequired": "Age rating is required",
+      "countryRequired": "Country is required",
+      "releaseDateRequired": "Release date is required",
+      "languageRequired": "Language is required",
+      "trailerUrlInvalid": "Trailer URL must be a valid URL",
+      "runtimeRequired": "Runtime is required",
+      "runtimeWhole": "Runtime must be a whole number",
+      "runtimeMin": "Runtime must be 0 or greater",
+      "networkRequired": "Network is required",
+      "directorRequired": "Director is required",
+      "posterImageOnly": "Only image files are supported for posters",
+      "videoRequiredForMovies": "Video file is required for Movies",
+      "videoOnly": "Only video files are supported"
+    },
+    "fields": {
+      "name": "Name",
+      "description": "Description",
+      "director": "Director",
+      "network": "Network",
+      "type": "Type",
+      "ageRating": "Age rating",
+      "country": "Country",
+      "language": "Language",
+      "releaseDate": "Release date",
+      "runtime": "Runtime",
+      "trailerUrl": "Trailer URL",
+      "posterFile": "Poster",
+      "videoFile": "Video file",
+      "genreIds": "Genres"
+    }
+  },
+  "player": {
+    "videoPlayer": "Video player",
+    "play": "Play",
+    "pause": "Pause",
+    "playVideo": "Play video",
+    "pauseVideo": "Pause video",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "muteVideo": "Mute video",
+    "unmuteVideo": "Unmute video",
+    "volume": "Volume",
+    "fullscreen": "Fullscreen",
+    "enterFullscreen": "Enter fullscreen",
+    "exitFullscreen": "Exit fullscreen",
+    "buffering": "Buffering",
+    "seekVideo": "Seek video",
+    "settings": {
+      "label": "Video settings",
+      "title": "Settings ({rate})",
+      "tabs": {
+        "quality": "Quality",
+        "speed": "Speed"
+      }
+    },
+    "quality": {
+      "auto": "Auto",
+      "autoWith": "Auto ({label})",
+      "numbered": "Quality {number}"
+    },
+    "errors": {
+      "networkRetrying": "Network error while loading video. Retrying...",
+      "playbackRecovering": "Playback error. Recovering...",
+      "streamUnavailable": "Video stream is unavailable"
+    },
+    "preview": {
+      "title": "Preview",
+      "loading": "Fetching stream URL...",
+      "error": "Could not load video stream"
+    }
+  },
+  "episodes": {
+    "episodeTitle": "Episode {number}: {name}",
+    "status": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "failed": "Failed"
+    },
+    "manager": {
+      "heading": "Episodes",
+      "add": "Add Episode",
+      "empty": "No episodes yet. Add the first one to get started."
+    },
+    "form": {
+      "addTitle": "Add Episode",
+      "editTitle": "Edit Episode",
+      "number": "Episode Number",
+      "name": "Name",
+      "description": "Description",
+      "videoFile": "Video File",
+      "uploading": "Uploading...",
+      "create": "Create",
+      "update": "Update"
+    },
+    "delete": {
+      "title": "Delete Episode",
+      "confirm": "Confirm Delete",
+      "pending": "Deleting...",
+      "description": "Are you sure you want to delete <strong>{title}</strong>? This action cannot be undone."
+    },
+    "validation": {
+      "numberRequired": "Episode number is required",
+      "numberInteger": "Episode number must be an integer",
+      "numberPositive": "Episode number must be greater than 0",
+      "nameRequired": "Name is required",
+      "descriptionTooLong": "Description is too long",
+      "videoRequired": "Video file is required",
+      "videoType": "Only video files are supported"
+    }
+  },
+  "season": {
+    "tab": "Season {number}",
+    "seasonTitle": "Season {number}: {name}",
+    "manager": {
+      "heading": "Seasons",
+      "add": "Add Season",
+      "empty": "No seasons yet. Add the first one to get started."
+    },
+    "form": {
+      "addTitle": "Add Season",
+      "editTitle": "Edit Season",
+      "number": "Season Number",
+      "name": "Name",
+      "description": "Description",
+      "banner": "Banner",
+      "saving": "Saving...",
+      "create": "Create",
+      "update": "Update"
+    },
+    "delete": {
+      "title": "Delete Season",
+      "confirm": "Confirm Delete",
+      "pending": "Deleting...",
+      "description": "Are you sure you want to delete <strong>{title}</strong>? This action cannot be undone. All episodes in this season will also be deleted."
+    },
+    "validation": {
+      "numberRequired": "Season number is required",
+      "numberInteger": "Season number must be an integer",
+      "numberPositive": "Season number must be greater than 0",
+      "nameRequired": "Name is required",
+      "descriptionTooLong": "Description is too long",
+      "posterType": "Only image files are supported for posters"
+    }
+  },
+  "admin": {
+    "meta": {
+      "title": "Watchly Admin",
+      "description": "Admin panel for Watchly"
+    },
+    "pages": {
+      "actors": "Actors | Watchly Admin",
+      "dashboard": "Dashboard | Watchly Admin",
+      "genres": "Genres | Watchly Admin",
+      "titles": "Content Library | Watchly Admin",
+      "users": "Users | Watchly Admin",
+      "createTitle": "Create Title | Watchly Admin"
+    },
+    "notFound": {
+      "title": "This admin page is missing",
+      "description": "The record may have been deleted, the route may be incorrect, or the page may not exist in this admin section.",
+      "backToDashboard": "Back to Dashboard"
+    },
+    "header": {
+      "panel": "Admin Panel",
+      "sections": {
+        "dashboard": "Dashboard",
+        "titles": "Content Management",
+        "fallback": "Admin"
+      },
+      "searchPlaceholder": "Search titles...",
+      "avatarAlt": "Admin user",
+      "userName": "Admin User",
+      "userRole": "Super Admin"
+    },
+    "sidebar": {
+      "badge": "Admin",
+      "menu": "Menu",
+      "dashboard": "Dashboard",
+      "titles": "Titles",
+      "users": "Users",
+      "actors": "Actors",
+      "genres": "Genres",
+      "backToSite": "Back to Site"
+    },
+    "dashboard": {
+      "title": "Admin Overview",
+      "subtitle": "Monitor your catalog, jump into common tasks, and keep the content pipeline moving.",
+      "stats": {
+        "totalTitles": "Total Titles",
+        "movies": "Movies",
+        "series": "Series"
+      },
+      "quickActions": {
+        "title": "Quick Actions",
+        "addTitle": "Add New Title",
+        "manageTitles": "Manage All Titles",
+        "overview": "Overview"
+      },
+      "recentAdditions": {
+        "title": "Recent Additions",
+        "empty": "No recent titles found."
+      },
+      "titleType": {
+        "MOVIE": "Movie",
+        "SERIES": "Series"
+      }
+    }
+  },
+  "artist": {
+    "validation": {
+      "nameRequired": "Name is required"
+    },
+    "form": {
+      "addTitle": "Add Actor",
+      "editTitle": "Edit Actor",
+      "nameLabel": "Name",
+      "namePlaceholder": "Actor name",
+      "photoLabel": "Photo",
+      "photoHint": "Any image format",
+      "error": "Error: {message}",
+      "uploadingPhoto": "Uploading Photo...",
+      "saving": "Saving Actor...",
+      "saveChanges": "Save Changes",
+      "submitAdd": "Add Actor",
+      "saveFailed": "Failed to save actor"
+    },
+    "card": {
+      "edit": "Edit {name}",
+      "delete": "Delete {name}"
+    },
+    "detail": {
+      "creditedOn": "{count, plural, one {Credited on # title.} other {Credited on # titles.}}",
+      "noCredits": "No cast credits yet.",
+      "edit": "Edit Actor",
+      "filmography": "Filmography",
+      "asCharacter": "as {character}",
+      "emptyFilmography": "This actor hasn't been credited on any titles yet."
+    },
+    "library": {
+      "title": "Actors",
+      "subtitle": "Manage the cast catalog actors are drawn from.",
+      "add": "Add Actor",
+      "searchPlaceholder": "Search actors...",
+      "emptyTitle": "No actors found",
+      "emptyDescription": "Try a different search or add a new actor."
+    },
+    "delete": {
+      "title": "Delete Actor",
+      "confirm": "Confirm Delete",
+      "pending": "Deleting...",
+      "description": "Are you sure you want to delete <strong>{name}</strong>? This will also remove their cast credits. This action cannot be undone."
+    }
+  },
+  "genre": {
+    "library": {
+      "title": "Genres",
+      "subtitle": "Manage the genre taxonomy titles are organized by.",
+      "count": "{count, plural, one {# Genre} other {# Genres}}",
+      "newPlaceholder": "New genre name",
+      "add": "Add genre",
+      "save": "Save",
+      "cancel": "Cancel",
+      "titleCount": "{count, plural, one {# title} other {# titles}}",
+      "rename": "Rename {name}",
+      "deleteLabel": "Delete {name}",
+      "stillAssigned": "{count, plural, one {Still assigned to # title — remove it from every title first} other {Still assigned to # titles — remove it from every title first}}",
+      "empty": "No genres yet."
+    },
+    "delete": {
+      "title": "Delete Genre",
+      "confirm": "Confirm Delete",
+      "pending": "Deleting...",
+      "description": "Are you sure you want to delete <strong>{name}</strong>? This action cannot be undone."
+    }
+  },
+  "user": {
+    "role": {
+      "ADMIN": "Admin",
+      "USER": "User"
+    },
+    "fields": {
+      "email": "Email",
+      "userId": "User ID",
+      "joined": "Joined",
+      "role": "Role"
+    },
+    "library": {
+      "title": "Users",
+      "subtitle": "Review accounts and manage admin access.",
+      "total": "Total Users"
+    },
+    "filters": {
+      "title": "Filters",
+      "reset": "Reset Filters",
+      "searchLabel": "Search",
+      "searchPlaceholder": "Search by email...",
+      "roleLabel": "Role",
+      "allRoles": "All Roles",
+      "found": "{count, plural, one {Found # user} other {Found # users}}",
+      "hint": "Refine the list to quickly find the account you need."
+    },
+    "table": {
+      "actions": "Actions",
+      "open": "Open {email}",
+      "emptyTitle": "No users found",
+      "emptyDescription": "Try changing your search query or clearing the active filters."
+    },
+    "detail": {
+      "notFoundTitle": "User not found",
+      "notFoundDescription": "This account may have been deleted, or the link is incorrect.",
+      "backToUsers": "Back to Users",
+      "subtitle": "Review account details and manage this user's role.",
+      "accountInfoTitle": "Account Info",
+      "accountInfoDescription": "Read-only identity details for this account.",
+      "roleTitle": "Role",
+      "roleDescription": "Admins can manage titles, users, and actors. Users have standard access.",
+      "cannotChangeOwnRole": "You can't change your own role."
+    },
+    "changeRole": {
+      "title": "Change Role",
+      "confirm": "Change Role",
+      "pending": "Updating...",
+      "description": "Change <strong>{email}</strong>'s role to <strong>{role}</strong>? This changes what they can access immediately."
+    }
+  }
+}

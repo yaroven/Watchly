@@ -1,4 +1,5 @@
 import TranscodingStatus from "@/types/transcoding-status";
+import type { useTranslations } from "next-intl";
 import { z } from "zod";
 
 export interface Episode {
@@ -12,44 +13,49 @@ export interface Episode {
   transcodingStatus: TranscodingStatus;
 }
 
-const EpisodeBaseSchema = z.object({
-  number: z
-    .number({
-      error: "Episode number is required",
-    })
-    .int("Episode number must be an integer")
-    .positive("Episode number must be greater than 0"),
-  name: z.string().trim().min(1, "Name is required"),
-  description: z.string().trim().max(500, "Description is too long"),
-});
+type EpisodesTranslator = ReturnType<typeof useTranslations<"episodes">>;
+
+const createEpisodeBaseSchema = (t: EpisodesTranslator) =>
+  z.object({
+    number: z
+      .number({
+        error: t("validation.numberRequired"),
+      })
+      .int(t("validation.numberInteger"))
+      .positive(t("validation.numberPositive")),
+    name: z.string().trim().min(1, t("validation.nameRequired")),
+    description: z.string().trim().max(500, t("validation.descriptionTooLong")),
+  });
 
 const EpisodeVideoFileSchema = z.custom<FileList | undefined>((value) => value === undefined || value instanceof FileList).optional();
 
-export const CreateEpisodeFormSchema = EpisodeBaseSchema.extend({
-  videoFile: EpisodeVideoFileSchema,
-})
-  .refine((data) => data.videoFile && data.videoFile.length > 0, {
-    message: "Video file is required",
-    path: ["videoFile"],
-  })
-  .refine(
-    (data) => {
-      if (!data.videoFile?.[0]) {
-        return true;
-      }
-
-      return data.videoFile[0].type.startsWith("video/");
-    },
-    {
-      message: "Only video files are supported",
+export const createCreateEpisodeFormSchema = (t: EpisodesTranslator) =>
+  createEpisodeBaseSchema(t)
+    .extend({
+      videoFile: EpisodeVideoFileSchema,
+    })
+    .refine((data) => data.videoFile && data.videoFile.length > 0, {
+      message: t("validation.videoRequired"),
       path: ["videoFile"],
-    },
-  );
+    })
+    .refine(
+      (data) => {
+        if (!data.videoFile?.[0]) {
+          return true;
+        }
 
-export const UpdateEpisodeFormSchema = EpisodeBaseSchema;
+        return data.videoFile[0].type.startsWith("video/");
+      },
+      {
+        message: t("validation.videoType"),
+        path: ["videoFile"],
+      },
+    );
 
-export type CreateEpisodeFormValues = z.infer<typeof CreateEpisodeFormSchema>;
-export type UpdateEpisodeFormValues = z.infer<typeof UpdateEpisodeFormSchema>;
+export const createUpdateEpisodeFormSchema = createEpisodeBaseSchema;
+
+export type CreateEpisodeFormValues = z.infer<ReturnType<typeof createCreateEpisodeFormSchema>>;
+export type UpdateEpisodeFormValues = z.infer<ReturnType<typeof createUpdateEpisodeFormSchema>>;
 
 export interface CreateEpisodeDto {
   number: number;

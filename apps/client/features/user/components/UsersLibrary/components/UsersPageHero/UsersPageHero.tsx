@@ -2,12 +2,15 @@
 
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import { useTranslations } from "next-intl";
 
 interface UsersPageHeroProps {
   totalCount: number;
 }
 
 export default function UsersPageHero({ totalCount }: UsersPageHeroProps) {
+  const t = useTranslations("user");
+
   return (
     <Box
       sx={{
@@ -23,16 +26,16 @@ export default function UsersPageHero({ totalCount }: UsersPageHeroProps) {
     >
       <Box>
         <Typography component="h1" variant="h2" sx={{ color: "#ffffff" }}>
-          Users
+          {t("library.title")}
         </Typography>
-        <Typography sx={{ mt: "14px", maxWidth: "640px", color: "text.secondary" }}>Review accounts and manage admin access.</Typography>
+        <Typography sx={{ mt: "14px", maxWidth: "640px", color: "text.secondary" }}>{t("library.subtitle")}</Typography>
       </Box>
 
       <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
         <Typography
           sx={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.secondary" }}
         >
-          Total Users
+          {t("library.total")}
         </Typography>
         <Typography sx={{ fontSize: "32px", fontWeight: 800, color: "primary.main", lineHeight: 1.2 }}>{totalCount}</Typography>
       </Box>

@@ -1,4 +1,5 @@
 import Box from "@mui/material/Box";
+import { useTranslations } from "next-intl";
 
 import { usePlayerQuality } from "../../CustomVideoPlayerContext";
 import { getQualityOptionLabel } from "../../utils";
@@ -30,9 +31,10 @@ const menuOptionActiveSx = {
 };
 
 export default function QualityMenu({ onSelect }: QualityMenuProps) {
+  const t = useTranslations("player");
   const { selected, options, currentLevel } = usePlayerQuality();
 
-  if (!options.length) return <Box sx={menuOptionSx}>Auto</Box>;
+  if (!options.length) return <Box sx={menuOptionSx}>{t("quality.auto")}</Box>;
 
   return options.map((option) => {
     const isActive = selected === option.level;
@@ -46,7 +48,7 @@ export default function QualityMenu({ onSelect }: QualityMenuProps) {
         aria-pressed={isActive}
         sx={[menuOptionSx, isActive && menuOptionActiveSx]}
       >
-        {getQualityOptionLabel(option, options, currentLevel)}
+        {getQualityOptionLabel(option, options, currentLevel, t)}
       </Box>
     );
   });

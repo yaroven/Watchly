@@ -1,23 +1,28 @@
+import type { useTranslations } from "next-intl";
 import { z } from "zod";
 
-export const LoginSchema = z.object({
-  email: z.email({ error: "Enter a valid email" }),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  rememberMe: z.boolean(),
-});
+type AuthTranslator = ReturnType<typeof useTranslations<"auth">>;
 
-export type LoginFormValues = z.infer<typeof LoginSchema>;
-
-export const RegisterSchema = z
-  .object({
-    name: z.string().trim().min(1, "Name is required"),
-    email: z.email({ error: "Enter a valid email" }),
-    password: z.string().min(6, "Password must be at least 6 characters"),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ["confirmPassword"],
+export const createLoginSchema = (t: AuthTranslator) =>
+  z.object({
+    email: z.email({ error: t("validation.emailInvalid") }),
+    password: z.string().min(6, t("validation.passwordMin", { min: 6 })),
+    rememberMe: z.boolean(),
   });
 
-export type RegisterFormValues = z.infer<typeof RegisterSchema>;
+export type LoginFormValues = z.infer<ReturnType<typeof createLoginSchema>>;
+
+export const createRegisterSchema = (t: AuthTranslator) =>
+  z
+    .object({
+      name: z.string().trim().min(1, t("validation.nameRequired")),
+      email: z.email({ error: t("validation.emailInvalid") }),
+      password: z.string().min(6, t("validation.passwordMin", { min: 6 })),
+      confirmPassword: z.string(),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+      message: t("validation.passwordsMismatch"),
+      path: ["confirmPassword"],
+    });
+
+export type RegisterFormValues = z.infer<ReturnType<typeof createRegisterSchema>>;

@@ -4,6 +4,7 @@ import MuiSelect, { type SelectProps as MuiSelectProps } from "@mui/material/Sel
 import { alpha } from "@mui/material/styles";
 import Typography from "@mui/material/Typography";
 import { inputVariants, tokens, type InputVariant } from "@shared/mui/theme";
+import { useTranslations } from "next-intl";
 import { Controller, type Control, type FieldError, type FieldValues, type Path } from "react-hook-form";
 
 export interface SelectOption {
@@ -28,11 +29,12 @@ export default function Select<T extends FieldValues>({
   control,
   error,
   options,
-  placeholder = "Select",
+  placeholder,
   variant = "pill",
   sx,
   ...rest
 }: SelectFieldProps<T>) {
+  const t = useTranslations("shared.select");
   const fieldId = id ?? String(name).replace(/\./g, "-");
   const errorId = error ? `${fieldId}-error` : undefined;
 
@@ -89,7 +91,7 @@ export default function Select<T extends FieldValues>({
             {...rest}
           >
             <MenuItem value="" disabled sx={menuItemSx}>
-              {placeholder}
+              {placeholder ?? t("placeholder")}
             </MenuItem>
             {options.map((option) => (
               <MenuItem key={option.value} value={option.value} sx={menuItemSx}>

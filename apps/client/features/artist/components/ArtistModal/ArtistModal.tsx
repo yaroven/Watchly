@@ -1,6 +1,6 @@
 "use client";
 
-import { Artist, ArtistFormSchema, ArtistFormValues } from "@/features/artist/schemas/artist";
+import { Artist, ArtistFormValues, createArtistFormSchema } from "@/features/artist/schemas/artist";
 import ProgressBar from "@/features/transcoding/components/ProgressBar";
 import FormField from "@/shared/ui/FormField";
 import FormFileInput from "@/shared/ui/FormFileInput";
@@ -10,7 +10,8 @@ import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import Button from "@shared/ui/Button";
-import { useEffect } from "react";
+import { useTranslations } from "next-intl";
+import { useEffect, useMemo } from "react";
 import { Resolver, useForm, useWatch } from "react-hook-form";
 import { useArtistSubmissionWorkflow } from "./useArtistSubmissionWorkflow";
 
@@ -21,7 +22,9 @@ interface ArtistModalProps {
 }
 
 export default function ArtistModal({ isOpen, onClose, artist }: ArtistModalProps) {
+  const t = useTranslations("artist");
   const isEditing = !!artist;
+  const schema = useMemo(() => createArtistFormSchema(t), [t]);
 
   const {
     register,
@@ -31,7 +34,7 @@ export default function ArtistModal({ isOpen, onClose, artist }: ArtistModalProp
     reset,
     setValue,
   } = useForm<ArtistFormValues>({
-    resolver: zodResolver(ArtistFormSchema) as Resolver<ArtistFormValues>,
+    resolver: zodResolver(schema) as Resolver<ArtistFormValues>,
     mode: "onBlur",
     defaultValues: { name: artist?.name ?? "" },
   });
@@ -53,29 +56,43 @@ export default function ArtistModal({ isOpen, onClose, artist }: ArtistModalProp
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="sm">
       <Box sx={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-        <Typography sx={{ fontSize: "24px", fontWeight: 700, color: "#ffffff" }}>{isEditing ? "Edit Actor" : "Add Actor"}</Typography>
+        <Typography sx={{ fontSize: "24px", fontWeight: 700, color: "#ffffff" }}>
+          {isEditing ? t("form.editTitle") : t("form.addTitle")}
+        </Typography>
 
         <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          <FormField label="Name" placeholder="Actor name" name="name" register={register} error={errors.name} />
+          <FormField
+            label={t("form.nameLabel")}
+            placeholder={t("form.namePlaceholder")}
+            name="name"
+            register={register}
+            error={errors.name}
+          />
 
           <FormFileInput
-            label="Photo"
+            label={t("form.photoLabel")}
             register={register}
             setValue={setValue}
             selectedFile={selectedPhotoFile}
             name="photoFile"
             accept="image/*"
-            hint="Any image format"
+            hint={t("form.photoHint")}
             disabled={isPending}
             error={errors.photoFile}
             id="artist-photo-file"
           />
 
           {isUploading && <ProgressBar progress={uploadProgress} />}
-          {actionError && <Alert severity="error">Error: {actionError.message}</Alert>}
+          {actionError && <Alert severity="error">{t("form.error", { message: actionError.message })}</Alert>}
 
           <Button disabled={isPending || (!isDirty && !isEditing)} type="submit">
-            {isPending ? (isUploading ? "Uploading Photo..." : "Saving Actor...") : isEditing ? "Save Changes" : "Add Actor"}
+            {isPending
+              ? isUploading
+                ? t("form.uploadingPhoto")
+                : t("form.saving")
+              : isEditing
+                ? t("form.saveChanges")
+                : t("form.submitAdd")}
           </Button>
         </Box>
       </Box>

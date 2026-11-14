@@ -3,6 +3,7 @@ import AddAPhotoIcon from "@mui/icons-material/AddAPhoto";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { getTitleOverviewFixture } from "../TitleOverview/mocks";
 
@@ -13,6 +14,7 @@ interface StreamPhotosProps {
 const VISIBLE_COUNT = 9;
 
 export default function StreamPhotos({ title }: StreamPhotosProps) {
+  const t = useTranslations("title.photos");
   const { stream } = getTitleOverviewFixture(title.id);
   const visible = stream.photos.slice(0, VISIBLE_COUNT);
   const remaining = stream.photos.length - visible.length;
@@ -21,7 +23,7 @@ export default function StreamPhotos({ title }: StreamPhotosProps) {
     <Box sx={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: "4px" }}>
-          <Typography variant="h3">Photos</Typography>
+          <Typography variant="h3">{t("heading")}</Typography>
           <Typography sx={{ fontSize: "16px", color: "text.secondary" }}>{stream.photos.length}</Typography>
           <ChevronRightIcon sx={{ color: "text.secondary" }} />
         </Box>
@@ -46,7 +48,7 @@ export default function StreamPhotos({ title }: StreamPhotosProps) {
           }}
         >
           <AddAPhotoIcon sx={{ fontSize: "18px" }} />
-          Add Photo
+          {t("add")}
         </Box>
       </Box>
 
