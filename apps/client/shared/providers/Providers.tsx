@@ -6,6 +6,7 @@ import MuiThemeProvider from "@shared/mui/MuiThemeProvider";
 import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { useEffect, useState } from "react";
+import TimeZoneSync from "./TimeZoneSync";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -34,7 +35,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <MuiThemeProvider>
       <QueryClientProvider client={queryClient}>
-        <NuqsAdapter>{children}</NuqsAdapter>
+        <NuqsAdapter>
+          <TimeZoneSync />
+          {children}
+        </NuqsAdapter>
       </QueryClientProvider>
     </MuiThemeProvider>
   );

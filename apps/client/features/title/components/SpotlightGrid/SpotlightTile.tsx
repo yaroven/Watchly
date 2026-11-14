@@ -6,6 +6,7 @@ import { Play } from "@shared/assets/icons";
 import Button from "@shared/ui/Button";
 import CustomIcon from "@shared/ui/CustomIcon";
 import GenreList from "@shared/ui/GenreList";
+import { useTranslations } from "next-intl";
 import Image, { type StaticImageData } from "next/image";
 
 export interface SpotlightTitle {
@@ -39,6 +40,7 @@ const GENRE_RATIO = 0.29;
 const BODY_RATIO = 0.22;
 
 export default function SpotlightTile({ title, variant, actionPosition, titleScale, imageSizes }: SpotlightTileProps) {
+  const t = useTranslations("title.spotlight");
   const { name, tagline, description, genres, imageUrl, watchLink } = title;
   const editorial = variant === "editorial";
 
@@ -72,7 +74,7 @@ export default function SpotlightTile({ title, variant, actionPosition, titleSca
           href={watchLink}
           sx={{ minHeight: "unset", paddingBlock: "8px", paddingInline: "16px", fontSize: "clamp(13px, 0.95vw, 17px)", fontWeight: 600 }}
         >
-          Watch now
+          {t("watchNow")}
         </Button>
       </Box>
 

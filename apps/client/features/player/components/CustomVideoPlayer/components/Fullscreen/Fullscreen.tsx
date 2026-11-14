@@ -1,10 +1,12 @@
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
 import Box from "@mui/material/Box";
+import { useTranslations } from "next-intl";
 
 import { usePlayerFullscreen } from "../../CustomVideoPlayerContext";
 
 export default function Fullscreen() {
+  const t = useTranslations("player");
   const { active, toggle } = usePlayerFullscreen();
 
   return (
@@ -12,8 +14,8 @@ export default function Fullscreen() {
       component="button"
       type="button"
       onClick={toggle}
-      aria-label={active ? "Exit fullscreen" : "Enter fullscreen"}
-      title={active ? "Exit fullscreen" : "Fullscreen"}
+      aria-label={active ? t("exitFullscreen") : t("enterFullscreen")}
+      title={active ? t("exitFullscreen") : t("fullscreen")}
       sx={{
         all: "unset",
         display: "inline-flex",

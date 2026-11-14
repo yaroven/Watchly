@@ -3,6 +3,7 @@
 import Box from "@mui/material/Box";
 import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
+import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
 export interface TitleTabsSection {
@@ -15,6 +16,7 @@ interface TitleTabsProps {
 }
 
 export default function TitleTabs({ sections }: TitleTabsProps) {
+  const t = useTranslations("title.tabs");
   const [activeId, setActiveId] = useState(sections[0]?.id);
   const isClickScrolling = useRef(false);
 
@@ -49,7 +51,7 @@ export default function TitleTabs({ sections }: TitleTabsProps) {
 
   return (
     <Box sx={{ borderBottom: "1px solid", borderColor: "divider" }}>
-      <Tabs value={activeId} onChange={handleChange} aria-label="Title sections">
+      <Tabs value={activeId} onChange={handleChange} aria-label={t("ariaLabel")}>
         {sections.map(({ id, label }) => (
           <Tab key={id} value={id} label={label} />
         ))}

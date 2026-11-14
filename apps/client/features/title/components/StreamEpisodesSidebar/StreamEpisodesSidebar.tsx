@@ -7,6 +7,7 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { getOptimizedImageSrc } from "@shared/lib/get-optimized-image-src";
 import Button from "@shared/ui/Button";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 
 interface StreamEpisodesSidebarProps {
@@ -26,9 +27,11 @@ export default function StreamEpisodesSidebar({
   onSeeAll,
   posterUrl,
 }: StreamEpisodesSidebarProps) {
+  const t = useTranslations("title.episodes");
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "16px", width: "100%" }}>
-      <Typography variant="h3">Episodes</Typography>
+      <Typography variant="h3">{t("heading")}</Typography>
 
       <Box sx={{ display: "flex", flexDirection: "column", gap: "16px" }}>
         {episodes.map((episode) => (
@@ -77,7 +80,7 @@ export default function StreamEpisodesSidebar({
             >
               <Box sx={{ textAlign: "left", minWidth: 0 }}>
                 <Typography sx={{ fontSize: "12px", color: "text.secondary" }}>
-                  S{seasonNumber}.E{episode.number}
+                  {t("shortCode", { season: seasonNumber, episode: episode.number })}
                 </Typography>
                 <Typography
                   sx={{
@@ -105,7 +108,7 @@ export default function StreamEpisodesSidebar({
 
       {onSeeAll && (
         <Button variant="contained" onClick={onSeeAll} sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          See All →
+          {t("seeAll")}
         </Button>
       )}
     </Box>

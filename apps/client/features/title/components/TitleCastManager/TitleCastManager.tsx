@@ -16,6 +16,7 @@ import IconButton from "@mui/material/IconButton";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import Button from "@shared/ui/Button";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 interface CastRow {
@@ -40,10 +41,11 @@ interface TitleCastManagerProps {
 }
 
 export default function TitleCastManager({ titleId }: TitleCastManagerProps) {
+  const t = useTranslations("title.cast");
   const { data: cast, isPending } = useTitleCast(titleId);
   const [rows, setRows] = useState<CastRow[]>([]);
   const [isDirty, setIsDirty] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ severity: "success" | "error"; text: string } | null>(null);
   const [syncedCast, setSyncedCast] = useState<CastCredit[] | undefined>(undefined);
 
   const [artistSearch, setArtistSearch] = useState("");
@@ -60,10 +62,10 @@ export default function TitleCastManager({ titleId }: TitleCastManagerProps) {
 
   const { mutate: saveCast, isPending: isSaving } = useSetTitleCast({
     onSuccess: () => {
-      setMessage("Cast updated.");
+      setMessage({ severity: "success", text: t("updated") });
       setIsDirty(false);
     },
-    onError: (error) => setMessage(error.message || "Failed to update cast."),
+    onError: (error) => setMessage({ severity: "error", text: error.message || t("updateFailed") }),
   });
 
   const availableArtists = (artistResults?.items || []).filter((artist) => !rows.some((row) => row.artistId === artist.id));
@@ -110,12 +112,12 @@ export default function TitleCastManager({ titleId }: TitleCastManagerProps) {
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       {message && (
-        <Alert severity={message.startsWith("Cast updated") ? "success" : "error"} onClose={() => setMessage(null)}>
-          {message}
+        <Alert severity={message.severity} onClose={() => setMessage(null)}>
+          {message.text}
         </Alert>
       )}
 
-      {!isPending && rows.length === 0 && <Typography sx={{ color: "text.secondary" }}>No cast members added yet.</Typography>}
+      {!isPending && rows.length === 0 && <Typography sx={{ color: "text.secondary" }}>{t("empty")}</Typography>}
 
       <Box sx={{ display: "flex", flexDirection: "column", gap: "10px" }}>
         {rows.map((row, index) => (
@@ -144,22 +146,22 @@ export default function TitleCastManager({ titleId }: TitleCastManagerProps) {
 
             <TextField
               size="small"
-              placeholder="Character (optional)"
+              placeholder={t("characterPlaceholder")}
               value={row.character}
               onChange={(e) => updateCharacter(index, e.target.value)}
               sx={{ flex: 1 }}
             />
 
             <Box sx={{ display: "flex", flexDirection: "column" }}>
-              <IconButton size="small" disabled={index === 0} onClick={() => moveRow(index, -1)} aria-label="Move up">
+              <IconButton size="small" disabled={index === 0} onClick={() => moveRow(index, -1)} aria-label={t("moveUp")}>
                 <KeyboardArrowUpIcon fontSize="small" />
               </IconButton>
-              <IconButton size="small" disabled={index === rows.length - 1} onClick={() => moveRow(index, 1)} aria-label="Move down">
+              <IconButton size="small" disabled={index === rows.length - 1} onClick={() => moveRow(index, 1)} aria-label={t("moveDown")}>
                 <KeyboardArrowDownIcon fontSize="small" />
               </IconButton>
             </Box>
 
-            <IconButton aria-label="Remove" color="error" onClick={() => removeRow(index)}>
+            <IconButton aria-label={t("remove")} color="error" onClick={() => removeRow(index)}>
               <DeleteIcon sx={{ fontSize: 18 }} />
             </IconButton>
           </Box>
@@ -175,13 +177,13 @@ export default function TitleCastManager({ titleId }: TitleCastManagerProps) {
         onInputChange={(_, value) => setArtistSearch(value)}
         onChange={(_, artist) => artist && addArtist(artist)}
         value={null}
-        noOptionsText={artistSearch ? "No actors found" : "Type to search actors"}
-        renderInput={(params) => <TextField {...params} size="small" placeholder="Add an actor to the cast..." />}
+        noOptionsText={artistSearch ? t("noActorsFound") : t("typeToSearch")}
+        renderInput={(params) => <TextField {...params} size="small" placeholder={t("addActorPlaceholder")} />}
       />
 
       <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
         <Button variant="contained" onClick={handleSave} disabled={!isDirty || isSaving}>
-          {isSaving ? "Saving..." : "Save Cast"}
+          {isSaving ? t("saving") : t("save")}
         </Button>
       </Box>
     </Box>

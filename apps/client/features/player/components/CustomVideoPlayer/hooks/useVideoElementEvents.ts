@@ -55,7 +55,7 @@ export default function useVideoElementEvents(
     store.setState({
       isInitialLoading: true,
       isBuffering: false,
-      errorMessage: null,
+      errorKey: null,
       timeline: 0,
     });
   }, [resetSession, store]);
@@ -65,7 +65,7 @@ export default function useVideoElementEvents(
     store.setState({
       isInitialLoading: false,
       isBuffering: false,
-      errorMessage: null,
+      errorKey: null,
       timeline: 0,
     });
   }, [resetSession, store]);
@@ -86,7 +86,7 @@ export default function useVideoElementEvents(
       store.setState({
         isInitialLoading: false,
         isBuffering: false,
-        errorMessage: null,
+        errorKey: null,
       });
       syncDuration();
 
@@ -105,7 +105,7 @@ export default function useVideoElementEvents(
       store.setState({
         isInitialLoading: false,
         isBuffering: false,
-        errorMessage: "Video stream is unavailable",
+        errorKey: "streamUnavailable",
       });
     };
 

@@ -6,21 +6,24 @@ import { alpha } from "@mui/material/styles";
 import { ADMIN } from "@shared/lib/routes";
 import { inputVariants, tokens } from "@shared/mui/theme";
 import Avatar from "@shared/ui/Avatar";
+import { useTranslations } from "next-intl";
 import { usePathname, useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 
-const SECTION_LABELS: Record<string, string> = {
-  dashboard: "Dashboard",
-  titles: "Content Management",
+const SECTION_LABEL_KEYS: Partial<Record<string, "header.sections.dashboard" | "header.sections.titles">> = {
+  dashboard: "header.sections.dashboard",
+  titles: "header.sections.titles",
 };
 
 export default function AdminHeader() {
+  const t = useTranslations("admin");
   const pathname = usePathname();
   const router = useRouter();
   const [searchValue, setSearchValue] = useState("");
 
-  const sectionKey = pathname.split("/")[2] || "dashboard";
-  const currentSection = SECTION_LABELS[sectionKey] || "Admin";
+  const segments = pathname.split("/");
+  const sectionKey = segments[segments.indexOf("admin") + 1] || "dashboard";
+  const currentSection = t(SECTION_LABEL_KEYS[sectionKey] ?? "header.sections.fallback");
 
   const handleSearchSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -49,7 +52,7 @@ export default function AdminHeader() {
           <Typography
             sx={{ fontSize: "12px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "text.secondary" }}
           >
-            Admin Panel
+            {t("header.panel")}
           </Typography>
           <Typography variant="h4" sx={{ color: "#ffffff", mt: "4px" }}>
             {currentSection}
@@ -60,7 +63,7 @@ export default function AdminHeader() {
           <Box component="form" onSubmit={handleSearchSubmit}>
             <Input
               disableUnderline
-              placeholder="Search titles..."
+              placeholder={t("header.searchPlaceholder")}
               value={searchValue}
               onChange={(event) => setSearchValue(event.target.value)}
               startAdornment={
@@ -91,10 +94,10 @@ export default function AdminHeader() {
               borderColor: alpha(tokens.border.subtle, 0.8),
             }}
           >
-            <Avatar src="https://www.svgrepo.com/show/384670/account-avatar-profile-user.svg" alt="Admin user" />
+            <Avatar src="https://www.svgrepo.com/show/384670/account-avatar-profile-user.svg" alt={t("header.avatarAlt")} />
             <Box sx={{ display: "flex", flexDirection: "column" }}>
-              <Typography sx={{ fontSize: "16px", fontWeight: 600, color: "#ffffff" }}>Admin User</Typography>
-              <Typography sx={{ fontSize: "14px", color: "text.secondary" }}>Super Admin</Typography>
+              <Typography sx={{ fontSize: "16px", fontWeight: 600, color: "#ffffff" }}>{t("header.userName")}</Typography>
+              <Typography sx={{ fontSize: "14px", color: "text.secondary" }}>{t("header.userRole")}</Typography>
             </Box>
           </Box>
         </Box>

@@ -1,5 +1,6 @@
 import AutorenewIcon from "@mui/icons-material/Autorenew";
 import Box from "@mui/material/Box";
+import { useTranslations } from "next-intl";
 
 import { usePlayerPlayback, usePlayerTimeline, usePlayerUI } from "../../CustomVideoPlayerContext";
 import { formatPlayerTime } from "../../utils";
@@ -10,6 +11,7 @@ import Settings from "../Settings";
 import Volume from "../Volume";
 
 export default function PlayerControls() {
+  const t = useTranslations("player");
   const { current, duration } = usePlayerTimeline();
   const { isBuffering } = usePlayerPlayback();
   const { controlsVisible } = usePlayerUI();
@@ -56,7 +58,7 @@ export default function PlayerControls() {
                 animation: "spin 1s linear infinite",
                 "@keyframes spin": { from: { transform: "rotate(0deg)" }, to: { transform: "rotate(360deg)" } },
               }}
-              aria-label="Buffering"
+              aria-label={t("buffering")}
             />
           )}
           {formatPlayerTime(current)} / {formatPlayerTime(duration)}

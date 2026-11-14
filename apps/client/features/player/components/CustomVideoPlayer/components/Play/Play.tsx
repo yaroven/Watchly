@@ -1,12 +1,14 @@
 import PauseIcon from "@mui/icons-material/Pause";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import Box from "@mui/material/Box";
+import { useTranslations } from "next-intl";
 
 import { usePlayerPlayback } from "../../CustomVideoPlayerContext";
 
 const ICON_SIZE = 32;
 
 export default function Play() {
+  const t = useTranslations("player");
   const { isPlaying, toggle } = usePlayerPlayback();
 
   return (
@@ -15,8 +17,8 @@ export default function Play() {
       type="button"
       onClick={toggle}
       style={{ width: ICON_SIZE, height: ICON_SIZE }}
-      aria-label={isPlaying ? "Pause video" : "Play video"}
-      title={isPlaying ? "Pause" : "Play"}
+      aria-label={isPlaying ? t("pauseVideo") : t("playVideo")}
+      title={isPlaying ? t("pause") : t("play")}
       sx={{
         all: "unset",
         display: "inline-flex",

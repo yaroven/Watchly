@@ -1,7 +1,7 @@
 "use client";
 
+import { Link } from "@/i18n/navigation";
 import { ListItem, ListItemButton, ListItemIcon, ListItemText } from "@mui/material";
-import Link from "next/link";
 import { type ReactNode } from "react";
 
 const buttonBaseSx = {

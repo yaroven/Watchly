@@ -1,11 +1,14 @@
 import AutorenewIcon from "@mui/icons-material/Autorenew";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import Box from "@mui/material/Box";
+import { useTranslations } from "next-intl";
+
+import type { PlayerErrorKey } from "../../store/playerStore";
 
 interface PlayerOverlayProps {
   isPlaying: boolean;
   isInitialLoading: boolean;
-  errorMessage: string | null;
+  errorKey: PlayerErrorKey | null;
   onPlay: () => void;
 }
 
@@ -19,8 +22,10 @@ const centeredOverlaySx = {
   pointerEvents: "auto",
 };
 
-export default function PlayerOverlay({ isPlaying, isInitialLoading, errorMessage, onPlay }: PlayerOverlayProps) {
-  if (errorMessage)
+export default function PlayerOverlay({ isPlaying, isInitialLoading, errorKey, onPlay }: PlayerOverlayProps) {
+  const t = useTranslations("player");
+
+  if (errorKey)
     return (
       <Box
         sx={{
@@ -37,7 +42,7 @@ export default function PlayerOverlay({ isPlaying, isInitialLoading, errorMessag
           textAlign: "center",
         }}
       >
-        {errorMessage}
+        {t(`errors.${errorKey}`)}
       </Box>
     );
 
@@ -65,7 +70,7 @@ export default function PlayerOverlay({ isPlaying, isInitialLoading, errorMessag
       component="button"
       type="button"
       onClick={onPlay}
-      aria-label="Play video"
+      aria-label={t("playVideo")}
       sx={[
         centeredOverlaySx,
         {

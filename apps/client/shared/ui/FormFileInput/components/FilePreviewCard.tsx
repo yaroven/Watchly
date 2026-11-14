@@ -2,6 +2,7 @@ import { Delete as DeleteIcon, Description as DescriptionIcon, Edit as EditIcon 
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { tokens } from "@shared/mui/theme";
+import { useTranslations } from "next-intl";
 
 interface FilePreviewCardProps {
   inputId: string;
@@ -24,6 +25,7 @@ export default function FilePreviewCard({
   hasError = false,
   disabled = false,
 }: FilePreviewCardProps) {
+  const t = useTranslations("shared.fileInput");
   return (
     <Box
       sx={{
@@ -55,7 +57,7 @@ export default function FilePreviewCard({
           <video src={fileUrl} preload="metadata" muted />
         ) : isImage ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={fileUrl} alt={fileName || "Selected file preview"} />
+          <img src={fileUrl} alt={fileName || t("previewAlt")} />
         ) : (
           <DescriptionIcon sx={{ fontSize: "32px", color: tokens.text.placeholder }} />
         )}
@@ -79,7 +81,7 @@ export default function FilePreviewCard({
           <Box
             component="label"
             htmlFor={disabled ? undefined : inputId}
-            aria-label="Replace file"
+            aria-label={t("replace")}
             sx={{
               ...actionSx,
               color: tokens.accent.primary,
@@ -94,7 +96,7 @@ export default function FilePreviewCard({
             type="button"
             onClick={onRemove}
             disabled={disabled}
-            aria-label="Remove file"
+            aria-label={t("remove")}
             sx={{
               ...actionSx,
               color: tokens.feedback.error,

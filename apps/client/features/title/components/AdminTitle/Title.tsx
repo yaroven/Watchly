@@ -13,6 +13,7 @@ import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
 import { tokens } from "@shared/mui/theme";
 import ConfirmDialog from "@shared/ui/ConfirmDialog";
+import { useFormatter, useTranslations } from "next-intl";
 import Link from "next/link";
 import { Fragment, useState } from "react";
 import TitleIdentity from "./components/TitleIdentity";
@@ -23,11 +24,14 @@ interface TitleProps extends Title {
 }
 
 export default function Title({ id, createdAt, name, posterUrl, transcodingStatus, type, to }: TitleProps) {
+  const t = useTranslations("title");
+  const format = useFormatter();
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const { mutate: deleteTitle, isPending: isDeleting } = useDeleteTitle({ onSuccess: () => setIsDeleteOpen(false) });
 
-  const createdYear = new Date(createdAt).getFullYear();
-  const typeLabel = type === "MOVIE" ? "Movie" : "Series";
+  const createdDate = new Date(createdAt);
+  const createdYear = Number.isNaN(createdDate.getTime()) ? "----" : format.dateTime(createdDate, { year: "numeric" });
+  const typeLabel = t(`type.${type}`);
 
   return (
     <Fragment>
@@ -43,7 +47,7 @@ export default function Title({ id, createdAt, name, posterUrl, transcodingStatu
           <TitleIdentity name={name} posterUrl={posterUrl} to={to} type={type} />
         </TableCell>
 
-        <TableCell sx={{ color: "text.secondary", fontWeight: 700 }}>{Number.isNaN(createdYear) ? "----" : createdYear}</TableCell>
+        <TableCell sx={{ color: "text.secondary", fontWeight: 700 }}>{createdYear}</TableCell>
 
         <TableCell>
           <Chip size="small" label={typeLabel} />
@@ -65,11 +69,11 @@ export default function Title({ id, createdAt, name, posterUrl, transcodingStatu
               overflow: "hidden",
             }}
           >
-            <IconButton component={Link} href={to} aria-label="Open" sx={{ color: "#ffffff", borderRadius: 0 }}>
+            <IconButton component={Link} href={to} aria-label={t("admin.open")} sx={{ color: "#ffffff", borderRadius: 0 }}>
               <ArrowOutwardIcon sx={{ fontSize: 18 }} />
             </IconButton>
             <Divider orientation="vertical" flexItem sx={{ borderColor: "rgba(255,255,255,0.12)" }} />
-            <IconButton aria-label="Delete" color="error" onClick={() => setIsDeleteOpen(true)} sx={{ borderRadius: 0 }}>
+            <IconButton aria-label={t("admin.delete")} color="error" onClick={() => setIsDeleteOpen(true)} sx={{ borderRadius: 0 }}>
               <DeleteIcon sx={{ fontSize: 18 }} />
             </IconButton>
           </Box>
@@ -81,14 +85,13 @@ export default function Title({ id, createdAt, name, posterUrl, transcodingStatu
         onClose={() => setIsDeleteOpen(false)}
         onConfirm={() => deleteTitle(id)}
         isPending={isDeleting}
-        confirmLabel="Confirm Delete"
-        pendingLabel="Deleting..."
-        title="Delete Title"
-        description={
-          <>
-            Are you sure you want to delete <Typography component="strong">{name}</Typography>? This action cannot be undone.
-          </>
-        }
+        confirmLabel={t("details.deleteModal.confirm")}
+        pendingLabel={t("details.deleteModal.pending")}
+        title={t("details.deleteModal.title")}
+        description={t.rich("details.deleteModal.description", {
+          name,
+          strong: (chunks) => <Typography component="strong">{chunks}</Typography>,
+        })}
       />
     </Fragment>
   );

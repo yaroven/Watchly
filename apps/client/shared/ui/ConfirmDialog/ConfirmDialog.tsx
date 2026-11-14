@@ -10,6 +10,7 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import Button from "@shared/ui/Button";
 import Modal from "@shared/ui/Modal";
+import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 
 export type ConfirmTone = "danger" | "warning" | "info" | "success";
@@ -34,11 +35,12 @@ export default function ConfirmDialog({
   title,
   description,
   tone = "danger",
-  confirmLabel = "Confirm",
+  confirmLabel,
   pendingLabel,
-  cancelLabel = "Cancel",
+  cancelLabel,
   isPending = false,
 }: ConfirmDialogProps) {
+  const t = useTranslations("common");
   const { Icon, color, tint } = TONES[tone];
 
   return (
@@ -75,10 +77,10 @@ export default function ConfirmDialog({
 
         <Box sx={{ display: "flex", gap: "12px", width: "100%", mt: "6px" }}>
           <Button variant="outlined" onClick={onClose} disabled={isPending} sx={{ flex: 1 }}>
-            {cancelLabel}
+            {cancelLabel ?? t("cancel")}
           </Button>
           <Button danger={tone === "danger"} onClick={onConfirm} disabled={isPending} sx={{ flex: 1 }}>
-            {isPending && pendingLabel ? pendingLabel : confirmLabel}
+            {isPending && pendingLabel ? pendingLabel : (confirmLabel ?? t("confirm"))}
           </Button>
         </Box>
       </Box>

@@ -3,6 +3,7 @@
 import { useCreateArtistWithUpload, useUpdateArtistWithUpload } from "@/features/artist/api/use-artist-mutations";
 import { Artist, ArtistFormValues } from "@/features/artist/schemas/artist";
 import { ApiError } from "@/shared/api/api-error";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 interface UseArtistSubmissionWorkflowProps {
@@ -10,6 +11,7 @@ interface UseArtistSubmissionWorkflowProps {
 }
 
 export function useArtistSubmissionWorkflow({ initialData }: UseArtistSubmissionWorkflowProps) {
+  const t = useTranslations("artist");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [actionError, setActionError] = useState<Error | null>(null);
 
@@ -32,7 +34,7 @@ export function useArtistSubmissionWorkflow({ initialData }: UseArtistSubmission
       }
       setUploadProgress(0);
     } catch (error: unknown) {
-      const normalizedError = error instanceof Error ? error : new ApiError("Failed to save actor");
+      const normalizedError = error instanceof Error ? error : new ApiError(t("form.saveFailed"));
       setUploadProgress(0);
       setActionError(normalizedError);
       throw normalizedError;

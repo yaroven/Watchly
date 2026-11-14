@@ -28,7 +28,7 @@ export const usePlayerPlayback = () => {
   const isPlaying = useStore(store, (s) => s.isPlaying);
   const isInitialLoading = useStore(store, (s) => s.isInitialLoading);
   const isBuffering = useStore(store, (s) => s.isBuffering);
-  const errorMessage = useStore(store, (s) => s.errorMessage);
+  const errorKey = useStore(store, (s) => s.errorKey);
   const toggle = useStore(store, (s) => s.togglePlay);
   const seek = useStore(store, (s) => s.seek);
   const skip = useStore(store, (s) => s.skip);
@@ -37,7 +37,7 @@ export const usePlayerPlayback = () => {
     isPlaying,
     isInitialLoading,
     isBuffering,
-    errorMessage,
+    errorKey,
     toggle,
     seek,
     skip,

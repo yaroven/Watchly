@@ -5,6 +5,7 @@ import InboxOutlinedIcon from "@mui/icons-material/InboxOutlined";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import Button from "@shared/ui/Button";
+import { useTranslations } from "next-intl";
 import DeleteModal from "./components/DeleteModal/DeleteModal";
 import SeasonItem from "./components/SeasonItem/SeasonItem";
 import SeasonModal from "./components/SeasonModal/SeasonModal";
@@ -31,14 +32,15 @@ export default function SeasonManager({ seasons, titleId, onSelectSeason, select
 }
 
 function SeasonManagerHeader() {
+  const t = useTranslations("season");
   const { openCreate } = useSeasonManagerContext();
   return (
     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
       <Typography component="h3" variant="h6" sx={{ color: "#ffffff", fontWeight: 700 }}>
-        Seasons
+        {t("manager.heading")}
       </Typography>
       <Button variant="outlined" size="small" startIcon={<AddIcon sx={{ fontSize: 16 }} />} onClick={openCreate}>
-        Add Season
+        {t("manager.add")}
       </Button>
     </Box>
   );
@@ -53,6 +55,8 @@ function SeasonList({
   selectedSeasonId?: string;
   onSelectSeason: (seasonId: string) => void;
 }) {
+  const t = useTranslations("season");
+
   if (seasons.length === 0) {
     return (
       <Box
@@ -67,7 +71,7 @@ function SeasonList({
         }}
       >
         <InboxOutlinedIcon sx={{ fontSize: 28, color: "#444444" }} />
-        <Typography sx={{ fontSize: "14px", color: "text.secondary" }}>No seasons yet. Add the first one to get started.</Typography>
+        <Typography sx={{ fontSize: "14px", color: "text.secondary" }}>{t("manager.empty")}</Typography>
       </Box>
     );
   }
@@ -82,13 +86,14 @@ function SeasonList({
 }
 
 function DeleteModalWrapper() {
+  const t = useTranslations("season");
   const { isDeleteModalOpen, closeDeleteModal, seasonToDelete, handleConfirmDelete, deleteMutation } = useSeasonManagerContext();
 
   return (
     <DeleteModal
       isOpen={isDeleteModalOpen}
       onClose={closeDeleteModal}
-      title={seasonToDelete ? `Season ${seasonToDelete.number}: ${seasonToDelete.name}` : ""}
+      title={seasonToDelete ? t("seasonTitle", { number: seasonToDelete.number, name: seasonToDelete.name }) : ""}
       onConfirm={handleConfirmDelete}
       isDeleting={deleteMutation.isPending}
     />

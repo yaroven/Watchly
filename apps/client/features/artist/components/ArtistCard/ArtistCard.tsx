@@ -7,6 +7,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import InvertedCornerBox from "@shared/ui/InvertedCornerBox";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 
 interface ArtistCardProps {
@@ -17,6 +18,7 @@ interface ArtistCardProps {
 }
 
 export default function ArtistCard({ artist, onOpen, onEdit, onDelete }: ArtistCardProps) {
+  const t = useTranslations("artist");
   const photoSrc = getOptimizedImageSrc(artist.photoUrl ?? undefined);
 
   return (
@@ -62,7 +64,7 @@ export default function ArtistCard({ artist, onOpen, onEdit, onDelete }: ArtistC
           className="artist-card-actions"
         >
           <IconAction
-            label={`Edit ${artist.name}`}
+            label={t("card.edit", { name: artist.name })}
             onClick={(e) => {
               e.stopPropagation();
               onEdit();
@@ -71,7 +73,7 @@ export default function ArtistCard({ artist, onOpen, onEdit, onDelete }: ArtistC
             <EditIcon sx={{ fontSize: 14 }} />
           </IconAction>
           <IconAction
-            label={`Delete ${artist.name}`}
+            label={t("card.delete", { name: artist.name })}
             onClick={(e) => {
               e.stopPropagation();
               onDelete();

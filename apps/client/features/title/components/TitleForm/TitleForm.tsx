@@ -1,7 +1,7 @@
 "use client";
 
 import useGenres from "@/features/genre/api/use-genres";
-import { CreateTitleSchema, Title, TitleFormValues, TitleType, UpdateTitleSchema } from "@/features/title/schemas/title";
+import { createCreateTitleSchema, createUpdateTitleSchema, Title, TitleFormValues, TitleType } from "@/features/title/schemas/title";
 import ProgressBar from "@/features/transcoding/components/ProgressBar";
 import { ADMIN } from "@/shared/lib/routes";
 import Modal from "@/shared/ui/Modal";
@@ -11,8 +11,9 @@ import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import Button from "@shared/ui/Button";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Resolver, useForm, useWatch } from "react-hook-form";
 import CreateRail from "./components/CreateRail";
 import FormSection from "./components/FormSection";
@@ -66,11 +67,16 @@ const toFormValues = (title: Title): TitleFormValues => ({
 });
 
 export default function TitleForm({ initialData }: TitleFormProps) {
+  const t = useTranslations("title.form");
+  const tValidation = useTranslations("title.validation");
   const router = useRouter();
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
 
   const isEditing = !!initialData;
-  const schema = isEditing ? UpdateTitleSchema : CreateTitleSchema;
+  const schema = useMemo(
+    () => (isEditing ? createUpdateTitleSchema(tValidation) : createCreateTitleSchema(tValidation)),
+    [isEditing, tValidation],
+  );
 
   const form = useForm<TitleFormValues>({
     resolver: zodResolver(schema) as Resolver<TitleFormValues>,
@@ -129,7 +135,9 @@ export default function TitleForm({ initialData }: TitleFormProps) {
     const section = readiness.sections.find((item) => item.key === sectionKey);
     if (!section) return undefined;
     const left = section.items.filter((item) => !item.done).length;
-    return left ? { label: `${left} LEFT`, tone: "todo" as const } : { label: "COMPLETE", tone: "done" as const };
+    return left
+      ? { label: t("sectionLeft", { count: left }), tone: "todo" as const }
+      : { label: t("sectionComplete"), tone: "done" as const };
   };
 
   if (isEditing) {
@@ -143,10 +151,10 @@ export default function TitleForm({ initialData }: TitleFormProps) {
         <AccessibilityFields form={form} />
 
         {isUploading && <ProgressBar progress={uploadProgress} />}
-        {actionError && <Alert severity="error">Error: {actionError.message}</Alert>}
+        {actionError && <Alert severity="error">{t("error", { message: actionError.message })}</Alert>}
 
         <Button disabled={isPending} type="submit">
-          {isPending ? "Saving Title..." : "Update Title"}
+          {isPending ? t("saving") : t("update")}
         </Button>
 
         <Modal isOpen={isSuccessModalOpen} onClose={closeSuccessModal} size="sm">
@@ -165,7 +173,7 @@ export default function TitleForm({ initialData }: TitleFormProps) {
               <CheckCircleIcon sx={{ fontSize: 30, color: "#27c237" }} />
             </Box>
 
-            <Typography sx={{ fontSize: "24px", fontWeight: 700, color: "#ffffff" }}>Title updated successfully!</Typography>
+            <Typography sx={{ fontSize: "24px", fontWeight: 700, color: "#ffffff" }}>{t("updatedSuccess")}</Typography>
 
             <Box sx={{ display: "flex", gap: "12px", width: "100%", mt: "6px" }}>
               <Button
@@ -176,10 +184,10 @@ export default function TitleForm({ initialData }: TitleFormProps) {
                   router.push(ADMIN.TITLES);
                 }}
               >
-                View All Titles
+                {t("viewAllTitles")}
               </Button>
               <Button sx={{ flex: 1 }} onClick={closeSuccessModal}>
-                Keep editing
+                {t("keepEditing")}
               </Button>
             </Box>
           </Box>
@@ -199,8 +207,8 @@ export default function TitleForm({ initialData }: TitleFormProps) {
 
         <FormSection
           index="01"
-          title="Identity"
-          description="What the title is called and who made it."
+          title={t("sections.identity.title")}
+          description={t("sections.identity.description")}
           status={sectionStatus("identity")}
           anchorId="section-identity"
         >
@@ -209,8 +217,8 @@ export default function TitleForm({ initialData }: TitleFormProps) {
 
         <FormSection
           index="02"
-          title="Format & classification"
-          description="Type decides the rest of the form. Pick it first."
+          title={t("sections.classification.title")}
+          description={t("sections.classification.description")}
           status={sectionStatus("classification")}
           anchorId="section-classification"
         >
@@ -219,28 +227,24 @@ export default function TitleForm({ initialData }: TitleFormProps) {
 
         <FormSection
           index="03"
-          title="Media"
-          description={
-            showVideoField
-              ? "Poster, trailer link, and the source video."
-              : "Poster and trailer only — episode video lives with the episode."
-          }
+          title={t("sections.media.title")}
+          description={showVideoField ? t("sections.media.descriptionWithVideo") : t("sections.media.descriptionWithoutVideo")}
           status={sectionStatus("media")}
           anchorId="section-media"
         >
           <MediaFields form={form} showVideoField={showVideoField} disabled={isPending} />
         </FormSection>
 
-        <FormSection index="04" title="Accessibility" description="What viewers get beyond the picture." anchorId="section-accessibility">
+        <FormSection
+          index="04"
+          title={t("sections.accessibility.title")}
+          description={t("sections.accessibility.description")}
+          anchorId="section-accessibility"
+        >
           <AccessibilityFields form={form} />
         </FormSection>
 
-        {actionError && (
-          <Alert severity="error">
-            Error: {actionError.message}
-            {" — nothing was kept. Your entries are still here."}
-          </Alert>
-        )}
+        {actionError && <Alert severity="error">{t("createError", { message: actionError.message })}</Alert>}
       </Box>
 
       <CreateRail

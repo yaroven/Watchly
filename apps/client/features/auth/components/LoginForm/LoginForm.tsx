@@ -10,20 +10,25 @@ import Checkbox from "@mui/material/Checkbox";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import InputAdornment from "@mui/material/InputAdornment";
 import Typography from "@mui/material/Typography";
+import { describeApiError } from "@shared/api/api-error";
 import { authStore } from "@shared/lib/auth-store";
 import { decodeAccessToken } from "@shared/lib/decode-jwt";
 import Button from "@shared/ui/Button";
 import FormField from "@shared/ui/FormField";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import AuthService from "../../api/auth.service";
-import { LoginFormValues, LoginSchema } from "../../schemas/auth";
+import { createLoginSchema, LoginFormValues } from "../../schemas/auth";
 import SocialAuthButtons from "../SocialAuthButtons";
 
 export default function LoginForm() {
+  const t = useTranslations("auth");
+  const tErrors = useTranslations("errors");
   const router = useRouter();
+  const loginSchema = useMemo(() => createLoginSchema(t), [t]);
   const [error, setError] = useState<string | null>(null);
   const {
     register,
@@ -31,7 +36,7 @@ export default function LoginForm() {
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<LoginFormValues>({
-    resolver: zodResolver(LoginSchema),
+    resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "", rememberMe: false },
   });
 
@@ -47,7 +52,7 @@ export default function LoginForm() {
       });
       router.push(APP.DISCOVER);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(describeApiError(err, tErrors));
     }
   };
 
@@ -69,7 +74,7 @@ export default function LoginForm() {
       }}
     >
       <Typography component="h1" sx={{ textAlign: "center", fontSize: "40px", fontWeight: 700, color: "#ffffff" }}>
-        login
+        {t("login.heading")}
       </Typography>
 
       <Box sx={{ display: "flex", flexDirection: "column", gap: "24px" }}>
@@ -77,7 +82,7 @@ export default function LoginForm() {
           variant="bordered"
           name="email"
           type="email"
-          label="Email"
+          label={t("fields.email")}
           register={register}
           error={errors.email}
           endAdornment={
@@ -91,7 +96,7 @@ export default function LoginForm() {
           variant="bordered"
           name="password"
           type="password"
-          label="Password"
+          label={t("fields.password")}
           register={register}
           error={errors.password}
           endAdornment={
@@ -109,13 +114,13 @@ export default function LoginForm() {
           render={({ field }) => (
             <FormControlLabel
               control={<Checkbox {...field} checked={field.value} size="small" sx={{ color: "text.secondary" }} />}
-              label="Remember Me"
+              label={t("login.rememberMe")}
               sx={{ color: "text.secondary", "& .MuiFormControlLabel-label": { fontSize: "14px" } }}
             />
           )}
         />
 
-        <Typography sx={{ fontSize: "14px", color: "text.secondary", cursor: "default" }}>Forgot Password?</Typography>
+        <Typography sx={{ fontSize: "14px", color: "text.secondary", cursor: "default" }}>{t("login.forgotPassword")}</Typography>
       </Box>
 
       {error && (
@@ -130,16 +135,19 @@ export default function LoginForm() {
         disabled={isSubmitting}
         sx={{ height: "52px", backgroundColor: "#e5e5e5", color: "#191919", "&:hover": { backgroundColor: "#ffffff" } }}
       >
-        {isSubmitting ? "Logging in…" : "Login"}
+        {isSubmitting ? t("login.submitting") : t("login.submit")}
       </Button>
 
       <SocialAuthButtons />
 
       <Typography sx={{ textAlign: "center", fontSize: "14px", color: "text.secondary" }}>
-        Don&apos;t have an account?{" "}
-        <Typography component={Link} href={APP.REGISTER} sx={{ fontSize: "inherit", fontWeight: 700, color: "primary.main" }}>
-          Create Account!
-        </Typography>
+        {t.rich("login.noAccount", {
+          link: (chunks) => (
+            <Typography component={Link} href={APP.REGISTER} sx={{ fontSize: "inherit", fontWeight: 700, color: "primary.main" }}>
+              {chunks}
+            </Typography>
+          ),
+        })}
       </Typography>
     </Box>
   );

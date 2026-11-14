@@ -1,4 +1,5 @@
 import Box from "@mui/material/Box";
+import { useTranslations } from "next-intl";
 
 interface SeasonTabItemProps {
   number: number;
@@ -7,6 +8,8 @@ interface SeasonTabItemProps {
 }
 
 export default function SeasonTabItem({ number, isActive, onClick }: SeasonTabItemProps) {
+  const t = useTranslations("season");
+
   return (
     <Box
       component="button"
@@ -29,7 +32,7 @@ export default function SeasonTabItem({ number, isActive, onClick }: SeasonTabIt
         ":hover": { color: isActive ? "primary.contrastText" : "text.primary" },
       }}
     >
-      Season {number}
+      {t("tab", { number })}
     </Box>
   );
 }

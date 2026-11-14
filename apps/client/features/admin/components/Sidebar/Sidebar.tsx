@@ -13,6 +13,7 @@ import { tokens } from "@shared/mui/theme";
 import CollapseButton from "@shared/ui/Sidebar/components/CollapseButton";
 import { useSidebar } from "@shared/ui/Sidebar/SidebarContext";
 import { useActiveIndicator } from "@shared/ui/Sidebar/useActiveIndicator";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -23,14 +24,15 @@ const INDICATOR_HEIGHT = 32;
 const BORDER_GRADIENT = `linear-gradient(180deg, #6e6e6e 0%, rgba(178, 178, 178, 0.12) 100%)`;
 
 const menuItems = [
-  { text: "Dashboard", href: ADMIN.DASHBOARD, icon: <DashboardIcon /> },
-  { text: "Titles", href: ADMIN.TITLES, icon: <VideoLibraryIcon /> },
-  { text: "Users", href: ADMIN.USERS, icon: <PeopleIcon /> },
-  { text: "Actors", href: ADMIN.ARTISTS, icon: <GroupsIcon /> },
-  { text: "Genres", href: ADMIN.GENRES, icon: <SellIcon /> },
-];
+  { labelKey: "sidebar.dashboard", href: ADMIN.DASHBOARD, icon: <DashboardIcon /> },
+  { labelKey: "sidebar.titles", href: ADMIN.TITLES, icon: <VideoLibraryIcon /> },
+  { labelKey: "sidebar.users", href: ADMIN.USERS, icon: <PeopleIcon /> },
+  { labelKey: "sidebar.actors", href: ADMIN.ARTISTS, icon: <GroupsIcon /> },
+  { labelKey: "sidebar.genres", href: ADMIN.GENRES, icon: <SellIcon /> },
+] as const;
 
 export default function Sidebar() {
+  const t = useTranslations("admin");
   const pathname = usePathname();
   const activeIndex = menuItems.findIndex((item) => pathname.startsWith(item.href));
   const listRef = useRef<HTMLUListElement>(null);
@@ -106,7 +108,7 @@ export default function Sidebar() {
               color: "primary.main",
             }}
           >
-            Admin
+            {t("sidebar.badge")}
           </Typography>
         </Box>
       </Box>
@@ -124,7 +126,7 @@ export default function Sidebar() {
           transition: "opacity 0.2s ease, max-height 0.3s ease",
         }}
       >
-        Menu
+        {t("sidebar.menu")}
       </Typography>
 
       <List ref={listRef} sx={{ py: 0, position: "relative", flex: 1 }}>
@@ -144,9 +146,9 @@ export default function Sidebar() {
         />
         {menuItems.map((item, index) => (
           <AdminNavItem
-            key={item.text}
+            key={item.href}
             href={item.href}
-            text={item.text}
+            text={t(item.labelKey)}
             icon={item.icon}
             isActive={index === activeIndex}
             collapsed={collapsed}
@@ -158,7 +160,7 @@ export default function Sidebar() {
       <List sx={{ py: 0, mb: 4 }}>
         <AdminNavItem
           href={APP.ROOT}
-          text="Back to Site"
+          text={t("sidebar.backToSite")}
           icon={<ArrowBackIcon />}
           isActive={false}
           collapsed={collapsed}

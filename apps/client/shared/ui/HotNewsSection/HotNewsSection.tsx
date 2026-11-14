@@ -5,6 +5,7 @@ import Typography from "@mui/material/Typography";
 import { Verified } from "@shared/assets/icons";
 import CustomIcon from "@shared/ui/CustomIcon";
 import SliderArrows from "@shared/ui/SliderArrows";
+import { useFormatter, useTranslations } from "next-intl";
 import Image from "next/image";
 import { useState } from "react";
 
@@ -20,6 +21,8 @@ interface HotNewsSectionProps {
 }
 
 export default function HotNewsSection({ news }: HotNewsSectionProps) {
+  const t = useTranslations("shared.hotNews");
+  const format = useFormatter();
   const [index, setIndex] = useState(0);
   const [direction, setDirection] = useState<-1 | 1>(1);
 
@@ -31,8 +34,7 @@ export default function HotNewsSection({ news }: HotNewsSectionProps) {
   };
 
   const slide = news[index];
-  const d = new Date(slide.createdAt);
-  const month = d.toLocaleDateString("en-US", { month: "long" });
+  const date = format.dateTime(new Date(slide.createdAt), { month: "long", day: "numeric" });
 
   return (
     <Box
@@ -104,7 +106,7 @@ export default function HotNewsSection({ news }: HotNewsSectionProps) {
           <CustomIcon icon={Verified} />
 
           <Typography component={"h1"} sx={{ fontSize: "clamp(16px, 1.3vw, 26px)", fontWeight: 700, color: "primary.main" }}>
-            Hot News
+            {t("heading")}
           </Typography>
         </Box>
 
@@ -120,9 +122,7 @@ export default function HotNewsSection({ news }: HotNewsSectionProps) {
             order: 4,
           }}
         >
-          <Typography sx={{ color: "text.secondary" }}>
-            {month} {d.getDate()}
-          </Typography>
+          <Typography sx={{ color: "text.secondary" }}>{date}</Typography>
           <Box sx={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <SliderArrows
               onPrev={() => go(-1)}
@@ -134,7 +134,7 @@ export default function HotNewsSection({ news }: HotNewsSectionProps) {
               sx={{ gap: "8px" }}
             />
             <Typography sx={{ fontSize: "clamp(12px, 0.85vw, 16px)" }}>
-              {index + 1}/{news.length}
+              {t("position", { current: index + 1, total: news.length })}
             </Typography>
           </Box>
         </Box>

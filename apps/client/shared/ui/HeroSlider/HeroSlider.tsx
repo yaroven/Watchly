@@ -6,6 +6,7 @@ import { IMDB } from "@shared/assets/icons";
 import Button from "@shared/ui/Button";
 import CustomIcon from "@shared/ui/CustomIcon";
 import SliderArrows from "@shared/ui/SliderArrows";
+import { useTranslations } from "next-intl";
 import { Fragment, useState } from "react";
 
 export interface SliderTitle {
@@ -24,6 +25,7 @@ interface HeroSliderProps {
 }
 
 export default function HeroSlider({ titles }: HeroSliderProps) {
+  const t = useTranslations("shared.heroSlider");
   const [index, setIndex] = useState(0);
   const [direction, setDirection] = useState<-1 | 1>(1);
 
@@ -129,7 +131,7 @@ export default function HeroSlider({ titles }: HeroSliderProps) {
 
         <Box sx={{ display: "flex", gap: "14px", px: "4px", mt: "auto" }}>
           <Button variant="contained" href={slide.watchLink} sx={{ fontWeight: 700, px: "44px", py: "8px" }}>
-            Watch
+            {t("watch")}
           </Button>
           {slide.trailerLink && (
             <Button
@@ -137,7 +139,7 @@ export default function HeroSlider({ titles }: HeroSliderProps) {
               href={slide.trailerLink}
               sx={{ fontWeight: 700, px: "48px", py: "8px", borderColor: "primary.main" }}
             >
-              Trailer
+              {t("trailer")}
             </Button>
           )}
         </Box>
