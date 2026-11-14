@@ -17,6 +17,7 @@ import { IMDB } from "@shared/assets/icons";
 import { inputVariants, tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
 import CustomIcon from "@shared/ui/CustomIcon";
+import { useFormatter, useTranslations } from "next-intl";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -48,20 +49,24 @@ const menuProps = {
   },
 };
 
-const DISABLED_FILTERS = [{ label: "Age rating" }, { label: "Artist" }, { label: "Country" }, { label: "Order" }, { label: "Quality" }];
+const DISABLED_FILTERS = ["ageRating", "artist", "country", "order", "quality"] as const;
 
 function DisabledFilter({ label }: { label: string }) {
+  const t = useTranslations("title.search.filters");
+
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: "16px" }}>
       <Typography sx={{ width: "90px", flexShrink: 0, fontWeight: 600, color: "#ffffff" }}>{label}</Typography>
       <MuiSelect fullWidth displayEmpty value="" disabled MenuProps={menuProps} sx={selectSx}>
-        <MenuItem value="">All</MenuItem>
+        <MenuItem value="">{t("all")}</MenuItem>
       </MuiSelect>
     </Box>
   );
 }
 
 export default function SearchResults() {
+  const t = useTranslations("title.search");
+  const tType = useTranslations("title.type");
   const router = useRouter();
   const searchParams = useSearchParams();
   const query = searchParams.get("q") ?? "";
@@ -107,12 +112,12 @@ export default function SearchResults() {
   const setType = (nextType: TitleType | "") => updateFilters({ type: nextType });
 
   const heading = query
-    ? `The search results for "${query}"`
+    ? t("headingQuery", { query })
     : typeFilter === TitleType.MOVIE
-      ? "All Movies"
+      ? t("headingMovies")
       : typeFilter === TitleType.SERIES
-        ? "All Series"
-        : "All Titles";
+        ? t("headingSeries")
+        : t("headingAll");
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "28px" }}>
@@ -150,14 +155,14 @@ export default function SearchResults() {
                     transition: "background-color .15s ease-out, color .15s ease-out",
                   }}
                 >
-                  {type === TitleType.MOVIE ? "Movie" : "Series"}
+                  {tType(type)}
                 </Box>
               ))}
             </Box>
           </Box>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <Typography sx={{ width: "90px", flexShrink: 0, fontWeight: 600, color: "#ffffff" }}>Genre</Typography>
+            <Typography sx={{ width: "90px", flexShrink: 0, fontWeight: 600, color: "#ffffff" }}>{t("filters.genre")}</Typography>
             <MuiSelect
               fullWidth
               displayEmpty
@@ -166,7 +171,7 @@ export default function SearchResults() {
               MenuProps={menuProps}
               sx={selectSx}
             >
-              <MenuItem value="">All</MenuItem>
+              <MenuItem value="">{t("filters.all")}</MenuItem>
               {genres.map((genre) => (
                 <MenuItem key={genre.id} value={genre.id}>
                   {genre.name}
@@ -176,11 +181,11 @@ export default function SearchResults() {
           </Box>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <Typography sx={{ width: "90px", flexShrink: 0, fontWeight: 600, color: "#ffffff" }}>Director</Typography>
+            <Typography sx={{ width: "90px", flexShrink: 0, fontWeight: 600, color: "#ffffff" }}>{t("filters.director")}</Typography>
             <Input
               fullWidth
               disableUnderline
-              placeholder="All"
+              placeholder={t("filters.all")}
               value={directorInput}
               onChange={(event) => setDirectorInput(event.target.value)}
               onBlur={() => updateFilters({ director: directorInput })}
@@ -192,11 +197,11 @@ export default function SearchResults() {
           </Box>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <Typography sx={{ width: "90px", flexShrink: 0, fontWeight: 600, color: "#ffffff" }}>Network</Typography>
+            <Typography sx={{ width: "90px", flexShrink: 0, fontWeight: 600, color: "#ffffff" }}>{t("filters.network")}</Typography>
             <Input
               fullWidth
               disableUnderline
-              placeholder="All"
+              placeholder={t("filters.all")}
               value={networkInput}
               onChange={(event) => setNetworkInput(event.target.value)}
               onBlur={() => updateFilters({ network: networkInput })}
@@ -207,8 +212,8 @@ export default function SearchResults() {
             />
           </Box>
 
-          {DISABLED_FILTERS.map(({ label }) => (
-            <DisabledFilter key={label} label={label} />
+          {DISABLED_FILTERS.map((key) => (
+            <DisabledFilter key={key} label={t(`filters.${key}`)} />
           ))}
         </Box>
       </Box>
@@ -243,16 +248,14 @@ export default function SearchResults() {
           {visibleCount < items.length && (
             <Box sx={{ display: "flex", justifyContent: "center" }}>
               <Button variant="outlined" onClick={() => setVisibleCount((count) => count + PAGE_SIZE)} sx={{ gap: "8px" }}>
-                More
+                {t("more")}
                 <ExpandMore sx={{ fontSize: "18px" }} />
               </Button>
             </Box>
           )}
         </>
       ) : (
-        <EmptyState
-          message={query ? `No movies or series matched "${query}". Try a different title.` : "Nothing here yet. Check back later."}
-        />
+        <EmptyState message={query ? t("emptyQuery", { query }) : t("empty")} />
       )}
     </Box>
   );
@@ -279,7 +282,11 @@ function ResultRows({ items, onOpen }: { items: Title[]; onOpen: (id: string) =>
 }
 
 function ResultItem({ title, onClick }: { title: Title; onClick: () => void }) {
-  const year = title.createdAt && !Number.isNaN(new Date(title.createdAt).getTime()) ? new Date(title.createdAt).getFullYear() : undefined;
+  const format = useFormatter();
+  const year =
+    title.createdAt && !Number.isNaN(new Date(title.createdAt).getTime())
+      ? format.dateTime(new Date(title.createdAt), { year: "numeric" })
+      : undefined;
   const imdbRating = title.externalRatings.find((r) => r.source === ExternalRatingSource.IMDB)?.rating;
 
   return (

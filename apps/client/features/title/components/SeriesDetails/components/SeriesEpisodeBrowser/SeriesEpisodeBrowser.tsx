@@ -9,6 +9,7 @@ import Chip from "@mui/material/Chip";
 import Typography from "@mui/material/Typography";
 import { APP } from "@shared/lib/routes";
 import { tokens } from "@shared/mui/theme";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useQueryState } from "nuqs";
 import { useCallback } from "react";
@@ -21,6 +22,7 @@ interface SeriesEpisodeBrowserProps {
 }
 
 export default function SeriesEpisodeBrowser({ titleId, seasons, episodes, currentSeasonId }: SeriesEpisodeBrowserProps) {
+  const t = useTranslations("title.episodes");
   const router = useRouter();
   const [, setSeasonId] = useQueryState("season", { history: "replace", shallow: false });
 
@@ -75,21 +77,21 @@ export default function SeriesEpisodeBrowser({ titleId, seasons, episodes, curre
 
       <Box sx={{ borderRadius: "20px", overflow: "hidden" }}>
         <Box sx={{ px: "24px", pt: "24px" }}>
-          <Typography variant="h4">Episodes</Typography>
+          <Typography variant="h4">{t("heading")}</Typography>
         </Box>
 
         <Box sx={{ borderBottom: "1px solid", borderColor: "divider", mt: "20px" }} />
 
         <Box sx={{ p: "24px", display: "flex", flexDirection: "column", gap: "20px" }}>
           <Chip
-            label={`${episodes.length} Episode${episodes.length === 1 ? "" : "s"}`}
+            label={t("count", { count: episodes.length })}
             sx={{ bgcolor: tokens.surface.fill, color: tokens.text.field, alignSelf: "flex-start" }}
           />
 
           {episodes.length ? (
             <EpisodeList episodes={episodes} onClick={handleEpisodeSelect} currentEpisodeId="" posterUrl={currentSeasonPosterUrl} />
           ) : (
-            <Typography sx={{ color: "text.secondary" }}>Episodes for this season have not been added yet.</Typography>
+            <Typography sx={{ color: "text.secondary" }}>{t("emptySeason")}</Typography>
           )}
         </Box>
       </Box>

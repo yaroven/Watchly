@@ -17,6 +17,7 @@ import Typography from "@mui/material/Typography";
 import { inputVariants, tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
 import GradientCard from "@shared/ui/GradientCard";
+import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { TitlesPageFilters } from "../../types";
 
@@ -86,17 +87,20 @@ export default function TitlesFiltersPanel({
   onUpdateFilters,
   onResetFilters,
 }: TitlesFiltersPanelProps) {
+  const t = useTranslations("title.library.filters");
+  const tStatus = useTranslations("title.admin.status");
+
   return (
     <GradientCard radius={24} sx={{ width: "100%", p: "28px" }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px", mb: "24px" }}>
         <Box sx={{ display: "inline-flex", alignItems: "center", gap: "12px", color: "text.secondary" }}>
           <FilterAltIcon sx={{ fontSize: 20 }} />
-          <Typography sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Filters</Typography>
+          <Typography sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>{t("heading")}</Typography>
         </Box>
 
         {hasActiveFilters && (
           <Button variant="outlined" size="small" onClick={onResetFilters} startIcon={<ReplayIcon sx={{ fontSize: 16 }} />}>
-            Reset Filters
+            {t("reset")}
           </Button>
         )}
       </Box>
@@ -110,10 +114,10 @@ export default function TitlesFiltersPanel({
           alignItems: "start",
         }}
       >
-        <FilterField icon={<SearchIcon sx={{ fontSize: 14 }} />} label="Search" primary>
+        <FilterField icon={<SearchIcon sx={{ fontSize: 14 }} />} label={t("search")} primary>
           <TextField
             variant="standard"
-            placeholder="Search by title..."
+            placeholder={t("searchPlaceholder")}
             value={searchString}
             onChange={(e) => onUpdateFilters({ search: e.target.value })}
             fullWidth
@@ -131,7 +135,7 @@ export default function TitlesFiltersPanel({
           />
         </FilterField>
 
-        <FilterField icon={<CategoryIcon sx={{ fontSize: 14 }} />} label="Type">
+        <FilterField icon={<CategoryIcon sx={{ fontSize: 14 }} />} label={t("type")}>
           <MuiSelect
             fullWidth
             displayEmpty
@@ -140,19 +144,19 @@ export default function TitlesFiltersPanel({
             MenuProps={menuProps}
             sx={selectSx}
           >
-            <MenuItem value="">All Types</MenuItem>
-            <MenuItem value={TitleType.MOVIE}>Movies</MenuItem>
-            <MenuItem value={TitleType.SERIES}>Series</MenuItem>
+            <MenuItem value="">{t("allTypes")}</MenuItem>
+            <MenuItem value={TitleType.MOVIE}>{t("movies")}</MenuItem>
+            <MenuItem value={TitleType.SERIES}>{t("series")}</MenuItem>
           </MuiSelect>
         </FilterField>
 
-        <FilterField icon={<SellIcon sx={{ fontSize: 14 }} />} label="Genre">
+        <FilterField icon={<SellIcon sx={{ fontSize: 14 }} />} label={t("genre")}>
           <MuiSelect fullWidth displayEmpty value="" disabled MenuProps={menuProps} sx={selectSx}>
-            <MenuItem value="">All Genres</MenuItem>
+            <MenuItem value="">{t("allGenres")}</MenuItem>
           </MuiSelect>
         </FilterField>
 
-        <FilterField icon={<FlagIcon sx={{ fontSize: 14 }} />} label="Status">
+        <FilterField icon={<FlagIcon sx={{ fontSize: 14 }} />} label={t("status")}>
           <MuiSelect
             fullWidth
             displayEmpty
@@ -161,11 +165,11 @@ export default function TitlesFiltersPanel({
             MenuProps={menuProps}
             sx={selectSx}
           >
-            <MenuItem value="">All Statuses</MenuItem>
-            <MenuItem value={TranscodingStatus.COMPLETED}>Published</MenuItem>
-            <MenuItem value={TranscodingStatus.PROCESSING}>Processing</MenuItem>
-            <MenuItem value={TranscodingStatus.PENDING}>Pending</MenuItem>
-            <MenuItem value={TranscodingStatus.FAILED}>Failed</MenuItem>
+            <MenuItem value="">{t("allStatuses")}</MenuItem>
+            <MenuItem value={TranscodingStatus.COMPLETED}>{tStatus("COMPLETED")}</MenuItem>
+            <MenuItem value={TranscodingStatus.PROCESSING}>{tStatus("PROCESSING")}</MenuItem>
+            <MenuItem value={TranscodingStatus.PENDING}>{tStatus("PENDING")}</MenuItem>
+            <MenuItem value={TranscodingStatus.FAILED}>{tStatus("FAILED")}</MenuItem>
           </MuiSelect>
         </FilterField>
       </Box>
@@ -182,10 +186,8 @@ export default function TitlesFiltersPanel({
           borderColor: "divider",
         }}
       >
-        <Typography sx={{ fontWeight: 700, color: "text.secondary" }}>Found titles number: {totalCount}</Typography>
-        <Typography sx={{ fontSize: "14px", color: tokens.text.placeholder }}>
-          Refine the list with filters to quickly find the content you need.
-        </Typography>
+        <Typography sx={{ fontWeight: 700, color: "text.secondary" }}>{t("found", { count: totalCount })}</Typography>
+        <Typography sx={{ fontSize: "14px", color: tokens.text.placeholder }}>{t("hint")}</Typography>
       </Box>
     </GradientCard>
   );

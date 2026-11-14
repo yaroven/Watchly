@@ -6,27 +6,28 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { alpha } from "@mui/material/styles";
 import { tokens } from "@shared/mui/theme";
+import { useTranslations } from "next-intl";
 import type { FieldErrors } from "react-hook-form";
 
 interface ValidationSummaryProps {
   errors: FieldErrors<TitleFormValues>;
 }
 
-const FIELD_LABELS: Partial<Record<keyof TitleFormValues, string>> = {
-  name: "Name",
-  description: "Description",
-  director: "Director",
-  network: "Network",
-  type: "Type",
-  ageRating: "Age rating",
-  country: "Country",
-  language: "Language",
-  releaseDate: "Release date",
-  runtime: "Runtime",
-  trailerUrl: "Trailer URL",
-  posterFile: "Poster",
-  videoFile: "Video file",
-};
+const LABELLED_FIELDS: ReadonlySet<keyof TitleFormValues> = new Set<keyof TitleFormValues>([
+  "name",
+  "description",
+  "director",
+  "network",
+  "type",
+  "ageRating",
+  "country",
+  "language",
+  "releaseDate",
+  "runtime",
+  "trailerUrl",
+  "posterFile",
+  "videoFile",
+]);
 
 const FIELD_ANCHORS: Partial<Record<keyof TitleFormValues, string>> = {
   ageRating: "field-ageRating",
@@ -35,7 +36,8 @@ const FIELD_ANCHORS: Partial<Record<keyof TitleFormValues, string>> = {
 };
 
 export default function ValidationSummary({ errors }: ValidationSummaryProps) {
-  const failed = (Object.keys(errors) as (keyof TitleFormValues)[]).filter((key) => FIELD_LABELS[key]);
+  const t = useTranslations("title");
+  const failed = (Object.keys(errors) as (keyof TitleFormValues)[]).filter((key) => LABELLED_FIELDS.has(key));
 
   if (!failed.length) return null;
 
@@ -56,7 +58,7 @@ export default function ValidationSummary({ errors }: ValidationSummaryProps) {
 
       <Box sx={{ flexGrow: 1 }}>
         <Typography sx={{ fontSize: "14px", fontWeight: 600, color: "#ffffff" }}>
-          {failed.length} {failed.length === 1 ? "field needs" : "fields need"} attention before this can save
+          {t("form.validationSummary", { count: failed.length })}
         </Typography>
 
         <Box sx={{ mt: "10px", display: "flex", flexWrap: "wrap", gap: "8px" }}>
@@ -77,7 +79,7 @@ export default function ValidationSummary({ errors }: ValidationSummaryProps) {
                 "&:hover": { borderColor: tokens.feedback.error },
               }}
             >
-              {FIELD_LABELS[key]}
+              {t(`fields.${key}`)}
             </Typography>
           ))}
         </Box>

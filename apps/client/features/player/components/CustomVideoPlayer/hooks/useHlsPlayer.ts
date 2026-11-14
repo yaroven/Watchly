@@ -104,18 +104,18 @@ export default function useHlsPlayer(
 
         switch (data.type) {
           case Hls.ErrorTypes.NETWORK_ERROR:
-            store.setState({ errorMessage: "Network error while loading video. Retrying..." });
+            store.setState({ errorKey: "networkRetrying" });
             hls.startLoad();
             break;
           case Hls.ErrorTypes.MEDIA_ERROR:
-            store.setState({ errorMessage: "Playback error. Recovering..." });
+            store.setState({ errorKey: "playbackRecovering" });
             hls.recoverMediaError();
             break;
           default:
             store.setState({
               isInitialLoading: false,
               isBuffering: false,
-              errorMessage: "Video stream is unavailable",
+              errorKey: "streamUnavailable",
             });
             hls.destroy();
             hlsRef.current = null;

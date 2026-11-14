@@ -8,12 +8,15 @@ import Chip from "@mui/material/Chip";
 import Skeleton from "@mui/material/Skeleton";
 import Typography from "@mui/material/Typography";
 import GradientCard from "@shared/ui/GradientCard";
+import { useFormatter, useTranslations } from "next-intl";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 const SKELETON_ROWS = Array.from({ length: 5 }, (_, index) => index);
 
 export default function RecentAdditions() {
+  const t = useTranslations("admin");
+  const format = useFormatter();
   const router = useRouter();
 
   const { data: recentTitles, isPending } = useTitles({ limit: 5, page: 1 });
@@ -21,7 +24,7 @@ export default function RecentAdditions() {
   return (
     <GradientCard sx={{ padding: "28px", display: "flex", flexDirection: "column", gap: "20px" }}>
       <Typography variant="h5" sx={{ color: "text.primary" }}>
-        Recent Additions
+        {t("dashboard.recentAdditions.title")}
       </Typography>
       <Box sx={{ display: "flex", flexDirection: "column", gap: "4px" }}>
         {isPending ? (
@@ -67,19 +70,19 @@ export default function RecentAdditions() {
                     {name}
                   </Typography>
                   <Chip
-                    label={type}
+                    label={t(`dashboard.titleType.${type}`)}
                     size="small"
                     sx={{ mt: "6px", fontSize: "0.7rem", fontWeight: 600, textTransform: "uppercase", height: "20px" }}
                   />
                 </Box>
               </Box>
               <Typography sx={{ color: "text.secondary", fontSize: "0.85rem", flexShrink: 0 }}>
-                {new Date(createdAt).toLocaleDateString()}
+                {format.dateTime(new Date(createdAt), { dateStyle: "short" })}
               </Typography>
             </Box>
           ))
         ) : (
-          <Typography sx={{ color: "text.secondary" }}>No recent titles found.</Typography>
+          <Typography sx={{ color: "text.secondary" }}>{t("dashboard.recentAdditions.empty")}</Typography>
         )}
       </Box>
     </GradientCard>

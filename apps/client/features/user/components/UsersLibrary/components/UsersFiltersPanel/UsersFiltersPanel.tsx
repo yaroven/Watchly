@@ -14,6 +14,7 @@ import Typography from "@mui/material/Typography";
 import { inputVariants, tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
 import GradientCard from "@shared/ui/GradientCard";
+import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { UsersPageFilters } from "../../types";
 
@@ -81,17 +82,19 @@ export default function UsersFiltersPanel({
   onUpdateFilters,
   onResetFilters,
 }: UsersFiltersPanelProps) {
+  const t = useTranslations("user");
+
   return (
     <GradientCard radius={24} sx={{ width: "100%", p: "28px" }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px", mb: "24px" }}>
         <Box sx={{ display: "inline-flex", alignItems: "center", gap: "12px", color: "text.secondary" }}>
           <FilterAltIcon sx={{ fontSize: 20 }} />
-          <Typography sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Filters</Typography>
+          <Typography sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>{t("filters.title")}</Typography>
         </Box>
 
         {hasActiveFilters && (
           <Button variant="outlined" size="small" onClick={onResetFilters} startIcon={<ReplayIcon sx={{ fontSize: 16 }} />}>
-            Reset Filters
+            {t("filters.reset")}
           </Button>
         )}
       </Box>
@@ -105,10 +108,10 @@ export default function UsersFiltersPanel({
           alignItems: "start",
         }}
       >
-        <FilterField icon={<SearchIcon sx={{ fontSize: 14 }} />} label="Search" primary>
+        <FilterField icon={<SearchIcon sx={{ fontSize: 14 }} />} label={t("filters.searchLabel")} primary>
           <TextField
             variant="standard"
-            placeholder="Search by email..."
+            placeholder={t("filters.searchPlaceholder")}
             value={searchString}
             onChange={(e) => onUpdateFilters({ search: e.target.value })}
             fullWidth
@@ -126,7 +129,7 @@ export default function UsersFiltersPanel({
           />
         </FilterField>
 
-        <FilterField icon={<ShieldIcon sx={{ fontSize: 14 }} />} label="Role">
+        <FilterField icon={<ShieldIcon sx={{ fontSize: 14 }} />} label={t("filters.roleLabel")}>
           <MuiSelect
             fullWidth
             displayEmpty
@@ -135,9 +138,9 @@ export default function UsersFiltersPanel({
             MenuProps={menuProps}
             sx={selectSx}
           >
-            <MenuItem value="">All Roles</MenuItem>
-            <MenuItem value={Role.ADMIN}>Admin</MenuItem>
-            <MenuItem value={Role.USER}>User</MenuItem>
+            <MenuItem value="">{t("filters.allRoles")}</MenuItem>
+            <MenuItem value={Role.ADMIN}>{t(`role.${Role.ADMIN}`)}</MenuItem>
+            <MenuItem value={Role.USER}>{t(`role.${Role.USER}`)}</MenuItem>
           </MuiSelect>
         </FilterField>
       </Box>
@@ -154,10 +157,8 @@ export default function UsersFiltersPanel({
           borderColor: "divider",
         }}
       >
-        <Typography sx={{ fontWeight: 700, color: "text.secondary" }}>Found users number: {totalCount}</Typography>
-        <Typography sx={{ fontSize: "14px", color: tokens.text.placeholder }}>
-          Refine the list to quickly find the account you need.
-        </Typography>
+        <Typography sx={{ fontWeight: 700, color: "text.secondary" }}>{t("filters.found", { count: totalCount })}</Typography>
+        <Typography sx={{ fontSize: "14px", color: tokens.text.placeholder }}>{t("filters.hint")}</Typography>
       </Box>
     </GradientCard>
   );

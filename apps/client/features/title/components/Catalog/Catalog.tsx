@@ -7,6 +7,7 @@ import { ArrowForward as ArrowForwardIcon } from "@mui/icons-material";
 import { Box } from "@mui/material";
 import Skeleton from "@mui/material/Skeleton";
 import Typography from "@mui/material/Typography";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 
 interface CatalogProps {
@@ -33,12 +34,13 @@ export default function Catalog({
   items,
   title,
   onViewAll,
-  viewAllLabel = "View All",
+  viewAllLabel,
   bleed = false,
   bleedSize = 24,
   isLoading = false,
   skeletonCount = 6,
 }: CatalogProps) {
+  const t = useTranslations("title.catalog");
   const router = useRouter();
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -74,7 +76,7 @@ export default function Catalog({
               },
             }}
           >
-            {viewAllLabel}
+            {viewAllLabel ?? t("viewAll")}
             <ArrowForwardIcon
               className="catalog-view-all-arrow"
               sx={{ fontSize: "20px", color: "primary.main", transition: "transform .15s ease-out" }}

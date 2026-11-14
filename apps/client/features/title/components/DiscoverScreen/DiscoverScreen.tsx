@@ -13,6 +13,7 @@ import { Box } from "@mui/material";
 import Typography from "@mui/material/Typography";
 import HeroSlider, { type SliderTitle } from "@shared/ui/HeroSlider";
 import HotNewsSection from "@shared/ui/HotNewsSection";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { news } from "./mocks";
 
@@ -23,13 +24,13 @@ function imdbRatingOf(title: Title): number | undefined {
   return title.externalRatings.find((rating) => rating.source === ExternalRatingSource.IMDB)?.rating;
 }
 
-function toSliderTitle(title: Title): SliderTitle {
+function toSliderTitle(title: Title, noScore: string): SliderTitle {
   const rating = imdbRatingOf(title);
   return {
     id: title.id,
     title: title.name,
     description: title.description,
-    score: rating !== undefined ? rating.toFixed(1) : "N/A",
+    score: rating !== undefined ? rating.toFixed(1) : noScore,
     backdropUrl: title.posterUrl,
     watchLink: APP.WATCH(title.id),
     trailerLink: title.trailerUrl,
@@ -49,6 +50,7 @@ function toSpotlightTitle(title: Title): SpotlightTitle {
 }
 
 export default function DiscoverScreen() {
+  const t = useTranslations("title.discover");
   const router = useRouter();
 
   const { data } = useTitles({
@@ -65,7 +67,7 @@ export default function DiscoverScreen() {
   const viewAllSeries = () => router.push(APP.SEARCH({ type: TitleType.SERIES }));
   const viewAllTitles = () => router.push(APP.SEARCH());
 
-  const heroTitles = items.slice(0, HERO_SLOTS).map(toSliderTitle);
+  const heroTitles = items.slice(0, HERO_SLOTS).map((title) => toSliderTitle(title, t("noScore")));
   const spotlightItems = items.slice(HERO_SLOTS, HERO_SLOTS + SPOTLIGHT_SLOTS);
 
   return (
@@ -73,14 +75,14 @@ export default function DiscoverScreen() {
       <Box sx={{ display: "flex", gap: "32px", mb: "40px" }}>
         <Box sx={{ flex: "1 1 auto", minWidth: 0, display: "flex", flexDirection: "column", gap: "32px" }}>
           {!!heroTitles.length && <HeroSlider titles={heroTitles} />}
-          <Catalog title="Recommended for you" items={items} onViewAll={viewAllTitles} />
+          <Catalog title={t("recommended")} items={items} onViewAll={viewAllTitles} />
         </Box>
         <HotNewsSection news={news} />
       </Box>
       <Box sx={{ display: "flex", flexDirection: "column", gap: "34px" }}>
-        <Catalog title="Trending movies" bleed items={items} onViewAll={viewAllMovies} />
-        <Catalog title="Trending series" bleed items={items} onViewAll={viewAllSeries} />
-        <Catalog title="Genres" bleed items={items} onViewAll={viewAllTitles} />
+        <Catalog title={t("trendingMovies")} bleed items={items} onViewAll={viewAllMovies} />
+        <Catalog title={t("trendingSeries")} bleed items={items} onViewAll={viewAllSeries} />
+        <Catalog title={t("genres")} bleed items={items} onViewAll={viewAllTitles} />
         {spotlightItems.length === SPOTLIGHT_SLOTS && (
           <Box sx={{ mt: "62px", mb: "56px" }}>
             <SpotlightGrid
@@ -90,19 +92,19 @@ export default function DiscoverScreen() {
             />
           </Box>
         )}
-        <Catalog title="IMDB Top Movies" bleed items={items} onViewAll={viewAllMovies} />
-        <Catalog title="IMDB Top Series" bleed items={items} onViewAll={viewAllSeries} />
-        <Catalog title="Trending TV Shows" bleed items={items} onViewAll={viewAllSeries} />
+        <Catalog title={t("imdbTopMovies")} bleed items={items} onViewAll={viewAllMovies} />
+        <Catalog title={t("imdbTopSeries")} bleed items={items} onViewAll={viewAllSeries} />
+        <Catalog title={t("trendingTvShows")} bleed items={items} onViewAll={viewAllSeries} />
         {watchlistFailed ? (
           <Box>
             <Typography variant="h3" sx={{ mb: "12px" }}>
-              My Watchlist
+              {t("myWatchlist")}
             </Typography>
-            <Typography sx={{ color: "text.secondary" }}>Could not load your watchlist right now.</Typography>
+            <Typography sx={{ color: "text.secondary" }}>{t("watchlistError")}</Typography>
           </Box>
         ) : (
           watchlistItems.length > 0 && (
-            <Catalog title="My Watchlist" bleed items={watchlistItems} onViewAll={() => router.push(APP.WATCHLIST)} />
+            <Catalog title={t("myWatchlist")} bleed items={watchlistItems} onViewAll={() => router.push(APP.WATCHLIST)} />
           )
         )}
       </Box>

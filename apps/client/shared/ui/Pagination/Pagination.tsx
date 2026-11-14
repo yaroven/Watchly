@@ -3,6 +3,7 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
 import Button from "@shared/ui/Button";
+import { useTranslations } from "next-intl";
 
 interface PaginationProps {
   currentPage: number;
@@ -22,6 +23,8 @@ const arrowSx = {
 };
 
 export default function Pagination({ currentPage, totalPages, onPageChange }: PaginationProps) {
+  const t = useTranslations("shared.pagination");
+
   if (totalPages <= 1) return null;
 
   const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -29,7 +32,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pa
   return (
     <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", flexWrap: "wrap" }}>
       <IconButton
-        aria-label="Previous page"
+        aria-label={t("previous")}
         onClick={() => onPageChange(Math.max(1, currentPage - 1).toString())}
         disabled={currentPage === 1}
         sx={arrowSx}
@@ -52,7 +55,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }: Pa
       </Box>
 
       <IconButton
-        aria-label="Next page"
+        aria-label={t("next")}
         onClick={() => onPageChange(Math.min(totalPages, currentPage + 1).toString())}
         disabled={currentPage === totalPages}
         sx={arrowSx}

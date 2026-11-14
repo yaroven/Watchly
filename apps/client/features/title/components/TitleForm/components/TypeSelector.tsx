@@ -7,6 +7,7 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { alpha } from "@mui/material/styles";
 import { tokens } from "@shared/mui/theme";
+import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 
 interface TypeSelectorProps {
@@ -15,26 +16,24 @@ interface TypeSelectorProps {
   disabled?: boolean;
 }
 
-const OPTIONS: { value: TitleType; label: string; hint: string; icon: ReactNode }[] = [
+const OPTIONS: { value: TitleType; icon: ReactNode }[] = [
   {
     value: TitleType.MOVIE,
-    label: "Movie",
-    hint: "One video file. Uploads and transcodes from this screen.",
     icon: <MovieIcon sx={{ fontSize: 22 }} />,
   },
   {
     value: TitleType.SERIES,
-    label: "Series",
-    hint: "Seasons and episodes are added after the title exists.",
     icon: <LiveTvIcon sx={{ fontSize: 22 }} />,
   },
 ];
 
 export default function TypeSelector({ value, onChange, disabled = false }: TypeSelectorProps) {
+  const t = useTranslations("title");
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "10px" }}>
       <Typography component="span" sx={{ fontSize: "14px", color: "text.secondary" }}>
-        Type
+        {t("fields.type")}
       </Typography>
 
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" }, gap: "14px" }}>
@@ -70,9 +69,11 @@ export default function TypeSelector({ value, onChange, disabled = false }: Type
               {option.icon}
               <Box>
                 <Typography sx={{ fontSize: "15px", fontWeight: 600, color: selected ? "#ffffff" : tokens.text.field }}>
-                  {option.label}
+                  {t(`type.${option.value}`)}
                 </Typography>
-                <Typography sx={{ mt: "3px", fontSize: "12px", lineHeight: 1.45, color: "text.secondary" }}>{option.hint}</Typography>
+                <Typography sx={{ mt: "3px", fontSize: "12px", lineHeight: 1.45, color: "text.secondary" }}>
+                  {t(`form.typeHint.${option.value}`)}
+                </Typography>
               </Box>
             </Box>
           );

@@ -6,6 +6,7 @@ import MovieIcon from "@mui/icons-material/Movie";
 import TheatersIcon from "@mui/icons-material/Theaters";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -17,7 +18,8 @@ interface TitleIdentityProps {
 }
 
 export default function TitleIdentity({ name, posterUrl, to, type }: TitleIdentityProps) {
-  const typeLabel = type === TitleType.MOVIE ? "Movie" : "Series";
+  const t = useTranslations("title");
+  const typeLabel = t(`type.${type}`);
   const posterSrc = getOptimizedImageSrc(posterUrl);
 
   return (

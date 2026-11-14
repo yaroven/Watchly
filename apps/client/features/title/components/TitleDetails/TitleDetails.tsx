@@ -19,6 +19,7 @@ import { keyframes } from "@mui/material/styles";
 import Typography from "@mui/material/Typography";
 import Button from "@shared/ui/Button";
 import GradientCard from "@shared/ui/GradientCard";
+import { useTranslations } from "next-intl";
 import { type ReactNode, useState } from "react";
 import DeleteModal from "./components/DeleteModal";
 import { useTitleDetails } from "./model/useTitleDetails";
@@ -59,11 +60,11 @@ export default function TitleDetails({ title, initialSeasons }: TitleDetailsProp
     initialSeasons,
   });
 
+  const t = useTranslations("title.details");
   const [ratingsSyncMessage, setRatingsSyncMessage] = useState<string | null>(null);
   const { mutate: syncRatings, isPending: isSyncingRatings } = useSyncTitleRatings({
-    onSuccess: (ratings) =>
-      setRatingsSyncMessage(ratings.length ? `Synced ${ratings.length} rating(s).` : "No ratings found for this title yet."),
-    onError: (error) => setRatingsSyncMessage(error.message || "Failed to sync ratings."),
+    onSuccess: (ratings) => setRatingsSyncMessage(ratings.length ? t("ratingsSynced", { count: ratings.length }) : t("ratingsNone")),
+    onError: (error) => setRatingsSyncMessage(error.message || t("ratingsSyncFailed")),
   });
 
   return (
@@ -80,11 +81,9 @@ export default function TitleDetails({ title, initialSeasons }: TitleDetailsProp
       >
         <Box sx={{ display: "flex", flexDirection: "column" }}>
           <Typography component="h1" variant="h2" sx={{ color: "#ffffff" }}>
-            Manage Title
+            {t("heading")}
           </Typography>
-          <Typography sx={{ mt: "14px", maxWidth: "680px", color: "text.secondary" }}>
-            Update metadata, review the stream, and manage seasons or episodes from one screen.
-          </Typography>
+          <Typography sx={{ mt: "14px", maxWidth: "680px", color: "text.secondary" }}>{t("subheading")}</Typography>
         </Box>
 
         <TitleDetailsActions
@@ -118,11 +117,11 @@ export default function TitleDetails({ title, initialSeasons }: TitleDetailsProp
         }}
       >
         <Box sx={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-          <SectionCard title="Details" description="Edit the primary metadata for this title.">
+          <SectionCard title={t("sections.details.title")} description={t("sections.details.description")}>
             <TitleForm initialData={currentTitle} />
           </SectionCard>
 
-          <SectionCard title="Cast" description="Assign actors and their characters, in display order.">
+          <SectionCard title={t("sections.cast.title")} description={t("sections.cast.description")}>
             <TitleCastManager titleId={title.id} />
           </SectionCard>
         </Box>
@@ -178,6 +177,7 @@ function TitleDetailsActions({
   onRestartTranscoding: () => void;
   onSyncRatings: () => void;
 }) {
+  const t = useTranslations("title.details");
   const hasSecondaryAction =
     (title.type === TitleType.MOVIE && currentTranscodingStatus === TranscodingStatus.FAILED) ||
     (title.type === TitleType.MOVIE && currentTranscodingStatus === TranscodingStatus.COMPLETED);
@@ -186,13 +186,13 @@ function TitleDetailsActions({
     <Box sx={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
       {title.type === TitleType.MOVIE && currentTranscodingStatus === TranscodingStatus.FAILED && (
         <Button variant="outlined" onClick={onRestartTranscoding} disabled={isTranscoding} startIcon={<ReplayIcon sx={{ fontSize: 16 }} />}>
-          {isTranscoding ? "Restarting..." : "Restart Transcoding"}
+          {isTranscoding ? t("restarting") : t("restartTranscoding")}
         </Button>
       )}
 
       {title.type === TitleType.MOVIE && currentTranscodingStatus === TranscodingStatus.COMPLETED && (
         <Button variant="outlined" onClick={onPreview} startIcon={<PlayArrowIcon sx={{ fontSize: 16 }} />}>
-          Preview
+          {t("preview")}
         </Button>
       )}
 
@@ -202,13 +202,13 @@ function TitleDetailsActions({
         disabled={isSyncingRatings}
         startIcon={<SyncIcon sx={{ fontSize: 16, animation: isSyncingRatings ? `${spin} 1s linear infinite` : "none" }} />}
       >
-        {isSyncingRatings ? "Syncing Ratings..." : "Sync Ratings"}
+        {isSyncingRatings ? t("syncingRatings") : t("syncRatings")}
       </Button>
 
       {hasSecondaryAction && <Divider orientation="vertical" flexItem sx={{ borderColor: "#333333", my: "4px" }} />}
 
       <Button variant="contained" danger onClick={onDelete} disabled={isDeleting}>
-        Delete Title
+        {t("deleteTitle")}
       </Button>
     </Box>
   );
@@ -227,14 +227,16 @@ function SeriesManagementSection({
   onSelectSeason: (seasonId: string) => void;
   episodes: ReturnType<typeof useTitleDetails>["episodes"];
 }) {
+  const t = useTranslations("title.details");
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-      <SectionCard title="Seasons" description="Organize the structure of your series before managing episodes.">
+      <SectionCard title={t("sections.seasons.title")} description={t("sections.seasons.description")}>
         <SeasonManager seasons={seasons} titleId={titleId} selectedSeasonId={selectedSeasonId} onSelectSeason={onSelectSeason} />
       </SectionCard>
 
       {selectedSeasonId && (
-        <SectionCard title="Episodes" description="Manage the episode list and uploads for the selected season.">
+        <SectionCard title={t("sections.episodes.title")} description={t("sections.episodes.description")}>
           <EpisodeManager seasonId={selectedSeasonId} episodes={episodes} />
         </SectionCard>
       )}

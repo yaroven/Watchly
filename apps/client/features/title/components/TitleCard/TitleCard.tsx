@@ -9,6 +9,7 @@ import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import { APP } from "@shared/lib/routes";
 import { useViewer } from "@shared/lib/use-viewer";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
@@ -17,8 +18,9 @@ type TitleProps = Pick<CardTitle, "id" | "name" | "posterUrl" | "type" | "genres
 };
 
 export default function TitleCard({ id, name, posterUrl, type, genres, externalRatings, engagement, onClick }: TitleProps) {
+  const t = useTranslations("title");
   const posterSrc = getOptimizedImageSrc(posterUrl);
-  const subtitle = genres.length ? genres.map((genre) => genre.name).join(", ") : type === "MOVIE" ? "Movie" : "Series";
+  const subtitle = genres.length ? genres.map((genre) => genre.name).join(", ") : t(`type.${type}`);
   const rating = externalRatings.find((r) => r.source === ExternalRatingSource.IMDB)?.rating;
 
   const router = useRouter();
@@ -41,16 +43,16 @@ export default function TitleCard({ id, name, posterUrl, type, genres, externalR
   };
 
   const toggleLabel = failed
-    ? "Could not update your watchlist — try again"
+    ? t("card.watchlistFailed")
     : viewer.status === "pending"
-      ? "Watchlist — still signing you in"
+      ? t("card.watchlistPending")
       : stateUnknown
-        ? "Watchlist — could not tell whether this is saved"
+        ? t("card.watchlistUnknown")
         : viewer.status === "anonymous"
-          ? "Sign in to add to your watchlist"
+          ? t("card.signInToAdd")
           : saved
-            ? "Remove from watchlist"
-            : "Add to watchlist";
+            ? t("card.removeFromWatchlist")
+            : t("card.addToWatchlist");
 
   return (
     <Card
@@ -190,7 +192,7 @@ export default function TitleCard({ id, name, posterUrl, type, genres, externalR
               textAlign: "center",
             }}
           >
-            Could not save — tap to retry
+            {t("card.saveFailed")}
           </Box>
         )}
 

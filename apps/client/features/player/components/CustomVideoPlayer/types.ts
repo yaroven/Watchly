@@ -1,7 +1,7 @@
 export interface VideoQuality {
   level: number;
   height: number;
-  label: string;
+  label: string | null;
 }
 export type Modifier = string;
 export type Key = string;

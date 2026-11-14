@@ -7,26 +7,28 @@ import ListAltIcon from "@mui/icons-material/ListAlt";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import GradientCard from "@shared/ui/GradientCard";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 
 const ACTIONS = [
-  { label: "Add New Title", icon: <AddCircleIcon sx={{ fontSize: 22 }} />, to: ADMIN.TITLES_NEW },
-  { label: "Manage All Titles", icon: <ListAltIcon sx={{ fontSize: 22 }} />, to: ADMIN.TITLES },
-  { label: "Overview", icon: <DashboardIcon sx={{ fontSize: 22 }} />, to: ADMIN.ROOT },
-];
+  { labelKey: "dashboard.quickActions.addTitle", icon: <AddCircleIcon sx={{ fontSize: 22 }} />, to: ADMIN.TITLES_NEW },
+  { labelKey: "dashboard.quickActions.manageTitles", icon: <ListAltIcon sx={{ fontSize: 22 }} />, to: ADMIN.TITLES },
+  { labelKey: "dashboard.quickActions.overview", icon: <DashboardIcon sx={{ fontSize: 22 }} />, to: ADMIN.ROOT },
+] as const;
 
 export default function QuickActions() {
+  const t = useTranslations("admin");
   const router = useRouter();
 
   return (
     <GradientCard sx={{ padding: "28px", display: "flex", flexDirection: "column", gap: "22px" }}>
       <Typography variant="h5" sx={{ color: "text.primary" }}>
-        Quick Actions
+        {t("dashboard.quickActions.title")}
       </Typography>
       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "14px" }}>
-        {ACTIONS.map(({ label, icon, to }) => (
+        {ACTIONS.map(({ labelKey, icon, to }) => (
           <GradientCard
-            key={label}
+            key={to}
             interactive
             radius={16}
             onClick={() => router.push(to)}
@@ -54,7 +56,7 @@ export default function QuickActions() {
             >
               {icon}
             </Box>
-            <Typography sx={{ fontSize: "0.82rem", fontWeight: 600, color: "text.primary" }}>{label}</Typography>
+            <Typography sx={{ fontSize: "0.82rem", fontWeight: 600, color: "text.primary" }}>{t(labelKey)}</Typography>
           </GradientCard>
         ))}
       </Box>

@@ -13,6 +13,7 @@ import Typography from "@mui/material/Typography";
 import { useAuthStore } from "@shared/lib/auth-store";
 import { formatCount } from "@shared/lib/format-count";
 import Button from "@shared/ui/Button";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import CommentCard from "./components/CommentCard";
 
@@ -20,15 +21,12 @@ interface TitleReviewsProps {
   title: Title;
 }
 
-const SORT_OPTIONS: { key: CommentSortMode; label: string }[] = [
-  { key: "newest", label: "Newest" },
-  { key: "oldest", label: "Oldest" },
-  { key: "hottest", label: "Hottest" },
-];
+const SORT_OPTIONS: CommentSortMode[] = ["newest", "oldest", "hottest"];
 
 const PAGE_SIZE = 5;
 
 export default function TitleReviews({ title }: TitleReviewsProps) {
+  const t = useTranslations("title.reviews");
   const userId = useAuthStore((state) => state.userId);
   const authStatus = useAuthStore((state) => state.status);
   const isSignedIn = Boolean(userId);
@@ -69,11 +67,15 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "32px" }}>
       <Box sx={{ display: "flex", alignItems: "baseline", gap: "16px", flexWrap: "wrap" }}>
-        <Typography variant="h3">Reviews</Typography>
+        <Typography variant="h3">{t("heading")}</Typography>
         <Typography sx={{ fontSize: "15px", color: "text.secondary" }}>
           {engagement?.averageScore == null
-            ? "Not rated yet"
-            : `${engagement.averageScore}/10 from ${formatCount(engagement.ratingCount)} ${engagement.ratingCount === 1 ? "viewer" : "viewers"}`}
+            ? t("notRated")
+            : t("averageScore", {
+                score: engagement.averageScore,
+                count: engagement.ratingCount,
+                formatted: formatCount(engagement.ratingCount),
+              })}
         </Typography>
       </Box>
 
@@ -90,7 +92,7 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
             p: "20px",
           }}
         >
-          <Typography sx={{ fontSize: "16px", fontWeight: 600, whiteSpace: "nowrap" }}>Your Score</Typography>
+          <Typography sx={{ fontSize: "16px", fontWeight: 600, whiteSpace: "nowrap" }}>{t("yourScore")}</Typography>
           <Slider
             value={score}
             onChange={(_, value) => setScore(value as number)}
@@ -102,11 +104,11 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
           />
           <Typography sx={{ fontSize: "14px", color: "#ffffff", width: "24px" }}>{score}</Typography>
           <Button variant="contained" disabled={score < 1 || setRating.isPending} onClick={() => setRating.mutate(score)}>
-            {myScore === null ? "Rate" : "Update"}
+            {myScore === null ? t("rate") : t("update")}
           </Button>
           {myScore !== null && (
             <Button variant="outlined" disabled={removeRating.isPending} onClick={() => removeRating.mutate()}>
-              Clear
+              {t("clear")}
             </Button>
           )}
         </Box>
@@ -124,11 +126,9 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
         }}
       >
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
-          <Typography sx={{ fontSize: "16px", fontWeight: 600 }}>
-            {isSignedIn ? "Post a comment for this title:" : "Sign in to leave a comment."}
-          </Typography>
+          <Typography sx={{ fontSize: "16px", fontWeight: 600 }}>{isSignedIn ? t("postPrompt") : t("signInPrompt")}</Typography>
           <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <Typography sx={{ fontSize: "14px", color: "text.secondary" }}>Contains spoilers</Typography>
+            <Typography sx={{ fontSize: "14px", color: "text.secondary" }}>{t("containsSpoilers")}</Typography>
             <Switch checked={hasSpoiler} onChange={(e) => setHasSpoiler(e.target.checked)} size="small" disabled={!isSignedIn} />
           </Box>
         </Box>
@@ -138,7 +138,7 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
           value={text}
           disabled={!isSignedIn}
           onChange={(e) => setText((e.target as HTMLTextAreaElement).value)}
-          placeholder="Comment Text ..."
+          placeholder={t("commentPlaceholder")}
           sx={{
             width: "100%",
             minHeight: "140px",
@@ -162,7 +162,7 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
             disabled={!isSignedIn || !text.trim() || createComment.isPending}
             sx={{ display: "flex", alignItems: "center", gap: "8px" }}
           >
-            Post Comment
+            {t("postComment")}
             <ForumIcon sx={{ fontSize: "18px" }} />
           </Button>
         </Box>
@@ -181,8 +181,8 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
         }}
       >
         <SortIcon sx={{ fontSize: "18px", color: "text.secondary" }} />
-        <Typography sx={{ fontSize: "14px", color: "text.secondary" }}>Sort by:</Typography>
-        {SORT_OPTIONS.map(({ key, label }) => (
+        <Typography sx={{ fontSize: "14px", color: "text.secondary" }}>{t("sortBy")}</Typography>
+        {SORT_OPTIONS.map((key) => (
           <Box
             key={key}
             component="button"
@@ -201,17 +201,15 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
               backgroundColor: sortMode === key ? "primary.main" : "transparent",
             }}
           >
-            {label}
+            {t(`sort.${key}`)}
           </Box>
         ))}
         <Typography sx={{ fontSize: "14px", color: "text.secondary", ml: "auto" }}>({formatCount(totalCount)})</Typography>
       </Box>
 
       <Box sx={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-        {isPending && <Typography sx={{ fontSize: "14px", color: "text.secondary" }}>Loading comments ...</Typography>}
-        {!isPending && comments.length === 0 && (
-          <Typography sx={{ fontSize: "14px", color: "text.secondary" }}>No comments yet — be the first.</Typography>
-        )}
+        {isPending && <Typography sx={{ fontSize: "14px", color: "text.secondary" }}>{t("loading")}</Typography>}
+        {!isPending && comments.length === 0 && <Typography sx={{ fontSize: "14px", color: "text.secondary" }}>{t("empty")}</Typography>}
         {comments.map((comment) => (
           <CommentCard key={comment.id} comment={comment} titleId={title.id} />
         ))}
@@ -225,7 +223,7 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
             onClick={() => fetchNextPage()}
             sx={{ display: "flex", alignItems: "center", gap: "6px" }}
           >
-            Show more
+            {t("showMore")}
             <ExpandMore sx={{ fontSize: "18px" }} />
           </Button>
         </Box>

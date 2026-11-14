@@ -18,9 +18,11 @@ import Typography from "@mui/material/Typography";
 import { inputVariants, tokens } from "@shared/mui/theme";
 import ConfirmDialog from "@shared/ui/ConfirmDialog";
 import GradientCard from "@shared/ui/GradientCard";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 export default function GenresLibrary() {
+  const t = useTranslations("genre");
   const { data, isPending } = useGenres({ limit: 100 });
   const genres = data?.items ?? [];
 
@@ -70,11 +72,9 @@ export default function GenresLibrary() {
       >
         <Box>
           <Typography component="h1" variant="h2" sx={{ color: "#ffffff" }}>
-            Genres
+            {t("library.title")}
           </Typography>
-          <Typography sx={{ mt: "14px", maxWidth: "640px", color: "text.secondary" }}>
-            Manage the genre taxonomy titles are organized by.
-          </Typography>
+          <Typography sx={{ mt: "14px", maxWidth: "640px", color: "text.secondary" }}>{t("library.subtitle")}</Typography>
         </Box>
       </Box>
 
@@ -88,7 +88,7 @@ export default function GenresLibrary() {
         <Box sx={{ display: "flex", alignItems: "center", gap: "10px", color: "text.secondary" }}>
           <SellIcon sx={{ fontSize: 20 }} />
           <Typography sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-            {genres.length} Genre{genres.length === 1 ? "" : "s"}
+            {t("library.count", { count: genres.length })}
           </Typography>
         </Box>
 
@@ -104,14 +104,14 @@ export default function GenresLibrary() {
             component="input"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="New genre name"
+            placeholder={t("library.newPlaceholder")}
             disabled={isCreating}
             sx={{ ...inputVariants.pill, flex: 1, height: 40, fontSize: "14px", border: "none", color: tokens.text.field }}
           />
           <IconButton
             type="submit"
             disabled={isCreating || !newName.trim()}
-            aria-label="Add genre"
+            aria-label={t("library.add")}
             sx={{
               width: 40,
               height: 40,
@@ -169,10 +169,21 @@ export default function GenresLibrary() {
                             px: "8px",
                           }}
                         />
-                        <IconButton size="small" onClick={submitEdit} disabled={isUpdating} aria-label="Save" sx={{ color: "#27c237" }}>
+                        <IconButton
+                          size="small"
+                          onClick={submitEdit}
+                          disabled={isUpdating}
+                          aria-label={t("library.save")}
+                          sx={{ color: "#27c237" }}
+                        >
                           <CheckIcon sx={{ fontSize: 16 }} />
                         </IconButton>
-                        <IconButton size="small" onClick={() => setEditingId(null)} aria-label="Cancel" sx={{ color: "#999999" }}>
+                        <IconButton
+                          size="small"
+                          onClick={() => setEditingId(null)}
+                          aria-label={t("library.cancel")}
+                          sx={{ color: "#999999" }}
+                        >
                           <CloseIcon sx={{ fontSize: 16 }} />
                         </IconButton>
                       </>
@@ -181,24 +192,24 @@ export default function GenresLibrary() {
                         <Typography sx={{ flex: 1, fontSize: "14px", color: "#ffffff", overflow: "hidden", textOverflow: "ellipsis" }}>
                           {genre.name}
                         </Typography>
-                        <Typography sx={{ fontSize: "12px", color: "text.secondary" }}>{genre.titleCount ?? 0} titles</Typography>
+                        <Typography sx={{ fontSize: "12px", color: "text.secondary" }}>
+                          {t("library.titleCount", { count: genre.titleCount ?? 0 })}
+                        </Typography>
                         <IconButton
                           size="small"
                           onClick={() => startEdit(genre)}
-                          aria-label={`Rename ${genre.name}`}
+                          aria-label={t("library.rename", { name: genre.name })}
                           sx={{ color: "#e5e5e5" }}
                         >
                           <EditIcon sx={{ fontSize: 14 }} />
                         </IconButton>
-                        <Tooltip
-                          title={canDelete ? "" : `Still assigned to ${genre.titleCount} title(s) — remove it from every title first`}
-                        >
+                        <Tooltip title={canDelete ? "" : t("library.stillAssigned", { count: genre.titleCount ?? 0 })}>
                           <span>
                             <IconButton
                               size="small"
                               disabled={!canDelete}
                               onClick={() => setPendingDelete(genre)}
-                              aria-label={`Delete ${genre.name}`}
+                              aria-label={t("library.deleteLabel", { name: genre.name })}
                               sx={{ color: canDelete ? "#f64e34" : "#555555" }}
                             >
                               <DeleteIcon sx={{ fontSize: 14 }} />
@@ -212,7 +223,9 @@ export default function GenresLibrary() {
               })}
 
           {!isPending && !genres.length && (
-            <Typography sx={{ fontSize: "13px", color: "text.secondary", textAlign: "center", py: "12px" }}>No genres yet.</Typography>
+            <Typography sx={{ fontSize: "13px", color: "text.secondary", textAlign: "center", py: "12px" }}>
+              {t("library.empty")}
+            </Typography>
           )}
         </Box>
       </GradientCard>
@@ -222,14 +235,13 @@ export default function GenresLibrary() {
         onClose={() => setPendingDelete(null)}
         onConfirm={() => pendingDelete && deleteGenre(pendingDelete.id)}
         isPending={isDeleting}
-        confirmLabel="Confirm Delete"
-        pendingLabel="Deleting..."
-        title="Delete Genre"
-        description={
-          <>
-            Are you sure you want to delete <Typography component="strong">{pendingDelete?.name}</Typography>? This action cannot be undone.
-          </>
-        }
+        confirmLabel={t("delete.confirm")}
+        pendingLabel={t("delete.pending")}
+        title={t("delete.title")}
+        description={t.rich("delete.description", {
+          name: pendingDelete?.name ?? "",
+          strong: (chunks) => <Typography component="strong">{chunks}</Typography>,
+        })}
       />
     </Box>
   );
