@@ -12,6 +12,7 @@ export interface S3Config {
   rawBucketName: string;
   internalEndpoint: string;
   publicEndpoint: string;
+  processedPublicUrl?: string;
 }
 
 export default registerAs(S3ConfigName, () => ({
@@ -42,4 +43,5 @@ export default registerAs(S3ConfigName, () => ({
     "S3_ENDPOINT_PUBLIC",
     "http://localhost:4566",
   ),
+  processedPublicUrl: process.env.S3_PUBLIC_BASE_URL || undefined,
 }));

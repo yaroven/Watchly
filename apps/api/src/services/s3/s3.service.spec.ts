@@ -84,6 +84,35 @@ describe("S3Service", () => {
     });
   });
 
+  describe("getPublicUrl", () => {
+    it("should build a path-style URL on the public endpoint when no public base URL is set", () => {
+      expect(service.getPublicUrl("posters/a.webp", BucketType.PROCESSED)).toBe(
+        "https://cdn.example.com/watchly-processed/posters/a.webp",
+      );
+    });
+
+    it("should serve processed keys from the public base URL without the bucket name", () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (service as any).s3Config = {
+        ...s3ConfigMock,
+        processedPublicUrl: "https://pub-abc.r2.dev/",
+      };
+
+      expect(service.getPublicUrl("posters/a.webp", BucketType.PROCESSED)).toBe(
+        "https://pub-abc.r2.dev/posters/a.webp",
+      );
+    });
+
+    it("should keep raw keys on the S3 endpoint even when a public base URL is set", () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (service as any).s3Config = { ...s3ConfigMock, processedPublicUrl: "https://pub-abc.r2.dev" };
+
+      expect(service.getPublicUrl("uploads/a.mp4", BucketType.RAW)).toBe(
+        "https://cdn.example.com/watchly-raw/uploads/a.mp4",
+      );
+    });
+  });
+
   describe("get", () => {
     it("should return readable stream from S3", async () => {
       const mockBody = new Readable({ read() {} });

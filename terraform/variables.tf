@@ -196,10 +196,26 @@ variable "budget_alert_email" {
   type        = string
 }
 
-# --- Secrets ---
-
 variable "secret_environments" {
   description = "Environments that get an app secret in the vault, one per k8s overlay"
   type        = list(string)
   default     = ["prod"]
+}
+
+variable "cloudflare_api_token" {
+  description = "Cloudflare API token with Workers R2 Storage: Edit and Account API Tokens: Edit on the account"
+  type        = string
+  sensitive   = true
+}
+
+variable "cloudflare_account_id" {
+  description = "Cloudflare account that owns the R2 buckets"
+  type        = string
+  default     = "cfd9fcdc17d31caa7e080d8b94f0a9f6"
+}
+
+variable "app_origins" {
+  description = "Browser origins allowed to upload to and read from the buckets"
+  type        = list(string)
+  default     = ["https://watchly.130-61-236-83.sslip.io"]
 }
