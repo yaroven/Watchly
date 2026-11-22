@@ -62,18 +62,23 @@ ADR-0006.
 
 ## Deploy
 
-Kustomize overlays in `k8s/`: `base`, plus `dev` and `prod`, plus a `migration` Job.
-The `prod` overlay runs its own postgres and redis in-cluster. `k8s/cluster/` holds the
-cluster-scoped pieces an admin applies once: the cert-manager ClusterIssuer and the
-`github-deployer` ServiceAccount CI deploys as.
+Kustomize overlays in `k8s/`: `base`, plus `prod`, plus a `migration` Job. The `prod`
+overlay runs its own postgres and redis in-cluster. `k8s/cluster/` holds the
+cluster-scoped pieces an admin applies once: the cert-manager ClusterIssuer, the OCI
+Vault ClusterSecretStore, and the `github-deployer` ServiceAccount CI deploys as.
 
 The cluster is OCI OKE, declared in `terraform/`. Its nodes are Ampere A1, so every
 image is built for `linux/arm64`.
 
+App secrets live in OCI Vault, one JSON secret per environment, also declared in
+`terraform/`. External Secrets Operator turns that secret into the `watchly-secrets`
+Secret. Values are uploaded with `scripts/push-secrets.sh <env>` from a gitignored
+`k8s/<env>/.env.secrets`, so they pass through neither GitHub nor Terraform state.
+
 The `deploy-kubernetes` workflow (manual dispatch) does the whole release at the
 dispatched commit: builds and pushes the four images, points the manifests at them with
-`scripts/set-images.sh`, applies the secret, config and databases, runs the migration
-Job, then applies the app and waits for the rollout. Migrations go out before the code
+`scripts/set-images.sh`, applies the config, the ExternalSecret and the databases, runs
+the migration Job, then applies the app and waits for the rollout. Migrations go out before the code
 that needs them. See ADR-0007 and ADR-0008.
 
 ## CI

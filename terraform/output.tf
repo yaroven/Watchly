@@ -23,3 +23,12 @@ output "lb_nsg_id" {
   description = "Attach to the ingress Service: annotation oci.oraclecloud.com/oci-network-security-groups (load balancer) or oci-network-load-balancer.oraclecloud.com/oci-network-security-groups (network load balancer)"
   value       = oci_core_network_security_group.k8s_lb_nsg.id
 }
+
+output "vault_id" {
+  value = oci_kms_vault.watchly.id
+}
+
+output "app_secret_ids" {
+  description = "OCID of each environment's app secret, for scripts/push-secrets.sh"
+  value       = { for env, s in oci_vault_secret.app : env => s.id }
+}

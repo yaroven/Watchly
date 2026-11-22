@@ -46,9 +46,3 @@ configMapGenerator:
     files:
       - grafana/provisioning/dashboards/logs.yml
       - grafana/provisioning/dashboards/application-logs.json
-secretGenerator:
-  - name: watchly-secrets
-    envs:
-      - .env.secrets
-    options:
-      disableNameSuffixHash: true

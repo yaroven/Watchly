@@ -1,14 +1,4 @@
 #!/usr/bin/env bash
-# Points one environment's manifests at one build.
-#
-# Four images across three kustomizations have to move together, and the
-# tags are immutable by design: a deploy is always an edit to these files,
-# and doing it by hand is how three of them end up on one build and the
-# fourth on another.
-#
-# The client tag carries its environment (<env>-<sha>) because its
-# NEXT_PUBLIC_* values are compiled in; the rest are environment-independent
-# and use the bare sha.
 set -euo pipefail
 
 ENV_NAME="${1:-}"

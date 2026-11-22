@@ -122,19 +122,6 @@ jobs:
       - name: Point the manifests at ${{ needs.meta.outputs.sha }}
         run: ./scripts/set-images.sh "$TARGET_ENV" "$SHA"
 
-      - name: Write the secret files
-        env:
-          K8S_ENV_SECRETS: ${{ secrets.K8S_ENV_SECRETS }}
-        run: |
-          set -euo pipefail
-          if [ -z "$K8S_ENV_SECRETS" ]; then
-            echo "Environment '$TARGET_ENV' has no K8S_ENV_SECRETS secret" >&2
-            exit 1
-          fi
-          umask 077
-          printf '%s\n' "$K8S_ENV_SECRETS" > "k8s/$TARGET_ENV/.env.secrets"
-          cp "k8s/$TARGET_ENV/.env.secrets" k8s/base/.env.secrets
-
       - name: Connect to the cluster
         env:
           KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG }}
@@ -159,12 +146,16 @@ jobs:
         run: |
           set -euo pipefail
           yq 'select(
-                .kind == "Namespace" or .kind == "Secret" or
+                .kind == "Namespace" or .kind == "ExternalSecret" or
                 .kind == "ConfigMap" or .kind == "PersistentVolumeClaim" or
                 ((.kind == "Deployment" or .kind == "Service") and
                  (.metadata.name == "postgres" or .metadata.name == "redis"))
               )' "$RUNNER_TEMP/app.yaml" > "$RUNNER_TEMP/prerequisites.yaml"
           kubectl apply -f "$RUNNER_TEMP/prerequisites.yaml"
+          if ! kubectl -n "$NAMESPACE" wait --for=condition=Ready externalsecret/watchly-secrets --timeout=2m; then
+            kubectl -n "$NAMESPACE" describe externalsecret watchly-secrets | tail -20
+            exit 1
+          fi
           for db in postgres redis; do
             if kubectl -n "$NAMESPACE" get deploy "$db" >/dev/null 2>&1; then
               kubectl -n "$NAMESPACE" rollout status "deploy/$db" --timeout=5m
@@ -174,12 +165,9 @@ jobs:
       - name: Migrate
         run: |
           set -euo pipefail
-          # A Job's pod template is immutable, so the previous one has to go.
           kubectl -n "$NAMESPACE" delete job watchly-migrate --ignore-not-found --wait=true
           kubectl -n "$NAMESPACE" apply -f "$RUNNER_TEMP/migration.yaml"
 
-          # `kubectl wait --for=condition=complete` would sit out the whole
-          # timeout on a failed Job (backoffLimit: 0), so watch for either.
           deadline=$(( $(date +%s) + 600 ))
           while :; do
             state="$(kubectl -n "$NAMESPACE" get job watchly-migrate \

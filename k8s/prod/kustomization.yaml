@@ -9,16 +9,12 @@ resources:
   - ingress.yaml
   - postgres.yaml
   - redis.yaml
+  - external-secret.yaml
 
 images:
   - name: razanka/watchly-client
     newTag: prod-duckdns-1
 
-# OCI rounds every Block Volume up to 50 GB, and Always Free covers 200 GB
-# including the two 50 GB node boot volumes. That leaves room for exactly two
-# PVCs, which go to postgres and redis. Logs, metrics and Grafana's own state
-# live on the node's disk instead and are lost when their pod restarts;
-# dashboards and datasources come from git, so those survive.
 patches:
   - target:
       kind: StatefulSet
@@ -85,10 +81,3 @@ configMapGenerator:
     literals:
       - S3_IMAGE_PUBLIC_ORIGIN=https://s3.eu-north-1.amazonaws.com
       - S3_IMAGE_INTERNAL_ORIGIN=https://s3.eu-north-1.amazonaws.com
-secretGenerator:
-  - name: watchly-secrets
-    behavior: replace
-    envs:
-      - .env.secrets
-    options:
-      disableNameSuffixHash: true

@@ -195,3 +195,11 @@ variable "budget_alert_email" {
   description = "Email that receives the budget alerts"
   type        = string
 }
+
+# --- Secrets ---
+
+variable "secret_environments" {
+  description = "Environments that get an app secret in the vault, one per k8s overlay"
+  type        = list(string)
+  default     = ["prod"]
+}
