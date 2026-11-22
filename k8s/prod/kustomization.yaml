@@ -75,6 +75,8 @@ configMapGenerator:
       - S3_ENDPOINT_INTERNAL=https://s3.eu-north-1.amazonaws.com
       - S3_ENDPOINT_PUBLIC=https://s3.eu-north-1.amazonaws.com
       - CORS_ALLOWED_ORIGINS=https://watchly.130-61-236-83.sslip.io
+      - JWT_EXPIRES_IN=1h
+      - JWT_REFRESH_EXPIRES_IN=30d
 
   - name: watchly-client-config
     behavior: merge
