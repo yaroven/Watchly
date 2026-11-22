@@ -3,8 +3,6 @@ kind: Service
 metadata:
   name: grafana
 spec:
-  # Unlike Loki this one is worth exposing: it is the UI, and it is behind an
-  # admin password.
   type: ClusterIP
   selector:
     app.kubernetes.io/name: grafana
@@ -18,10 +16,6 @@ kind: PersistentVolumeClaim
 metadata:
   name: grafana-data
 spec:
-  # DigitalOcean CSI block storage. It is the default class on DOKS,
-  # but naming it explicitly keeps the manifest honest about where it
-  # is meant to run. Volumes are network-attached, so they survive a
-  # node being replaced.
   storageClassName: do-block-storage
   accessModes:
   - ReadWriteOnce
@@ -38,8 +32,6 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: grafana
-  # ReadWriteOnce cannot be held by two pods at once, so a rolling update would
-  # deadlock: the new pod waits for a volume the old one still has.
   strategy:
     type: Recreate
   template:
@@ -47,8 +39,6 @@ spec:
       labels:
         app.kubernetes.io/name: grafana
     spec:
-      # The image runs as uid 472; without fsGroup the fresh volume stays
-      # root-owned and Grafana cannot write its database.
       securityContext:
         fsGroup: 472
       containers:
@@ -88,8 +78,6 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /var/lib/grafana
-        # Same two paths compose bind-mounts, so the provider file's `path:`
-        # stays valid in both environments.
         - name: datasources
           mountPath: /etc/grafana/provisioning/datasources
         - name: dashboards

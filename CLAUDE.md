@@ -6,9 +6,9 @@ Redis for jobs, S3-compatible storage for media (DigitalOcean Spaces in prod, Lo
 uploads are confirmed by the client, ADR-0018), Loki for logs, Kubernetes
 via kustomize overlays under `k8s/`.
 
-`apps/api/prisma/schema.prisma` is the source of truth for the domain. The Makefile,
-that schema and `pnpm-workspace.yaml` carry the rationale for most of the decisions
-that would otherwise be puzzling.
+`apps/api/prisma/schema.prisma` is the source of truth for the domain. That schema
+and `pnpm-workspace.yaml` carry the rationale for most of the decisions that would
+otherwise be puzzling.
 
 ## Commands
 
@@ -24,7 +24,7 @@ pnpm --filter api test --testPathPattern=title-engagement # one suite (no `--`)
 pnpm --filter client test   # vitest; unit only, no DOM environment
 ```
 
-Swagger: `http://localhost:3000/docs`. Deploys go through `make help`.
+Swagger: `http://localhost:3000/docs`. Deploys go through the `deploy-kubernetes` workflow (manual dispatch).
 
 ## Rules
 

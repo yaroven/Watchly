@@ -1,28 +1,13 @@
-# One entry point, two hostnames, handled by ingress-nginx. Installing the
-# controller created a DigitalOcean Load Balancer with its own public IP; both
-# DuckDNS names below are A records pointing at THAT IP, not at a node.
-#
-# Grafana is deliberately absent. It is guarded by nothing but an admin
-# password, and `kubectl port-forward svc/grafana 3001:3000` gives the same
-# access without publishing it or spending a certificate SAN on it.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: watchly
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt
-
-    # Video and posters are uploaded straight to S3 with presigned URLs, so
-    # nothing large ever crosses this proxy — the api has no upload endpoint
-    # at all. A modest cap is therefore free protection rather than a
-    # limitation; the previous "0" removed the limit entirely.
-    nginx.ingress.kubernetes.io/proxy-body-size: 10m
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
 spec:
-  ingressClassName: nginx
+  ingressClassName: traefik
   rules:
-    - host: razanka-watchly.duckdns.org
+    - host: watchly.130-61-236-83.sslip.io
       http:
         paths:
           - path: /
@@ -32,7 +17,7 @@ spec:
                 name: client
                 port:
                   number: 4000
-    - host: razanka-watchly-api.duckdns.org
+    - host: api.watchly.130-61-236-83.sslip.io
       http:
         paths:
           - path: /
@@ -44,6 +29,6 @@ spec:
                   number: 3000
   tls:
     - hosts:
-        - razanka-watchly.duckdns.org
-        - razanka-watchly-api.duckdns.org
+        - watchly.130-61-236-83.sslip.io
+        - api.watchly.130-61-236-83.sslip.io
       secretName: watchly-tls

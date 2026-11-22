@@ -25,10 +25,6 @@ spec:
       labels:
         app.kubernetes.io/name: api
       annotations:
-        # Opt-in for the scrape config in prometheus-config.yaml. /metrics is
-        # served from the application port, so Prometheus scrapes a pod
-        # directly on 3000 — the same port the Ingress publishes, which is why
-        # MetricsController refuses a request carrying x-forwarded-for.
         prometheus.io/scrape: "true"
         prometheus.io/port: "3000"
     spec:
@@ -42,8 +38,6 @@ spec:
             name: watchly-config
         - secretRef:
             name: watchly-secrets
-        # Prisma connects and migrations may run on boot, so give startup a
-        # generous budget while keeping liveness tight afterwards.
         startupProbe:
           httpGet:
             path: /health

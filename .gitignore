@@ -36,3 +36,8 @@ config/dev/data/*
 !config/dev/volumes/transcoder-worker/.gitkeep
 .DS_Store
 .idea/
+/terraform/terraform.tfvars
+/terraform/.terraform/
+/terraform/*.tfstate
+/terraform/*.tfstate.*
+/terraform/.terraform.tfstate.lock.info

@@ -1,0 +1,13 @@
+apiVersion: external-secrets.io/v1
+kind: ClusterSecretStore
+metadata:
+  name: oci-vault
+spec:
+  provider:
+    oracle:
+      vault: ocid1.vault.oc1.eu-frankfurt-1.envqg3abaadlu.abtheljskuddh5udh5fybo7qvgg5nipabfoheic5jr37mvruizasepyhheaq
+      region: eu-frankfurt-1
+      principalType: InstancePrincipal
+  conditions:
+    - namespaces:
+        - watchly-prod

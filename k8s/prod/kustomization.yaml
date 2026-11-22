@@ -7,51 +7,77 @@ resources:
   - namespace.yaml
   - ../base
   - ingress.yaml
+  - postgres.yaml
+  - redis.yaml
+  - external-secret.yaml
 
-# Built separately per environment — NEXT_PUBLIC_BACKEND_API_URL and friends
-# are compiled into the browser bundle, so one image cannot serve both.
 images:
   - name: razanka/watchly-client
-    newTag: prod-duckdns-1
+    newTag: set-by-deploy-kubernetes
 
 patches:
-  - path: replicas-patch.yaml
-    target:
+  - target:
+      kind: StatefulSet
+      name: loki
+    patch: |-
+      - op: remove
+        path: /spec/volumeClaimTemplates
+      - op: add
+        path: /spec/template/spec/volumes/-
+        value:
+          name: data
+          emptyDir:
+            sizeLimit: 5Gi
+  - target:
+      kind: StatefulSet
+      name: prometheus
+    patch: |-
+      - op: remove
+        path: /spec/volumeClaimTemplates
+      - op: add
+        path: /spec/template/spec/volumes/-
+        value:
+          name: data
+          emptyDir:
+            sizeLimit: 5Gi
+  - target:
       kind: Deployment
-      name: api
+      name: grafana
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: grafana
+      spec:
+        template:
+          spec:
+            volumes:
+              - name: data
+                persistentVolumeClaim: null
+                emptyDir:
+                  sizeLimit: 1Gi
+  - target:
+      kind: PersistentVolumeClaim
+      name: grafana-data
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: grafana-data
 
 configMapGenerator:
   - name: watchly-config
     behavior: merge
     literals:
-      # Managed Redis uses its own TLS port, not 6379.
-      - REDIS_PORT=25061
-      # Both point at the same regional endpoint on purpose. S3Service signs
-      # URLs with forcePathStyle and then rewrites only the host
-      # (s3.service.ts:47-53) — against real AWS that rewrite invalidates the
-      # SigV4 signature, which covers the Host header. Equal values make the
-      # rewrite a no-op and keep the path-style `/<bucket>/<key>` shape the
-      # client's image proxy matches on.
+      - REDIS_PORT=6379
+      - REDIS_TLS=false
       - S3_ENDPOINT_INTERNAL=https://s3.eu-north-1.amazonaws.com
       - S3_ENDPOINT_PUBLIC=https://s3.eu-north-1.amazonaws.com
-      - CORS_ALLOWED_ORIGINS=https://razanka-watchly.duckdns.org
+      - CORS_ALLOWED_ORIGINS=https://watchly.130-61-236-83.sslip.io
 
   - name: watchly-client-config
     behavior: merge
     literals:
-      # Read at runtime by app/api/image-proxy/route.ts. Without them it falls
-      # back to the LocalStack defaults (localstack:4566 / localhost:4566) and
-      # every poster 400s. Same value twice for the same reason as above: there
-      # is no separate in-cluster S3 to rewrite towards.
       - S3_IMAGE_PUBLIC_ORIGIN=https://s3.eu-north-1.amazonaws.com
       - S3_IMAGE_INTERNAL_ORIGIN=https://s3.eu-north-1.amazonaws.com
-secretGenerator:
-  # Kept inside this overlay, not in base: kustomize refuses to read files
-  # above a kustomization root, and there is no --load-restrictor knob on
-  # `kubectl apply -k`.
-  - name: watchly-secrets
-    behavior: replace
-    envs:
-      - .env.secrets
-    options:
-      disableNameSuffixHash: true

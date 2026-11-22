@@ -1,0 +1,210 @@
+name: Deploy Kubernetes
+run-name: "Deploy ${{ github.ref_name }} to prod"
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-kubernetes-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  TARGET_ENV: prod
+  NAMESPACE: watchly-prod
+  REGISTRY: razanka
+
+jobs:
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
+    steps:
+      - id: sha
+        run: echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+  services:
+    needs: meta
+    runs-on: ubuntu-24.04-arm
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - image: watchly-api
+            target: runner
+          - image: watchly-transcoder-worker
+            target: worker-runner
+          - image: watchly-migrator
+            target: migrator
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.image }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          target: ${{ matrix.target }}
+          platforms: linux/arm64
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ matrix.image }}:${{ needs.meta.outputs.sha }}
+          cache-from: type=gha,scope=${{ matrix.image }}-arm64
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-arm64
+
+  client:
+    needs: meta
+    runs-on: ubuntu-24.04-arm
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fail early if the environment has no URLs
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -z "${{ vars.NEXT_PUBLIC_BACKEND_API_URL }}" ] && missing="$missing NEXT_PUBLIC_BACKEND_API_URL"
+          [ -z "${{ vars.NEXT_PUBLIC_APP_URL }}" ] && missing="$missing NEXT_PUBLIC_APP_URL"
+          if [ -n "$missing" ]; then
+            echo "Environment '$TARGET_ENV' is missing:$missing" >&2
+            echo "Set them as Variables on that environment — baking empty values produces a client that calls the wrong host." >&2
+            exit 1
+          fi
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push client for ${{ env.TARGET_ENV }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/client/Dockerfile
+          platforms: linux/arm64
+          push: true
+          build-args: |
+            NEXT_PUBLIC_BACKEND_API_URL=${{ vars.NEXT_PUBLIC_BACKEND_API_URL }}
+            NEXT_PUBLIC_APP_URL=${{ vars.NEXT_PUBLIC_APP_URL }}
+            NEXT_PUBLIC_REMOTE_IMAGE_HOSTNAME=${{ vars.NEXT_PUBLIC_REMOTE_IMAGE_HOSTNAME }}
+            NEXT_PUBLIC_S3_IMAGE_PROTOCOL=${{ vars.NEXT_PUBLIC_S3_IMAGE_PROTOCOL }}
+            NEXT_PUBLIC_S3_IMAGE_HOSTNAME=${{ vars.NEXT_PUBLIC_S3_IMAGE_HOSTNAME }}
+            NEXT_PUBLIC_S3_IMAGE_PORT=${{ vars.NEXT_PUBLIC_S3_IMAGE_PORT }}
+            NEXT_PUBLIC_S3_IMAGE_BUCKET=${{ vars.NEXT_PUBLIC_S3_IMAGE_BUCKET }}
+          tags: ${{ env.REGISTRY }}/watchly-client:${{ env.TARGET_ENV }}-${{ needs.meta.outputs.sha }}
+          cache-from: type=gha,scope=client-${{ env.TARGET_ENV }}-arm64
+          cache-to: type=gha,mode=max,scope=client-${{ env.TARGET_ENV }}-arm64
+
+  deploy:
+    needs: [meta, services, client]
+    runs-on: ubuntu-latest
+    environment: prod
+    timeout-minutes: 30
+    env:
+      SHA: ${{ needs.meta.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: v1.36.4
+
+      - name: Point the manifests at ${{ needs.meta.outputs.sha }}
+        run: ./scripts/set-images.sh "$TARGET_ENV" "$SHA"
+
+      - name: Connect to the cluster
+        env:
+          KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KUBECONFIG_CONTENT" ]; then
+            echo "Environment '$TARGET_ENV' has no KUBECONFIG secret" >&2
+            exit 1
+          fi
+          umask 077
+          printf '%s\n' "$KUBECONFIG_CONTENT" > "$RUNNER_TEMP/kubeconfig"
+          echo "KUBECONFIG=$RUNNER_TEMP/kubeconfig" >> "$GITHUB_ENV"
+          KUBECONFIG="$RUNNER_TEMP/kubeconfig" kubectl auth can-i patch deployments -n "$NAMESPACE"
+
+      - name: Render the manifests
+        run: |
+          set -euo pipefail
+          kubectl kustomize "k8s/$TARGET_ENV" > "$RUNNER_TEMP/app.yaml"
+          kubectl kustomize k8s/migration > "$RUNNER_TEMP/migration.yaml"
+
+      - name: Apply the prerequisites
+        run: |
+          set -euo pipefail
+          yq 'select(
+                .kind == "Namespace" or .kind == "ExternalSecret" or
+                .kind == "ConfigMap" or .kind == "PersistentVolumeClaim" or
+                ((.kind == "Deployment" or .kind == "Service") and
+                 (.metadata.name == "postgres" or .metadata.name == "redis"))
+              )' "$RUNNER_TEMP/app.yaml" > "$RUNNER_TEMP/prerequisites.yaml"
+          kubectl apply -f "$RUNNER_TEMP/prerequisites.yaml"
+          if ! kubectl -n "$NAMESPACE" wait --for=condition=Ready externalsecret/watchly-secrets --timeout=2m; then
+            kubectl -n "$NAMESPACE" describe externalsecret watchly-secrets | tail -20
+            exit 1
+          fi
+          for db in postgres redis; do
+            if kubectl -n "$NAMESPACE" get deploy "$db" >/dev/null 2>&1; then
+              kubectl -n "$NAMESPACE" rollout status "deploy/$db" --timeout=5m
+            fi
+          done
+
+      - name: Migrate
+        run: |
+          set -euo pipefail
+          kubectl -n "$NAMESPACE" delete job watchly-migrate --ignore-not-found --wait=true
+          kubectl -n "$NAMESPACE" apply -f "$RUNNER_TEMP/migration.yaml"
+
+          deadline=$(( $(date +%s) + 600 ))
+          while :; do
+            state="$(kubectl -n "$NAMESPACE" get job watchly-migrate \
+              -o jsonpath='{.status.conditions[?(@.status=="True")].type}')"
+            case "$state" in
+              *Complete*) break ;;
+              *Failed*)
+                kubectl -n "$NAMESPACE" logs job/watchly-migrate --tail=200 || true
+                echo "Migration failed; the app was not rolled out." >&2
+                exit 1
+                ;;
+            esac
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              kubectl -n "$NAMESPACE" logs job/watchly-migrate --tail=200 || true
+              echo "Migration did not finish in 10 minutes." >&2
+              exit 1
+            fi
+            sleep 5
+          done
+          kubectl -n "$NAMESPACE" logs job/watchly-migrate --tail=50
+
+      - name: Apply the app
+        run: kubectl apply -f "$RUNNER_TEMP/app.yaml"
+
+      - name: Wait for the rollout
+        run: |
+          set -euo pipefail
+          for deploy in api client transcoder-worker; do
+            kubectl -n "$NAMESPACE" rollout status "deploy/$deploy" --timeout=5m
+          done
+
+      - name: Report
+        if: always()
+        run: |
+          {
+            echo "### $NAMESPACE @ $SHA"
+            echo '```'
+            kubectl -n "$NAMESPACE" get pods 2>&1 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
