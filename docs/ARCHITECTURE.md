@@ -66,7 +66,9 @@ Kustomize overlays in `k8s/`: `base`, plus `prod`, plus a `migration` Job. The `
 overlay runs its own postgres and redis in-cluster. `k8s/cluster/` holds the
 cluster-scoped pieces an admin applies once: the cert-manager ClusterIssuer, the OCI
 Vault ClusterSecretStore, and the `github-deployer` ServiceAccount CI deploys as. `scripts/bootstrap-cluster.sh` installs
-External Secrets Operator and applies them.
+External Secrets Operator, cert-manager and Traefik, and applies them. Traefik is the
+ingress controller, behind the one OCI Network Load Balancer the free tier includes;
+ingress-nginx was retired upstream in March 2026.
 
 The cluster is OCI OKE, declared in `terraform/`. Its nodes are Ampere A1, so every
 image is built for `linux/arm64`.
