@@ -31,9 +31,6 @@ spec:
         ports:
         - containerPort: 4000
         envFrom:
-        # watchly-config, not watchly-client-config, would hand the browser
-        # tier the api's Redis host and S3 endpoints — none of which it reads —
-        # while leaving BACKEND_API_URL and S3_IMAGE_*_ORIGIN unset.
         - configMapRef:
             name: watchly-client-config
         readinessProbe:

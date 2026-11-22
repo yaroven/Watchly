@@ -1,14 +1,8 @@
-# Scrapes pods by annotation; see prometheus-config.yaml. Only the api carries
-# the annotation today — it serves /metrics as a route on its application port.
-# The transcoder worker has no HTTP server and exposes nothing.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: prometheus
 ---
-# Namespaced Role, not a ClusterRole: discovery is restricted to this
-# namespace's own pods (`own_namespace: true` in the scrape config), so
-# nothing cluster-scoped is needed.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -35,9 +29,6 @@ kind: Service
 metadata:
   name: prometheus
 spec:
-  # ClusterIP and deliberately absent from the Ingress. Prometheus has no
-  # authentication of its own, and the series it holds name every route and
-  # queue in the system.
   type: ClusterIP
   selector:
     app.kubernetes.io/name: prometheus
@@ -62,8 +53,6 @@ spec:
         app.kubernetes.io/name: prometheus
     spec:
       serviceAccountName: prometheus
-      # The image runs as uid 65534; without fsGroup the fresh volume stays
-      # root-owned and the TSDB cannot be created.
       securityContext:
         fsGroup: 65534
       containers:
@@ -72,8 +61,6 @@ spec:
         args:
         - --config.file=/etc/prometheus/prometheus.yml
         - --storage.tsdb.path=/prometheus
-        # Local disk, single replica, no remote write — retention is bounded
-        # by the volume below, so keep the window short enough to fit it.
         - --storage.tsdb.retention.time=15d
         - --web.enable-lifecycle
         ports:
@@ -110,8 +97,6 @@ spec:
   - metadata:
       name: data
     spec:
-      # DigitalOcean CSI block storage, as with the Loki volume. The home
-      # overlay patches this to local-path.
       storageClassName: do-block-storage
       accessModes:
       - ReadWriteOnce

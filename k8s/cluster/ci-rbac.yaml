@@ -1,0 +1,107 @@
+# The identity .github/workflows/deploy-kubernetes.yml deploys as.
+#
+# Applied once per cluster by an admin, never by the workflow itself:
+#
+#   kubectl apply -f k8s/cluster/ci-rbac.yaml
+#
+# The workflow gets namespace-scoped rights only: what the overlays and the
+# migration Job create, in the namespaces bound below. It cannot touch other
+# namespaces, nodes, CRDs or cluster RBAC. A new environment needs its
+# Namespace, a RoleBinding, and its name in the namespaces ClusterRole.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: watchly-ci
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: github-deployer
+  namespace: watchly-ci
+---
+# Long-lived token for the GitHub secret KUBECONFIG. Deleting this Secret
+# revokes it; re-applying the file issues a new one.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: github-deployer-token
+  namespace: watchly-ci
+  annotations:
+    kubernetes.io/service-account.name: github-deployer
+type: kubernetes.io/service-account-token
+---
+# Created here rather than left to the first deploy, because the RoleBinding
+# below has to live in it.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: watchly-prod
+---
+# Everything a deploy applies, waits on or reads logs from.
+# The Role/RoleBinding rights are for Prometheus's pod-discovery Role in base;
+# granting it does not escalate, since this role already holds those verbs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: watchly-deployer
+rules:
+  - apiGroups: [""]
+    resources: [configmaps, secrets, services, serviceaccounts, persistentvolumeclaims]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [""]
+    resources: [pods, pods/log, events]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments, statefulsets]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [apps]
+    resources: [replicasets, controllerrevisions]
+    verbs: [get, list, watch]
+  - apiGroups: [batch]
+    resources: [jobs]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [rbac.authorization.k8s.io]
+    resources: [roles, rolebindings]
+    verbs: [get, list, watch, create, update, patch, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: github-deployer
+  namespace: watchly-prod
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: watchly-deployer
+subjects:
+  - kind: ServiceAccount
+    name: github-deployer
+    namespace: watchly-ci
+---
+# Each overlay declares its own Namespace, which `kubectl apply` reads and
+# patches. Limited by name, so the workflow cannot create or edit any other.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: watchly-deployer-namespaces
+rules:
+  - apiGroups: [""]
+    resources: [namespaces]
+    resourceNames: [watchly-prod]
+    verbs: [get, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: github-deployer-namespaces
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: watchly-deployer-namespaces
+subjects:
+  - kind: ServiceAccount
+    name: github-deployer
+    namespace: watchly-ci

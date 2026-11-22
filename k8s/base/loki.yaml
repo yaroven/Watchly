@@ -1,16 +1,8 @@
-# Named `loki` so the in-cluster DNS name matches the compose service name.
-# That keeps one LOKI_URL and one Grafana datasource file working in both
-# environments.
-#
-# No config is mounted: the image ships /etc/loki/local-config.yaml (single
-# binary, filesystem storage under /loki), which is what this needs.
 apiVersion: v1
 kind: Service
 metadata:
   name: loki
 spec:
-  # ClusterIP, not LoadBalancer: Loki runs with auth_enabled false, so an
-  # external address would expose the push and query API to anyone.
   type: ClusterIP
   selector:
     app.kubernetes.io/name: loki
@@ -75,10 +67,6 @@ spec:
   - metadata:
       name: data
     spec:
-      # DigitalOcean CSI block storage. It is the default class on DOKS,
-      # but naming it explicitly keeps the manifest honest about where it
-      # is meant to run. Volumes are network-attached, so they survive a
-      # node being replaced.
       storageClassName: do-block-storage
       accessModes:
       - ReadWriteOnce

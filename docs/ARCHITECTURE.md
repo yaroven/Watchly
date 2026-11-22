@@ -62,34 +62,32 @@ ADR-0006.
 
 ## Deploy
 
-Kustomize overlays in `k8s/`: `base`, plus `dev`, `home` and `prod`, plus a `migration`
-Job. The `home` overlay additionally runs its own postgres, redis, minio and localstack
-in-cluster.
+Kustomize overlays in `k8s/`: `base`, plus `dev` and `prod`, plus a `migration` Job.
+The `prod` overlay runs its own postgres and redis in-cluster. `k8s/cluster/` holds the
+cluster-scoped pieces an admin applies once: the cert-manager ClusterIssuer and the
+`github-deployer` ServiceAccount CI deploys as.
 
-Driven by the `Makefile`:
+The cluster is OCI OKE, declared in `terraform/`. Its nodes are Ampere A1, so every
+image is built for `linux/arm64`.
 
-```
-make release-home                 # build + push images on GitHub runners
-make migrate-home SHA=<sha>       # run the migration Job at that build
-make deploy-home SHA=<sha>        # point the overlay at it and roll out
-make status-home
-```
-
-Migrations go out before the code that needs them, as a separate step. See ADR-0007 and
-ADR-0008.
+The `deploy-kubernetes` workflow (manual dispatch) does the whole release at the
+dispatched commit: builds and pushes the four images, points the manifests at them with
+`scripts/set-images.sh`, applies the secret, config and databases, runs the migration
+Job, then applies the app and waits for the rollout. Migrations go out before the code
+that needs them. See ADR-0007 and ADR-0008.
 
 ## CI
 
 `.github/workflows/`: `api-test`, `build-api`, `build-client`, `pr-title-lint`,
-`release-images`, `deploy-home`, `backport`.
+`deploy-kubernetes`, `backport`.
 
 Read the "What the gates actually check" section of the root `CLAUDE.md` before trusting
 a green run — in particular, the `lint` check is the PR *title* linter, ESLint never runs
 in CI, and the paths-filter wrappers let a job report success having built nothing.
 
-`deploy-home` is `workflow_dispatch` only, deliberately: the runner is self-hosted on a
-home LAN and the repo is public, so a `pull_request` trigger would let a fork execute on
-that machine.
+`deploy-kubernetes` is `workflow_dispatch` only, deliberately: it holds cluster
+credentials and the repo is public, so a `pull_request` trigger would hand them to a
+fork's code.
 
 ## Local gates
 

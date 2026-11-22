@@ -1,6 +1,3 @@
-# BullMQ's queue state lives here, so the volume is not optional: losing it
-# mid-transcode loses the job. Plaintext on purpose — REDIS_TLS=false in the
-# overlay's config — since this never leaves the cluster network.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -44,8 +41,6 @@ spec:
       containers:
         - name: redis
           image: redis:8.4.0
-          # appendonly keeps queued jobs across a restart; requirepass is read
-          # from the same secret the api authenticates with.
           command:
             - sh
             - -c

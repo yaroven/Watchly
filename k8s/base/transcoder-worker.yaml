@@ -12,11 +12,6 @@ spec:
       labels:
         app.kubernetes.io/name: transcoder-worker
     spec:
-      # ffmpeg runs for minutes per job. The 30s default would SIGKILL a
-      # transcode on every rollout; BullMQ would then see the job stall and
-      # burn one of its 3 attempts (see video-transcode-queue.options.ts).
-      # worker-main.ts calls enableShutdownHooks, so the process does drain
-      # cleanly when given the time.
       terminationGracePeriodSeconds: 600
       containers:
       - name: transcoder-worker
