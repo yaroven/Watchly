@@ -6,6 +6,10 @@ terraform {
       source  = "oracle/oci"
       version = "~> 9.13"
     }
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 5.28"
+    }
   }
 
   backend "s3" {
@@ -34,4 +38,8 @@ provider "oci" {
   fingerprint      = var.api_fingerprint
   private_key_path = var.api_private_key_path
   region           = var.region
+}
+
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
 }

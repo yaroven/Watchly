@@ -32,3 +32,24 @@ output "app_secret_ids" {
   description = "OCID of each environment's app secret, for scripts/push-secrets.sh"
   value       = { for env, s in oci_vault_secret.app : env => s.id }
 }
+
+output "r2_endpoint" {
+  value = local.r2_endpoint
+}
+
+output "r2_buckets" {
+  value = { for k, b in cloudflare_r2_bucket.watchly : k => b.name }
+}
+
+output "r2_content_public_url" {
+  value = "https://${cloudflare_r2_managed_domain.content.domain}"
+}
+
+output "r2_app_credentials" {
+  description = "S3 credentials of the app's R2 token, for scripts/push-secrets.sh"
+  sensitive   = true
+  value = {
+    access_key_id     = cloudflare_account_token.app.id
+    secret_access_key = sha256(cloudflare_account_token.app.value)
+  }
+}
