@@ -2,7 +2,7 @@
 
 Streaming catalogue with a video transcoding pipeline. pnpm workspace: `apps/api`
 (NestJS 11) and `apps/client` (Next.js 16, App Router). Postgres via Prisma, BullMQ on
-Redis for jobs, S3-compatible storage for media (DigitalOcean Spaces in prod, LocalStack in dev;
+Redis for jobs, S3-compatible storage for media (Cloudflare R2 in prod, LocalStack in dev;
 uploads are confirmed by the client, ADR-0018), Loki for logs, Kubernetes
 via kustomize overlays under `k8s/`.
 

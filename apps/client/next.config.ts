@@ -5,6 +5,7 @@ const s3ImageProtocol = process.env.NEXT_PUBLIC_S3_IMAGE_PROTOCOL === "https" ? 
 const s3ImagePort = process.env.NEXT_PUBLIC_S3_IMAGE_PORT || "4566";
 const s3ImageBucket = process.env.NEXT_PUBLIC_S3_IMAGE_BUCKET || "content";
 const s3ImageHostname = process.env.NEXT_PUBLIC_S3_IMAGE_HOSTNAME || "localhost";
+const s3PublicBaseUrl = process.env.NEXT_PUBLIC_S3_PUBLIC_BASE_URL ? new URL(process.env.NEXT_PUBLIC_S3_PUBLIC_BASE_URL) : null;
 const s3InternalOrigin = process.env.NEXT_PUBLIC_S3_IMAGE_INTERNAL_ORIGIN
   ? new URL(process.env.NEXT_PUBLIC_S3_IMAGE_INTERNAL_ORIGIN)
   : null;
@@ -54,6 +55,15 @@ const nextConfig: NextConfig = {
         port: s3ImagePort,
         pathname: `/${s3ImageBucket}/**`,
       },
+      ...(s3PublicBaseUrl
+        ? [
+            {
+              protocol: s3PublicBaseUrl.protocol.replace(":", "") as "http" | "https",
+              hostname: s3PublicBaseUrl.hostname,
+              pathname: "/**",
+            },
+          ]
+        : []),
       ...(s3InternalOrigin
         ? [
             {

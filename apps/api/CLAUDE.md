@@ -1,6 +1,6 @@
 # apps/api
 
-NestJS 11, Prisma + Postgres, BullMQ on Redis, AWS SDK v3 for S3 (DigitalOcean Spaces in prod). Two entrypoints from one codebase and one
+NestJS 11, Prisma + Postgres, BullMQ on Redis, AWS SDK v3 for S3 (Cloudflare R2 in prod). Two entrypoints from one codebase and one
 Dockerfile: `src/main.ts` (HTTP, port 3000) and
 `src/worker-main.ts` (background worker). `README.md` here is `nest new` boilerplate — ignore it.
 
@@ -130,7 +130,7 @@ Over HTTP every kind has the same three routes: `POST …/upload-url` with `{ co
 because a header proves nothing about the bytes.
 
 An upload is **confirmed by the client, then processed asynchronously** (ADR-0018). There is no bucket notification
-and no SQS: the storage is DigitalOcean Spaces, which has neither. After its PUT the client posts the `rawKey` to
+and no SQS: the storage is Cloudflare R2, which has neither. After its PUT the client posts the `rawKey` to
 `upload-url/complete`; `ImageService.assertUploaded` refuses a key that is not this owner's and this kind's, or that
 nothing was uploaded to, and only then is the conversion queued — `image-<rawKey>` makes a repeated confirmation queue
 one job. A video confirms itself the same way through `completeUpload`, and `POST …/transcode` re-queues one by hand,
@@ -298,7 +298,7 @@ still processing is client work that has not been done.
   Ingress publishes:
   - **The route refuses any request carrying `x-forwarded-for`, with a 404.** That header is what keeps route names,
     library versions and queue depths off the internet: Prometheus scrapes a pod by its IP and never crosses the
-    proxy, while ingress-nginx always sets it. The alternative was an nginx `server-snippet` denying the path, which
+    proxy, while the ingress (Traefik) always sets it. The alternative was an nginx `server-snippet` denying the path, which
     ingress-nginx ≥ 1.9 ignores unless `allow-snippet-annotations` is re-enabled — a protection that can silently not
     apply is worse than none.
   - Collection is not free (it reads Redis), and on this port it competes with user traffic. Keep `collect`

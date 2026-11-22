@@ -72,14 +72,11 @@ configMapGenerator:
     literals:
       - REDIS_PORT=6379
       - REDIS_TLS=false
-      - S3_ENDPOINT_INTERNAL=https://s3.eu-north-1.amazonaws.com
-      - S3_ENDPOINT_PUBLIC=https://s3.eu-north-1.amazonaws.com
+      - S3_REGION=auto
+      - S3_RAW_BUCKET_NAME=watchly-raw
+      - S3_PROCESSED_BUCKET_NAME=watchly-content
+      - S3_ENDPOINT_INTERNAL=https://cfd9fcdc17d31caa7e080d8b94f0a9f6.r2.cloudflarestorage.com
+      - S3_ENDPOINT_PUBLIC=https://cfd9fcdc17d31caa7e080d8b94f0a9f6.r2.cloudflarestorage.com
       - CORS_ALLOWED_ORIGINS=https://watchly.130-61-236-83.sslip.io
       - JWT_EXPIRES_IN=1h
       - JWT_REFRESH_EXPIRES_IN=30d
-
-  - name: watchly-client-config
-    behavior: merge
-    literals:
-      - S3_IMAGE_PUBLIC_ORIGIN=https://s3.eu-north-1.amazonaws.com
-      - S3_IMAGE_INTERNAL_ORIGIN=https://s3.eu-north-1.amazonaws.com

@@ -218,6 +218,9 @@ export class S3Service implements OnModuleInit {
   }
 
   getPublicUrl(key: string, type: BucketType): string {
+    if (type === BucketType.PROCESSED && this.s3Config.processedPublicUrl) {
+      return `${this.s3Config.processedPublicUrl.replace(/\/$/, "")}/${key}`;
+    }
     const endpoint = this.s3Config.publicEndpoint.replace(/\/$/, "");
     return `${endpoint}/${this.getBucketName(type)}/${key}`;
   }
