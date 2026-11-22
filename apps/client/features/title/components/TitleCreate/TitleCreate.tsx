@@ -26,7 +26,7 @@ export default function TitleCreate() {
       </Box>
 
       <Box sx={{ pb: "22px", borderBottom: `1px solid ${tokens.border.subtle}` }}>
-        <Typography component="h1" variant="h2" sx={{ color: "#ffffff" }}>
+        <Typography component="h1" variant="h2" sx={{ color: tokens.text.primary }}>
           {t("heading")}
         </Typography>
         <Typography sx={{ mt: "12px", maxWidth: "620px", color: "text.secondary" }}>{t("subheading")}</Typography>

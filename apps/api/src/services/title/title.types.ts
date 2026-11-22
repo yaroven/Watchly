@@ -1,13 +1,14 @@
 import {
   AgeRating,
   ExternalRatings,
-  Genre,
   Title,
+  TitleTranslation,
   TitleType,
   TranscodingStatus,
 } from "@prisma/client";
+import { ContentLocaleView } from "../../common/utils/localize.util";
 import { ExternalRatingView } from "../external-ratings/external-ratings.types";
-import { GenreView } from "../genre/genre.types";
+import { GenreView, GenreWithTranslations } from "../genre/genre.types";
 import {
   CardViewerTitleEngagementView,
   StoredViewerTitleEngagementView,
@@ -32,8 +33,9 @@ export interface TitleInput {
 }
 
 export type TitleWithCatalogueRelations = Title & {
-  genres: Genre[];
+  genres: GenreWithTranslations[];
   externalRatings?: ExternalRatings[];
+  translations?: TitleTranslation[];
 };
 
 export interface TitleView<V = ViewerTitleEngagementView> {
@@ -57,6 +59,7 @@ export interface TitleView<V = ViewerTitleEngagementView> {
   transcodingStatus: TranscodingStatus;
   engagement: TitleEngagementView<V>;
   externalRatings: ExternalRatingView[];
+  content: ContentLocaleView;
 }
 
 export type StoredTitleView = TitleView<StoredViewerTitleEngagementView>;

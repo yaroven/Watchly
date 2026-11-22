@@ -1,6 +1,7 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { AgeRating, TitleType, TranscodingStatus } from "@prisma/client";
 import { TitleView } from "../../../../../services/title/title.types";
+import { ContentLocaleDto } from "../../../../dto/response/content-locale.dto";
 import { GenreResponseDto } from "../../../genres/dto/response/genre-response.dto";
 import { ExternalRatingResponseDto } from "./external-rating-response.dto";
 import { TitleEngagementDto } from "./title-engagement.dto";
@@ -69,4 +70,10 @@ export class TitleResponseDto implements TitleView {
       "Watchly's own score, likes, dislikes and watchlist state — the viewer's own included when signed in. Distinct from `externalRatings`, which are other sites' numbers.",
   })
   engagement: TitleEngagementDto;
+
+  @ApiProperty({
+    type: ContentLocaleDto,
+    description: "The language `name` and `description` are in. Nested genres carry their own.",
+  })
+  content: ContentLocaleDto;
 }

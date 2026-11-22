@@ -2,15 +2,16 @@
 
 import useTitles from "@/features/title/api/use-titles";
 import { ExternalRatingSource, type Title } from "@/features/title/schemas/title";
+import { useRouter } from "@/i18n/navigation";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import { APP } from "@/shared/lib/routes";
 import ArrowForward from "@mui/icons-material/ArrowForward";
 import StarIcon from "@mui/icons-material/Star";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import { tokens } from "@shared/mui/theme";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 
 const RESULT_LIMIT = 6;
 
@@ -42,7 +43,7 @@ export default function TitleMoreLikeThis({ title }: TitleMoreLikeThisProps) {
             background: "none",
             font: "inherit",
             fontSize: "16px",
-            color: "#ffffff",
+            color: tokens.text.primary,
             cursor: "pointer",
             ":hover": { color: "primary.main" },
           }}
@@ -81,7 +82,7 @@ export default function TitleMoreLikeThis({ title }: TitleMoreLikeThisProps) {
                 borderColor: "divider",
                 borderRadius: "16px",
                 p: "10px",
-                backgroundColor: "#191919",
+                backgroundColor: tokens.surface.default,
                 cursor: "pointer",
                 textAlign: "left",
                 font: "inherit",
@@ -95,7 +96,7 @@ export default function TitleMoreLikeThis({ title }: TitleMoreLikeThisProps) {
                 sx={{
                   fontSize: "16px",
                   fontWeight: 700,
-                  color: "#ffffff",
+                  color: tokens.text.primary,
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
@@ -113,7 +114,7 @@ export default function TitleMoreLikeThis({ title }: TitleMoreLikeThisProps) {
               {rating !== undefined && (
                 <Box sx={{ display: "flex", alignItems: "center", gap: "4px" }}>
                   <StarIcon sx={{ fontSize: "16px", color: "primary.main" }} />
-                  <Typography component="span" sx={{ fontSize: "13px", fontWeight: 600, color: "#ffffff" }}>
+                  <Typography component="span" sx={{ fontSize: "13px", fontWeight: 600, color: tokens.text.primary }}>
                     {rating.toFixed(1)}
                   </Typography>
                   <Typography component="span" sx={{ fontSize: "12px", color: "text.secondary" }}>

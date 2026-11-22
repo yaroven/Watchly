@@ -1,14 +1,15 @@
 "use client";
 
 import { CardTitle } from "@/features/title/schemas/title";
+import { useRouter } from "@/i18n/navigation";
 import { APP } from "@/shared/lib/routes";
 import TitleCard from "@features/title/components/TitleCard";
 import { ArrowForward as ArrowForwardIcon } from "@mui/icons-material";
 import { Box } from "@mui/material";
 import Skeleton from "@mui/material/Skeleton";
 import Typography from "@mui/material/Typography";
+import { tokens } from "@shared/mui/theme";
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
 
 interface CatalogProps {
   title: string;
@@ -46,7 +47,7 @@ export default function Catalog({
     <Box sx={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
         {title && (
-          <Typography component="span" sx={{ fontSize: 24, fontWeight: 700, color: "#ffffff" }}>
+          <Typography component="span" sx={{ fontSize: 24, fontWeight: 700, color: tokens.text.primary }}>
             {title}
           </Typography>
         )}
@@ -65,7 +66,7 @@ export default function Catalog({
               background: "none",
               font: "inherit",
               fontSize: "16px",
-              color: "#ffffff",
+              color: tokens.text.primary,
               cursor: "pointer",
               transition: "color .15s ease-out",
               ":hover": { color: "primary.main" },
@@ -99,7 +100,7 @@ export default function Catalog({
           scrollbarColor: "#333333 transparent",
           "&::-webkit-scrollbar": { height: "6px" },
           "&::-webkit-scrollbar-track": { background: "transparent" },
-          "&::-webkit-scrollbar-thumb": { background: "#333333", borderRadius: "3px" },
+          "&::-webkit-scrollbar-thumb": { background: tokens.surface.fill, borderRadius: "3px" },
           "&::-webkit-scrollbar-thumb:hover": { background: "#4a4a4a" },
         }}
       >

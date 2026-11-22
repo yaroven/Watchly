@@ -19,6 +19,7 @@ import Button from "@shared/ui/Button";
 import GradientCard from "@shared/ui/GradientCard";
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
+import { useId } from "react";
 import { TitlesPageFilters } from "../../types";
 
 interface TitlesFiltersPanelProps {
@@ -67,9 +68,10 @@ const labelSx = {
 };
 
 function FilterField({ icon, label, primary, children }: { icon: ReactNode; label: string; primary?: boolean; children: ReactNode }) {
+  const labelId = useId();
   return (
-    <Box sx={{ minWidth: 0, opacity: primary ? 1 : 0.9 }}>
-      <Box component="span" sx={labelSx}>
+    <Box role="group" aria-labelledby={labelId} sx={{ minWidth: 0, opacity: primary ? 1 : 0.9 }}>
+      <Box component="span" id={labelId} sx={labelSx}>
         {icon}
         {label}
       </Box>

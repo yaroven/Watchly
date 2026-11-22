@@ -1,4 +1,5 @@
 import { GenresLibrary } from "@features/genre";
+import { BaseContentScope } from "@shared/lib/content-locale-scope";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
@@ -9,5 +10,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function Page() {
-  return <GenresLibrary />;
+  return (
+    <BaseContentScope>
+      <GenresLibrary />
+    </BaseContentScope>
+  );
 }

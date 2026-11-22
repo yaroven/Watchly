@@ -1,5 +1,8 @@
 "use client";
 
+import { INLINE_ERROR } from "@shared/api/write-errors";
+import { useLoginPath } from "@shared/lib/use-login-path";
+
 import {
   type Comment,
   ReactionType,
@@ -10,14 +13,18 @@ import {
   useSetCommentReaction,
 } from "@/features/comment";
 import { FeatureGate } from "@/features/feature-flags";
+import { useRouter } from "@/i18n/navigation";
 import Role from "@/types/role";
 import { ThumbDown as DislikeIcon, ThumbUp as LikeIcon, ChatBubble as ReplyIcon } from "@mui/icons-material";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
-import { useAuthStore } from "@shared/lib/auth-store";
+import { useApiErrorMessage } from "@shared/api/use-api-error-message";
 import { formatCount } from "@shared/lib/format-count";
+import { useViewer } from "@shared/lib/use-viewer";
+import { nextVote, viewerControl } from "@shared/lib/viewer-control";
 import { tokens } from "@shared/mui/theme";
 import Avatar from "@shared/ui/Avatar";
 import Button from "@shared/ui/Button";
@@ -28,6 +35,7 @@ interface CommentCardProps {
   comment: Comment;
   titleId: string;
   depth?: number;
+  listRefreshFailed?: boolean;
 }
 
 const FALLBACK_AVATAR = "https://picsum.photos/id/1074/120/120";
@@ -43,14 +51,14 @@ function relativeTimeArgs(postedAt: Date): [Date, { now: Date; unit: "minute" | 
   return [at, { now, unit: "day" }];
 }
 
-export default function CommentCard({ comment, titleId, depth = 0 }: CommentCardProps) {
+export default function CommentCard({ comment, titleId, depth = 0, listRefreshFailed = false }: CommentCardProps) {
   const t = useTranslations("title.reviews.comment");
   const format = useFormatter();
-  const userId = useAuthStore((state) => state.userId);
-  const role = useAuthStore((state) => state.role);
-  const status = useAuthStore((state) => state.status);
-  const isSignedIn = Boolean(userId);
-  const canDelete = status === "resolved" && (comment.author.id === userId || role === Role.ADMIN);
+  const router = useRouter();
+  const signInPath = useLoginPath();
+  const describeError = useApiErrorMessage();
+  const viewer = useViewer();
+  const canDelete = viewer.status === "signed-in" && (comment.author.id === viewer.userId || viewer.role === Role.ADMIN);
 
   const [expanded, setExpanded] = useState(false);
   const [replyOpen, setReplyOpen] = useState(false);
@@ -58,10 +66,11 @@ export default function CommentCard({ comment, titleId, depth = 0 }: CommentCard
   const [reported, setReported] = useState(false);
   const [spoilerRevealed, setSpoilerRevealed] = useState(!comment.hasSpoiler);
 
-  const react = useSetCommentReaction();
-  const report = useReportComment({ onSuccess: () => setReported(true) });
-  const remove = useDeleteComment(titleId);
+  const react = useSetCommentReaction({ meta: INLINE_ERROR });
+  const report = useReportComment({ meta: INLINE_ERROR, onSuccess: () => setReported(true) });
+  const remove = useDeleteComment(titleId, { meta: INLINE_ERROR });
   const createReply = useCreateComment(titleId, {
+    meta: INLINE_ERROR,
     onSuccess: () => {
       setReplyText("");
       setReplyOpen(false);
@@ -70,12 +79,17 @@ export default function CommentCard({ comment, titleId, depth = 0 }: CommentCard
   });
 
   const hasMoreReplies = comment.replyCount > comment.replies.length;
-  const { data: fetchedReplies } = useCommentReplies(comment.id, { enabled: expanded && hasMoreReplies });
-  const replies = expanded ? (fetchedReplies?.items ?? comment.replies) : [];
+  const fetchedReplies = useCommentReplies(comment.id, { enabled: expanded && hasMoreReplies });
+  const replies = expanded ? (fetchedReplies.items.length ? fetchedReplies.items : comment.replies) : [];
+
+  const reactControl = viewerControl({ viewer: viewer.status, known: true, refreshFailed: listRefreshFailed, busy: react.isPending });
+  const replyControl = viewerControl({ viewer: viewer.status, known: true, busy: createReply.isPending });
+  const reportControl = viewerControl({ viewer: viewer.status, known: true, busy: report.isPending });
+  const writeError = describeError(react.error ?? report.error ?? remove.error ?? createReply.error);
 
   const handleReact = (type: ReactionType) => {
-    if (!isSignedIn) return;
-    react.mutate({ commentId: comment.id, type: comment.myReaction === type ? null : type });
+    if (reactControl.intent === "sign-in") return router.push(signInPath());
+    if (reactControl.intent === "write") react.mutate({ commentId: comment.id, type: nextVote(comment.myReaction, type) });
   };
 
   const isReply = depth > 0;
@@ -145,7 +159,7 @@ export default function CommentCard({ comment, titleId, depth = 0 }: CommentCard
                 type="button"
                 aria-label={comment.myReaction === ReactionType.LIKE ? t("removeLike") : t("like")}
                 aria-pressed={comment.myReaction === ReactionType.LIKE}
-                disabled={!isSignedIn || react.isPending}
+                disabled={reactControl.disabled}
                 onClick={() => handleReact(ReactionType.LIKE)}
                 sx={{ ...reactionButtonSx, color: comment.myReaction === ReactionType.LIKE ? "primary.main" : "text.secondary" }}
               >
@@ -159,7 +173,7 @@ export default function CommentCard({ comment, titleId, depth = 0 }: CommentCard
                 type="button"
                 aria-label={comment.myReaction === ReactionType.DISLIKE ? t("removeDislike") : t("dislike")}
                 aria-pressed={comment.myReaction === ReactionType.DISLIKE}
-                disabled={!isSignedIn || react.isPending}
+                disabled={reactControl.disabled}
                 onClick={() => handleReact(ReactionType.DISLIKE)}
                 sx={{ ...reactionButtonSx, color: comment.myReaction === ReactionType.DISLIKE ? "primary.main" : "text.secondary" }}
               >
@@ -184,8 +198,14 @@ export default function CommentCard({ comment, titleId, depth = 0 }: CommentCard
                 </Typography>
               </Box>
             )}
-            {depth === 0 && isSignedIn && (
-              <Box component="button" type="button" onClick={() => setReplyOpen((value) => !value)} sx={reactionButtonSx}>
+            {depth === 0 && (
+              <Box
+                component="button"
+                type="button"
+                disabled={replyControl.disabled}
+                onClick={() => (replyControl.intent === "sign-in" ? router.push(signInPath()) : setReplyOpen((value) => !value))}
+                sx={[reactionButtonSx, replyControl.dimmed && { opacity: 0.6 }]}
+              >
                 <Typography component="span" sx={{ fontSize: "13px" }}>
                   {t("reply")}
                 </Typography>
@@ -210,9 +230,9 @@ export default function CommentCard({ comment, titleId, depth = 0 }: CommentCard
               <Box
                 component="button"
                 type="button"
-                disabled={!isSignedIn || reported || report.isPending}
-                onClick={() => report.mutate({ commentId: comment.id })}
-                sx={reactionButtonSx}
+                disabled={reported || reportControl.disabled}
+                onClick={() => (reportControl.intent === "sign-in" ? router.push(signInPath()) : report.mutate({ commentId: comment.id }))}
+                sx={[reactionButtonSx, reportControl.dimmed && { opacity: 0.6 }]}
               >
                 <Typography component="span" sx={{ fontSize: "13px" }}>
                   {reported ? t("reported") : t("report")}
@@ -220,6 +240,12 @@ export default function CommentCard({ comment, titleId, depth = 0 }: CommentCard
               </Box>
             </Box>
           </Box>
+
+          {writeError && (
+            <Alert severity="error" variant="outlined" sx={{ py: 0 }}>
+              {t("writeError", { message: writeError })}
+            </Alert>
+          )}
 
           {replyOpen && (
             <Box sx={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
@@ -268,8 +294,18 @@ export default function CommentCard({ comment, titleId, depth = 0 }: CommentCard
           }}
         >
           {replies.map((reply) => (
-            <CommentCard key={reply.id} comment={reply} titleId={titleId} depth={depth + 1} />
+            <CommentCard key={reply.id} comment={reply} titleId={titleId} depth={depth + 1} listRefreshFailed={listRefreshFailed} />
           ))}
+          {fetchedReplies.hasMore && (
+            <Button
+              variant="outlined"
+              onClick={fetchedReplies.loadMore}
+              disabled={fetchedReplies.isLoadingMore}
+              sx={{ alignSelf: "flex-start", fontSize: "13px" }}
+            >
+              {t("moreReplies")}
+            </Button>
+          )}
         </Box>
       )}
     </Box>

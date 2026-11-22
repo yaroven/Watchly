@@ -1,5 +1,7 @@
 import { Injectable } from "@nestjs/common";
+import { Locale, TranslationLocale } from "../../../common/locale.const";
 import { Filter, PageQuery, Sorting } from "../../../common/pagination/pagination.types";
+import { NameDescriptionTranslation, TranslationView } from "../../../common/translation.types";
 import { Logged } from "../../../decorators/logged.decorator";
 import { MediaAssetService } from "../../../services/media-asset/media-asset.service";
 import { VideoType } from "../../../services/queues/video-transcoder/enums/video-type.enum";
@@ -73,18 +75,25 @@ export class TitlesService {
   @Logged()
   async findAll(
     query: PageQuery,
+    locale: Locale,
     sort?: Sorting,
     filters?: Filter[],
     viewerId?: string,
   ): Promise<{ items: TitleView[]; totalCount: number }> {
-    const { items, totalCount } = await this.titleService.findAll(query, sort, filters, viewerId);
+    const { items, totalCount } = await this.titleService.findAll(
+      query,
+      locale,
+      sort,
+      filters,
+      viewerId,
+    );
 
     return { items: await this.withVotes(items, viewerId), totalCount };
   }
 
   @Logged()
-  async findOne(id: string, viewerId?: string): Promise<TitleView | null> {
-    const title = await this.titleService.findOne(id, viewerId);
+  async findOne(id: string, locale: Locale, viewerId?: string): Promise<TitleView | null> {
+    const title = await this.titleService.findOne(id, locale, viewerId);
     if (!title) return null;
 
     const [view] = await this.withVotes([title], viewerId);
@@ -98,6 +107,25 @@ export class TitlesService {
       viewerId,
     );
     return view;
+  }
+
+  @Logged()
+  async listTranslations(id: string): Promise<TranslationView<NameDescriptionTranslation>[]> {
+    return this.titleService.listTranslations(id);
+  }
+
+  @Logged()
+  async upsertTranslation(
+    id: string,
+    locale: TranslationLocale,
+    data: NameDescriptionTranslation,
+  ): Promise<TranslationView<NameDescriptionTranslation>> {
+    return this.titleService.upsertTranslation(id, locale, data);
+  }
+
+  @Logged()
+  async removeTranslation(id: string, locale: TranslationLocale): Promise<void> {
+    return this.titleService.removeTranslation(id, locale);
   }
 
   @Logged({ completedLevel: "debug" })

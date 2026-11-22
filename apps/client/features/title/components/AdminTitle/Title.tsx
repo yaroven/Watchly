@@ -11,6 +11,8 @@ import IconButton from "@mui/material/IconButton";
 import TableCell from "@mui/material/TableCell";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
+import { useApiErrorMessage } from "@shared/api/use-api-error-message";
+import { INLINE_ERROR } from "@shared/api/write-errors";
 import { tokens } from "@shared/mui/theme";
 import ConfirmDialog from "@shared/ui/ConfirmDialog";
 import { useFormatter, useTranslations } from "next-intl";
@@ -23,11 +25,17 @@ interface TitleProps extends Title {
   to: string;
 }
 
-export default function Title({ id, createdAt, name, posterUrl, transcodingStatus, type, to }: TitleProps) {
+export default function Title({ id, createdAt, name, posterUrl, transcodingStatus, type, content, to }: TitleProps) {
   const t = useTranslations("title");
   const format = useFormatter();
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const { mutate: deleteTitle, isPending: isDeleting } = useDeleteTitle({ onSuccess: () => setIsDeleteOpen(false) });
+  const describeError = useApiErrorMessage();
+  const {
+    mutate: deleteTitle,
+    isPending: isDeleting,
+    error: deleteError,
+    reset: resetDelete,
+  } = useDeleteTitle({ meta: INLINE_ERROR, onSuccess: () => setIsDeleteOpen(false) });
 
   const createdDate = new Date(createdAt);
   const createdYear = Number.isNaN(createdDate.getTime()) ? "----" : format.dateTime(createdDate, { year: "numeric" });
@@ -44,7 +52,7 @@ export default function Title({ id, createdAt, name, posterUrl, transcodingStatu
         }}
       >
         <TableCell>
-          <TitleIdentity name={name} posterUrl={posterUrl} to={to} type={type} />
+          <TitleIdentity name={name} posterUrl={posterUrl} to={to} type={type} untranslated={content.fallback} />
         </TableCell>
 
         <TableCell sx={{ color: "text.secondary", fontWeight: 700 }}>{createdYear}</TableCell>
@@ -69,11 +77,19 @@ export default function Title({ id, createdAt, name, posterUrl, transcodingStatu
               overflow: "hidden",
             }}
           >
-            <IconButton component={Link} href={to} aria-label={t("admin.open")} sx={{ color: "#ffffff", borderRadius: 0 }}>
+            <IconButton component={Link} href={to} aria-label={t("admin.open")} sx={{ color: tokens.text.primary, borderRadius: 0 }}>
               <ArrowOutwardIcon sx={{ fontSize: 18 }} />
             </IconButton>
             <Divider orientation="vertical" flexItem sx={{ borderColor: "rgba(255,255,255,0.12)" }} />
-            <IconButton aria-label={t("admin.delete")} color="error" onClick={() => setIsDeleteOpen(true)} sx={{ borderRadius: 0 }}>
+            <IconButton
+              aria-label={t("admin.delete")}
+              color="error"
+              onClick={() => {
+                resetDelete();
+                setIsDeleteOpen(true);
+              }}
+              sx={{ borderRadius: 0 }}
+            >
               <DeleteIcon sx={{ fontSize: 18 }} />
             </IconButton>
           </Box>
@@ -85,6 +101,7 @@ export default function Title({ id, createdAt, name, posterUrl, transcodingStatu
         onClose={() => setIsDeleteOpen(false)}
         onConfirm={() => deleteTitle(id)}
         isPending={isDeleting}
+        error={describeError(deleteError)}
         confirmLabel={t("details.deleteModal.confirm")}
         pendingLabel={t("details.deleteModal.pending")}
         title={t("details.deleteModal.title")}

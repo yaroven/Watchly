@@ -9,41 +9,57 @@ import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import SellIcon from "@mui/icons-material/Sell";
+import TranslateIcon from "@mui/icons-material/Translate";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
 import Skeleton from "@mui/material/Skeleton";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
+import { useApiErrorMessage } from "@shared/api/use-api-error-message";
+import { INLINE_ERROR } from "@shared/api/write-errors";
+import { BASE_CONTENT_LOCALE, type ContentLocale } from "@shared/lib/content-locale";
 import { inputVariants, tokens } from "@shared/mui/theme";
 import ConfirmDialog from "@shared/ui/ConfirmDialog";
 import GradientCard from "@shared/ui/GradientCard";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
+import GenreTranslationModal from "./components/GenreTranslationModal";
 
 export default function GenresLibrary() {
   const t = useTranslations("genre");
   const { data, isPending } = useGenres({ limit: 100 });
   const genres = data?.items ?? [];
+  const uiLocale = useLocale() as ContentLocale;
+  const showsLocalName = uiLocale !== BASE_CONTENT_LOCALE;
+  const { data: localData } = useGenres({ limit: 100 }, { enabled: showsLocalName, contentLocale: uiLocale });
+  const localNames = new Map(
+    showsLocalName ? (localData?.items ?? []).filter((genre) => !genre.content.fallback).map((genre) => [genre.id, genre.name]) : [],
+  );
 
   const [newName, setNewName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [pendingDelete, setPendingDelete] = useState<Genre | null>(null);
+  const [translating, setTranslating] = useState<Genre | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const describeError = useApiErrorMessage();
+  const duplicate = { 400: t("library.duplicate") };
 
   const { mutate: createGenre, isPending: isCreating } = useCreateGenre({
     onSuccess: () => setNewName(""),
-    onError: (error) => setErrorMessage(error.message),
+    onError: (error) => setErrorMessage(describeError(error, duplicate)),
   });
   const { mutate: updateGenre, isPending: isUpdating } = useUpdateGenre({
     onSuccess: () => setEditingId(null),
-    onError: (error) => setErrorMessage(error.message),
+    onError: (error) => setErrorMessage(describeError(error, duplicate)),
   });
-  const { mutate: deleteGenre, isPending: isDeleting } = useDeleteGenre({
-    onSuccess: () => setPendingDelete(null),
-    onError: (error) => setErrorMessage(error.message),
-  });
+  const {
+    mutate: deleteGenre,
+    isPending: isDeleting,
+    error: deleteError,
+    reset: resetDelete,
+  } = useDeleteGenre({ meta: INLINE_ERROR, onSuccess: () => setPendingDelete(null) });
 
   const startEdit = (genre: Genre) => {
     setEditingId(genre.id);
@@ -71,7 +87,7 @@ export default function GenresLibrary() {
         }}
       >
         <Box>
-          <Typography component="h1" variant="h2" sx={{ color: "#ffffff" }}>
+          <Typography component="h1" variant="h2" sx={{ color: tokens.text.primary }}>
             {t("library.title")}
           </Typography>
           <Typography sx={{ mt: "14px", maxWidth: "640px", color: "text.secondary" }}>{t("library.subtitle")}</Typography>
@@ -117,7 +133,7 @@ export default function GenresLibrary() {
               height: 40,
               borderRadius: "10px",
               bgcolor: "primary.main",
-              color: "#000000",
+              color: tokens.surface.paper,
               "&:hover": { bgcolor: "primary.main" },
             }}
           >
@@ -152,6 +168,7 @@ export default function GenresLibrary() {
                         <Box
                           component="input"
                           autoFocus
+                          aria-label={t("library.renameField", { name: genre.name })}
                           value={editingName}
                           onChange={(e) => setEditingName(e.target.value)}
                           onKeyDown={(e) => {
@@ -162,7 +179,7 @@ export default function GenresLibrary() {
                             flex: 1,
                             height: 28,
                             fontSize: "14px",
-                            color: "#ffffff",
+                            color: tokens.text.primary,
                             backgroundColor: "transparent",
                             border: `1px solid ${tokens.border.faint}`,
                             borderRadius: "6px",
@@ -174,7 +191,7 @@ export default function GenresLibrary() {
                           onClick={submitEdit}
                           disabled={isUpdating}
                           aria-label={t("library.save")}
-                          sx={{ color: "#27c237" }}
+                          sx={{ color: tokens.feedback.success }}
                         >
                           <CheckIcon sx={{ fontSize: 16 }} />
                         </IconButton>
@@ -182,24 +199,42 @@ export default function GenresLibrary() {
                           size="small"
                           onClick={() => setEditingId(null)}
                           aria-label={t("library.cancel")}
-                          sx={{ color: "#999999" }}
+                          sx={{ color: tokens.text.secondary }}
                         >
                           <CloseIcon sx={{ fontSize: 16 }} />
                         </IconButton>
                       </>
                     ) : (
                       <>
-                        <Typography sx={{ flex: 1, fontSize: "14px", color: "#ffffff", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {genre.name}
-                        </Typography>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography sx={{ fontSize: "14px", color: tokens.text.primary, overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {genre.name}
+                          </Typography>
+                          {localNames.has(genre.id) && (
+                            <Typography
+                              lang={uiLocale}
+                              sx={{ fontSize: "12px", color: tokens.text.secondary, overflow: "hidden", textOverflow: "ellipsis" }}
+                            >
+                              {localNames.get(genre.id)}
+                            </Typography>
+                          )}
+                        </Box>
                         <Typography sx={{ fontSize: "12px", color: "text.secondary" }}>
                           {t("library.titleCount", { count: genre.titleCount ?? 0 })}
                         </Typography>
                         <IconButton
                           size="small"
+                          onClick={() => setTranslating(genre)}
+                          aria-label={t("translation.open", { name: genre.name })}
+                          sx={{ color: localNames.has(genre.id) ? tokens.accent.primary : tokens.text.field }}
+                        >
+                          <TranslateIcon sx={{ fontSize: 14 }} />
+                        </IconButton>
+                        <IconButton
+                          size="small"
                           onClick={() => startEdit(genre)}
                           aria-label={t("library.rename", { name: genre.name })}
-                          sx={{ color: "#e5e5e5" }}
+                          sx={{ color: tokens.text.field }}
                         >
                           <EditIcon sx={{ fontSize: 14 }} />
                         </IconButton>
@@ -208,9 +243,12 @@ export default function GenresLibrary() {
                             <IconButton
                               size="small"
                               disabled={!canDelete}
-                              onClick={() => setPendingDelete(genre)}
+                              onClick={() => {
+                                resetDelete();
+                                setPendingDelete(genre);
+                              }}
                               aria-label={t("library.deleteLabel", { name: genre.name })}
-                              sx={{ color: canDelete ? "#f64e34" : "#555555" }}
+                              sx={{ color: canDelete ? tokens.feedback.error : tokens.text.placeholder }}
                             >
                               <DeleteIcon sx={{ fontSize: 14 }} />
                             </IconButton>
@@ -230,11 +268,14 @@ export default function GenresLibrary() {
         </Box>
       </GradientCard>
 
+      <GenreTranslationModal genre={translating} onClose={() => setTranslating(null)} />
+
       <ConfirmDialog
         isOpen={!!pendingDelete}
         onClose={() => setPendingDelete(null)}
         onConfirm={() => pendingDelete && deleteGenre(pendingDelete.id)}
         isPending={isDeleting}
+        error={describeError(deleteError, { 400: t("library.stillAssignedError") })}
         confirmLabel={t("delete.confirm")}
         pendingLabel={t("delete.pending")}
         title={t("delete.title")}

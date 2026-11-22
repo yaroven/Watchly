@@ -2,6 +2,7 @@
 
 import { useWatchlist } from "@/features/title-engagement";
 import { ExternalRatingSource, Title, TitleType } from "@/features/title/schemas/title";
+import { useRouter } from "@/i18n/navigation";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import { APP } from "@/shared/lib/routes";
 import { TranscodingStatus } from "@/types";
@@ -14,7 +15,6 @@ import Typography from "@mui/material/Typography";
 import HeroSlider, { type SliderTitle } from "@shared/ui/HeroSlider";
 import HotNewsSection from "@shared/ui/HotNewsSection";
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
 import { news } from "./mocks";
 
 const HERO_SLOTS = 3;

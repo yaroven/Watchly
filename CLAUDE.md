@@ -82,8 +82,6 @@ Worth knowing before trusting a green build:
 
 ## Planning docs
 
-- `apps/client/PLACEHOLDER_DATA_BACKEND_TODO.md` — client screens still rendering
-  hardcoded data.
-
-Read it before starting feature work, and update it in the same change that makes it
-wrong.
+- The "Placeholder data" section of `apps/client/CLAUDE.md` lists the client screens
+  still rendering hardcoded data. Read it before starting feature work, and update it in
+  the same change that makes it wrong.

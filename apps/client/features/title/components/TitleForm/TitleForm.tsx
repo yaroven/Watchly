@@ -1,8 +1,8 @@
 "use client";
 
-import useGenres from "@/features/genre/api/use-genres";
+import { useGenres } from "@/features/genre";
 import { createCreateTitleSchema, createUpdateTitleSchema, Title, TitleFormValues, TitleType } from "@/features/title/schemas/title";
-import ProgressBar from "@/features/transcoding/components/ProgressBar";
+import { useRouter } from "@/i18n/navigation";
 import { ADMIN } from "@/shared/lib/routes";
 import Modal from "@/shared/ui/Modal";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,10 +10,12 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import { useApiErrorMessage } from "@shared/api/use-api-error-message";
+import { tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
+import UploadProgress from "@shared/ui/UploadProgress";
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Resolver, useForm, useWatch } from "react-hook-form";
 import CreateRail from "./components/CreateRail";
 import FormSection from "./components/FormSection";
@@ -26,8 +28,16 @@ import MediaFields from "./components/fields/MediaFields";
 import { getTitleReadiness } from "./model/titleReadiness";
 import { useTitleSubmissionWorkflow } from "./useTitleSubmissionWorkflow";
 
+export interface TitleEditStatus {
+  isDirty: boolean;
+  isPending: boolean;
+  savedAt: Date | null;
+}
+
 interface TitleFormProps {
   initialData?: Title;
+  formId?: string;
+  onEditStatusChange?: (status: TitleEditStatus) => void;
 }
 
 const emptyValues: TitleFormValues = {
@@ -66,11 +76,13 @@ const toFormValues = (title: Title): TitleFormValues => ({
   videoFile: undefined,
 });
 
-export default function TitleForm({ initialData }: TitleFormProps) {
+export default function TitleForm({ initialData, formId, onEditStatusChange }: TitleFormProps) {
   const t = useTranslations("title.form");
   const tValidation = useTranslations("title.validation");
   const router = useRouter();
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const hasExternalActions = !!formId;
 
   const isEditing = !!initialData;
   const schema = useMemo(
@@ -87,7 +99,7 @@ export default function TitleForm({ initialData }: TitleFormProps) {
   const {
     handleSubmit,
     control,
-    formState: { errors },
+    formState: { errors, isDirty },
     reset,
   } = form;
 
@@ -102,15 +114,21 @@ export default function TitleForm({ initialData }: TitleFormProps) {
   const { data: genreData } = useGenres({ limit: 100 });
   const genreNames = (genreData?.items ?? []).filter((genre) => values.genreIds?.includes(genre.id)).map((genre) => genre.name);
 
+  const describeError = useApiErrorMessage();
   const { submit, resetWorkflow, uploadProgress, uploadParts, isUploading, isPending, actionError, createdTitle } =
     useTitleSubmissionWorkflow({ initialData });
+
+  useEffect(() => {
+    onEditStatusChange?.({ isDirty, isPending, savedAt });
+  }, [onEditStatusChange, isDirty, isPending, savedAt]);
 
   const onSubmit = async (data: TitleFormValues) => {
     try {
       await submit(data);
       if (isEditing) {
         reset({ ...data, posterFile: undefined, videoFile: undefined });
-        setIsSuccessModalOpen(true);
+        if (hasExternalActions) setSavedAt(new Date());
+        else setIsSuccessModalOpen(true);
       }
     } catch {}
   };
@@ -142,20 +160,46 @@ export default function TitleForm({ initialData }: TitleFormProps) {
 
   if (isEditing) {
     return (
-      <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+      <Box
+        component="form"
+        id={formId}
+        onSubmit={handleSubmit(onSubmit)}
+        sx={{ display: "flex", flexDirection: "column", gap: hasExternalActions ? "36px" : "20px" }}
+      >
         <ValidationSummary errors={errors} />
 
-        <IdentityFields form={form} columns={1} />
-        <ClassificationFields form={form} columns={1} isEditing selectedType={selectedType} />
-        <MediaFields form={form} showVideoField={false} disabled={isPending} />
-        <AccessibilityFields form={form} />
+        {hasExternalActions ? (
+          <>
+            <FieldGroup title={t("sections.identity.title")}>
+              <IdentityFields form={form} columns={1} />
+            </FieldGroup>
+            <FieldGroup title={t("sections.classification.title")}>
+              <ClassificationFields form={form} columns={2} isEditing selectedType={selectedType} />
+            </FieldGroup>
+            <FieldGroup title={t("sections.media.title")}>
+              <MediaFields form={form} showVideoField={false} disabled={isPending} />
+            </FieldGroup>
+            <FieldGroup title={t("sections.accessibility.title")}>
+              <AccessibilityFields form={form} />
+            </FieldGroup>
+          </>
+        ) : (
+          <>
+            <IdentityFields form={form} columns={1} />
+            <ClassificationFields form={form} columns={1} isEditing selectedType={selectedType} />
+            <MediaFields form={form} showVideoField={false} disabled={isPending} />
+            <AccessibilityFields form={form} />
+          </>
+        )}
 
-        {isUploading && <ProgressBar progress={uploadProgress} />}
-        {actionError && <Alert severity="error">{t("error", { message: actionError.message })}</Alert>}
+        {isUploading && <UploadProgress progress={uploadProgress} />}
+        {actionError && <Alert severity="error">{t("error", { message: describeError(actionError) ?? "" })}</Alert>}
 
-        <Button disabled={isPending} type="submit">
-          {isPending ? t("saving") : t("update")}
-        </Button>
+        {!hasExternalActions && (
+          <Button disabled={isPending} type="submit">
+            {isPending ? t("saving") : t("update")}
+          </Button>
+        )}
 
         <Modal isOpen={isSuccessModalOpen} onClose={closeSuccessModal} size="sm">
           <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "18px" }}>
@@ -170,10 +214,10 @@ export default function TitleForm({ initialData }: TitleFormProps) {
                 backgroundColor: "rgba(39,194,55,.16)",
               }}
             >
-              <CheckCircleIcon sx={{ fontSize: 30, color: "#27c237" }} />
+              <CheckCircleIcon sx={{ fontSize: 30, color: tokens.feedback.success }} />
             </Box>
 
-            <Typography sx={{ fontSize: "24px", fontWeight: 700, color: "#ffffff" }}>{t("updatedSuccess")}</Typography>
+            <Typography sx={{ fontSize: "24px", fontWeight: 700, color: tokens.text.primary }}>{t("updatedSuccess")}</Typography>
 
             <Box sx={{ display: "flex", gap: "12px", width: "100%", mt: "6px" }}>
               <Button
@@ -244,7 +288,7 @@ export default function TitleForm({ initialData }: TitleFormProps) {
           <AccessibilityFields form={form} />
         </FormSection>
 
-        {actionError && <Alert severity="error">{t("createError", { message: actionError.message })}</Alert>}
+        {actionError && <Alert severity="error">{t("createError", { message: describeError(actionError) ?? "" })}</Alert>}
       </Box>
 
       <CreateRail
@@ -256,6 +300,20 @@ export default function TitleForm({ initialData }: TitleFormProps) {
         uploadProgress={uploadProgress}
         uploadParts={uploadParts}
       />
+    </Box>
+  );
+}
+
+function FieldGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <Box component="fieldset" sx={{ m: 0, p: 0, border: 0, minWidth: 0, display: "flex", flexDirection: "column", gap: "16px" }}>
+      <Typography
+        component="legend"
+        sx={{ p: 0, mb: "16px", width: "100%", fontSize: "13px", fontWeight: 600, color: tokens.text.secondary }}
+      >
+        {title}
+      </Typography>
+      {children}
     </Box>
   );
 }

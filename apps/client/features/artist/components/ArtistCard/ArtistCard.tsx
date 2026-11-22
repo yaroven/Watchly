@@ -6,6 +6,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import { tokens } from "@shared/mui/theme";
 import InvertedCornerBox from "@shared/ui/InvertedCornerBox";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
@@ -45,7 +46,7 @@ export default function ArtistCard({ artist, onOpen, onEdit, onDelete }: ArtistC
           position: "relative",
           overflow: "hidden",
           borderRadius: "16px",
-          border: "1px solid #333333",
+          border: `1px solid ${tokens.border.subtle}`,
           aspectRatio: "3 / 4",
         }}
       >
@@ -101,7 +102,7 @@ export default function ArtistCard({ artist, onOpen, onEdit, onDelete }: ArtistC
             sx={{
               fontSize: 14,
               fontWeight: 600,
-              color: "#ffffff",
+              color: tokens.text.primary,
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -140,7 +141,7 @@ function IconAction({
         alignItems: "center",
         justifyContent: "center",
         bgcolor: "rgba(25,25,25,.72)",
-        color: danger ? "#f64e34" : "#ffffff",
+        color: danger ? "#f64e34" : tokens.text.primary,
         backdropFilter: "blur(12px)",
         "&:hover": { bgcolor: danger ? "rgba(246,78,52,.24)" : "rgba(231,188,15,.24)" },
       }}

@@ -61,9 +61,9 @@ describe("GenresController", () => {
         const genresResponse = { items: [{ id: "genre-1" }], totalCount: 1 };
         (genreServiceMock.findAll as jest.Mock).mockResolvedValue(genresResponse);
 
-        const result = await controller.findAll(query);
+        const result = await controller.findAll(query, "uk");
 
-        expect(genreServiceMock.findAll).toHaveBeenCalledWith(query, undefined, undefined);
+        expect(genreServiceMock.findAll).toHaveBeenCalledWith(query, "uk", undefined, undefined);
         expect(result).toEqual(genresResponse);
       });
     });
@@ -75,9 +75,9 @@ describe("GenresController", () => {
         const genre = { id: "genre-1" };
         (genreServiceMock.findOne as jest.Mock).mockResolvedValue(genre);
 
-        const result = await controller.findOne("genre-1");
+        const result = await controller.findOne("genre-1", "uk");
 
-        expect(genreServiceMock.findOne).toHaveBeenCalledWith("genre-1");
+        expect(genreServiceMock.findOne).toHaveBeenCalledWith("genre-1", "uk");
         expect(result).toEqual(genre);
       });
     });
@@ -86,7 +86,7 @@ describe("GenresController", () => {
       it("if the genre does not exist", async () => {
         (genreServiceMock.findOne as jest.Mock).mockResolvedValue(null);
 
-        const action = controller.findOne("non-existent");
+        const action = controller.findOne("non-existent", "en");
 
         await expect(action).rejects.toThrow(NotFoundException);
       });

@@ -1,15 +1,20 @@
 "use client";
 
 import { parseAsInteger, useQueryState } from "nuqs";
-import { RefObject, useCallback, useEffect, useRef } from "react";
+import { RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { StoreApi } from "zustand";
 import { PlayerStoreState } from "../store/playerStore";
 import { clampTime, getBufferedTime } from "../utils";
 
+interface VideoElementEventsOptions {
+  onEnded?: () => void;
+  startAt?: number;
+}
+
 export default function useVideoElementEvents(
   videoRef: RefObject<HTMLVideoElement | null>,
   store: StoreApi<PlayerStoreState>,
-  onEnded?: () => void,
+  { onEnded, startAt }: VideoElementEventsOptions = {},
 ) {
   const [urlTime, setUrlTime] = useQueryState(
     "t",
@@ -25,6 +30,12 @@ export default function useVideoElementEvents(
   const hasPlayedRef = useRef(false);
   const hasSeekedInitialTimeRef = useRef(false);
   const onEndedRef = useRef(onEnded);
+  const [startTime] = useState(() => startAt ?? urlTime);
+
+  useEffect(() => {
+    if (startAt === undefined) return;
+    void setUrlTime(startAt > 0 ? startAt : null);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     onEndedRef.current = onEnded;
@@ -92,9 +103,8 @@ export default function useVideoElementEvents(
 
       if (!hasSeekedInitialTimeRef.current) {
         hasSeekedInitialTimeRef.current = true;
-        const initialTime = urlTime;
-        if (initialTime > 0) {
-          const target = clampTime(initialTime, video.duration || 0);
+        if (startTime > 0) {
+          const target = clampTime(startTime, video.duration || 0);
           video.currentTime = target;
           store.setState({ timeline: target });
         }
@@ -211,7 +221,7 @@ export default function useVideoElementEvents(
       video.removeEventListener("durationchange", handleDurationChange);
       video.removeEventListener("error", handleError);
     };
-  }, [syncBuffered, syncDuration, videoRef, store, urlTime, setUrlTime]);
+  }, [syncBuffered, syncDuration, videoRef, store, startTime, setUrlTime]);
 
   return {
     beginSourceLoad,

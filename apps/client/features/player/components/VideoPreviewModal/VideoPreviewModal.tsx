@@ -5,6 +5,7 @@ import Modal from "@/shared/ui/Modal";
 import AutorenewIcon from "@mui/icons-material/Autorenew";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import { tokens } from "@shared/mui/theme";
 import { useTranslations } from "next-intl";
 
 interface VideoPreviewModalProps {
@@ -21,13 +22,15 @@ export default function VideoPreviewModal({ isOpen, onClose, streamUrl, title, i
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="xl">
       <Box sx={{ display: "flex", flexDirection: "column", gap: "18px" }}>
-        <Typography sx={{ fontSize: "24px", fontWeight: 700, color: "#ffffff", pr: "44px" }}>{title || t("preview.title")}</Typography>
+        <Typography sx={{ fontSize: "24px", fontWeight: 700, color: tokens.text.primary, pr: "44px" }}>
+          {title || t("preview.title")}
+        </Typography>
 
         <Box
           sx={{
             borderRadius: "12px",
             overflow: "hidden",
-            backgroundColor: "#111111",
+            backgroundColor: tokens.surface.dropzone,
             minHeight: 260,
             display: "flex",
             alignItems: "center",
@@ -35,7 +38,7 @@ export default function VideoPreviewModal({ isOpen, onClose, streamUrl, title, i
           }}
         >
           {isLoading ? (
-            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", color: "#999999" }}>
+            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", color: tokens.text.secondary }}>
               <Box
                 sx={{
                   display: "flex",
@@ -44,14 +47,14 @@ export default function VideoPreviewModal({ isOpen, onClose, streamUrl, title, i
                   "@media (prefers-reduced-motion: reduce)": { animation: "none" },
                 }}
               >
-                <AutorenewIcon sx={{ fontSize: 48, color: "#e7bc0f" }} />
+                <AutorenewIcon sx={{ fontSize: 48, color: tokens.accent.primary }} />
               </Box>
               <Typography sx={{ fontSize: "14px" }}>{t("preview.loading")}</Typography>
             </Box>
           ) : streamUrl ? (
             <CustomVideoPlayer src={streamUrl} />
           ) : (
-            <Typography sx={{ fontSize: "14px", color: "#f64e34" }}>{t("preview.error")}</Typography>
+            <Typography sx={{ fontSize: "14px", color: tokens.feedback.error }}>{t("preview.error")}</Typography>
           )}
         </Box>
       </Box>

@@ -1,19 +1,21 @@
 "use client";
 
 import { useWatchlist } from "@/features/title-engagement";
+import { useRouter } from "@/i18n/navigation";
 import { APP } from "@/shared/lib/routes";
 import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutlineOutlined";
 import Box from "@mui/material/Box";
 import Skeleton from "@mui/material/Skeleton";
 import Typography from "@mui/material/Typography";
+import { useApiErrorMessage } from "@shared/api/use-api-error-message";
 import { formatCount } from "@shared/lib/format-count";
+import { useClampedPage, useSearchPageParams } from "@shared/lib/list-state";
+import { useLoginPath } from "@shared/lib/use-login-path";
 import { useViewer } from "@shared/lib/use-viewer";
 import Button from "@shared/ui/Button";
 import Pagination from "@shared/ui/Pagination";
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
 import TitleCard from "../TitleCard";
 
 const PAGE_SIZE = 12;
@@ -29,19 +31,22 @@ const gridSx = {
 
 export default function WatchlistScreen() {
   const t = useTranslations("title.watchlist");
+  const describeError = useApiErrorMessage();
   const router = useRouter();
+  const signInPath = useLoginPath();
   const viewer = useViewer();
-  const [page, setPage] = useState(1);
+  const { page, setPage } = useSearchPageParams();
 
   const { data, isPending, isError, error, refetch, isFetching } = useWatchlist({ page, limit: PAGE_SIZE });
   const items = data?.items ?? [];
   const totalCount = data?.totalCount ?? 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+  useClampedPage(page, data?.totalCount, PAGE_SIZE, setPage);
 
   if (viewer.status === "anonymous") {
     return (
       <EmptyState message={t("signInPrompt")}>
-        <Button variant="contained" onClick={() => router.push(APP.LOGIN)}>
+        <Button variant="contained" onClick={() => router.push(signInPath())}>
           {t("signIn")}
         </Button>
       </EmptyState>
@@ -72,7 +77,7 @@ export default function WatchlistScreen() {
       )}
 
       {isError && (
-        <EmptyState message={t("loadError", { message: error.message })} icon={<ErrorOutlineIcon sx={iconSx} />}>
+        <EmptyState message={t("loadError", { message: describeError(error) ?? "" })} icon={<ErrorOutlineIcon sx={iconSx} />}>
           <Button variant="outlined" disabled={isFetching} onClick={() => void refetch()}>
             {t("tryAgain")}
           </Button>

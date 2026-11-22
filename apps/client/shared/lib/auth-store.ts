@@ -9,9 +9,6 @@ export interface AuthStoreState {
   userId: string | null;
   status: AuthStatus;
   setSession: (session: { token: string; role: Role; userId: string }) => void;
-  setToken: (token: string | null) => void;
-  setRole: (role: Role | null) => void;
-  setUserId: (userId: string | null) => void;
   setStatus: (status: AuthStatus) => void;
   clear: () => void;
 }
@@ -24,9 +21,6 @@ export const createAuthStore = () =>
     status: "idle",
 
     setSession: ({ token, role, userId }) => set({ token, role, userId }),
-    setToken: (token) => set({ token }),
-    setRole: (role) => set({ role }),
-    setUserId: (userId) => set({ userId }),
     setStatus: (status) => set({ status }),
     clear: () => set({ token: null, role: null, userId: null }),
   }));

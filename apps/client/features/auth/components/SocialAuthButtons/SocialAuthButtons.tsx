@@ -3,6 +3,7 @@ import FacebookIcon from "@mui/icons-material/Facebook";
 import GoogleIcon from "@mui/icons-material/Google";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import { tokens } from "@shared/mui/theme";
 import { useTranslations } from "next-intl";
 
 const PROVIDERS = [
@@ -43,7 +44,7 @@ export default function SocialAuthButtons() {
               cursor: "not-allowed",
             }}
           >
-            <Icon sx={{ fontSize: "22px", color: "#ffffff" }} />
+            <Icon sx={{ fontSize: "22px", color: tokens.text.primary }} />
           </Box>
         ))}
       </Box>

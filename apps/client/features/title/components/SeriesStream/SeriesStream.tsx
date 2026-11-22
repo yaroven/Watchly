@@ -1,10 +1,9 @@
 "use client";
 
-import TranscodingStatus from "@/types/transcoding-status";
-import EpisodeService from "@features/episodes/api/episode.service";
-import type { Episode } from "@features/episodes/schemas/episode";
-import CustomVideoPlayer, { VideoPlayerSkeleton } from "@features/player/components/CustomVideoPlayer";
-import type { Season } from "@features/season/schemas/season";
+import { useRouter } from "@/i18n/navigation";
+import type { Episode } from "@features/episodes";
+import { CustomVideoPlayer, VideoPlayerSkeleton } from "@features/player";
+import type { Season } from "@features/season";
 import StreamEpisodesSidebar from "@features/title/components/StreamEpisodesSidebar";
 import StreamFilmInfo from "@features/title/components/StreamFilmInfo";
 import StreamPhotos from "@features/title/components/StreamPhotos";
@@ -14,9 +13,7 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { APP } from "@shared/lib/routes";
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
-import { useQueryState } from "nuqs";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSeriesPlayback } from "./use-series-playback";
 
 interface SeriesStreamProps {
   title: Title;
@@ -29,56 +26,19 @@ interface SeriesStreamProps {
 export default function SeriesStream({ title, season, episodes, initialEpisodeUrl, initialEpisodeId }: SeriesStreamProps) {
   const t = useTranslations("title.episodes");
   const router = useRouter();
-  const [episodeId, setEpisodeId] = useQueryState("episode", { history: "replace", shallow: true });
-
-  const activeEpisodeId = episodeId ?? initialEpisodeId;
-  const activeEpisode = useMemo(
-    () => episodes.find((episode) => episode.id === activeEpisodeId) ?? episodes[0],
-    [activeEpisodeId, episodes],
-  );
-
-  const [fetchedUrl, setFetchedUrl] = useState("");
-  const streamUrl = activeEpisodeId === initialEpisodeId && initialEpisodeUrl ? initialEpisodeUrl : fetchedUrl;
-  const isStreamLoading = !!(activeEpisodeId && activeEpisodeId !== initialEpisodeId && !fetchedUrl);
-
-  useEffect(() => {
-    if (!activeEpisodeId) return;
-    if (activeEpisodeId === initialEpisodeId && initialEpisodeUrl) return;
-
-    let cancelled = false;
-
-    EpisodeService.getStreamUrl(activeEpisodeId)
-      .then((url) => {
-        if (!cancelled) setFetchedUrl(url);
-      })
-      .catch(() => {
-        if (!cancelled) setFetchedUrl("");
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeEpisodeId, initialEpisodeId, initialEpisodeUrl]);
-
-  const handleEpisodeChange = useCallback(
-    (id: string) => {
-      void setEpisodeId(id, { scroll: false });
-    },
-    [setEpisodeId],
-  );
-
-  const handleEpisodeEnded = useCallback(() => {
-    if (!activeEpisode) return;
-
-    const currentIndex = episodes.findIndex((episode) => episode.id === activeEpisode.id);
-    const nextEpisode = episodes[currentIndex + 1];
-
-    if (!nextEpisode || nextEpisode.transcodingStatus !== TranscodingStatus.COMPLETED) return;
-
-    handleEpisodeChange(nextEpisode.id);
-  }, [activeEpisode, episodes, handleEpisodeChange]);
-
-  const isEpisodeAvailable = activeEpisode?.transcodingStatus === TranscodingStatus.COMPLETED;
+  const {
+    episode: activeEpisode,
+    streamUrl,
+    startAt,
+    isLoading: isStreamLoading,
+    select,
+    playNext,
+  } = useSeriesPlayback({
+    episodes,
+    initialEpisodeId,
+    initialEpisodeUrl,
+  });
+  const activeEpisodeId = activeEpisode?.id ?? "";
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "40px", pb: "64px" }}>
@@ -95,8 +55,8 @@ export default function SeriesStream({ title, season, episodes, initialEpisodeUr
         >
           {isStreamLoading ? (
             <VideoPlayerSkeleton />
-          ) : streamUrl && isEpisodeAvailable ? (
-            <CustomVideoPlayer key={activeEpisodeId} src={streamUrl} onEnded={handleEpisodeEnded} />
+          ) : streamUrl ? (
+            <CustomVideoPlayer key={activeEpisodeId} src={streamUrl} startAt={startAt} onEnded={playNext} />
           ) : (
             <Typography sx={{ color: "text.secondary", p: "24px" }}>{t("streamUnavailable")}</Typography>
           )}
@@ -107,7 +67,7 @@ export default function SeriesStream({ title, season, episodes, initialEpisodeUr
             seasonNumber={season.number}
             episodes={episodes}
             currentEpisodeId={activeEpisode?.id ?? ""}
-            onSelect={handleEpisodeChange}
+            onSelect={select}
             onSeeAll={() => router.push(`${APP.TITLE(title.id)}#episodes`)}
             posterUrl={season.posterUrl}
           />

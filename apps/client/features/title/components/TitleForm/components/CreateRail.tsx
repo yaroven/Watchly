@@ -110,7 +110,7 @@ export default function CreateRail({
                 fontSize: "28px",
                 lineHeight: 1.05,
                 textTransform: "uppercase",
-                color: "#ffffff",
+                color: tokens.text.primary,
                 wordBreak: "break-word",
               }}
             >
@@ -159,7 +159,7 @@ export default function CreateRail({
       <Box sx={PANEL_SX}>
         <Box sx={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "12px" }}>
           <Typography sx={CAPTION_SX}>{t("form.rail.readyToSave")}</Typography>
-          <Typography sx={{ fontFamily: "var(--font-display)", fontSize: "34px", lineHeight: 0.9, color: "#ffffff" }}>
+          <Typography sx={{ fontFamily: "var(--font-display)", fontSize: "34px", lineHeight: 0.9, color: tokens.text.primary }}>
             {readiness.doneCount}
             <Typography component="span" sx={{ fontSize: "18px", color: tokens.text.placeholder }}>
               /{readiness.totalCount}

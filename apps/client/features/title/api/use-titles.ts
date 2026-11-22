@@ -1,23 +1,8 @@
-import { useViewer } from "@shared/lib/use-viewer";
-import { useQuery, UseQueryOptions } from "@tanstack/react-query";
-import { GetAllTitlesDto, Title } from "../schemas/title";
-import titleKeys from "./title.keys";
-import titleService from "./title.service";
+import { type LocalizedQueryOptions, useLocalizedQuery } from "@shared/api/localized-query";
+import type { GetAllTitlesDto, Title } from "../schemas/title";
+import { titleReads } from "./title.reads";
 
-const useTitles = (
-  params: GetAllTitlesDto = {},
-  options?: Omit<
-    UseQueryOptions<{ items: Title[]; totalCount: number }, Error, { items: Title[]; totalCount: number }, readonly unknown[]>,
-    "queryKey" | "queryFn"
-  >,
-) => {
-  const { viewerKey } = useViewer();
-
-  return useQuery({
-    queryKey: titleKeys.listFor(params, viewerKey),
-    queryFn: () => titleService.getAll(params),
-    ...options,
-  });
-};
+const useTitles = (params: GetAllTitlesDto = {}, options?: LocalizedQueryOptions<{ items: Title[]; totalCount: number }>) =>
+  useLocalizedQuery(titleReads.list(params), options);
 
 export default useTitles;

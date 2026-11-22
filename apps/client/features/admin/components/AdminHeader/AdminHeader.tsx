@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname, useRouter } from "@/i18n/navigation";
 import { Search as SearchIcon } from "@mui/icons-material";
 import { Box, Input, InputAdornment, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
@@ -7,12 +8,16 @@ import { ADMIN } from "@shared/lib/routes";
 import { inputVariants, tokens } from "@shared/mui/theme";
 import Avatar from "@shared/ui/Avatar";
 import { useTranslations } from "next-intl";
-import { usePathname, useRouter } from "next/navigation";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 
-const SECTION_LABEL_KEYS: Partial<Record<string, "header.sections.dashboard" | "header.sections.titles">> = {
+type SectionLabelKey = "header.sections.dashboard" | "header.sections.titles" | "sidebar.genres" | "sidebar.actors" | "sidebar.users";
+
+const SECTION_LABEL_KEYS: Partial<Record<string, SectionLabelKey>> = {
   dashboard: "header.sections.dashboard",
   titles: "header.sections.titles",
+  genres: "sidebar.genres",
+  artists: "sidebar.actors",
+  users: "sidebar.users",
 };
 
 export default function AdminHeader() {
@@ -20,6 +25,21 @@ export default function AdminHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const [searchValue, setSearchValue] = useState("");
+  const headerRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const root = document.documentElement;
+    const observer = new ResizeObserver(([entry]) => {
+      root.style.setProperty("--admin-header-h", `${Math.round(entry.borderBoxSize[0]?.blockSize ?? header.offsetHeight)}px`);
+    });
+    observer.observe(header);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--admin-header-h");
+    };
+  }, []);
 
   const segments = pathname.split("/");
   const sectionKey = segments[segments.indexOf("admin") + 1] || "dashboard";
@@ -34,6 +54,7 @@ export default function AdminHeader() {
   return (
     <Box
       component="header"
+      ref={headerRef}
       sx={{
         position: "sticky",
         top: 0,
@@ -54,7 +75,7 @@ export default function AdminHeader() {
           >
             {t("header.panel")}
           </Typography>
-          <Typography variant="h4" sx={{ color: "#ffffff", mt: "4px" }}>
+          <Typography variant="h4" sx={{ color: tokens.text.primary, mt: "4px" }}>
             {currentSection}
           </Typography>
         </Box>
@@ -68,7 +89,7 @@ export default function AdminHeader() {
               onChange={(event) => setSearchValue(event.target.value)}
               startAdornment={
                 <InputAdornment position="start">
-                  <SearchIcon sx={{ fontSize: 18, color: "#999999" }} />
+                  <SearchIcon sx={{ fontSize: 18, color: tokens.text.secondary }} />
                 </InputAdornment>
               }
               sx={{
@@ -96,7 +117,7 @@ export default function AdminHeader() {
           >
             <Avatar src="https://www.svgrepo.com/show/384670/account-avatar-profile-user.svg" alt={t("header.avatarAlt")} />
             <Box sx={{ display: "flex", flexDirection: "column" }}>
-              <Typography sx={{ fontSize: "16px", fontWeight: 600, color: "#ffffff" }}>{t("header.userName")}</Typography>
+              <Typography sx={{ fontSize: "16px", fontWeight: 600, color: tokens.text.primary }}>{t("header.userName")}</Typography>
               <Typography sx={{ fontSize: "14px", color: "text.secondary" }}>{t("header.userRole")}</Typography>
             </Box>
           </Box>

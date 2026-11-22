@@ -1,8 +1,9 @@
 "use client";
 
-import useGenres from "@/features/genre/api/use-genres";
-import useTitles from "@/features/title/api/use-titles";
+import { useGenres } from "@/features/genre";
+import { titleReads } from "@/features/title/api/title.reads";
 import { ExternalRatingSource, Title, TitleType } from "@/features/title/schemas/title";
+import { useRouter } from "@/i18n/navigation";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import { APP } from "@/shared/lib/routes";
 import ExpandMore from "@mui/icons-material/ExpandMore";
@@ -13,16 +14,20 @@ import MenuItem from "@mui/material/MenuItem";
 import MuiSelect from "@mui/material/Select";
 import Skeleton from "@mui/material/Skeleton";
 import Typography from "@mui/material/Typography";
+import { localizedQuery } from "@shared/api/localized-query";
+import { usePagedRead } from "@shared/api/paged-read";
 import { IMDB } from "@shared/assets/icons";
+import { useContentLocale } from "@shared/lib/content-locale-scope";
+import { parseEnumValue } from "@shared/lib/list-state";
+import { useViewer } from "@shared/lib/use-viewer";
 import { inputVariants, tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
 import CustomIcon from "@shared/ui/CustomIcon";
 import { useFormatter, useTranslations } from "next-intl";
 import Image from "next/image";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-const FETCH_LIMIT = 60;
 const PAGE_SIZE = 9;
 const SKELETON_ROWS = Array.from({ length: 6 }, (_, index) => index);
 
@@ -56,7 +61,7 @@ function DisabledFilter({ label }: { label: string }) {
 
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: "16px" }}>
-      <Typography sx={{ width: "90px", flexShrink: 0, fontWeight: 600, color: "#ffffff" }}>{label}</Typography>
+      <Typography sx={{ width: "90px", flexShrink: 0, fontWeight: 600, color: tokens.text.primary }}>{label}</Typography>
       <MuiSelect fullWidth displayEmpty value="" disabled MenuProps={menuProps} sx={selectSx}>
         <MenuItem value="">{t("all")}</MenuItem>
       </MuiSelect>
@@ -70,33 +75,37 @@ export default function SearchResults() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const query = searchParams.get("q") ?? "";
-  const typeFilter = (searchParams.get("type") as TitleType | null) ?? "";
+  const typeFilter = parseEnumValue(searchParams.get("type"), Object.values(TitleType));
   const directorFilter = searchParams.get("director") ?? "";
   const networkFilter = searchParams.get("network") ?? "";
   const genreIdFilter = searchParams.get("genreId") ?? "";
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [directorInput, setDirectorInput] = useState(directorFilter);
   const [networkInput, setNetworkInput] = useState(networkFilter);
 
   const { data: genresData } = useGenres();
   const genres = genresData?.items ?? [];
 
-  const { data, isPending, isFetching } = useTitles({
-    searchString: query,
-    page: 1,
-    limit: FETCH_LIMIT,
-    type: typeFilter || undefined,
-    director: directorFilter || undefined,
-    network: networkFilter || undefined,
-    genreId: genreIdFilter || undefined,
-  });
+  const scope = { locale: useContentLocale(), viewerKey: useViewer().viewerKey };
+  const results = usePagedRead((page) =>
+    localizedQuery(
+      titleReads.list({
+        searchString: query,
+        page,
+        limit: PAGE_SIZE,
+        type: typeFilter || undefined,
+        director: directorFilter || undefined,
+        network: networkFilter || undefined,
+        genreId: genreIdFilter || undefined,
+      }),
+      scope,
+    ),
+  );
 
-  const items = data?.items ?? [];
-  const visibleItems = items.slice(0, visibleCount);
-  const loading = isPending || isFetching;
+  const items = results.items;
+  const loading = results.isPending;
 
   const updateFilters = (next: Partial<{ type: TitleType | ""; director: string; network: string; genreId: string }>) => {
-    setVisibleCount(PAGE_SIZE);
+    results.reset();
     router.push(
       APP.SEARCH({
         q: query || undefined,
@@ -162,7 +171,7 @@ export default function SearchResults() {
           </Box>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <Typography sx={{ width: "90px", flexShrink: 0, fontWeight: 600, color: "#ffffff" }}>{t("filters.genre")}</Typography>
+            <Typography sx={{ width: "90px", flexShrink: 0, fontWeight: 600, color: tokens.text.primary }}>{t("filters.genre")}</Typography>
             <MuiSelect
               fullWidth
               displayEmpty
@@ -181,7 +190,9 @@ export default function SearchResults() {
           </Box>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <Typography sx={{ width: "90px", flexShrink: 0, fontWeight: 600, color: "#ffffff" }}>{t("filters.director")}</Typography>
+            <Typography sx={{ width: "90px", flexShrink: 0, fontWeight: 600, color: tokens.text.primary }}>
+              {t("filters.director")}
+            </Typography>
             <Input
               fullWidth
               disableUnderline
@@ -197,7 +208,9 @@ export default function SearchResults() {
           </Box>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <Typography sx={{ width: "90px", flexShrink: 0, fontWeight: 600, color: "#ffffff" }}>{t("filters.network")}</Typography>
+            <Typography sx={{ width: "90px", flexShrink: 0, fontWeight: 600, color: tokens.text.primary }}>
+              {t("filters.network")}
+            </Typography>
             <Input
               fullWidth
               disableUnderline
@@ -219,7 +232,7 @@ export default function SearchResults() {
       </Box>
 
       <Box>
-        <Typography variant="h3" sx={{ color: "#ffffff" }}>
+        <Typography variant="h3" sx={{ color: tokens.text.primary }}>
           {heading}
         </Typography>
       </Box>
@@ -243,11 +256,11 @@ export default function SearchResults() {
         </Box>
       ) : items.length ? (
         <>
-          <ResultRows items={visibleItems} onOpen={(id) => router.push(APP.TITLE(id))} />
+          <ResultRows items={items} onOpen={(id) => router.push(APP.TITLE(id))} />
 
-          {visibleCount < items.length && (
+          {results.hasMore && (
             <Box sx={{ display: "flex", justifyContent: "center" }}>
-              <Button variant="outlined" onClick={() => setVisibleCount((count) => count + PAGE_SIZE)} sx={{ gap: "8px" }}>
+              <Button variant="outlined" onClick={results.loadMore} disabled={results.isLoadingMore} sx={{ gap: "8px" }}>
                 {t("more")}
                 <ExpandMore sx={{ fontSize: "18px" }} />
               </Button>
@@ -315,7 +328,7 @@ function ResultItem({ title, onClick }: { title: Title; onClick: () => void }) {
           className="search-result-title"
           sx={{
             fontWeight: 700,
-            color: "#ffffff",
+            color: tokens.text.primary,
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
@@ -328,7 +341,7 @@ function ResultItem({ title, onClick }: { title: Title; onClick: () => void }) {
         {imdbRating !== undefined && (
           <Box sx={{ display: "flex", alignItems: "center", gap: "6px", mt: "10px" }}>
             <CustomIcon icon={IMDB} sx={{ fontSize: "22px" }} />
-            <Typography sx={{ fontSize: "14px", fontWeight: 700, color: "#ffffff" }}>{imdbRating.toFixed(1)}</Typography>
+            <Typography sx={{ fontSize: "14px", fontWeight: 700, color: tokens.text.primary }}>{imdbRating.toFixed(1)}</Typography>
           </Box>
         )}
       </Box>

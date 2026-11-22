@@ -1,9 +1,10 @@
 import Role from "@/types/role";
 import { authStore } from "@shared/lib/auth-store";
-import { decodeAccessToken, isAccessTokenExpired } from "@shared/lib/decode-jwt";
+import { isAccessTokenExpired } from "@shared/lib/decode-jwt";
+import { localizedLoginUrl } from "@shared/lib/login-redirect";
 import { resolveRequestLocale } from "@shared/lib/request-locale";
-import { APP } from "@shared/lib/routes";
 import { recordServerTime } from "@shared/lib/server-time";
+import { identityFrom } from "@shared/lib/session";
 import axios, { type InternalAxiosRequestConfig } from "axios";
 import { SessionUnusableError, toApiError } from "./api-error";
 
@@ -43,6 +44,8 @@ function isSessionRejection(error: unknown): boolean {
 }
 
 api.interceptors.request.use(async (config: TrackedConfig) => {
+  if (config.headers.has("Accept-Language")) return config;
+
   const locale = await resolveRequestLocale();
   if (locale) config.headers["Accept-Language"] = locale;
   return config;
@@ -82,24 +85,12 @@ api.interceptors.request.use(async (config: TrackedConfig) => {
   return config;
 });
 
-function readIdentity(body: { accessToken: string; userId?: string; role?: Role }) {
-  const fromToken = decodeAccessToken(body.accessToken);
-
-  if (!body.userId) return fromToken;
-
-  if (typeof body.role === "string" && Object.values(Role).includes(body.role)) {
-    return { userId: body.userId, role: body.role };
-  }
-
-  return fromToken?.userId === body.userId ? fromToken : null;
-}
-
 async function refreshAccessToken(): Promise<string> {
   const { data } = await api.post<{ accessToken: string; userId?: string; role?: Role }>(REFRESH_PATH, undefined, {
     _isRefreshCall: true,
   } as TrackedConfig);
 
-  const identity = readIdentity(data);
+  const identity = identityFrom(data);
   if (!identity) {
     throw new SessionUnusableError("/auth/refresh returned no identity this client can use");
   }
@@ -163,7 +154,10 @@ api.interceptors.response.use(
       if (isSessionRejection(refreshError)) {
         console.error("[auth] Session ended after a 401 retry; redirecting to login");
         authStore.getState().clear();
-        if (typeof window !== "undefined") window.location.href = APP.LOGIN;
+        if (typeof window !== "undefined") {
+          const { pathname = "/", search = "" } = window.location;
+          window.location.href = localizedLoginUrl(`${pathname}${search}`);
+        }
       }
       return Promise.reject(toApiError(refreshError));
     }

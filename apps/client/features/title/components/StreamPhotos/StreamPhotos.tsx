@@ -3,6 +3,7 @@ import AddAPhotoIcon from "@mui/icons-material/AddAPhoto";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import { tokens } from "@shared/mui/theme";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { getTitleOverviewFixture } from "../TitleOverview/mocks";
@@ -39,7 +40,7 @@ export default function StreamPhotos({ title }: StreamPhotosProps) {
             cursor: "pointer",
             borderRadius: "10px",
             backgroundColor: "primary.main",
-            color: "#191919",
+            color: tokens.surface.default,
             fontWeight: 600,
             fontSize: "14px",
             px: "16px",
@@ -73,7 +74,7 @@ export default function StreamPhotos({ title }: StreamPhotosProps) {
                   justifyContent: "center",
                 }}
               >
-                <Typography sx={{ color: "#ffffff", fontSize: "18px", fontWeight: 600 }}>+{remaining}</Typography>
+                <Typography sx={{ color: tokens.text.primary, fontSize: "18px", fontWeight: 600 }}>+{remaining}</Typography>
               </Box>
             )}
           </Box>

@@ -34,7 +34,10 @@ export default function FormSection({ index, title, description, status, anchorI
         </Typography>
 
         <Box sx={{ flexGrow: 1 }}>
-          <Typography component="h2" sx={{ fontFamily: "var(--font-heading)", fontSize: "19px", fontWeight: 600, color: "#ffffff" }}>
+          <Typography
+            component="h2"
+            sx={{ fontFamily: "var(--font-heading)", fontSize: "19px", fontWeight: 600, color: tokens.text.primary }}
+          >
             {title}
           </Typography>
           <Typography sx={{ mt: "3px", fontSize: "13px", color: "text.secondary" }}>{description}</Typography>

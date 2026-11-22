@@ -3,6 +3,7 @@
 import { useUsers } from "@/features/user/api/use-users";
 import Pagination from "@/shared/ui/Pagination";
 import Box from "@mui/material/Box";
+import { useClampedPage } from "@shared/lib/list-state";
 import UsersFiltersPanel from "./components/UsersFiltersPanel";
 import UsersPageHero from "./components/UsersPageHero";
 import UsersTable from "./components/UsersTable";
@@ -23,6 +24,7 @@ export default function UsersLibrary() {
   const users = data?.items || [];
   const totalCount = data?.totalCount || 0;
   const totalPages = Math.ceil(totalCount / LIMIT);
+  useClampedPage(page, data?.totalCount, LIMIT, (next) => updateFilters({ page: next }));
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", width: "100%", gap: "28px", p: { xs: "24px 16px 40px", md: "40px 36px 56px" } }}>

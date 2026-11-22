@@ -5,6 +5,7 @@ import SyncIcon from "@mui/icons-material/Sync";
 import Box from "@mui/material/Box";
 import { keyframes } from "@mui/material/styles";
 import Typography from "@mui/material/Typography";
+import { tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
 import { useTranslations } from "next-intl";
 
@@ -36,7 +37,7 @@ export default function TitlesPageHero({ onCreate, onSyncAllRatings, isSyncingAl
       }}
     >
       <Box>
-        <Typography component="h1" variant="h2" sx={{ color: "#ffffff" }}>
+        <Typography component="h1" variant="h2" sx={{ color: tokens.text.primary }}>
           {t("heading")}
         </Typography>
         <Typography sx={{ mt: "14px", maxWidth: "640px", color: "text.secondary" }}>{t("subheading")}</Typography>

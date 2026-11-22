@@ -1,3 +1,6 @@
+import { Season, SeasonTranslation } from "@prisma/client";
+import { ContentLocaleView } from "../../common/utils/localize.util";
+
 export interface SeasonInput {
   number: number;
   name: string;
@@ -14,4 +17,7 @@ export interface SeasonView {
   description: string;
   posterUrl: string | null;
   titleId: string;
+  content: ContentLocaleView;
 }
+
+export type SeasonWithTranslations = Season & { translations?: SeasonTranslation[] };

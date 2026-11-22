@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "@/i18n/navigation";
 import { APP } from "@/shared/lib/routes";
 import { zodResolver } from "@hookform/resolvers/zod";
 import LockIcon from "@mui/icons-material/Lock";
@@ -10,14 +11,14 @@ import Checkbox from "@mui/material/Checkbox";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import InputAdornment from "@mui/material/InputAdornment";
 import Typography from "@mui/material/Typography";
-import { describeApiError } from "@shared/api/api-error";
-import { authStore } from "@shared/lib/auth-store";
-import { decodeAccessToken } from "@shared/lib/decode-jwt";
+import { describeApiError, SessionUnusableError } from "@shared/api/api-error";
+import { LOGIN_RETURN_PARAM, safeReturnPath } from "@shared/lib/login-redirect";
+import { startSession } from "@shared/lib/session";
+import { tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
 import FormField from "@shared/ui/FormField";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import AuthService from "../../api/auth.service";
@@ -44,15 +45,10 @@ export default function LoginForm() {
     setError(null);
     try {
       const session = await AuthService.login({ email, password });
-      const claims = decodeAccessToken(session.accessToken);
-      authStore.getState().setSession({
-        token: session.accessToken,
-        userId: claims?.userId ?? session.userId,
-        role: claims?.role ?? session.role,
-      });
-      router.push(APP.DISCOVER);
+      if (!startSession(session)) throw new SessionUnusableError("The sign-in response carried no identity this client can use");
+      router.push(safeReturnPath(new URLSearchParams(window.location.search).get(LOGIN_RETURN_PARAM)) ?? APP.DISCOVER);
     } catch (err) {
-      setError(describeApiError(err, tErrors));
+      setError(describeApiError(err, tErrors, { 400: t("errors.invalidCredentials"), 401: t("errors.invalidCredentials") }));
     }
   };
 
@@ -67,13 +63,13 @@ export default function LoginForm() {
         borderRadius: "24px",
         border: "1px solid",
         borderColor: "divider",
-        backgroundColor: "#000000",
+        backgroundColor: tokens.surface.paper,
         display: "flex",
         flexDirection: "column",
         gap: "36px",
       }}
     >
-      <Typography component="h1" sx={{ textAlign: "center", fontSize: "40px", fontWeight: 700, color: "#ffffff" }}>
+      <Typography component="h1" sx={{ textAlign: "center", fontSize: "40px", fontWeight: 700, color: tokens.text.primary }}>
         {t("login.heading")}
       </Typography>
 
@@ -133,7 +129,12 @@ export default function LoginForm() {
         type="submit"
         isPill
         disabled={isSubmitting}
-        sx={{ height: "52px", backgroundColor: "#e5e5e5", color: "#191919", "&:hover": { backgroundColor: "#ffffff" } }}
+        sx={{
+          height: "52px",
+          backgroundColor: tokens.text.field,
+          color: tokens.surface.default,
+          "&:hover": { backgroundColor: tokens.text.primary },
+        }}
       >
         {isSubmitting ? t("login.submitting") : t("login.submit")}
       </Button>

@@ -4,6 +4,7 @@ import { KeyboardArrowLeft as KeyboardArrowLeftIcon, KeyboardArrowRight as Keybo
 import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
 import type { SxProps, Theme } from "@mui/material/styles";
+import { tokens } from "@shared/mui/theme";
 import { useTranslations } from "next-intl";
 
 export type SliderItemLabel = "item" | "title" | "story" | "episode";
@@ -34,10 +35,14 @@ export default function SliderArrows({
   return (
     <Box sx={[{ display: "flex", alignItems: "center", gap: "24px" }, ...(Array.isArray(sx) ? sx : [sx])]}>
       <IconButton onClick={onPrev} disabled={disablePrev} aria-label={t(`previous.${itemLabel}`)} sx={arrowButtonSx(-1, size, shape)}>
-        <KeyboardArrowLeftIcon sx={{ fontSize: size * 0.85, color: shape === "square" && disablePrev ? "#666666" : "#000000" }} />
+        <KeyboardArrowLeftIcon
+          sx={{ fontSize: size * 0.85, color: shape === "square" && disablePrev ? "#666666" : tokens.surface.paper }}
+        />
       </IconButton>
       <IconButton onClick={onNext} disabled={disableNext} aria-label={t(`next.${itemLabel}`)} sx={arrowButtonSx(1, size, shape)}>
-        <KeyboardArrowRightIcon sx={{ fontSize: size * 0.85, color: shape === "square" && disableNext ? "#666666" : "#000000" }} />
+        <KeyboardArrowRightIcon
+          sx={{ fontSize: size * 0.85, color: shape === "square" && disableNext ? "#666666" : tokens.surface.paper }}
+        />
       </IconButton>
     </Box>
   );
@@ -56,7 +61,7 @@ const arrowButtonSx = (dir: -1 | 1, size: number, shape: "circle" | "square") =>
   ":active": { transform: "scale(0.94)" },
   ":disabled":
     shape === "square"
-      ? { backgroundColor: "#333333", opacity: 1, cursor: "not-allowed", transform: "none" }
+      ? { backgroundColor: tokens.surface.fill, opacity: 1, cursor: "not-allowed", transform: "none" }
       : { backgroundColor: "primary.main", opacity: 0.35, cursor: "not-allowed", transform: "none" },
   "@media (prefers-reduced-motion: reduce)": { transition: "none" },
 });

@@ -3,6 +3,7 @@
 import Hls from "hls.js";
 import { RefObject, useCallback, useEffect, useRef } from "react";
 import { StoreApi } from "zustand";
+import { type FatalHlsError, nextHlsRecovery } from "../../../lib/hls-recovery";
 import { PlayerStoreState } from "../store/playerStore";
 import { createQualityOptions } from "../utils";
 
@@ -99,27 +100,29 @@ export default function useHlsPlayer(
         });
       });
 
+      let recoveries = 0;
+      hls.on(Hls.Events.FRAG_BUFFERED, () => {
+        recoveries = 0;
+      });
+
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (!data.fatal) return;
 
-        switch (data.type) {
-          case Hls.ErrorTypes.NETWORK_ERROR:
-            store.setState({ errorKey: "networkRetrying" });
-            hls.startLoad();
-            break;
-          case Hls.ErrorTypes.MEDIA_ERROR:
-            store.setState({ errorKey: "playbackRecovering" });
-            hls.recoverMediaError();
-            break;
-          default:
-            store.setState({
-              isInitialLoading: false,
-              isBuffering: false,
-              errorKey: "streamUnavailable",
-            });
-            hls.destroy();
-            hlsRef.current = null;
-            break;
+        const error: FatalHlsError =
+          data.type === Hls.ErrorTypes.NETWORK_ERROR ? "network" : data.type === Hls.ErrorTypes.MEDIA_ERROR ? "media" : "other";
+        const recovery = nextHlsRecovery(error, recoveries);
+        recoveries += 1;
+
+        if (recovery === "restart-load") {
+          store.setState({ errorKey: "networkRetrying" });
+          hls.startLoad();
+        } else if (recovery === "recover-media") {
+          store.setState({ errorKey: "playbackRecovering" });
+          hls.recoverMediaError();
+        } else {
+          store.setState({ isInitialLoading: false, isBuffering: false, errorKey: "streamUnavailable" });
+          hls.destroy();
+          hlsRef.current = null;
         }
       });
 

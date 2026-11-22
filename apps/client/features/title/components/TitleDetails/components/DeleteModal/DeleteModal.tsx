@@ -6,14 +6,16 @@ interface DeleteModalProps {
   onClose: () => void;
   titleName: string;
   isDeleting: boolean;
-  onConfirm: () => Promise<void>;
+  error?: string | null;
+  onConfirm: () => void;
 }
 
-export default function DeleteModal({ isOpen, onClose, titleName, isDeleting, onConfirm }: DeleteModalProps) {
+export default function DeleteModal({ isOpen, onClose, titleName, isDeleting, onConfirm, error }: DeleteModalProps) {
   const t = useTranslations("title.details.deleteModal");
 
   return (
     <ConfirmDialog
+      error={error}
       isOpen={isOpen}
       onClose={onClose}
       onConfirm={onConfirm}

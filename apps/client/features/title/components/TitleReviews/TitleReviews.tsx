@@ -3,15 +3,22 @@
 import { type CommentSortMode, useComments, useCreateComment } from "@/features/comment";
 import { useRemoveTitleRating, useSetTitleRating, useTitleEngagement } from "@/features/title-engagement";
 import type { Title } from "@/features/title/schemas/title";
+import { useRouter } from "@/i18n/navigation";
 import ExpandMore from "@mui/icons-material/ExpandMore";
 import ForumIcon from "@mui/icons-material/Forum";
 import SortIcon from "@mui/icons-material/Sort";
+import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Slider from "@mui/material/Slider";
 import Switch from "@mui/material/Switch";
 import Typography from "@mui/material/Typography";
-import { useAuthStore } from "@shared/lib/auth-store";
+import { useApiErrorMessage } from "@shared/api/use-api-error-message";
+import { INLINE_ERROR } from "@shared/api/write-errors";
 import { formatCount } from "@shared/lib/format-count";
+import { useLoginPath } from "@shared/lib/use-login-path";
+import { useViewer } from "@shared/lib/use-viewer";
+import { viewerControl } from "@shared/lib/viewer-control";
+import { tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
@@ -27,25 +34,40 @@ const PAGE_SIZE = 5;
 
 export default function TitleReviews({ title }: TitleReviewsProps) {
   const t = useTranslations("title.reviews");
-  const userId = useAuthStore((state) => state.userId);
-  const authStatus = useAuthStore((state) => state.status);
-  const isSignedIn = Boolean(userId);
-  const sessionReady = authStatus === "resolved";
+  const describeError = useApiErrorMessage();
+  const viewer = useViewer();
+  const router = useRouter();
+  const signInPath = useLoginPath();
+  const sessionReady = viewer.status !== "pending";
 
   const [sortMode, setSortMode] = useState<CommentSortMode>("newest");
   const [text, setText] = useState("");
   const [hasSpoiler, setHasSpoiler] = useState(false);
   const [score, setScore] = useState(0);
 
-  const { data: engagement } = useTitleEngagement(title.id);
-  const setRating = useSetTitleRating(title.id);
-  const removeRating = useRemoveTitleRating(title.id);
+  const { data: engagement, isError: engagementFailed } = useTitleEngagement(title.id);
+  const setRating = useSetTitleRating(title.id, { meta: INLINE_ERROR });
+  const removeRating = useRemoveTitleRating(title.id, { meta: INLINE_ERROR });
+  const ratingControl = viewerControl({
+    viewer: viewer.status,
+    known: engagement?.viewer != null,
+    refreshFailed: engagementFailed,
+    busy: setRating.isPending || removeRating.isPending,
+  });
 
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isPending } = useComments(title.id, sortMode, PAGE_SIZE, sessionReady);
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isPending,
+    isError: commentsFailed,
+  } = useComments(title.id, sortMode, PAGE_SIZE, sessionReady);
   const comments = data?.pages.flatMap((page) => page.items) ?? [];
   const totalCount = data?.pages[0]?.totalCount ?? 0;
 
   const createComment = useCreateComment(title.id, {
+    meta: INLINE_ERROR,
     onSuccess: () => {
       setText("");
       setHasSpoiler(false);
@@ -59,8 +81,15 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
     setScore(myScore ?? 0);
   }
 
+  const ratingError = describeError(setRating.error ?? removeRating.error);
+  const commentError = describeError(createComment.error);
+
+  const composeControl = viewerControl({ viewer: viewer.status, known: true, busy: createComment.isPending });
+  const canWrite = composeControl.state === "ready";
+
   const handleSubmit = () => {
-    if (!text.trim()) return;
+    if (composeControl.intent === "sign-in") return router.push(signInPath());
+    if (composeControl.intent !== "write" || !text.trim()) return;
     createComment.mutate({ text: text.trim(), hasSpoiler });
   };
 
@@ -79,7 +108,7 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
         </Typography>
       </Box>
 
-      {isSignedIn && (
+      {(ratingControl.state === "ready" || ratingControl.state === "unknown") && (
         <Box
           sx={{
             display: "flex",
@@ -102,14 +131,19 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
             size="small"
             sx={{ color: "primary.main", flex: 1, minWidth: "180px" }}
           />
-          <Typography sx={{ fontSize: "14px", color: "#ffffff", width: "24px" }}>{score}</Typography>
-          <Button variant="contained" disabled={score < 1 || setRating.isPending} onClick={() => setRating.mutate(score)}>
+          <Typography sx={{ fontSize: "14px", color: tokens.text.primary, width: "24px" }}>{score}</Typography>
+          <Button variant="contained" disabled={score < 1 || ratingControl.disabled} onClick={() => setRating.mutate(score)}>
             {myScore === null ? t("rate") : t("update")}
           </Button>
           {myScore !== null && (
-            <Button variant="outlined" disabled={removeRating.isPending} onClick={() => removeRating.mutate()}>
+            <Button variant="outlined" disabled={ratingControl.disabled} onClick={() => removeRating.mutate()}>
               {t("clear")}
             </Button>
+          )}
+          {ratingError && (
+            <Alert severity="error" variant="outlined" sx={{ flexBasis: "100%" }}>
+              {t("writeError", { message: ratingError })}
+            </Alert>
           )}
         </Box>
       )}
@@ -126,17 +160,19 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
         }}
       >
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
-          <Typography sx={{ fontSize: "16px", fontWeight: 600 }}>{isSignedIn ? t("postPrompt") : t("signInPrompt")}</Typography>
+          <Typography sx={{ fontSize: "16px", fontWeight: 600 }}>
+            {composeControl.state === "anonymous" ? t("signInPrompt") : t("postPrompt")}
+          </Typography>
           <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <Typography sx={{ fontSize: "14px", color: "text.secondary" }}>{t("containsSpoilers")}</Typography>
-            <Switch checked={hasSpoiler} onChange={(e) => setHasSpoiler(e.target.checked)} size="small" disabled={!isSignedIn} />
+            <Switch checked={hasSpoiler} onChange={(e) => setHasSpoiler(e.target.checked)} size="small" disabled={!canWrite} />
           </Box>
         </Box>
 
         <Box
           component="textarea"
           value={text}
-          disabled={!isSignedIn}
+          disabled={!canWrite}
           onChange={(e) => setText((e.target as HTMLTextAreaElement).value)}
           placeholder={t("commentPlaceholder")}
           sx={{
@@ -147,7 +183,7 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
             border: "1px solid",
             borderColor: "primary.main",
             backgroundColor: "transparent",
-            color: "#e5e5e5",
+            color: tokens.text.field,
             padding: "14px",
             font: "inherit",
             fontSize: "14px",
@@ -159,13 +195,18 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
           <Button
             variant="contained"
             onClick={handleSubmit}
-            disabled={!isSignedIn || !text.trim() || createComment.isPending}
+            disabled={composeControl.disabled || (composeControl.intent === "write" && !text.trim())}
             sx={{ display: "flex", alignItems: "center", gap: "8px" }}
           >
             {t("postComment")}
             <ForumIcon sx={{ fontSize: "18px" }} />
           </Button>
         </Box>
+        {commentError && (
+          <Alert severity="error" variant="outlined">
+            {t("writeError", { message: commentError })}
+          </Alert>
+        )}
       </Box>
 
       <Box
@@ -211,7 +252,7 @@ export default function TitleReviews({ title }: TitleReviewsProps) {
         {isPending && <Typography sx={{ fontSize: "14px", color: "text.secondary" }}>{t("loading")}</Typography>}
         {!isPending && comments.length === 0 && <Typography sx={{ fontSize: "14px", color: "text.secondary" }}>{t("empty")}</Typography>}
         {comments.map((comment) => (
-          <CommentCard key={comment.id} comment={comment} titleId={title.id} />
+          <CommentCard key={comment.id} comment={comment} titleId={title.id} listRefreshFailed={commentsFailed} />
         ))}
       </Box>
 

@@ -2,6 +2,7 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
+import { tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
 import { useTranslations } from "next-intl";
 
@@ -15,11 +16,11 @@ const arrowSx = {
   width: 36,
   height: 36,
   borderRadius: "10px",
-  backgroundColor: "#333333",
-  color: "#ffffff",
+  backgroundColor: tokens.surface.fill,
+  color: tokens.text.primary,
   transition: "background-color .15s ease-out",
-  ":hover": { backgroundColor: "primary.main", color: "#000000" },
-  ":disabled": { backgroundColor: "#191919", color: "#666666" },
+  ":hover": { backgroundColor: "primary.main", color: tokens.surface.paper },
+  ":disabled": { backgroundColor: tokens.surface.default, color: tokens.text.placeholder },
 };
 
 export default function Pagination({ currentPage, totalPages, onPageChange }: PaginationProps) {

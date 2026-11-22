@@ -1,76 +1,57 @@
+import { catalogueCopies, ownedBy } from "@/features/title/api/catalogue-copies";
 import createMutationHook from "@/shared/api/createMutationHook";
-import { uploadImageFile } from "@/shared/api/upload-media";
+import { createWithMedia, imageAsset, updateWithMedia } from "@/shared/api/media-backed-write";
+import { useUploadProgress, withUploadProgress } from "@/shared/api/use-upload-progress";
 import { UseMutationOptions } from "@tanstack/react-query";
 import { Artist, ArtistFormValues } from "../schemas/artist";
-import artistKeys from "./artist.keys";
 import artistService from "./artist.service";
 
-type CreateArtistWithUploadOptions = Omit<UseMutationOptions<Artist, Error, ArtistFormValues>, "mutationFn"> & {
-  onUploadProgress?: (progress: number) => void;
-};
+type CreateArtistWithUploadOptions = Omit<UseMutationOptions<Artist, Error, ArtistFormValues>, "mutationFn"> & {};
 type UpdateArtistMutationArgs = { id: string; payload: ArtistFormValues };
-type UpdateArtistMutationOptions = Omit<UseMutationOptions<Artist, Error, UpdateArtistMutationArgs>, "mutationFn"> & {
-  onUploadProgress?: (progress: number) => void;
-};
+type UpdateArtistMutationOptions = Omit<UseMutationOptions<Artist, Error, UpdateArtistMutationArgs>, "mutationFn"> & {};
+
+const artistPhoto = (id: string, files: FileList | null | undefined) =>
+  imageAsset(files, {
+    getUploadUrl: (contentType) => artistService.getPhotoUploadUrl(id, contentType),
+    completeUpload: (rawKey) => artistService.completePhotoUpload(id, rawKey),
+  });
 
 export const useCreateArtistWithUpload = (options?: CreateArtistWithUploadOptions) => {
+  const progress = useUploadProgress();
   const useCreateArtistWithUpload = createMutationHook({
-    mutationFn: async ({ photoFile, ...payload }: ArtistFormValues) => {
-      let createdArtist: Artist | null = null;
-
-      try {
-        createdArtist = await artistService.create(payload);
-        const artistId = createdArtist.id;
-        await uploadImageFile({
-          files: photoFile,
-          getUploadUrl: (contentType) => artistService.getPhotoUploadUrl(artistId, contentType),
-          completeUpload: (rawKey) => artistService.completePhotoUpload(artistId, rawKey),
-          uploadToUrl: artistService.uploadToS3,
-          onProgress: options?.onUploadProgress,
-        });
-
-        return createdArtist;
-      } catch (error) {
-        if (createdArtist) {
-          try {
-            await artistService.delete(createdArtist.id);
-          } catch (rollbackError) {
-            console.error("Failed to rollback artist after upload error", rollbackError);
-          }
-        }
-
-        throw error;
-      }
-    },
-    getInvalidateKeys: () => [artistKeys.all()],
+    mutationFn: ({ photoFile, ...payload }: ArtistFormValues) =>
+      createWithMedia({
+        create: () => artistService.create(payload),
+        assets: ({ id }) => [artistPhoto(id, photoFile)],
+        remove: ({ id }) => artistService.delete(id),
+        reload: ({ id }) => artistService.getById(id),
+        onProgress: progress.report,
+      }),
+    getInvalidateKeys: () => catalogueCopies.anyArtist(),
   });
-  return useCreateArtistWithUpload(options);
+  return withUploadProgress(useCreateArtistWithUpload(options), progress);
 };
 
 export const useUpdateArtistWithUpload = (options?: UpdateArtistMutationOptions) => {
+  const progress = useUploadProgress();
   const useUpdateArtistWithUpload = createMutationHook({
-    mutationFn: async ({ id, payload }: UpdateArtistMutationArgs) => {
-      const { name, photoFile } = payload;
-      await uploadImageFile({
-        files: photoFile,
-        getUploadUrl: (contentType) => artistService.getPhotoUploadUrl(id, contentType),
-        completeUpload: (rawKey) => artistService.completePhotoUpload(id, rawKey),
-        uploadToUrl: artistService.uploadToS3,
-        onProgress: options?.onUploadProgress,
-      });
-
-      return artistService.update(id, { name });
-    },
-    getInvalidateKeys: ({ id }: UpdateArtistMutationArgs) => [artistKeys.all(), artistKeys.detail(id)],
+    mutationFn: ({ id, payload: { name, photoFile } }: UpdateArtistMutationArgs) =>
+      updateWithMedia({
+        update: () => artistService.update(id, { name }),
+        assets: () => [artistPhoto(id, photoFile)],
+        reload: () => artistService.getById(id),
+        onProgress: progress.report,
+      }),
+    getInvalidateKeys: ({ id }: UpdateArtistMutationArgs) => catalogueCopies.artist(id),
   });
-  return useUpdateArtistWithUpload(options);
+  return withUploadProgress(useUpdateArtistWithUpload(options), progress);
 };
 
 export const useDeleteArtist = (options?: Omit<UseMutationOptions<void, Error, string>, "mutationFn">) => {
   const useDeleteArtist = createMutationHook({
     mutationFn: (id: string) => artistService.delete(id),
-    getInvalidateKeys: () => [artistKeys.all()],
-    getRemoveKeys: (id: string) => [artistKeys.detail(id)],
+    getInvalidateKeys: () => catalogueCopies.anyArtist(),
+    getRemoveKeys: (id: string) => ownedBy.artist(id),
   });
   return useDeleteArtist(options);
 };

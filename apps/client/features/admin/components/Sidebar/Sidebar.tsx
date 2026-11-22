@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "@/i18n/navigation";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import GroupsIcon from "@mui/icons-material/Groups";
@@ -16,7 +17,6 @@ import { useActiveIndicator } from "@shared/ui/Sidebar/useActiveIndicator";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { useMemo, useRef } from "react";
 import AdminNavItem from "./components/AdminNavItem";
 
@@ -60,7 +60,7 @@ export default function Sidebar() {
         "& .MuiDrawer-paper": {
           width,
           boxSizing: "border-box",
-          backgroundColor: "#191919",
+          backgroundColor: tokens.surface.default,
           color: "text.primary",
           border: "none",
           transition: "width 0.3s ease",
@@ -118,7 +118,7 @@ export default function Sidebar() {
           px: 3,
           pb: 1,
           fontSize: "14px",
-          color: "#666666",
+          color: tokens.text.placeholder,
           fontWeight: "700",
           overflow: "hidden",
           opacity: collapsed ? 0 : 1,

@@ -8,8 +8,10 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  UseInterceptors,
 } from "@nestjs/common";
 import {
+  ApiHeader,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -17,8 +19,11 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
+import { type Locale } from "../../../common/locale.const";
+import { VaryAcceptLanguageInterceptor } from "../../../common/utils/vary-accept-language.interceptor";
 import { Auth } from "../../../decorators/auth.decorator";
 import { CurrentUserId } from "../../../decorators/current-user-id.decorator";
+import { RequestLocale } from "../../../decorators/request-locale.decorator";
 import { TitleExistsPipe } from "../../../services/title/utils/title-exists.pipe";
 import { WatchlistService } from "../../../services/watchlist/watchlist.service";
 import { PaginatedQueryDto } from "../../dto/paginated-query.dto";
@@ -27,6 +32,13 @@ import { TitleEngagementDto } from "../titles/dto/response/title-engagement.dto"
 import { WatchlistTitleResponseDto } from "./dto/response/watchlist-title-response.dto";
 
 @ApiTags("watchlist")
+@ApiHeader({
+  name: "Accept-Language",
+  required: false,
+  description:
+    "Language of title names and descriptions (en, uk); English when absent or unsupported",
+})
+@UseInterceptors(VaryAcceptLanguageInterceptor)
 @Controller("watchlist")
 export class WatchlistController {
   constructor(private readonly watchlistService: WatchlistService) {}
@@ -41,9 +53,10 @@ export class WatchlistController {
   @Get()
   findAll(
     @Query() query: PaginatedQueryDto,
+    @RequestLocale() locale: Locale,
     @CurrentUserId() userId: string,
   ): Promise<Paginated<WatchlistTitleResponseDto>> {
-    return this.watchlistService.findAll(userId, query);
+    return this.watchlistService.findAll(userId, query, locale);
   }
 
   @ApiOperation({ summary: "Put a title on your watchlist" })

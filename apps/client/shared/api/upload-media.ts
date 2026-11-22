@@ -1,3 +1,5 @@
+import { putFileToS3, putPartToS3 } from "./s3-upload";
+
 type UploadProgressHandler = (progress: number) => void;
 type UploadToUrl = (url: string, file: File, onProgress: UploadProgressHandler) => Promise<void>;
 
@@ -12,7 +14,7 @@ type UploadMultipartFileParams = {
   startUpload: (fileSize: number) => Promise<StartMultipartUpload>;
   completeUpload: (uploadId: string, parts: CompletedPart[]) => Promise<void>;
   abortUpload: (uploadId: string) => Promise<void>;
-  uploadPartToUrl: UploadPartToUrl;
+  uploadPartToUrl?: UploadPartToUrl;
   onProgress?: UploadProgressHandler;
   onPartProgress?: (completedParts: number, totalParts: number) => void;
 };
@@ -22,7 +24,7 @@ export type GetImageUploadUrl = (contentType: string) => Promise<{ uploadUrl: st
 type UploadImageFileParams = {
   files?: FileList | null;
   getUploadUrl: GetImageUploadUrl;
-  uploadToUrl: UploadToUrl;
+  uploadToUrl?: UploadToUrl;
   completeUpload: (rawKey: string) => Promise<void>;
   onProgress?: UploadProgressHandler;
 };
@@ -60,7 +62,7 @@ export const uploadMultipartFile = async ({
   startUpload,
   completeUpload,
   abortUpload,
-  uploadPartToUrl,
+  uploadPartToUrl = putPartToS3,
   onProgress = noopProgress,
   onPartProgress,
 }: UploadMultipartFileParams): Promise<boolean> => {
@@ -101,7 +103,7 @@ export const uploadMultipartFile = async ({
 export const uploadImageFile = async ({
   files,
   getUploadUrl,
-  uploadToUrl,
+  uploadToUrl = putFileToS3,
   completeUpload,
   onProgress = noopProgress,
 }: UploadImageFileParams): Promise<boolean> => {

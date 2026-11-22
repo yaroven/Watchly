@@ -79,7 +79,7 @@ describe("WatchlistService", () => {
 
   describe("findAll", () => {
     it("should page in a fixed order even when two rows were added in the same instant", async () => {
-      await service.findAll(viewerId, {});
+      await service.findAll(viewerId, {}, "uk");
 
       expect(prismaMock.watchlistItem.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ orderBy: [{ createdAt: "desc" }, { id: "desc" }] }),
@@ -90,7 +90,7 @@ describe("WatchlistService", () => {
       watchlistPage(["title-b", "title-a"], 2);
       titleServiceMock.findManyByIds.mockResolvedValue([card("title-a"), card("title-b")]);
 
-      const result = await service.findAll(viewerId, {});
+      const result = await service.findAll(viewerId, {}, "uk");
 
       expect(result.items.map((item) => item.id)).toEqual(["title-b", "title-a"]);
       expect(result.totalCount).toBe(2);
@@ -99,16 +99,16 @@ describe("WatchlistService", () => {
     it("should forward the viewer, or every row renders as unsaved", async () => {
       watchlistPage(["title-a"], 1);
 
-      await service.findAll(viewerId, {});
+      await service.findAll(viewerId, {}, "uk");
 
-      expect(titleServiceMock.findManyByIds).toHaveBeenCalledWith(["title-a"], viewerId);
+      expect(titleServiceMock.findManyByIds).toHaveBeenCalledWith(["title-a"], viewerId, "uk");
     });
 
     it("should drop a title that no longer exists, and not count it either", async () => {
       watchlistPage(["title-a", "gone"], 2);
       titleServiceMock.findManyByIds.mockResolvedValue([card("title-a")]);
 
-      const result = await service.findAll(viewerId, {});
+      const result = await service.findAll(viewerId, {}, "uk");
 
       expect(result.items.map((item) => item.id)).toEqual(["title-a"]);
       expect(result.totalCount).toBe(1);
@@ -117,14 +117,14 @@ describe("WatchlistService", () => {
     it("should not ask for titles at all for an empty watchlist", async () => {
       watchlistPage([], 0);
 
-      const result = await service.findAll(viewerId, {});
+      const result = await service.findAll(viewerId, {}, "uk");
 
       expect(result).toEqual({ items: [], totalCount: 0 });
       expect(titleServiceMock.findManyByIds).not.toHaveBeenCalled();
     });
 
     it("should scope the id page to the viewer and exclude orphaned rows", async () => {
-      await service.findAll(viewerId, {});
+      await service.findAll(viewerId, {}, "uk");
 
       expect(prismaMock.watchlistItem.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { userId: viewerId, title: { is: {} } } }),

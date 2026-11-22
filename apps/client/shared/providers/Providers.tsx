@@ -1,8 +1,10 @@
 "use client";
 
 import { restoreSession } from "@shared/api/axios";
+import { isErrorUnhandled, useWriteErrorStore } from "@shared/api/write-errors";
 import { authStore } from "@shared/lib/auth-store";
 import MuiThemeProvider from "@shared/mui/MuiThemeProvider";
+import WriteErrorToast from "@shared/ui/WriteErrorToast";
 import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { useEffect, useState } from "react";
@@ -15,6 +17,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         mutationCache: new MutationCache({
           onError: (error, _variables, _context, mutation) => {
             console.error("[Mutation failed]", mutation.options.mutationKey ?? "", error);
+            if (isErrorUnhandled(mutation)) useWriteErrorStore.getState().show(error);
           },
         }),
         defaultOptions: {
@@ -38,6 +41,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         <NuqsAdapter>
           <TimeZoneSync />
           {children}
+          <WriteErrorToast />
         </NuqsAdapter>
       </QueryClientProvider>
     </MuiThemeProvider>

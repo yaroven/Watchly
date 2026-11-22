@@ -115,14 +115,17 @@ describe("TitlesController (viewer propagation)", () => {
     it("should pass the signed-in viewer through to the service", async () => {
       viewerId = "user-1";
 
-      await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .get("/titles/11111111-1111-4111-8111-111111111111")
+        .set("Accept-Language", "uk-UA,uk;q=0.9,en;q=0.8")
         .expect(200);
 
       expect(titleService.findOne).toHaveBeenCalledWith(
         "11111111-1111-4111-8111-111111111111",
+        "uk",
         "user-1",
       );
+      expect(response.headers.vary).toContain("Accept-Language");
     });
 
     it("should pass no viewer for an anonymous caller", async () => {
@@ -134,6 +137,7 @@ describe("TitlesController (viewer propagation)", () => {
 
       expect(titleService.findOne).toHaveBeenCalledWith(
         "11111111-1111-4111-8111-111111111111",
+        "en",
         undefined,
       );
     });
@@ -143,9 +147,15 @@ describe("TitlesController (viewer propagation)", () => {
     it("should pass the signed-in viewer through to the service", async () => {
       viewerId = "user-1";
 
-      await request(app.getHttpServer()).get("/titles").expect(200);
+      await request(app.getHttpServer()).get("/titles").set("Accept-Language", "uk").expect(200);
 
-      expect(titleService.findAll).toHaveBeenCalledWith(expect.anything(), undefined, [], "user-1");
+      expect(titleService.findAll).toHaveBeenCalledWith(
+        expect.anything(),
+        "uk",
+        undefined,
+        [],
+        "user-1",
+      );
     });
   });
 

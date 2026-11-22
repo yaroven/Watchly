@@ -1,16 +1,16 @@
 "use client";
 
-import EpisodeList from "@features/episodes/components/EpisodeList";
-import { Episode } from "@features/episodes/schemas/episode";
-import SeasonTabs from "@features/season/components/SeasonTabs";
-import { Season } from "@features/season/schemas/season";
+import { useRouter } from "@/i18n/navigation";
+import type { Episode } from "@features/episodes";
+import { EpisodeList } from "@features/episodes";
+import type { Season } from "@features/season";
+import { SeasonTabs } from "@features/season";
 import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
 import Typography from "@mui/material/Typography";
 import { APP } from "@shared/lib/routes";
 import { tokens } from "@shared/mui/theme";
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
 import { useQueryState } from "nuqs";
 import { useCallback } from "react";
 

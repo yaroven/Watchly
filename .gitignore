@@ -41,3 +41,6 @@ config/dev/data/*
 /terraform/*.tfstate
 /terraform/*.tfstate.*
 /terraform/.terraform.tfstate.lock.info
+openspec/
+/apps/client/.impeccable
+/apps/client/PRODUCT.md

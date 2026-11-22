@@ -8,6 +8,8 @@ import {
   Episode,
 } from "@/features/episodes/schemas/episode";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { INLINE_ERROR } from "@shared/api/write-errors";
+import { nextNumber } from "@shared/lib/numbering";
 import { useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
@@ -41,11 +43,14 @@ export const useEpisodeManager = ({ seasonId, episodes }: UseEpisodeManagerProps
 
   function closeEditor() {
     setIsModalOpen(false);
+  }
+
+  function clearEditor() {
     setEditingEpisode(null);
     reset({
       name: "",
       description: "",
-      number: episodes.length + 1,
+      number: nextNumber(episodes),
     });
   }
 
@@ -57,6 +62,7 @@ export const useEpisodeManager = ({ seasonId, episodes }: UseEpisodeManagerProps
   });
 
   const deleteMutation = useDeleteEpisode({
+    meta: INLINE_ERROR,
     onSuccess: () => {
       closeDeleteModal();
     },
@@ -74,7 +80,13 @@ export const useEpisodeManager = ({ seasonId, episodes }: UseEpisodeManagerProps
     submit(data);
   };
 
+  const clearSaveErrors = () => {
+    createMutation.reset();
+    updateMutation.reset();
+  };
+
   const openEdit = (episode: Episode) => {
+    clearSaveErrors();
     setEditingEpisode(episode);
     reset({
       name: episode.name,
@@ -85,16 +97,18 @@ export const useEpisodeManager = ({ seasonId, episodes }: UseEpisodeManagerProps
   };
 
   const openCreate = () => {
+    clearSaveErrors();
     setEditingEpisode(null);
     reset({
       name: "",
       description: "",
-      number: episodes.length + 1,
+      number: nextNumber(episodes),
     });
     setIsModalOpen(true);
   };
 
   const openDelete = (episode: Episode) => {
+    deleteMutation.reset();
     setEpisodeToDelete(episode);
   };
 
@@ -111,6 +125,7 @@ export const useEpisodeManager = ({ seasonId, episodes }: UseEpisodeManagerProps
   return {
     isModalOpen,
     closeEditor,
+    clearEditor,
     editingEpisode,
     uploadProgress,
     isPreviewModalOpen,

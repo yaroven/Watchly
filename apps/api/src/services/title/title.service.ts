@@ -1,8 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
+import { BASE_LOCALE, Locale, TranslationLocale } from "../../common/locale.const";
 import { paginate } from "../../common/pagination/paginate.util";
 import { Filter, PageQuery, Sorting } from "../../common/pagination/pagination.types";
 import { buildOrderBy } from "../../common/pagination/prisma-query.util";
+import { NameDescriptionTranslation, TranslationView } from "../../common/translation.types";
 import { Logged } from "../../decorators/logged.decorator";
 import { ImageService } from "../image/image.service";
 import { MediaAssetService } from "../media-asset/media-asset.service";
@@ -22,11 +24,16 @@ export class TitleService {
     private readonly mediaAssetService: MediaAssetService,
   ) {}
 
-  private toView(title: TitleWithEngagement, viewerId: string | null): StoredTitleView {
+  private toView(
+    title: TitleWithEngagement,
+    viewerId: string | null,
+    locale: Locale,
+  ): StoredTitleView {
     return toTitleView(
       title,
       titleEngagementViewFromRelations(title, viewerId),
       this.imageService.toPublicUrl(title.posterKey),
+      locale,
     );
   }
 
@@ -38,7 +45,7 @@ export class TitleService {
           ...rest,
           genres: genreIds?.length ? { connect: genreIds.map((id) => ({ id })) } : undefined,
         },
-        include: titleQuery.base(),
+        include: titleQuery.base(BASE_LOCALE),
       });
       return titleViewWithoutEngagement(title);
     } catch (error) {
@@ -52,6 +59,7 @@ export class TitleService {
   @Logged()
   async findAll(
     { page = 1, limit = 10 }: PageQuery,
+    locale: Locale,
     sort?: Sorting,
     filters: Filter[] = [],
     viewerId?: string,
@@ -66,24 +74,24 @@ export class TitleService {
       orderBy,
       page,
       limit,
-      extra: { include: titleQuery.withEngagement(viewerId ?? null) },
+      extra: { include: titleQuery.withEngagement(viewerId ?? null, locale) },
     });
 
     return {
-      items: items.map((title) => this.toView(title, viewerId ?? null)),
+      items: items.map((title) => this.toView(title, viewerId ?? null, locale)),
       totalCount,
     };
   }
 
   @Logged()
-  async findOne(id: string, viewerId?: string): Promise<StoredTitleView | null> {
+  async findOne(id: string, locale: Locale, viewerId?: string): Promise<StoredTitleView | null> {
     const title = (await this.prisma.title.findUnique({
       where: { id },
-      include: titleQuery.withEngagement(viewerId ?? null),
+      include: titleQuery.withEngagement(viewerId ?? null, locale),
     })) as TitleWithEngagement | null;
     if (!title) return null;
 
-    return this.toView(title, viewerId ?? null);
+    return this.toView(title, viewerId ?? null, locale);
   }
 
   @Logged()
@@ -104,10 +112,10 @@ export class TitleService {
               ? { set: genreIds.map((genreId) => ({ id: genreId })) }
               : undefined,
         },
-        include: titleQuery.withEngagement(viewerId ?? null),
+        include: titleQuery.withEngagement(viewerId ?? null, BASE_LOCALE),
       })) as TitleWithEngagement;
 
-      return this.toView(updated, viewerId ?? null);
+      return this.toView(updated, viewerId ?? null, BASE_LOCALE);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
         await assertTitleExists(this.prisma, id);
@@ -139,17 +147,58 @@ export class TitleService {
   }
 
   @Logged()
-  async findManyByIds(titleIds: string[], viewerId: string | null): Promise<CardTitleView[]> {
+  async findManyByIds(
+    titleIds: string[],
+    viewerId: string | null,
+    locale: Locale,
+  ): Promise<CardTitleView[]> {
     if (titleIds.length === 0) return [];
 
     const titles = (await this.prisma.title.findMany({
       where: { id: { in: titleIds } },
-      include: titleQuery.withEngagement(viewerId),
+      include: titleQuery.withEngagement(viewerId, locale),
     })) as TitleWithEngagement[];
 
     return titles.map((title) => {
-      const view = this.toView(title, viewerId);
+      const view = this.toView(title, viewerId, locale);
       return { ...view, engagement: withoutVote(view.engagement) };
     });
+  }
+
+  @Logged()
+  async listTranslations(titleId: string): Promise<TranslationView<NameDescriptionTranslation>[]> {
+    const rows = await this.prisma.titleTranslation.findMany({
+      where: { titleId },
+      orderBy: { locale: "asc" },
+      select: { locale: true, name: true, description: true },
+    });
+    return rows as TranslationView<NameDescriptionTranslation>[];
+  }
+
+  @Logged()
+  async upsertTranslation(
+    titleId: string,
+    locale: TranslationLocale,
+    data: NameDescriptionTranslation,
+  ): Promise<TranslationView<NameDescriptionTranslation>> {
+    try {
+      const row = await this.prisma.titleTranslation.upsert({
+        where: { titleId_locale: { titleId, locale } },
+        create: { titleId, locale, name: data.name, description: data.description },
+        update: { name: data.name, description: data.description },
+        select: { locale: true, name: true, description: true },
+      });
+      return row as TranslationView<NameDescriptionTranslation>;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+        throw new NotFoundException(`Title with id ${titleId} not found`);
+      }
+      throw error;
+    }
+  }
+
+  @Logged()
+  async removeTranslation(titleId: string, locale: TranslationLocale): Promise<void> {
+    await this.prisma.titleTranslation.deleteMany({ where: { titleId, locale } });
   }
 }

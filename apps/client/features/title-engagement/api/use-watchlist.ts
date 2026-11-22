@@ -1,20 +1,13 @@
 import type { CardTitle } from "@/features/title/schemas/title";
+import { type LocalizedQueryOptions, useLocalizedQuery } from "@shared/api/localized-query";
 import { useViewer } from "@shared/lib/use-viewer";
-import { useQuery, UseQueryOptions } from "@tanstack/react-query";
-import titleEngagementKeys from "./title-engagement.keys";
-import titleEngagementService from "./title-engagement.service";
+import { titleEngagementReads } from "./title-engagement.reads";
 
 type WatchlistPage = { items: CardTitle[]; totalCount: number };
 
-const useWatchlist = (
-  params: { page?: number; limit?: number } = {},
-  options?: Omit<UseQueryOptions<WatchlistPage, Error, WatchlistPage, readonly unknown[]>, "queryKey" | "queryFn">,
-) => {
+const useWatchlist = (params: { page?: number; limit?: number } = {}, options?: LocalizedQueryOptions<WatchlistPage>) => {
   const viewer = useViewer();
-
-  return useQuery({
-    queryKey: titleEngagementKeys.watchlist(params, viewer.viewerKey),
-    queryFn: () => titleEngagementService.getWatchlist(params),
+  return useLocalizedQuery(titleEngagementReads.watchlist(params), {
     ...options,
     enabled: viewer.status === "signed-in" && (options?.enabled ?? true),
   });

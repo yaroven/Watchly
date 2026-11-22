@@ -6,8 +6,11 @@ import {
   ReportProblem as ReportProblemIcon,
   WarningAmber as WarningAmberIcon,
 } from "@mui/icons-material";
+import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
+import { alpha } from "@mui/material/styles";
 import Typography from "@mui/material/Typography";
+import { tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
 import Modal from "@shared/ui/Modal";
 import { useTranslations } from "next-intl";
@@ -26,6 +29,7 @@ interface ConfirmDialogProps {
   pendingLabel?: string;
   cancelLabel?: string;
   isPending?: boolean;
+  error?: string | null;
 }
 
 export default function ConfirmDialog({
@@ -39,6 +43,7 @@ export default function ConfirmDialog({
   pendingLabel,
   cancelLabel,
   isPending = false,
+  error,
 }: ConfirmDialogProps) {
   const t = useTranslations("common");
   const { Icon, color, tint } = TONES[tone];
@@ -52,7 +57,7 @@ export default function ConfirmDialog({
           alignItems: "center",
           textAlign: "center",
           gap: "18px",
-          color: "#ffffff",
+          color: tokens.text.primary,
         }}
       >
         <Box
@@ -71,9 +76,15 @@ export default function ConfirmDialog({
 
         <Typography sx={{ fontSize: "24px", fontWeight: 700 }}>{title}</Typography>
 
-        <Typography sx={{ fontSize: "14px", color: "#999999", lineHeight: 1.5, "& strong": { color: "#ffffff" } }}>
+        <Typography sx={{ fontSize: "14px", color: tokens.text.secondary, lineHeight: 1.5, "& strong": { color: tokens.text.primary } }}>
           {description}
         </Typography>
+
+        {error && (
+          <Alert severity="error" sx={{ width: "100%", textAlign: "start" }}>
+            {error}
+          </Alert>
+        )}
 
         <Box sx={{ display: "flex", gap: "12px", width: "100%", mt: "6px" }}>
           <Button variant="outlined" onClick={onClose} disabled={isPending} sx={{ flex: 1 }}>
@@ -89,8 +100,8 @@ export default function ConfirmDialog({
 }
 
 const TONES = {
-  danger: { Icon: ReportProblemIcon, color: "#f64e34", tint: "rgba(246,78,52,.16)" },
-  warning: { Icon: WarningAmberIcon, color: "#eb8509", tint: "rgba(235,133,9,.16)" },
-  info: { Icon: InfoIcon, color: "#275bc2", tint: "rgba(39,91,194,.18)" },
-  success: { Icon: CheckCircleIcon, color: "#27c237", tint: "rgba(39,194,55,.16)" },
+  danger: { Icon: ReportProblemIcon, color: tokens.feedback.error, tint: alpha(tokens.feedback.error, 0.16) },
+  warning: { Icon: WarningAmberIcon, color: tokens.feedback.warning, tint: alpha(tokens.feedback.warning, 0.16) },
+  info: { Icon: InfoIcon, color: tokens.feedback.info, tint: alpha(tokens.feedback.info, 0.18) },
+  success: { Icon: CheckCircleIcon, color: tokens.feedback.success, tint: alpha(tokens.feedback.success, 0.16) },
 } as const;

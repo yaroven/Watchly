@@ -1,7 +1,7 @@
 "use client";
 
-import { useArtists } from "@/features/artist/api/use-artists";
-import { Artist } from "@/features/artist/schemas/artist";
+import type { Artist } from "@/features/artist";
+import { useArtists } from "@/features/artist";
 import useTitleCast from "@/features/title/api/use-title-cast";
 import { useSetTitleCast } from "@/features/title/api/use-title-mutations";
 import { CastCredit } from "@/features/title/schemas/title";
@@ -15,26 +15,14 @@ import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
+import { useApiErrorMessage } from "@shared/api/use-api-error-message";
+import { languageName } from "@shared/lib/content-locale";
+import { useEditingLanguage } from "@shared/lib/editing-language";
+import { tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
-
-interface CastRow {
-  artistId: string;
-  name: string;
-  photoUrl?: string | null;
-  character: string;
-}
-
-const toRows = (credits: CastCredit[]): CastRow[] =>
-  [...credits]
-    .sort((a, b) => a.order - b.order)
-    .map((credit) => ({
-      artistId: credit.artist.id,
-      name: credit.artist.name,
-      photoUrl: credit.artist.photoUrl,
-      character: credit.character || "",
-    }));
+import { type CastRow, toCastCreditInputs, toCastRows, withCharacterTranslation } from "./cast-rows";
 
 interface TitleCastManagerProps {
   titleId: string;
@@ -44,6 +32,9 @@ export default function TitleCastManager({ titleId }: TitleCastManagerProps) {
   const t = useTranslations("title.cast");
   const { data: cast, isPending } = useTitleCast(titleId);
   const [rows, setRows] = useState<CastRow[]>([]);
+  const { language, isBase, translationLocale } = useEditingLanguage();
+  const uiLocale = useLocale();
+  const languageLabel = languageName(language, uiLocale);
   const [isDirty, setIsDirty] = useState(false);
   const [message, setMessage] = useState<{ severity: "success" | "error"; text: string } | null>(null);
   const [syncedCast, setSyncedCast] = useState<CastCredit[] | undefined>(undefined);
@@ -56,22 +47,26 @@ export default function TitleCastManager({ titleId }: TitleCastManagerProps) {
 
   if (cast && cast !== syncedCast) {
     setSyncedCast(cast);
-    setRows(toRows(cast));
+    setRows(toCastRows(cast));
     setIsDirty(false);
   }
 
+  const describeError = useApiErrorMessage();
   const { mutate: saveCast, isPending: isSaving } = useSetTitleCast({
     onSuccess: () => {
       setMessage({ severity: "success", text: t("updated") });
       setIsDirty(false);
     },
-    onError: (error) => setMessage({ severity: "error", text: error.message || t("updateFailed") }),
+    onError: (error) => setMessage({ severity: "error", text: `${t("updateFailed")} ${describeError(error)}` }),
   });
 
   const availableArtists = (artistResults?.items || []).filter((artist) => !rows.some((row) => row.artistId === artist.id));
 
   const addArtist = (artist: Artist) => {
-    setRows((prev) => [...prev, { artistId: artist.id, name: artist.name, photoUrl: artist.photoUrl, character: "" }]);
+    setRows((prev) => [
+      ...prev,
+      { artistId: artist.id, name: artist.name, photoUrl: artist.photoUrl, character: "", characterTranslations: {} },
+    ]);
     setIsDirty(true);
     setArtistSearch("");
   };
@@ -81,8 +76,12 @@ export default function TitleCastManager({ titleId }: TitleCastManagerProps) {
     setIsDirty(true);
   };
 
-  const updateCharacter = (index: number, character: string) => {
-    setRows((prev) => prev.map((row, i) => (i === index ? { ...row, character } : row)));
+  const updateCharacter = (index: number, value: string) => {
+    setRows((prev) =>
+      prev.map((row, i) =>
+        i !== index ? row : isBase ? { ...row, character: value } : withCharacterTranslation(row, translationLocale!, value),
+      ),
+    );
     setIsDirty(true);
   };
 
@@ -99,14 +98,7 @@ export default function TitleCastManager({ titleId }: TitleCastManagerProps) {
 
   const handleSave = () => {
     setMessage(null);
-    saveCast({
-      id: titleId,
-      credits: rows.map((row, index) => ({
-        artistId: row.artistId,
-        character: row.character || undefined,
-        order: index,
-      })),
-    });
+    saveCast({ id: titleId, credits: toCastCreditInputs(rows) });
   };
 
   return (
@@ -139,18 +131,35 @@ export default function TitleCastManager({ titleId }: TitleCastManagerProps) {
             </Avatar>
 
             <Box sx={{ minWidth: 0, flex: "0 0 180px" }}>
-              <Typography noWrap sx={{ color: "#ffffff", fontWeight: 600 }}>
+              <Typography noWrap sx={{ color: tokens.text.primary, fontWeight: 600 }}>
                 {row.name}
               </Typography>
             </Box>
 
-            <TextField
-              size="small"
-              placeholder={t("characterPlaceholder")}
-              value={row.character}
-              onChange={(e) => updateCharacter(index, e.target.value)}
-              sx={{ flex: 1 }}
-            />
+            <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "6px" }}>
+              {isBase ? (
+                <TextField
+                  size="small"
+                  placeholder={t("characterPlaceholder")}
+                  slotProps={{ htmlInput: { "aria-label": t("characterLabel", { name: row.name }) } }}
+                  value={row.character}
+                  onChange={(e) => updateCharacter(index, e.target.value)}
+                />
+              ) : (
+                <TextField
+                  size="small"
+                  disabled={!row.character.trim()}
+                  placeholder={
+                    row.character.trim() ? t("characterTranslatedPlaceholder", { character: row.character }) : t("characterNeedsBase")
+                  }
+                  value={row.characterTranslations[translationLocale!] ?? ""}
+                  onChange={(e) => updateCharacter(index, e.target.value)}
+                  slotProps={{
+                    htmlInput: { lang: language, "aria-label": t("characterTranslatedLabel", { name: row.name, language: languageLabel }) },
+                  }}
+                />
+              )}
+            </Box>
 
             <Box sx={{ display: "flex", flexDirection: "column" }}>
               <IconButton size="small" disabled={index === 0} onClick={() => moveRow(index, -1)} aria-label={t("moveUp")}>
@@ -178,7 +187,17 @@ export default function TitleCastManager({ titleId }: TitleCastManagerProps) {
         onChange={(_, artist) => artist && addArtist(artist)}
         value={null}
         noOptionsText={artistSearch ? t("noActorsFound") : t("typeToSearch")}
-        renderInput={(params) => <TextField {...params} size="small" placeholder={t("addActorPlaceholder")} />}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            size="small"
+            placeholder={t("addActorPlaceholder")}
+            slotProps={{
+              ...params.slotProps,
+              htmlInput: { ...params.slotProps.htmlInput, "aria-label": t("addActorLabel") },
+            }}
+          />
+        )}
       />
 
       <Box sx={{ display: "flex", justifyContent: "flex-end" }}>

@@ -1,7 +1,7 @@
-import { CreateSeasonDto, Season, UpdateSeasonDto } from "@/features/season/schemas/season";
+import { CreateSeasonDto, Season, SeasonTranslation, SeasonTranslationInput, UpdateSeasonDto } from "@/features/season/schemas/season";
 import api from "@/shared/api/axios";
 import { parseApiDate } from "@/shared/lib/parse-api-date";
-import axios from "axios";
+import { type ContentLocale, inLocale, type TranslationLocale } from "@shared/lib/content-locale";
 
 const prefix = "seasons";
 
@@ -17,16 +17,17 @@ const mapSeason = (season: ApiSeason): Season => ({
 });
 
 const SeasonService = {
-  getAll: async (titleId: string): Promise<Season[]> => {
+  getAll: async (titleId: string, locale: ContentLocale): Promise<Season[]> => {
     const { data } = await api.get<ApiSeason[]>(`/${prefix}`, {
       params: { filter: [`titleId:eq:${titleId}`] },
       paramsSerializer: { indexes: null },
+      ...inLocale(locale),
     });
     return data.map(mapSeason);
   },
 
-  getById: async (id: string): Promise<Season> => {
-    const { data } = await api.get<ApiSeason>(`/${prefix}/${id}`);
+  getById: async (id: string, locale: ContentLocale): Promise<Season> => {
+    const { data } = await api.get<ApiSeason>(`/${prefix}/${id}`, inLocale(locale));
 
     return mapSeason(data);
   },
@@ -53,19 +54,18 @@ const SeasonService = {
     await api.post(`/${prefix}/${id}/poster/upload-url/complete`, { rawKey });
   },
 
-  async uploadToS3(url: string, file: File, onProgress?: (percent: number) => void): Promise<void> {
-    await axios.put(url, file, {
-      headers: {
-        "Content-Type": file.type,
-      },
-      onUploadProgress: (progressEvent) => {
-        if (!onProgress) return;
+  getTranslations: async (id: string): Promise<SeasonTranslation[]> => {
+    const { data } = await api.get<SeasonTranslation[]>(`/${prefix}/${id}/translations`);
+    return data;
+  },
 
-        const total = progressEvent.total || file.size;
-        const percentCompleted = Math.round((progressEvent.loaded * 100) / total);
-        onProgress(percentCompleted);
-      },
-    });
+  saveTranslation: async (id: string, locale: TranslationLocale, translation: SeasonTranslationInput): Promise<SeasonTranslation> => {
+    const { data } = await api.put<SeasonTranslation>(`/${prefix}/${id}/translations/${locale}`, translation);
+    return data;
+  },
+
+  deleteTranslation: async (id: string, locale: TranslationLocale): Promise<void> => {
+    await api.delete(`/${prefix}/${id}/translations/${locale}`);
   },
 };
 

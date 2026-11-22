@@ -1,8 +1,8 @@
 import api from "@/shared/api/axios";
 import { StartMultipartUpload } from "@/shared/api/upload-media";
 import { parseApiDate } from "@/shared/lib/parse-api-date";
-import axios from "axios";
-import { CreateEpisodeDto, Episode, UpdateEpisodeDto } from "../schemas/episode";
+import { type ContentLocale, inLocale, type TranslationLocale } from "@shared/lib/content-locale";
+import { CreateEpisodeDto, Episode, EpisodeTranslation, EpisodeTranslationInput, UpdateEpisodeDto } from "../schemas/episode";
 
 const prefix = "episodes";
 
@@ -18,16 +18,17 @@ const mapEpisode = (episode: ApiEpisode): Episode => ({
 });
 
 const EpisodeService = {
-  getAll: async (seasonId: string): Promise<Episode[]> => {
+  getAll: async (seasonId: string, locale: ContentLocale): Promise<Episode[]> => {
     const { data } = await api.get<ApiEpisode[]>(`/${prefix}`, {
       params: { filter: [`seasonId:eq:${seasonId}`] },
       paramsSerializer: { indexes: null },
+      ...inLocale(locale),
     });
     return data.map(mapEpisode);
   },
 
-  getById: async (id: string): Promise<Episode> => {
-    const { data } = await api.get<ApiEpisode>(`/${prefix}/${id}`);
+  getById: async (id: string, locale: ContentLocale): Promise<Episode> => {
+    const { data } = await api.get<ApiEpisode>(`/${prefix}/${id}`, inLocale(locale));
     return mapEpisode(data);
   },
 
@@ -62,13 +63,18 @@ const EpisodeService = {
     await api.delete(`/${prefix}/${id}/upload-url/${uploadId}`);
   },
 
-  uploadPartToS3: async (url: string, chunk: Blob, onLoaded: (loaded: number) => void): Promise<string> => {
-    const response = await axios.put(url, chunk, {
-      onUploadProgress: (progressEvent) => onLoaded(progressEvent.loaded),
-    });
-    const eTag = response.headers.etag as string | undefined;
-    if (!eTag) throw new Error("S3 did not return an ETag for the uploaded part");
-    return eTag;
+  getTranslations: async (id: string): Promise<EpisodeTranslation[]> => {
+    const { data } = await api.get<EpisodeTranslation[]>(`/${prefix}/${id}/translations`);
+    return data;
+  },
+
+  saveTranslation: async (id: string, locale: TranslationLocale, translation: EpisodeTranslationInput): Promise<EpisodeTranslation> => {
+    const { data } = await api.put<EpisodeTranslation>(`/${prefix}/${id}/translations/${locale}`, translation);
+    return data;
+  },
+
+  deleteTranslation: async (id: string, locale: TranslationLocale): Promise<void> => {
+    await api.delete(`/${prefix}/${id}/translations/${locale}`);
   },
 };
 

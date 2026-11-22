@@ -278,7 +278,7 @@ describe("the reactive 401 path", () => {
     await expect(api.get("/title")).rejects.toThrow();
 
     expect(authStore.getState().token).toBeNull();
-    expect(window.location.href).toBe(APP.LOGIN);
+    expect(window.location.href).toBe(`/en${APP.LOGIN}`);
   });
 
   it("should keep the session when the refresh fails for a transient reason", async () => {
@@ -311,5 +311,28 @@ describe("the reactive 401 path", () => {
     await Promise.all([api.get("/title"), api.get("/genre")]);
 
     expect(mock.history.post).toHaveLength(1);
+  });
+});
+
+describe("Accept-Language", () => {
+  beforeEach(() => {
+    vi.stubGlobal("document", { documentElement: { lang: "uk" } });
+    mock.onGet("/titles").reply(200, {});
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("should send the page's language when the request names none", async () => {
+    await api.get("/titles");
+
+    expect(mock.history.get[0].headers?.["Accept-Language"]).toBe("uk");
+  });
+
+  it("should keep a language the caller asked for, even on a page in another one", async () => {
+    await api.get("/titles", { headers: { "Accept-Language": "en" } });
+
+    expect(mock.history.get[0].headers?.["Accept-Language"]).toBe("en");
   });
 });

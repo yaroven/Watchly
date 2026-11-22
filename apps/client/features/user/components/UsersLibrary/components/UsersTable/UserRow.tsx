@@ -35,7 +35,13 @@ export default function UserRow({ id, email, role, createdAt, to }: UserRowProps
         <Typography
           component={Link}
           href={to}
-          sx={{ fontSize: "1.05rem", fontWeight: 800, color: "#ffffff", textDecoration: "none", "&:hover": { color: "primary.main" } }}
+          sx={{
+            fontSize: "1.05rem",
+            fontWeight: 800,
+            color: tokens.text.primary,
+            textDecoration: "none",
+            "&:hover": { color: "primary.main" },
+          }}
         >
           {email}
         </Typography>
@@ -68,7 +74,12 @@ export default function UserRow({ id, email, role, createdAt, to }: UserRowProps
             overflow: "hidden",
           }}
         >
-          <IconButton component={Link} href={to} aria-label={t("table.open", { email })} sx={{ color: "#ffffff", borderRadius: 0 }}>
+          <IconButton
+            component={Link}
+            href={to}
+            aria-label={t("table.open", { email })}
+            sx={{ color: tokens.text.primary, borderRadius: 0 }}
+          >
             <ArrowOutwardIcon sx={{ fontSize: 18 }} />
           </IconButton>
         </Box>

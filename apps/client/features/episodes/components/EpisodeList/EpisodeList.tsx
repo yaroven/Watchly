@@ -1,8 +1,8 @@
 "use client";
 
 import { Episode } from "@/features/episodes/schemas/episode";
-import { getEpisodeScore, getEpisodeThumbnail } from "@features/title/components/TitleOverview/mocks";
 import Box from "@mui/material/Box";
+import { tokens } from "@shared/mui/theme";
 import SliderArrows from "@shared/ui/SliderArrows";
 import { useEffect, useRef, useState } from "react";
 import EpisodeItem from "../EpisodeItem";
@@ -52,7 +52,7 @@ export default function EpisodeList({ episodes, currentEpisodeId, onClick, poste
           scrollSnapType: "x proximity",
           "& > *": { scrollSnapAlign: "start" },
           scrollbarWidth: "thin",
-          scrollbarColor: "#333333 transparent",
+          scrollbarColor: `${tokens.border.subtle} transparent`,
         }}
       >
         {episodes.map((episode) => (
@@ -63,8 +63,7 @@ export default function EpisodeList({ episodes, currentEpisodeId, onClick, poste
             name={episode.name}
             transcodingStatus={episode.transcodingStatus}
             isActive={episode.id === currentEpisodeId}
-            thumbnailUrl={getEpisodeThumbnail(episode.id, posterUrl)}
-            score={getEpisodeScore(episode.number)}
+            thumbnailUrl={posterUrl}
           />
         ))}
       </Box>

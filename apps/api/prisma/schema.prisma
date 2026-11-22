@@ -84,8 +84,20 @@ model Title {
   comments         Comment[]
   reactions        Reaction[]
   counters         EngagementCounters?
+  translations     TitleTranslation[]
 
   @@index([type, transcodingStatus])
+}
+
+model TitleTranslation {
+  id          String @id @default(uuid())
+  titleId     String
+  title       Title  @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  locale      String
+  name        String
+  description String
+
+  @@unique([titleId, locale])
 }
 
 model TitleEngagement {
@@ -224,7 +236,19 @@ model Genre {
   updatedAt DateTime @updatedAt
   name      String   @unique
 
-  titles Title[]
+  titles       Title[]
+  translations GenreTranslation[]
+}
+
+model GenreTranslation {
+  id      String @id @default(uuid())
+  genreId String
+  genre   Genre  @relation(fields: [genreId], references: [id], onDelete: Cascade)
+  locale  String
+  name    String
+
+  @@unique([genreId, locale])
+  @@unique([locale, name])
 }
 
 model Artist {
@@ -238,13 +262,14 @@ model Artist {
 }
 
 model CastCredit {
-  id        String  @id @default(uuid())
-  titleId   String
-  title     Title   @relation(fields: [titleId], references: [id], onDelete: Cascade)
-  artistId  String
-  artist    Artist  @relation(fields: [artistId], references: [id], onDelete: Cascade)
-  character String?
-  order     Int     @default(0)
+  id                    String  @id @default(uuid())
+  titleId               String
+  title                 Title   @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  artistId              String
+  artist                Artist  @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  character             String?
+  characterTranslations Json?
+  order                 Int     @default(0)
 
   @@unique([titleId, artistId])
   @@index([artistId])
@@ -267,18 +292,30 @@ model VideoTranscodingProgress {
 }
 
 model Season {
-  id          String    @id @default(uuid())
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  number      Int
-  name        String
-  description String
-  posterKey   String?
-  titleId     String
-  title       Title     @relation(fields: [titleId], references: [id], onDelete: Cascade)
-  episodes    Episode[]
+  id           String              @id @default(uuid())
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  number       Int
+  name         String
+  description  String
+  posterKey    String?
+  titleId      String
+  title        Title               @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  episodes     Episode[]
+  translations SeasonTranslation[]
 
   @@unique([titleId, number])
+}
+
+model SeasonTranslation {
+  id          String @id @default(uuid())
+  seasonId    String
+  season      Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  locale      String
+  name        String
+  description String
+
+  @@unique([seasonId, locale])
 }
 
 model Episode {
@@ -293,6 +330,18 @@ model Episode {
   transcodingStatus TranscodingStatus @default(PENDING)
 
   videoTranscodingProgress VideoTranscodingProgress?
+  translations             EpisodeTranslation[]
 
   @@unique([seasonId, number])
+}
+
+model EpisodeTranslation {
+  id          String  @id @default(uuid())
+  episodeId   String
+  episode     Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  locale      String
+  name        String
+  description String
+
+  @@unique([episodeId, locale])
 }

@@ -3,6 +3,7 @@
 import { useCreateTitleWithUpload, useUpdateTitle } from "@/features/title/api/use-title-mutations";
 import { Title, TitleFormValues } from "@/features/title/schemas/title";
 import { ApiError } from "@/shared/api/api-error";
+import { INLINE_ERROR } from "@shared/api/write-errors";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
@@ -12,37 +13,35 @@ interface UseTitleSubmissionWorkflowProps {
 
 export function useTitleSubmissionWorkflow({ initialData }: UseTitleSubmissionWorkflowProps) {
   const t = useTranslations("title.form");
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadParts, setUploadParts] = useState<{ completed: number; total: number } | null>(null);
   const [actionError, setActionError] = useState<Error | null>(null);
   const [createdTitle, setCreatedTitle] = useState<Title | null>(null);
 
-  const { mutateAsync: createTitle, isPending: isCreating } = useCreateTitleWithUpload({
-    onUploadProgress: setUploadProgress,
+  const create = useCreateTitleWithUpload({
+    meta: INLINE_ERROR,
     onUploadPartProgress: (completed, total) => setUploadParts({ completed, total }),
   });
-  const { mutateAsync: updateTitle, isPending: isUpdating } = useUpdateTitle();
+  const update = useUpdateTitle({ meta: INLINE_ERROR });
+  const { mutateAsync: createTitle, isPending: isCreating } = create;
+  const { mutateAsync: updateTitle, isPending: isUpdating } = update;
+  const uploadProgress = Math.max(create.uploadProgress, update.uploadProgress);
 
   const submit = async (data: TitleFormValues) => {
     setActionError(null);
-    setUploadProgress(0);
     setUploadParts(null);
 
     try {
       if (initialData) {
         await updateTitle({ id: initialData.id, payload: data });
-        setUploadProgress(0);
         return { createdId: initialData.id };
       }
 
       const title = await createTitle(data);
 
       setCreatedTitle(title);
-      setUploadProgress(100);
       return { createdId: title.id };
     } catch (error: unknown) {
       const normalizedError = error instanceof Error ? error : new ApiError(t("saveFailed"));
-      setUploadProgress(0);
       setUploadParts(null);
       setActionError(normalizedError);
       throw normalizedError;
@@ -51,7 +50,6 @@ export function useTitleSubmissionWorkflow({ initialData }: UseTitleSubmissionWo
 
   const resetWorkflow = () => {
     setCreatedTitle(null);
-    setUploadProgress(0);
     setUploadParts(null);
     setActionError(null);
   };
@@ -61,7 +59,7 @@ export function useTitleSubmissionWorkflow({ initialData }: UseTitleSubmissionWo
     resetWorkflow,
     uploadProgress,
     uploadParts,
-    isUploading: uploadProgress > 0 && uploadProgress < 100,
+    isUploading: create.isUploading || update.isUploading,
     isPending: isCreating || isUpdating,
     actionError,
     createdTitle,

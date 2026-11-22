@@ -1,4 +1,5 @@
-import { TranscodingStatus } from "@prisma/client";
+import { Episode, EpisodeTranslation, TranscodingStatus } from "@prisma/client";
+import { ContentLocaleView } from "../../common/utils/localize.util";
 
 export interface EpisodeInput {
   number: number;
@@ -18,4 +19,7 @@ export interface EpisodeView {
   description: string;
   seasonId: string;
   transcodingStatus: TranscodingStatus;
+  content: ContentLocaleView;
 }
+
+export type EpisodeWithTranslations = Episode & { translations?: EpisodeTranslation[] };

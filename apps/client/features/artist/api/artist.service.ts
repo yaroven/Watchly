@@ -1,6 +1,5 @@
 import { parseApiDate } from "@/shared/lib/parse-api-date";
 import api from "@shared/api/axios";
-import axios from "axios";
 import { Artist, ArtistFilmographyItem, CreateArtistDto, GetAllArtistsDto, UpdateArtistDto } from "../schemas/artist";
 
 const prefix = "artists";
@@ -65,19 +64,6 @@ const ArtistService = {
 
   completePhotoUpload: async (id: string, rawKey: string): Promise<void> => {
     await api.post(`/${prefix}/${id}/photo/upload-url/complete`, { rawKey });
-  },
-
-  async uploadToS3(url: string, file: File, onProgress: (percent: number) => void): Promise<void> {
-    await axios.put(url, file, {
-      headers: {
-        "Content-Type": file.type,
-      },
-      onUploadProgress: (progressEvent) => {
-        const total = progressEvent.total || file.size;
-        const percentCompleted = Math.round((progressEvent.loaded * 100) / total);
-        onProgress(percentCompleted);
-      },
-    });
   },
 };
 

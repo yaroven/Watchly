@@ -57,7 +57,7 @@ export default function ValidationSummary({ errors }: ValidationSummaryProps) {
       <ErrorOutlineIcon sx={{ fontSize: 20, color: tokens.feedback.error, flexShrink: 0, mt: "1px" }} />
 
       <Box sx={{ flexGrow: 1 }}>
-        <Typography sx={{ fontSize: "14px", fontWeight: 600, color: "#ffffff" }}>
+        <Typography sx={{ fontSize: "14px", fontWeight: 600, color: tokens.text.primary }}>
           {t("form.validationSummary", { count: failed.length })}
         </Typography>
 
@@ -75,7 +75,7 @@ export default function ValidationSummary({ errors }: ValidationSummaryProps) {
                 textDecoration: "none",
                 backgroundColor: alpha(tokens.feedback.error, 0.14),
                 border: `1px solid ${alpha(tokens.feedback.error, 0.5)}`,
-                color: "#ff9c8a",
+                color: tokens.text.field,
                 "&:hover": { borderColor: tokens.feedback.error },
               }}
             >

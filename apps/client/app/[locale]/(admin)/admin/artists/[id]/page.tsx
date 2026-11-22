@@ -1,5 +1,4 @@
-import { ArtistDetail } from "@features/artist";
-import ArtistService from "@features/artist/api/artist.service";
+import { ArtistDetail, ArtistService } from "@features/artist";
 import { notFound } from "next/navigation";
 
 interface PageProps {

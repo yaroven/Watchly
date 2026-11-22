@@ -7,10 +7,13 @@ react-hook-form, hls.js. Dev server on port 4000. `README.md` here is
 Tests are **vitest, unit only** (`pnpm --filter client test`, run in CI by Build Client).
 Coverage is thin and deliberate: the auth plumbing in `shared/` and the JWT helpers,
 because they are module-level state that no type can hold, and what a mutation does to
-the cache — `title-engagement.invalidation` (which keys a title write refreshes, checked
-with TanStack's own `partialMatchKey`) and `comment-reaction.cache` (how a comment vote
-is written into the lists and replies). Keep that logic in pure functions beside the
-hook, not inside `onSuccess`, so it stays testable without a DOM. There is no DOM environment
+the cache — `catalogue-copies` (which cached reads hold a copy of a title or genre, so
+which keys a write refreshes, checked with TanStack's own `partialMatchKey`),
+`localized-reads` and `content-translations` (every localized read keys and fetches in
+the same language, and every write reaches it in both), `comment-reaction.cache` (how a
+comment vote is written into the lists and replies) and `viewer-control` (what an
+engagement control does for each viewer state). Keep that logic in pure functions beside
+the hook, not inside `onSuccess`, so it stays testable without a DOM. There is no DOM environment
 and no component test yet, so behaviour in a component is still verified in the browser —
 say so when you do.
 
@@ -32,9 +35,12 @@ say so when you do.
   tokens), `ui/`, `assets/`.
 
 Layer rules are ESLint-enforced: `shared/**` may not import `features/*` or `app/*`, and
-`features/**` may not import `app/*`. Nothing enforces the feature-to-feature direction,
-and roughly forty deep cross-feature imports exist today — prefer the other feature's
-`index.ts`, and expect to find neighbours that do not.
+`features/**` may not import `app/*`. Nothing enforces the feature-to-feature direction.
+Every slice has an `index.ts`; import another feature through it. The deep imports left
+are deliberate and point at leaf modules only — `title/api/catalogue-copies` and the key
+files it reads, and `title-engagement` reaching `title/api/title.service` and
+`title/schemas` — because `title` and `title-engagement` import each other and a barrel
+on either side would make that a load-order cycle.
 
 ## Rules
 
@@ -68,7 +74,12 @@ This is where the bugs have been. The rules exist because each was broken:
 - `useViewer()` returns a union: `pending` | `anonymous` | `signed-in`. They are not
   interchangeable. A control disabled on "not signed in" during `pending` is disabled
   for someone who _is_ signed in; one dimmed on `pending` alone is bright and dead for
-  someone who is not.
+  someone who is not. Don't derive this per component: `viewerControl` in
+  `shared/lib/viewer-control` turns the viewer, whether their own value is known, a
+  failed refresh and an in-flight write into `disabled` / `dimmed` / `intent`
+  (`write` | `sign-in` | `ignore`), and `nextVote` turns a click into the absolute vote.
+  Read identity through `useViewer()`, not `useAuthStore` — `Boolean(userId)` reads
+  `pending` as signed out.
 - **`engagement.viewer === null` means unknown, not "no".** Server-rendered payloads
   carry no bearer token, so they can never know. Don't coerce it with `?? false` — show
   an indeterminate control and disable the toggle. Reacting is **absolute** now
@@ -90,6 +101,36 @@ This is where the bugs have been. The rules exist because each was broken:
   the QueryClient's mutation cache logs every failure but shows the viewer nothing. An
   app-level surface reading from that cache is still missing.
 
+### Anything that depends on the language asked for
+
+Catalogue content (title, season, episode and genre names and descriptions, cast
+characters) comes back in the language of `Accept-Language`, with English as the base and
+the fallback. Every localized entity carries `content: { locale, fallback }`.
+
+- **The content locale belongs in the cache key**, beside the viewer key. A localized read
+  is a `LocalizedRead` (`<slice>/api/<slice>.reads.ts`): one `key({ locale, viewerKey })`
+  and one `fetch(locale)`, run by `useLocalizedQuery` (`shared/api/localized-query`),
+  which resolves the locale once and hands the same value to both. Don't build a full key
+  or call a localized service from a hook by hand — that is how a key and a request end
+  up in different languages. Otherwise a language switch serves the cached answer in the
+  old language. The `*Prefix` rungs writes invalidate carry no locale, so one write
+  refreshes every language; in every slice a bare rung is named `*Prefix`.
+- **Admin edit screens pin English.** They edit the base content, and a form filled from a
+  translation would save it back as English. The admin title, create-title and genre
+  routes wrap their screen in `<BaseContentScope>`, and every localized read under it
+  resolves to English; the admin title page fetches with `BASE_CONTENT_LOCALE` on the
+  server. A read that needs another language there names it with `{ contentLocale }`.
+  Admin lists (titles, dashboard) are not scoped and follow the page language. The api
+  answers every write in English for the same reason. The axios interceptor keeps a
+  caller's own `Accept-Language`, which is what makes the pin work on `/uk/admin`.
+- **Translations are one module.** Each translated entity has a `TranslatableContent`
+  descriptor (`<slice>/api/<slice>.translations.ts`: fields with limits, message
+  namespace, service calls, and the `copies` a write refreshes), and
+  `ContentTranslationEditor` runs the load / save / remove / feedback cycle for any of
+  them. A new translated entity is a new descriptor, not a new editor.
+- **A cast save replaces every credit**, so the cast manager resends each credit's
+  `characterTranslations` on every save; dropping them wipes the translations.
+
 ### Auth plumbing (`shared/api/axios.ts`)
 
 The request interceptor refreshes an expired access token **before** sending it, because
@@ -107,7 +148,7 @@ arrive to trigger a retry. Two invariants there, both of which were violated onc
 
 ## Placeholder data
 
-`PLACEHOLDER_DATA_BACKEND_TODO.md` tracks what is still hardcoded. `features/title/
-components/TitleOverview/mocks.ts` is the remaining fixture file — its header lists
-every importer, including one in another feature. Update both when you replace a
-placeholder.
+Two fixture files are left, both inside `title`: `components/TitleOverview/mocks.ts`
+(stream photos, read by `StreamPhotos`) and `components/DiscoverScreen/mocks.ts` (the
+news rail). The public cast is the real localized read. Delete a fixture when its screen
+gets a backend.

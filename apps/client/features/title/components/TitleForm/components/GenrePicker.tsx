@@ -1,6 +1,6 @@
 "use client";
 
-import useGenres from "@/features/genre/api/use-genres";
+import { useGenres } from "@/features/genre";
 import { ADMIN } from "@/shared/lib/routes";
 import Box from "@mui/material/Box";
 import Skeleton from "@mui/material/Skeleton";

@@ -2,6 +2,7 @@
 
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import { tokens } from "@shared/mui/theme";
 import { useTranslations } from "next-intl";
 
 interface UsersPageHeroProps {
@@ -25,7 +26,7 @@ export default function UsersPageHero({ totalCount }: UsersPageHeroProps) {
       }}
     >
       <Box>
-        <Typography component="h1" variant="h2" sx={{ color: "#ffffff" }}>
+        <Typography component="h1" variant="h2" sx={{ color: tokens.text.primary }}>
           {t("library.title")}
         </Typography>
         <Typography sx={{ mt: "14px", maxWidth: "640px", color: "text.secondary" }}>{t("library.subtitle")}</Typography>

@@ -1,5 +1,4 @@
-import { routing } from "@/i18n/routing";
-import { APP } from "@shared/lib/routes";
+import { localizedLoginUrl } from "@shared/lib/login-redirect";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
@@ -10,8 +9,6 @@ export function authProxy(request: NextRequest) {
     return null;
   }
 
-  const segment = request.nextUrl.pathname.split("/")[1];
-  const locale = routing.locales.find((l) => l === segment) ?? routing.defaultLocale;
-
-  return NextResponse.redirect(new URL(`/${locale}${APP.LOGIN}`, request.url));
+  const { pathname, search } = request.nextUrl;
+  return NextResponse.redirect(new URL(localizedLoginUrl(`${pathname}${search}`), request.url));
 }

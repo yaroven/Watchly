@@ -1,10 +1,7 @@
-import EpisodeService from "@features/episodes/api/episode.service";
-import SeasonService from "@features/season/api/season.service";
-import { MovieDetails, SeriesDetails } from "@features/title";
-import TitleService from "@features/title/api/title.service";
-import { TitleType } from "@features/title/schemas/title";
+import { getTitleForRequest, loadTitlePage, MovieDetails, SeriesDetails, type TitlePageData, TitleType } from "@features/title";
+import type { ContentLocale } from "@shared/lib/content-locale";
 import { Metadata } from "next";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 
 interface PageProps {
@@ -14,8 +11,9 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
+  const locale = (await getLocale()) as ContentLocale;
   try {
-    const title = await TitleService.getById(id);
+    const title = await getTitleForRequest(id, locale);
     const t = await getTranslations("pages.metadata");
     return {
       title: t("title", { name: title.name }),
@@ -30,32 +28,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function Page({ params, searchParams }: PageProps) {
   const { id } = await params;
-  const { season: seasonId } = await searchParams;
+  const locale = (await getLocale()) as ContentLocale;
+  const { season } = await searchParams;
 
-  let title: Awaited<ReturnType<typeof TitleService.getById>>;
-  let seasons: Awaited<ReturnType<typeof SeasonService.getAll>> = [];
-  let episodes: Awaited<ReturnType<typeof EpisodeService.getAll>> = [];
-  let currentSeasonId = "";
-
+  let data: TitlePageData;
   try {
-    title = await TitleService.getById(id);
-
-    if (title.type === TitleType.SERIES) {
-      seasons = await SeasonService.getAll(id);
-      currentSeasonId = seasonId && seasons.some((season) => season.id === seasonId) ? seasonId : (seasons[0]?.id ?? "");
-
-      if (currentSeasonId) {
-        episodes = await EpisodeService.getAll(currentSeasonId);
-      }
-    }
+    data = await loadTitlePage(id, locale, season);
   } catch (error) {
     console.error("Failed to fetch title details", error);
     return notFound();
   }
 
-  if (title.type === TitleType.MOVIE) {
-    return <MovieDetails title={title} />;
-  }
+  if (data.title.type === TitleType.MOVIE) return <MovieDetails title={data.title} />;
 
-  return <SeriesDetails title={title} seasons={seasons} episodes={episodes} currentSeasonId={currentSeasonId} />;
+  return <SeriesDetails title={data.title} seasons={data.seasons} episodes={data.episodes} currentSeasonId={data.currentSeasonId} />;
 }

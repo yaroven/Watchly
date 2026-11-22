@@ -3,6 +3,7 @@ import Box from "@mui/material/Box";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
+import { tokens } from "@shared/mui/theme";
 import { usePlayerPlaybackRate, usePlayerQuality } from "../../CustomVideoPlayerContext";
 import useDismissiblePanel from "../../hooks/useDismissiblePanel";
 import { formatPlaybackRate } from "../../utils";
@@ -109,7 +110,7 @@ export default function Settings() {
                     borderRadius: "6px",
                     transition: "background 0.2s ease, color 0.2s ease",
                     "&:hover": { color: "#fff" },
-                    "&:focus-visible": { outline: "2px solid #e7bc0f", outlineOffset: "-2px" },
+                    "&:focus-visible": { outline: `2px solid ${tokens.accent.primary}`, outlineOffset: "-2px" },
                   },
                   activeTab === tab && { color: "#fff", background: "rgba(231, 188, 15, 0.35)" },
                 ]}

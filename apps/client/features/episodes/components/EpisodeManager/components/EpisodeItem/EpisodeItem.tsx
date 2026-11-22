@@ -5,14 +5,21 @@ import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
 import Typography from "@mui/material/Typography";
+import { tokens } from "@shared/mui/theme";
+import { MissingTranslation } from "@shared/ui/LocalePicker";
+import { useTranslations } from "next-intl";
 import { useEpisodeManagerContext } from "../../context/EpisodeManagerContext";
 
 interface EpisodeItemProps {
   episode: Episode;
+  isUntranslated?: boolean;
 }
 
-export default function EpisodeItem({ episode }: EpisodeItemProps) {
+export default function EpisodeItem({ episode, isUntranslated = false }: EpisodeItemProps) {
   const { openPreview, openEdit, openDelete } = useEpisodeManagerContext();
+  const t = useTranslations("episodes.item");
+  const label = { number: episode.number, name: episode.name };
+
   return (
     <Box
       sx={{
@@ -21,10 +28,10 @@ export default function EpisodeItem({ episode }: EpisodeItemProps) {
         alignItems: "center",
         padding: "10px 14px",
         borderRadius: "12px",
-        border: "1px solid #333333",
+        border: `1px solid ${tokens.border.subtle}`,
         backgroundColor: "rgba(255, 255, 255, 0.02)",
-        transition: "background-color .15s ease-out, transform .15s ease-out",
-        "&:hover": { backgroundColor: "rgba(255, 255, 255, 0.05)", transform: "translateX(2px)" },
+        transition: "background-color .15s ease-out",
+        "&:hover": { backgroundColor: "rgba(255, 255, 255, 0.05)" },
       }}
     >
       <Box sx={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -45,7 +52,8 @@ export default function EpisodeItem({ episode }: EpisodeItemProps) {
         >
           #{episode.number}
         </Box>
-        <Typography sx={{ fontWeight: 500, color: "#ffffff" }}>{episode.name}</Typography>
+        <Typography sx={{ fontWeight: 500, color: tokens.text.primary }}>{episode.name}</Typography>
+        {isUntranslated && <MissingTranslation />}
       </Box>
       <Box
         sx={{
@@ -57,13 +65,23 @@ export default function EpisodeItem({ episode }: EpisodeItemProps) {
           padding: "2px",
         }}
       >
-        <IconButton size="small" onClick={() => openPreview(episode)} sx={{ color: "text.secondary", "&:hover": { color: "#ffffff" } }}>
+        <IconButton
+          size="small"
+          onClick={() => openPreview(episode)}
+          aria-label={t("preview", label)}
+          sx={{ color: "text.secondary", "&:hover": { color: tokens.text.primary } }}
+        >
           <PlayArrowIcon sx={{ fontSize: 16 }} />
         </IconButton>
-        <IconButton size="small" onClick={() => openEdit(episode)} sx={{ color: "text.secondary", "&:hover": { color: "#ffffff" } }}>
+        <IconButton
+          size="small"
+          onClick={() => openEdit(episode)}
+          aria-label={t("edit", label)}
+          sx={{ color: "text.secondary", "&:hover": { color: tokens.text.primary } }}
+        >
           <EditIcon sx={{ fontSize: 16 }} />
         </IconButton>
-        <IconButton size="small" color="error" onClick={() => openDelete(episode)}>
+        <IconButton size="small" color="error" onClick={() => openDelete(episode)} aria-label={t("delete", label)}>
           <DeleteIcon sx={{ fontSize: 16 }} />
         </IconButton>
       </Box>

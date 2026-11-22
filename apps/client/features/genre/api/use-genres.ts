@@ -1,20 +1,8 @@
-import { useQuery, UseQueryOptions } from "@tanstack/react-query";
-import { Genre, GetAllGenresDto } from "../schemas/genre";
-import genreKeys from "./genre.keys";
-import genreService from "./genre.service";
+import { type LocalizedQueryOptions, useLocalizedQuery } from "@shared/api/localized-query";
+import type { Genre, GetAllGenresDto } from "../schemas/genre";
+import { genreReads } from "./genre.reads";
 
-const useGenres = (
-  params: GetAllGenresDto = {},
-  options?: Omit<
-    UseQueryOptions<{ items: Genre[]; totalCount: number }, Error, { items: Genre[]; totalCount: number }, readonly unknown[]>,
-    "queryKey" | "queryFn"
-  >,
-) => {
-  return useQuery({
-    queryKey: genreKeys.list(params),
-    queryFn: () => genreService.getAll(params),
-    ...options,
-  });
-};
+const useGenres = (params: GetAllGenresDto = {}, options?: LocalizedQueryOptions<{ items: Genre[]; totalCount: number }>) =>
+  useLocalizedQuery(genreReads.list(params), options);
 
 export default useGenres;

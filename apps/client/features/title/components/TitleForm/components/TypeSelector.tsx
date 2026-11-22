@@ -68,7 +68,7 @@ export default function TypeSelector({ value, onChange, disabled = false }: Type
             >
               {option.icon}
               <Box>
-                <Typography sx={{ fontSize: "15px", fontWeight: 600, color: selected ? "#ffffff" : tokens.text.field }}>
+                <Typography sx={{ fontSize: "15px", fontWeight: 600, color: selected ? tokens.text.primary : tokens.text.field }}>
                   {t(`type.${option.value}`)}
                 </Typography>
                 <Typography sx={{ mt: "3px", fontSize: "12px", lineHeight: 1.45, color: "text.secondary" }}>

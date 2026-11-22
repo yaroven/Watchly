@@ -1,11 +1,15 @@
 "use client";
 import useEpisodeStreamUrl from "@/features/episodes/api/use-episode-stream-url";
+import useEpisodes from "@/features/episodes/api/use-episodes";
 import { Episode } from "@/features/episodes/schemas/episode";
-import VideoPreviewModal from "@/features/player/components/VideoPreviewModal";
+import { VideoPreviewModal } from "@/features/player";
 import AddIcon from "@mui/icons-material/Add";
 import InboxOutlinedIcon from "@mui/icons-material/InboxOutlined";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import { useApiErrorMessage } from "@shared/api/use-api-error-message";
+import { useEditingLanguage } from "@shared/lib/editing-language";
+import { tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
 import { useTranslations } from "next-intl";
 import DeleteModal from "./components/DeleteModal";
@@ -23,7 +27,7 @@ export default function EpisodeManager({ seasonId, episodes }: EpisodeManagerPro
     <EpisodeManagerProvider seasonId={seasonId} episodes={episodes}>
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}>
         <EpisodeManagerHeader />
-        <EpisodeList episodes={episodes} />
+        <EpisodeList seasonId={seasonId} episodes={episodes} />
         <EpisodeModal />
         <DeleteModalWrapper />
         <VideoPreviewModalWrapper />
@@ -33,6 +37,7 @@ export default function EpisodeManager({ seasonId, episodes }: EpisodeManagerPro
 }
 
 function DeleteModalWrapper() {
+  const describeError = useApiErrorMessage();
   const t = useTranslations("episodes");
   const { isDeleteModalOpen, closeDeleteModal, episodeToDelete, handleConfirmDelete, deleteMutation } = useEpisodeManagerContext();
 
@@ -43,6 +48,7 @@ function DeleteModalWrapper() {
       title={episodeToDelete ? t("episodeTitle", { number: episodeToDelete.number, name: episodeToDelete.name }) : ""}
       onConfirm={handleConfirmDelete}
       isDeleting={deleteMutation.isPending}
+      error={describeError(deleteMutation.error)}
     />
   );
 }
@@ -52,7 +58,7 @@ function EpisodeManagerHeader() {
   const { openCreate } = useEpisodeManagerContext();
   return (
     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-      <Typography component="h3" variant="h6" sx={{ color: "#ffffff", fontWeight: 700 }}>
+      <Typography component="h3" variant="h6" sx={{ color: tokens.text.primary, fontWeight: 700 }}>
         {t("manager.heading")}
       </Typography>
       <Button variant="outlined" size="small" startIcon={<AddIcon sx={{ fontSize: 16 }} />} onClick={openCreate}>
@@ -62,8 +68,13 @@ function EpisodeManagerHeader() {
   );
 }
 
-function EpisodeList({ episodes }: { episodes: Episode[] }) {
+function EpisodeList({ seasonId, episodes }: { seasonId: string; episodes: Episode[] }) {
   const t = useTranslations("episodes");
+  const { translationLocale } = useEditingLanguage();
+  const { data: localized } = useEpisodes(seasonId, { enabled: !!translationLocale, contentLocale: translationLocale ?? undefined });
+  const untranslated = new Set(
+    translationLocale ? (localized ?? []).filter((episode) => episode.content.fallback).map((episode) => episode.id) : [],
+  );
   if (episodes.length === 0) {
     return (
       <Box
@@ -77,16 +88,16 @@ function EpisodeList({ episodes }: { episodes: Episode[] }) {
           color: "text.secondary",
         }}
       >
-        <InboxOutlinedIcon sx={{ fontSize: 28, color: "#444444" }} />
+        <InboxOutlinedIcon sx={{ fontSize: 28, color: tokens.border.faint }} />
         <Typography sx={{ fontSize: "14px", color: "text.secondary" }}>{t("manager.empty")}</Typography>
       </Box>
     );
   }
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 1, overflowY: "auto" }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
       {episodes.map((episode) => (
-        <EpisodeItem key={episode.id} episode={episode} />
+        <EpisodeItem key={episode.id} episode={episode} isUntranslated={untranslated.has(episode.id)} />
       ))}
     </Box>
   );

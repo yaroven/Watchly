@@ -1,3 +1,5 @@
+export { default as TitleService } from "./api/title.service";
+export { default as useTitles } from "./api/use-titles";
 export { default as AdminTitle } from "./components/AdminTitle";
 export { default as Catalog } from "./components/Catalog";
 export { default as DiscoverScreen } from "./components/DiscoverScreen";
@@ -18,3 +20,5 @@ export { default as TitleReviews } from "./components/TitleReviews";
 export { default as TitlesLibrary } from "./components/TitlesLibrary";
 export { default as TitleTabs } from "./components/TitleTabs";
 export { default as WatchlistScreen } from "./components/WatchlistScreen";
+export { getTitleForRequest, loadTitlePage, loadWatchPage, type TitlePageData, type WatchPageData } from "./lib/page-data";
+export { TitleType } from "./schemas/title";

@@ -2,7 +2,7 @@
 
 import { useCreateEpisodeWithUpload, useUpdateEpisode } from "@/features/episodes/api/use-episode-mutations";
 import { CreateEpisodeDto, CreateEpisodeFormValues, Episode, UpdateEpisodeFormValues } from "@/features/episodes/schemas/episode";
-import { useState } from "react";
+import { INLINE_ERROR } from "@shared/api/write-errors";
 
 interface UseEpisodeSubmissionWorkflowProps {
   seasonId: string;
@@ -17,19 +17,14 @@ export function useEpisodeSubmissionWorkflow({
   onCreateSuccess,
   onUpdateSuccess,
 }: UseEpisodeSubmissionWorkflowProps) {
-  const [uploadProgress, setUploadProgress] = useState(0);
-
   const createMutation = useCreateEpisodeWithUpload({
-    onUploadProgress: setUploadProgress,
-    onError: () => {
-      setUploadProgress(0);
-    },
+    meta: INLINE_ERROR,
     onSuccess: () => {
-      setUploadProgress(0);
       onCreateSuccess?.();
     },
   });
   const updateMutation = useUpdateEpisode({
+    meta: INLINE_ERROR,
     onSuccess: () => {
       onUpdateSuccess?.();
     },
@@ -63,9 +58,8 @@ export function useEpisodeSubmissionWorkflow({
 
   return {
     submit,
-    uploadProgress,
-    setUploadProgress,
-    isUploading: uploadProgress > 0 && uploadProgress < 100,
+    uploadProgress: createMutation.uploadProgress,
+    isUploading: createMutation.isUploading,
     createMutation,
     updateMutation,
   };

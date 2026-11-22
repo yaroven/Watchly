@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { Locale } from "../../common/locale.const";
 import { Logged } from "../../decorators/logged.decorator";
 import { PrismaService } from "../prisma/prisma.service";
 import { TitleEngagementService } from "../title/title-engagement.service";
@@ -42,11 +43,12 @@ export class WatchlistService {
   async findAll(
     viewerId: string,
     { page = 1, limit = 10 }: { page?: number; limit?: number },
+    locale: Locale,
   ): Promise<{ items: CardTitleView[]; totalCount: number }> {
     const { titleIds, totalCount } = await this.findTitleIds(viewerId, { page, limit });
     if (titleIds.length === 0) return { items: [], totalCount };
 
-    const titles = await this.titleService.findManyByIds(titleIds, viewerId);
+    const titles = await this.titleService.findManyByIds(titleIds, viewerId, locale);
     const byId = new Map(titles.map((title) => [title.id, title]));
     const items = titleIds
       .map((id) => byId.get(id))

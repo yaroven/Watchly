@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
+import { BASE_LOCALE, Locale } from "../../common/locale.const";
 import { Logged } from "../../decorators/logged.decorator";
 import { ImageService } from "../image/image.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -15,11 +16,11 @@ export class TitleCastService {
   ) {}
 
   @Logged()
-  async findForTitle(titleId: string): Promise<CastCreditView[]> {
+  async findForTitle(titleId: string, locale: Locale): Promise<CastCreditView[]> {
     const credits = await this.prisma.castCredit.findMany(titleCastQuery.forTitle(titleId));
 
     return credits.map((credit) =>
-      toCastCreditView(credit, this.imageService.toPublicUrl(credit.artist.photoKey)),
+      toCastCreditView(credit, this.imageService.toPublicUrl(credit.artist.photoKey), locale),
     );
   }
 
@@ -33,6 +34,7 @@ export class TitleCastService {
             titleId,
             artistId: credit.artistId,
             character: credit.character,
+            characterTranslations: credit.characterTranslations ?? Prisma.DbNull,
             order: credit.order ?? index,
           })),
         }),
@@ -44,6 +46,6 @@ export class TitleCastService {
       throw error;
     }
 
-    return this.findForTitle(titleId);
+    return this.findForTitle(titleId, BASE_LOCALE);
   }
 }
