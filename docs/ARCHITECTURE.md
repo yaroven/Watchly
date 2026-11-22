@@ -65,7 +65,8 @@ ADR-0006.
 Kustomize overlays in `k8s/`: `base`, plus `prod`, plus a `migration` Job. The `prod`
 overlay runs its own postgres and redis in-cluster. `k8s/cluster/` holds the
 cluster-scoped pieces an admin applies once: the cert-manager ClusterIssuer, the OCI
-Vault ClusterSecretStore, and the `github-deployer` ServiceAccount CI deploys as.
+Vault ClusterSecretStore, and the `github-deployer` ServiceAccount CI deploys as. `scripts/bootstrap-cluster.sh` installs
+External Secrets Operator and applies them.
 
 The cluster is OCI OKE, declared in `terraform/`. Its nodes are Ampere A1, so every
 image is built for `linux/arm64`.
