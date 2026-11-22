@@ -27,7 +27,7 @@ spec:
     spec:
       containers:
       - name: client
-        image: razanka/watchly-client
+        image: docker.io/razanka/watchly-client
         ports:
         - containerPort: 4000
         envFrom:

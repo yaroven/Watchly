@@ -10,7 +10,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: migrate
-          image: razanka/watchly-migrator:latest
+          image: docker.io/razanka/watchly-migrator:latest
           envFrom:
             - secretRef:
                 name: watchly-secrets
