@@ -13,7 +13,7 @@ resources:
 
 images:
   - name: razanka/watchly-client
-    newTag: prod-duckdns-1
+    newTag: set-by-deploy-kubernetes
 
 patches:
   - target:
@@ -74,7 +74,7 @@ configMapGenerator:
       - REDIS_TLS=false
       - S3_ENDPOINT_INTERNAL=https://s3.eu-north-1.amazonaws.com
       - S3_ENDPOINT_PUBLIC=https://s3.eu-north-1.amazonaws.com
-      - CORS_ALLOWED_ORIGINS=https://razanka-watchly.duckdns.org
+      - CORS_ALLOWED_ORIGINS=https://watchly.130-61-236-83.sslip.io
 
   - name: watchly-client-config
     behavior: merge

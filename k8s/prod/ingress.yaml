@@ -7,7 +7,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: razanka-watchly.duckdns.org
+    - host: watchly.130-61-236-83.sslip.io
       http:
         paths:
           - path: /
@@ -17,7 +17,7 @@ spec:
                 name: client
                 port:
                   number: 4000
-    - host: razanka-watchly-api.duckdns.org
+    - host: api.watchly.130-61-236-83.sslip.io
       http:
         paths:
           - path: /
@@ -29,6 +29,6 @@ spec:
                   number: 3000
   tls:
     - hosts:
-        - razanka-watchly.duckdns.org
-        - razanka-watchly-api.duckdns.org
+        - watchly.130-61-236-83.sslip.io
+        - api.watchly.130-61-236-83.sslip.io
       secretName: watchly-tls
