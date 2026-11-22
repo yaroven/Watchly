@@ -23,14 +23,14 @@ import sys
 env, sha = sys.argv[1], sys.argv[2]
 targets = {
     "k8s/base/kustomization.yaml": {
-        "razanka/watchly-api": sha,
-        "razanka/watchly-transcoder-worker": sha,
+        "docker.io/razanka/watchly-api": sha,
+        "docker.io/razanka/watchly-transcoder-worker": sha,
     },
     f"k8s/{env}/kustomization.yaml": {
-        "razanka/watchly-client": f"{env}-{sha}",
+        "docker.io/razanka/watchly-client": f"{env}-{sha}",
     },
     "k8s/migration/kustomization.yaml": {
-        "razanka/watchly-migrator": sha,
+        "docker.io/razanka/watchly-migrator": sha,
     },
 }
 

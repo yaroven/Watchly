@@ -12,7 +12,7 @@ resources:
   - external-secret.yaml
 
 images:
-  - name: razanka/watchly-client
+  - name: docker.io/razanka/watchly-client
     newTag: set-by-deploy-kubernetes
 
 patches:

@@ -15,7 +15,7 @@ spec:
       terminationGracePeriodSeconds: 600
       containers:
       - name: transcoder-worker
-        image: razanka/watchly-transcoder-worker
+        image: docker.io/razanka/watchly-transcoder-worker
         envFrom:
         - configMapRef:
             name: watchly-config

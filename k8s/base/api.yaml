@@ -30,7 +30,7 @@ spec:
     spec:
       containers:
       - name: api
-        image: razanka/watchly-api
+        image: docker.io/razanka/watchly-api
         ports:
         - containerPort: 3000
         envFrom:
