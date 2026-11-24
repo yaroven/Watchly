@@ -26,7 +26,7 @@ import CustomIcon from "@shared/ui/CustomIcon";
 import { useFormatter, useTranslations } from "next-intl";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 const PAGE_SIZE = 9;
 const SKELETON_ROWS = Array.from({ length: 6 }, (_, index) => index);
@@ -54,18 +54,41 @@ const menuProps = {
   },
 };
 
+const filtersGridSx = {
+  display: "grid",
+  gridTemplateColumns: { xs: "max-content minmax(0, 1fr)", md: "repeat(3, max-content minmax(0, 1fr))" },
+  columnGap: "40px",
+  rowGap: "16px",
+} as const;
+
+const filterFieldSx = {
+  display: "grid",
+  gridTemplateColumns: "subgrid",
+  gridColumn: "span 2",
+  columnGap: "16px",
+  alignItems: "center",
+} as const;
+
 const DISABLED_FILTERS = ["ageRating", "artist", "country", "order", "quality"] as const;
+
+function FilterField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <Box sx={filterFieldSx}>
+      <Typography sx={{ fontWeight: 600, color: tokens.text.primary }}>{label}</Typography>
+      {children}
+    </Box>
+  );
+}
 
 function DisabledFilter({ label }: { label: string }) {
   const t = useTranslations("title.search.filters");
 
   return (
-    <Box sx={{ display: "flex", alignItems: "center", gap: "16px" }}>
-      <Typography sx={{ width: "90px", flexShrink: 0, fontWeight: 600, color: tokens.text.primary }}>{label}</Typography>
+    <FilterField label={label}>
       <MuiSelect fullWidth displayEmpty value="" disabled MenuProps={menuProps} sx={selectSx}>
         <MenuItem value="">{t("all")}</MenuItem>
       </MuiSelect>
-    </Box>
+    </FilterField>
   );
 }
 
@@ -142,8 +165,8 @@ export default function SearchResults() {
           backgroundColor: "#141414",
         }}
       >
-        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" }, columnGap: "40px", rowGap: "16px" }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: "16px" }}>
+        <Box sx={filtersGridSx}>
+          <Box sx={{ display: "flex", alignItems: "center", gridColumn: "span 2" }}>
             <Box sx={{ display: "flex", borderRadius: "999px", overflow: "hidden", border: "1px solid", borderColor: "divider" }}>
               {[TitleType.MOVIE, TitleType.SERIES].map((type) => (
                 <Box
@@ -170,8 +193,7 @@ export default function SearchResults() {
             </Box>
           </Box>
 
-          <Box sx={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <Typography sx={{ width: "90px", flexShrink: 0, fontWeight: 600, color: tokens.text.primary }}>{t("filters.genre")}</Typography>
+          <FilterField label={t("filters.genre")}>
             <MuiSelect
               fullWidth
               displayEmpty
@@ -187,12 +209,9 @@ export default function SearchResults() {
                 </MenuItem>
               ))}
             </MuiSelect>
-          </Box>
+          </FilterField>
 
-          <Box sx={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <Typography sx={{ width: "90px", flexShrink: 0, fontWeight: 600, color: tokens.text.primary }}>
-              {t("filters.director")}
-            </Typography>
+          <FilterField label={t("filters.director")}>
             <Input
               fullWidth
               disableUnderline
@@ -205,12 +224,9 @@ export default function SearchResults() {
               }}
               sx={selectSx}
             />
-          </Box>
+          </FilterField>
 
-          <Box sx={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <Typography sx={{ width: "90px", flexShrink: 0, fontWeight: 600, color: tokens.text.primary }}>
-              {t("filters.network")}
-            </Typography>
+          <FilterField label={t("filters.network")}>
             <Input
               fullWidth
               disableUnderline
@@ -223,7 +239,7 @@ export default function SearchResults() {
               }}
               sx={selectSx}
             />
-          </Box>
+          </FilterField>
 
           {DISABLED_FILTERS.map((key) => (
             <DisabledFilter key={key} label={t(`filters.${key}`)} />
