@@ -227,12 +227,8 @@
     "discover": {
       "noScore": "N/A",
       "recommended": "Recommended for you",
-      "trendingMovies": "Trending movies",
-      "trendingSeries": "Trending series",
-      "genres": "Genres",
-      "imdbTopMovies": "IMDB Top Movies",
-      "imdbTopSeries": "IMDB Top Series",
-      "trendingTvShows": "Trending TV Shows",
+      "movies": "Movies",
+      "series": "Series",
       "myWatchlist": "My Watchlist",
       "watchlistError": "Could not load your watchlist right now."
     },

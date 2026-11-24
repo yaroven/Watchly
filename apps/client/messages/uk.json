@@ -227,12 +227,8 @@
     "discover": {
       "noScore": "Н/Д",
       "recommended": "Рекомендовано для вас",
-      "trendingMovies": "Популярні фільми",
-      "trendingSeries": "Популярні серіали",
-      "genres": "Жанри",
-      "imdbTopMovies": "Топ фільмів IMDB",
-      "imdbTopSeries": "Топ серіалів IMDB",
-      "trendingTvShows": "Популярні телешоу",
+      "movies": "Фільми",
+      "series": "Серіали",
       "myWatchlist": "Мій список",
       "watchlistError": "Зараз не вдалося завантажити ваш список."
     },
