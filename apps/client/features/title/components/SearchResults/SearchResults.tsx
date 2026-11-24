@@ -1,6 +1,6 @@
 "use client";
 
-import { useGenres } from "@/features/genre";
+import { useAllGenres } from "@/features/genre";
 import { titleReads } from "@/features/title/api/title.reads";
 import { ExternalRatingSource, Title, TitleType } from "@/features/title/schemas/title";
 import { useRouter } from "@/i18n/navigation";
@@ -82,7 +82,7 @@ export default function SearchResults() {
   const [directorInput, setDirectorInput] = useState(directorFilter);
   const [networkInput, setNetworkInput] = useState(networkFilter);
 
-  const { data: genresData } = useGenres();
+  const { data: genresData } = useAllGenres();
   const genres = genresData?.items ?? [];
 
   const scope = { locale: useContentLocale(), viewerKey: useViewer().viewerKey };

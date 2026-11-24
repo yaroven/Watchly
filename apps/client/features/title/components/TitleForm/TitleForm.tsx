@@ -1,6 +1,6 @@
 "use client";
 
-import { useGenres } from "@/features/genre";
+import { useAllGenres } from "@/features/genre";
 import { createCreateTitleSchema, createUpdateTitleSchema, Title, TitleFormValues, TitleType } from "@/features/title/schemas/title";
 import { useRouter } from "@/i18n/navigation";
 import { ADMIN } from "@/shared/lib/routes";
@@ -111,7 +111,7 @@ export default function TitleForm({ initialData, formId, onEditStatusChange }: T
   const selectedType = values.type ?? TitleType.MOVIE;
   const showVideoField = selectedType === TitleType.MOVIE && !isEditing;
 
-  const { data: genreData } = useGenres({ limit: 100 });
+  const { data: genreData } = useAllGenres();
   const genreNames = (genreData?.items ?? []).filter((genre) => values.genreIds?.includes(genre.id)).map((genre) => genre.name);
 
   const describeError = useApiErrorMessage();

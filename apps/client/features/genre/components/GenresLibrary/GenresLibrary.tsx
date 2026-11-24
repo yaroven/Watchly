@@ -1,7 +1,7 @@
 "use client";
 
+import useAllGenres from "@/features/genre/api/use-all-genres";
 import { useCreateGenre, useDeleteGenre, useUpdateGenre } from "@/features/genre/api/use-genre-mutations";
-import useGenres from "@/features/genre/api/use-genres";
 import { Genre } from "@/features/genre/schemas/genre";
 import AddIcon from "@mui/icons-material/Add";
 import CheckIcon from "@mui/icons-material/Check";
@@ -28,11 +28,11 @@ import GenreTranslationModal from "./components/GenreTranslationModal";
 
 export default function GenresLibrary() {
   const t = useTranslations("genre");
-  const { data, isPending } = useGenres({ limit: 100 });
+  const { data, isPending } = useAllGenres();
   const genres = data?.items ?? [];
   const uiLocale = useLocale() as ContentLocale;
   const showsLocalName = uiLocale !== BASE_CONTENT_LOCALE;
-  const { data: localData } = useGenres({ limit: 100 }, { enabled: showsLocalName, contentLocale: uiLocale });
+  const { data: localData } = useAllGenres({ enabled: showsLocalName, contentLocale: uiLocale });
   const localNames = new Map(
     showsLocalName ? (localData?.items ?? []).filter((genre) => !genre.content.fallback).map((genre) => [genre.id, genre.name]) : [],
   );
