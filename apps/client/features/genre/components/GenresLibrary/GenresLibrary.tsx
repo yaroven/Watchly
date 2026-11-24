@@ -22,6 +22,7 @@ import { BASE_CONTENT_LOCALE, type ContentLocale } from "@shared/lib/content-loc
 import { inputVariants, tokens } from "@shared/mui/theme";
 import ConfirmDialog from "@shared/ui/ConfirmDialog";
 import GradientCard from "@shared/ui/GradientCard";
+import TruncatedText from "@shared/ui/TruncatedText";
 import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import GenreTranslationModal from "./components/GenreTranslationModal";
@@ -207,16 +208,11 @@ export default function GenresLibrary() {
                     ) : (
                       <>
                         <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography sx={{ fontSize: "14px", color: tokens.text.primary, overflow: "hidden", textOverflow: "ellipsis" }}>
-                            {genre.name}
-                          </Typography>
+                          <TruncatedText sx={{ fontSize: "14px", color: tokens.text.primary }}>{genre.name}</TruncatedText>
                           {localNames.has(genre.id) && (
-                            <Typography
-                              lang={uiLocale}
-                              sx={{ fontSize: "12px", color: tokens.text.secondary, overflow: "hidden", textOverflow: "ellipsis" }}
-                            >
-                              {localNames.get(genre.id)}
-                            </Typography>
+                            <TruncatedText lang={uiLocale} sx={{ fontSize: "12px", color: tokens.text.secondary }}>
+                              {localNames.get(genre.id) ?? ""}
+                            </TruncatedText>
                           )}
                         </Box>
                         <Typography sx={{ fontSize: "12px", color: "text.secondary" }}>

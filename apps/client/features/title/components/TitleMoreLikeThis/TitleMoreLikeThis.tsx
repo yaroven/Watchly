@@ -10,6 +10,7 @@ import StarIcon from "@mui/icons-material/Star";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { tokens } from "@shared/mui/theme";
+import TruncatedText from "@shared/ui/TruncatedText";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 
@@ -92,24 +93,19 @@ export default function TitleMoreLikeThis({ title }: TitleMoreLikeThisProps) {
               <Box sx={{ position: "relative", width: "100%", aspectRatio: "1 / 1", borderRadius: "10px", overflow: "hidden" }}>
                 <Image src={getOptimizedImageSrc(item.posterUrl)} alt="" fill sizes="220px" style={{ objectFit: "cover" }} />
               </Box>
-              <Typography
+              <TruncatedText
                 sx={{
                   fontSize: "16px",
                   fontWeight: 700,
                   color: tokens.text.primary,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
                 }}
               >
                 {item.name}
-              </Typography>
+              </TruncatedText>
               {!!item.genres.length && (
-                <Typography
-                  sx={{ fontSize: "13px", color: "text.secondary", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                >
+                <TruncatedText sx={{ fontSize: "13px", color: "text.secondary" }}>
                   {item.genres.map((genre) => genre.name).join(", ")}
-                </Typography>
+                </TruncatedText>
               )}
               {rating !== undefined && (
                 <Box sx={{ display: "flex", alignItems: "center", gap: "4px" }}>

@@ -13,6 +13,7 @@ import Typography from "@mui/material/Typography";
 import { tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
 import InvertedCornerBox from "@shared/ui/InvertedCornerBox";
+import TruncatedText from "@shared/ui/TruncatedText";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import Link from "next/link";
@@ -143,15 +144,13 @@ export default function ArtistDetail({ artist: initialArtist }: ArtistDetailProp
                       backdropFilter: "blur(16px)",
                     }}
                   >
-                    <Typography
-                      sx={{ fontSize: 14, fontWeight: 600, color: tokens.text.primary, overflow: "hidden", textOverflow: "ellipsis" }}
-                    >
+                    <TruncatedText lines={2} sx={{ fontSize: 14, fontWeight: 600, color: tokens.text.primary }}>
                       {credit.name}
-                    </Typography>
+                    </TruncatedText>
                     {credit.character && (
-                      <Typography sx={{ fontSize: 12, color: tokens.text.field, overflow: "hidden", textOverflow: "ellipsis" }}>
+                      <TruncatedText lines={2} sx={{ fontSize: 12, color: tokens.text.field }}>
                         {t("detail.asCharacter", { character: credit.character })}
-                      </Typography>
+                      </TruncatedText>
                     )}
                   </Box>
                 </Box>

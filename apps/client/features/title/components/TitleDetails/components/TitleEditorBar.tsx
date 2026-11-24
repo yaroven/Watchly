@@ -9,6 +9,7 @@ import { type ContentLocale, languageName, type TranslationCoverage, type Transl
 import { tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
 import LocalePicker from "@shared/ui/LocalePicker";
+import TruncatedText from "@shared/ui/TruncatedText";
 import { useFormatter, useLocale, useTranslations } from "next-intl";
 import type { TitleEditStatus } from "../../TitleForm/TitleForm";
 
@@ -78,20 +79,17 @@ export default function TitleEditorBar({
         <Box component="span" aria-hidden sx={{ color: tokens.border.faint }}>
           /
         </Box>
-        <Typography
+        <TruncatedText
           component="span"
           aria-current="page"
           sx={{
             fontSize: "14px",
             fontWeight: 500,
             color: tokens.text.primary,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
           }}
         >
           {titleName}
-        </Typography>
+        </TruncatedText>
       </Box>
 
       <Box sx={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>

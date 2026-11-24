@@ -12,6 +12,7 @@ import { useLoginPath } from "@shared/lib/use-login-path";
 import { useViewer } from "@shared/lib/use-viewer";
 import { viewerControl } from "@shared/lib/viewer-control";
 import { tokens } from "@shared/mui/theme";
+import TruncatedText from "@shared/ui/TruncatedText";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 
@@ -194,11 +195,14 @@ export default function TitleCard({ id, name, posterUrl, type, genres, externalR
         )}
 
         <Box
+          onClick={onClick}
           sx={{
             position: "absolute",
             left: 0,
             right: 0,
             bottom: 0,
+            zIndex: 2,
+            cursor: "pointer",
             px: 1.5,
             py: 1.25,
             textAlign: "center",
@@ -206,28 +210,24 @@ export default function TitleCard({ id, name, posterUrl, type, genres, externalR
             backdropFilter: "blur(16px)",
           }}
         >
-          <Typography
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "3em", fontSize: 14, lineHeight: 1.5 }}>
+            <TruncatedText
+              lines={2}
+              sx={{ minWidth: 0, fontSize: "inherit", fontWeight: 600, lineHeight: "inherit", color: tokens.text.primary }}
+            >
+              {name}
+            </TruncatedText>
+          </Box>
+          <TruncatedText
             sx={{
-              fontSize: 14,
-              fontWeight: 600,
-              color: tokens.text.primary,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {name}
-          </Typography>
-          <Typography
-            sx={{
+              minHeight: "1.5em",
               fontSize: 12,
               fontWeight: 400,
               color: tokens.text.field,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
             }}
           >
             {subtitle}
-          </Typography>
+          </TruncatedText>
         </Box>
       </Box>
     </Card>

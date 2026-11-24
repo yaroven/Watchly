@@ -4,6 +4,7 @@ import StarIcon from "@mui/icons-material/Star";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { tokens } from "@shared/mui/theme";
+import TruncatedText from "@shared/ui/TruncatedText";
 import { useFormatter, useTranslations } from "next-intl";
 import Image from "next/image";
 
@@ -119,20 +120,16 @@ export default function EpisodeItem({ number, name, transcodingStatus, isActive,
           background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.85) 100%)",
         }}
       >
-        <Typography
+        <TruncatedText
           component="span"
           sx={{
-            display: "block",
             fontSize: "14px",
             fontWeight: 600,
             color: tokens.text.primary,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
           }}
         >
           {name}
-        </Typography>
+        </TruncatedText>
       </Box>
     </Box>
   );

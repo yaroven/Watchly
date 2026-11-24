@@ -9,6 +9,7 @@ import Chip from "@mui/material/Chip";
 import Skeleton from "@mui/material/Skeleton";
 import Typography from "@mui/material/Typography";
 import GradientCard from "@shared/ui/GradientCard";
+import TruncatedText from "@shared/ui/TruncatedText";
 import { useFormatter, useTranslations } from "next-intl";
 import Image from "next/image";
 
@@ -64,11 +65,7 @@ export default function RecentAdditions() {
                   style={{ display: "block", borderRadius: "6px", objectFit: "cover", flexShrink: 0 }}
                 />
                 <Box sx={{ minWidth: 0 }}>
-                  <Typography
-                    sx={{ fontWeight: 500, color: "text.primary", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                  >
-                    {name}
-                  </Typography>
+                  <TruncatedText sx={{ fontWeight: 500, color: "text.primary" }}>{name}</TruncatedText>
                   <Chip
                     label={t(`dashboard.titleType.${type}`)}
                     size="small"

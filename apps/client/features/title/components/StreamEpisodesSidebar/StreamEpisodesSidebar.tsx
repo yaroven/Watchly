@@ -6,6 +6,7 @@ import Typography from "@mui/material/Typography";
 import { getOptimizedImageSrc } from "@shared/lib/get-optimized-image-src";
 import { tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
+import TruncatedText from "@shared/ui/TruncatedText";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 
@@ -75,18 +76,15 @@ export default function StreamEpisodesSidebar({
                 <Typography sx={{ fontSize: "12px", color: "text.secondary" }}>
                   {t("shortCode", { season: seasonNumber, episode: episode.number })}
                 </Typography>
-                <Typography
+                <TruncatedText
                   sx={{
                     fontSize: "16px",
                     fontWeight: 700,
                     color: tokens.text.primary,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
                   }}
                 >
                   {episode.name}
-                </Typography>
+                </TruncatedText>
               </Box>
             </Box>
           </Box>

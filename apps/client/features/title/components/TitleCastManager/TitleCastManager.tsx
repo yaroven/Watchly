@@ -20,6 +20,7 @@ import { languageName } from "@shared/lib/content-locale";
 import { useEditingLanguage } from "@shared/lib/editing-language";
 import { tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
+import TruncatedText from "@shared/ui/TruncatedText";
 import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import { type CastRow, toCastCreditInputs, toCastRows, withCharacterTranslation } from "./cast-rows";
@@ -131,9 +132,7 @@ export default function TitleCastManager({ titleId }: TitleCastManagerProps) {
             </Avatar>
 
             <Box sx={{ minWidth: 0, flex: "0 0 180px" }}>
-              <Typography noWrap sx={{ color: tokens.text.primary, fontWeight: 600 }}>
-                {row.name}
-              </Typography>
+              <TruncatedText sx={{ color: tokens.text.primary, fontWeight: 600 }}>{row.name}</TruncatedText>
             </Box>
 
             <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "6px" }}>

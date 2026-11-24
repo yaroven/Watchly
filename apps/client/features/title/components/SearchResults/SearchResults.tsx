@@ -23,6 +23,7 @@ import { useViewer } from "@shared/lib/use-viewer";
 import { inputVariants, tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
 import CustomIcon from "@shared/ui/CustomIcon";
+import TruncatedText from "@shared/ui/TruncatedText";
 import { useFormatter, useTranslations } from "next-intl";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
@@ -298,7 +299,14 @@ function ResultRows({ items, onOpen }: { items: Title[]; onOpen: (id: string) =>
     <Box sx={{ display: "flex", flexDirection: "column" }}>
       {rows.map((row, rowIndex) => (
         <Box key={rowIndex}>
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" }, gap: "24px", py: "20px" }}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "repeat(3, minmax(0, 1fr))" },
+              gap: "24px",
+              py: "20px",
+            }}
+          >
             {row.map((item) => (
               <ResultItem key={item.id} title={item} onClick={() => onOpen(item.id)} />
             ))}
@@ -340,19 +348,16 @@ function ResultItem({ title, onClick }: { title: Title; onClick: () => void }) {
       </Box>
 
       <Box sx={{ minWidth: 0, pt: "6px" }}>
-        <Typography
+        <TruncatedText
           className="search-result-title"
           sx={{
             fontWeight: 700,
             color: tokens.text.primary,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
             transition: "color .15s ease-out",
           }}
         >
           {title.name}
-        </Typography>
+        </TruncatedText>
         {year && <Typography sx={{ mt: "4px", fontSize: "14px", color: "text.secondary" }}>{year}</Typography>}
         {imdbRating !== undefined && (
           <Box sx={{ display: "flex", alignItems: "center", gap: "6px", mt: "10px" }}>
