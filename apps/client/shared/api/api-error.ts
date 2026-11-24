@@ -42,10 +42,40 @@ export function toApiError(error: unknown): ApiError {
   return new ApiError("Unexpected API error");
 }
 
-export type ApiErrorMessageKey = "sessionUnusable" | "unexpected";
+export type ApiErrorMessageKey =
+  | "sessionUnusable"
+  | "unexpected"
+  | "network"
+  | "badRequest"
+  | "unauthorized"
+  | "forbidden"
+  | "notFound"
+  | "conflict"
+  | "tooLarge"
+  | "rateLimited"
+  | "server";
 
-export function describeApiError(error: unknown, t: (key: ApiErrorMessageKey) => string): string {
+const STATUS_MESSAGE_KEYS: Partial<Record<number, ApiErrorMessageKey>> = {
+  400: "badRequest",
+  401: "unauthorized",
+  403: "forbidden",
+  404: "notFound",
+  409: "conflict",
+  413: "tooLarge",
+  429: "rateLimited",
+};
+
+export function describeApiError(
+  error: unknown,
+  t: (key: ApiErrorMessageKey) => string,
+  overrides: Partial<Record<number, string>> = {},
+): string {
   if (error instanceof SessionUnusableError) return t("sessionUnusable");
-  if (error instanceof ApiError) return readServerMessage(error.details) ?? t("unexpected");
-  return t("unexpected");
+  if (!(error instanceof ApiError)) return t("unexpected");
+  if (error.statusCode === undefined) return t("network");
+
+  const override = overrides[error.statusCode];
+  if (override !== undefined) return override;
+  if (error.statusCode >= 500) return t("server");
+  return t(STATUS_MESSAGE_KEYS[error.statusCode] ?? "unexpected");
 }
