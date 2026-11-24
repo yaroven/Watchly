@@ -39,7 +39,7 @@ for path, images in targets.items():
     text = file.read_text()
     for image, tag in images.items():
         pattern = rf"(- name: {re.escape(image)}\n\s*newTag: )\S+"
-        text, count = re.subn(pattern, rf"\g<1>{tag}", text)
+        text, count = re.subn(pattern, rf'\g<1>"{tag}"', text)
         if count != 1:
             sys.exit(f"{path}: expected one entry for {image}, matched {count}")
         print(f"  {image} -> {tag}")
