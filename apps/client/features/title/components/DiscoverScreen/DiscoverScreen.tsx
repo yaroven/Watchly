@@ -2,6 +2,7 @@
 
 import { useWatchlist } from "@/features/title-engagement";
 import { ExternalRatingSource, Title, TitleType } from "@/features/title/schemas/title";
+import { useRouter } from "@/i18n/navigation";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import { APP } from "@/shared/lib/routes";
 import { TranscodingStatus } from "@/types";
@@ -14,11 +15,12 @@ import Typography from "@mui/material/Typography";
 import HeroSlider, { type SliderTitle } from "@shared/ui/HeroSlider";
 import HotNewsSection from "@shared/ui/HotNewsSection";
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
+import TitleRow from "./components/TitleRow";
 import { news } from "./mocks";
 
 const HERO_SLOTS = 3;
 const SPOTLIGHT_SLOTS = 3;
+const ROW_SIZE = 12;
 
 function imdbRatingOf(title: Title): number | undefined {
   return title.externalRatings.find((rating) => rating.source === ExternalRatingSource.IMDB)?.rating;
@@ -55,16 +57,14 @@ export default function DiscoverScreen() {
 
   const { data } = useTitles({
     page: 1,
-    limit: 12,
+    limit: ROW_SIZE,
     transcodingStatus: TranscodingStatus.COMPLETED,
   });
 
-  const { data: watchlist, isError: watchlistFailed } = useWatchlist({ page: 1, limit: 12 });
+  const { data: watchlist, isError: watchlistFailed } = useWatchlist({ page: 1, limit: ROW_SIZE });
   const watchlistItems = watchlist?.items ?? [];
 
   const items = data?.items || [];
-  const viewAllMovies = () => router.push(APP.SEARCH({ type: TitleType.MOVIE }));
-  const viewAllSeries = () => router.push(APP.SEARCH({ type: TitleType.SERIES }));
   const viewAllTitles = () => router.push(APP.SEARCH());
 
   const heroTitles = items.slice(0, HERO_SLOTS).map((title) => toSliderTitle(title, t("noScore")));
@@ -80,9 +80,8 @@ export default function DiscoverScreen() {
         <HotNewsSection news={news} />
       </Box>
       <Box sx={{ display: "flex", flexDirection: "column", gap: "34px" }}>
-        <Catalog title={t("trendingMovies")} bleed items={items} onViewAll={viewAllMovies} />
-        <Catalog title={t("trendingSeries")} bleed items={items} onViewAll={viewAllSeries} />
-        <Catalog title={t("genres")} bleed items={items} onViewAll={viewAllTitles} />
+        <TitleRow heading={t("movies")} type={TitleType.MOVIE} />
+        <TitleRow heading={t("series")} type={TitleType.SERIES} />
         {spotlightItems.length === SPOTLIGHT_SLOTS && (
           <Box sx={{ mt: "62px", mb: "56px" }}>
             <SpotlightGrid
@@ -92,9 +91,6 @@ export default function DiscoverScreen() {
             />
           </Box>
         )}
-        <Catalog title={t("imdbTopMovies")} bleed items={items} onViewAll={viewAllMovies} />
-        <Catalog title={t("imdbTopSeries")} bleed items={items} onViewAll={viewAllSeries} />
-        <Catalog title={t("trendingTvShows")} bleed items={items} onViewAll={viewAllSeries} />
         {watchlistFailed ? (
           <Box>
             <Typography variant="h3" sx={{ mb: "12px" }}>

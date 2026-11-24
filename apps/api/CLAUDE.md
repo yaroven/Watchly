@@ -378,6 +378,30 @@ still processing is client work that has not been done.
   answers for rows that exist, so densify before returning. Callers treat a map miss as a broken invariant and throw.
 - Pass `viewerId` explicitly, including when it is `null`. Don't let it default.
 
+### Responses that depend on the language asked for
+
+- **English is the base content language.** `Title`, `Season`, `Episode` and `Genre` keep English in their own
+  columns, and every other language lives in their `*Translation` table, one row per entity and locale.
+  `CastCredit.characterTranslations` is the exception — JSON on the row, because `replaceForTitle` deletes and
+  recreates every credit and would orphan a separate table. Locales are `common/locale.const.ts`; adding one is an
+  entry in `TRANSLATION_LOCALES`.
+- **The locale is an argument, like `viewerId`.** Controllers take it with `@RequestLocale()`, which runs
+  `negotiateLocale` on `Accept-Language` (q-weights, `uk-UA` → `uk`, English when nothing supported is named), and
+  pass it to services. A service never reads the header, and read methods take `locale` as a required parameter so
+  the compiler finds a call site that forgot it.
+- **`localize()` is the one rule for served text**: the requested locale's translation when there is one, English
+  otherwise, with `content: { locale, fallback }` on every localized view. A translation is complete, so an entity is
+  served wholly in one language. Build the Prisma include with `translationsInclude` / `translationsQuery`: an
+  English read adds nothing, so it costs what it did before translations existed.
+- **Writes answer in English**, whatever the request locale. An admin form refreshes from the write's response; a
+  translation there would be saved back as the English value.
+- **Search, sort and the OMDb lookup read the English columns.** Translated search and sorting are Elasticsearch's job.
+- Translation routes are `GET|PUT|DELETE /<entity>/:id/translations[/:locale]`, admin-only, each with the domain's
+  existence pipe on `:id` and `TranslationLocalePipe` on `:locale` (400 for `en`, which is edited on the entity
+  itself). Their bodies are `app/dto/request/translation.dto.ts`, which mirror the English field limits.
+- Controllers whose reads are localized carry `@UseInterceptors(VaryAcceptLanguageInterceptor)`. It is per
+  controller on purpose: auth, metrics and uploads do not vary by language.
+
 ### Errors
 
 - A missing title is `NotFoundException` on every route, including writes. The request was well-formed; the resource is

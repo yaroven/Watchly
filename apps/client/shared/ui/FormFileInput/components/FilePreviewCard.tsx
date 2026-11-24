@@ -1,7 +1,7 @@
 import { Delete as DeleteIcon, Description as DescriptionIcon, Edit as EditIcon } from "@mui/icons-material";
 import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
 import { tokens } from "@shared/mui/theme";
+import TruncatedText from "@shared/ui/TruncatedText";
 import { useTranslations } from "next-intl";
 
 interface FilePreviewCardProps {
@@ -64,19 +64,15 @@ export default function FilePreviewCard({
       </Box>
 
       <Box sx={{ display: "flex", flexDirection: "column", gap: "8px", minWidth: 0 }}>
-        <Typography
-          title={fileName}
+        <TruncatedText
           sx={{
             fontSize: "14px",
             fontWeight: 400,
             color: tokens.text.field,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
           }}
         >
           {fileName}
-        </Typography>
+        </TruncatedText>
         <Box sx={{ display: "flex", gap: "12px" }}>
           <Box
             component="label"

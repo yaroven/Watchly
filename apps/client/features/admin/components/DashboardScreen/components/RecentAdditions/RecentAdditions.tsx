@@ -1,6 +1,7 @@
 "use client";
 
-import useTitles from "@/features/title/api/use-titles";
+import { useTitles } from "@/features/title";
+import { useRouter } from "@/i18n/navigation";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import { ADMIN } from "@/shared/lib/routes";
 import Box from "@mui/material/Box";
@@ -8,9 +9,9 @@ import Chip from "@mui/material/Chip";
 import Skeleton from "@mui/material/Skeleton";
 import Typography from "@mui/material/Typography";
 import GradientCard from "@shared/ui/GradientCard";
+import TruncatedText from "@shared/ui/TruncatedText";
 import { useFormatter, useTranslations } from "next-intl";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 
 const SKELETON_ROWS = Array.from({ length: 5 }, (_, index) => index);
 
@@ -64,11 +65,7 @@ export default function RecentAdditions() {
                   style={{ display: "block", borderRadius: "6px", objectFit: "cover", flexShrink: 0 }}
                 />
                 <Box sx={{ minWidth: 0 }}>
-                  <Typography
-                    sx={{ fontWeight: 500, color: "text.primary", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                  >
-                    {name}
-                  </Typography>
+                  <TruncatedText sx={{ fontWeight: 500, color: "text.primary" }}>{name}</TruncatedText>
                   <Chip
                     label={t(`dashboard.titleType.${type}`)}
                     size="small"

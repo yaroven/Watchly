@@ -4,4 +4,10 @@ export { default as useTitleEngagement } from "./api/use-title-engagement";
 export { useRemoveTitleRating, useSetTitleRating, useSetTitleReaction, useSetTitleWatchlist } from "./api/use-title-engagement-mutations";
 export { default as useWatchlist } from "./api/use-watchlist";
 export { ReactionType } from "./schemas/title-engagement";
-export type { ReactionResult, TitleEngagement, TitleEngagementCounts, ViewerTitleEngagement } from "./schemas/title-engagement";
+export type {
+  CardTitleEngagement,
+  ReactionResult,
+  TitleEngagement,
+  TitleEngagementCounts,
+  ViewerTitleEngagement,
+} from "./schemas/title-engagement";

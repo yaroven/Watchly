@@ -1,4 +1,5 @@
 import { TitleCreate } from "@features/title";
+import { BaseContentScope } from "@shared/lib/content-locale-scope";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
@@ -9,5 +10,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function Page() {
-  return <TitleCreate />;
+  return (
+    <BaseContentScope>
+      <TitleCreate />
+    </BaseContentScope>
+  );
 }

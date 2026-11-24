@@ -63,7 +63,7 @@ describe("EpisodeService", () => {
         const result = await service.create(createData as any);
 
         expect(prismaMock.episode.create).toHaveBeenCalledWith({ data: createData });
-        expect(result).toEqual(createdEpisode);
+        expect(result).toEqual({ ...createdEpisode, content: { locale: "en", fallback: false } });
       });
     });
 
@@ -89,7 +89,7 @@ describe("EpisodeService", () => {
         const episodes = [{ id: "episode-1" }, { id: "episode-2" }];
         (prismaMock.episode.findMany as jest.Mock).mockResolvedValue(episodes);
 
-        const result = await service.findAll([
+        const result = await service.findAll("en", [
           { property: "seasonId", rule: FilterRule.EQ, value: "season-1" },
         ]);
 
@@ -97,7 +97,9 @@ describe("EpisodeService", () => {
           where: { seasonId: "season-1" },
           orderBy: { number: "asc" },
         });
-        expect(result).toEqual(episodes);
+        expect(result).toEqual(
+          episodes.map((episode) => ({ ...episode, content: { locale: "en", fallback: false } })),
+        );
       });
     });
 
@@ -106,13 +108,15 @@ describe("EpisodeService", () => {
         const episodes = [{ id: "episode-1" }, { id: "episode-2" }];
         (prismaMock.episode.findMany as jest.Mock).mockResolvedValue(episodes);
 
-        const result = await service.findAll();
+        const result = await service.findAll("en");
 
         expect(prismaMock.episode.findMany).toHaveBeenCalledWith({
           where: {},
           orderBy: { number: "asc" },
         });
-        expect(result).toEqual(episodes);
+        expect(result).toEqual(
+          episodes.map((episode) => ({ ...episode, content: { locale: "en", fallback: false } })),
+        );
       });
     });
   });
@@ -140,10 +144,10 @@ describe("EpisodeService", () => {
         const episode = { id: "episode-1" };
         (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(episode);
 
-        const result = await service.findOne("episode-1");
+        const result = await service.findOne("episode-1", "en");
 
         expect(prismaMock.episode.findUnique).toHaveBeenCalledWith({ where: { id: "episode-1" } });
-        expect(result).toEqual(episode);
+        expect(result).toEqual({ ...episode, content: { locale: "en", fallback: false } });
       });
     });
 
@@ -151,7 +155,7 @@ describe("EpisodeService", () => {
       it("if the episode does not exist", async () => {
         (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(null);
 
-        const result = await service.findOne("non-existent");
+        const result = await service.findOne("non-existent", "en");
 
         expect(prismaMock.episode.findUnique).toHaveBeenCalledWith({
           where: { id: "non-existent" },
@@ -205,7 +209,7 @@ describe("EpisodeService", () => {
           where: { id: "episode-1" },
           data: updateData,
         });
-        expect(result).toEqual(updatedEpisode);
+        expect(result).toEqual({ ...updatedEpisode, content: { locale: "en", fallback: false } });
       });
     });
 
@@ -258,7 +262,11 @@ describe("EpisodeService", () => {
           titleId: "title-1",
         });
         expect(prismaMock.episode.delete).toHaveBeenCalledWith({ where: { id: "episode-1" } });
-        expect(result).toEqual({ id: episode.id, seasonId: episode.seasonId });
+        expect(result).toEqual({
+          id: episode.id,
+          seasonId: episode.seasonId,
+          content: { locale: "en", fallback: false },
+        });
       });
     });
   });
@@ -283,6 +291,76 @@ describe("EpisodeService", () => {
         seasonId: "season-1",
         episodeId: "episode-1",
       });
+    });
+  });
+  describe("localized content", () => {
+    const englishRow = {
+      id: "episode-1",
+      name: "Pilot",
+      description: "Where it starts.",
+    };
+    const ukrainian = { locale: "uk", name: "Пілот", description: "Звідки все починається." };
+
+    it("should serve the Ukrainian translation for a uk read", async () => {
+      (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue({
+        ...englishRow,
+        translations: [ukrainian],
+      });
+
+      const result = await service.findOne("episode-1", "uk");
+
+      expect(prismaMock.episode.findUnique).toHaveBeenCalledWith({
+        where: { id: "episode-1" },
+        include: { translations: { where: { locale: "uk" } } },
+      });
+      expect(result).toMatchObject({
+        name: "Пілот",
+        description: "Звідки все починається.",
+        content: { locale: "uk", fallback: false },
+      });
+    });
+
+    it("should fall back to English and say so when a uk read finds no translation", async () => {
+      (prismaMock.episode.findMany as jest.Mock).mockResolvedValue([
+        { ...englishRow, translations: [ukrainian] },
+        { ...englishRow, id: "episode-2", name: "Finale", translations: [] },
+      ]);
+
+      const result = await service.findAll("uk");
+
+      expect(result.map((item) => [item.name, item.content])).toEqual([
+        ["Пілот", { locale: "uk", fallback: false }],
+        ["Finale", { locale: "en", fallback: true }],
+      ]);
+    });
+
+    it("should serve English with no include for an en read", async () => {
+      (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue(englishRow);
+
+      const result = await service.findOne("episode-1", "en");
+
+      expect(prismaMock.episode.findUnique).toHaveBeenCalledWith({ where: { id: "episode-1" } });
+      expect(result).toMatchObject({ name: "Pilot", content: { locale: "en", fallback: false } });
+    });
+
+    it("should answer an update in English even when the episode is translated", async () => {
+      (prismaMock.episode.findUnique as jest.Mock).mockResolvedValue({
+        id: "episode-1",
+        seasonId: "season-1",
+      });
+      (prismaMock.episode.findFirst as jest.Mock).mockResolvedValue(null);
+      (prismaMock.episode.update as jest.Mock).mockResolvedValue({
+        ...englishRow,
+        translations: [ukrainian],
+      });
+
+      const result = await service.update("episode-1", {
+        number: 1,
+        name: "Pilot",
+        description: "Where it starts.",
+      });
+
+      expect(result).toMatchObject({ name: "Pilot", content: { locale: "en", fallback: false } });
     });
   });
 });

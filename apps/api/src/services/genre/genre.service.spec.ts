@@ -46,7 +46,7 @@ describe("GenreService", () => {
         const result = await service.create({ name: "Action" });
 
         expect(prismaMock.genre.create).toHaveBeenCalledWith({ data: { name: "Action" } });
-        expect(result).toEqual(createdGenre);
+        expect(result).toEqual({ ...createdGenre, content: { locale: "en", fallback: false } });
       });
     });
 
@@ -73,7 +73,7 @@ describe("GenreService", () => {
         (prismaMock.genre.findMany as jest.Mock).mockResolvedValue(genres);
         (prismaMock.genre.count as jest.Mock).mockResolvedValue(1);
 
-        const result = await service.findAll({ page: 1, limit: 10 });
+        const result = await service.findAll({ page: 1, limit: 10 }, "en");
 
         expect(prismaMock.genre.findMany).toHaveBeenCalledWith({
           where: {},
@@ -82,7 +82,10 @@ describe("GenreService", () => {
           orderBy: { createdAt: "desc" },
           include: { _count: { select: { titles: true } } },
         });
-        expect(result).toEqual({ items: genres, totalCount: 1 });
+        expect(result).toEqual({
+          items: [{ ...genres[0], content: { locale: "en", fallback: false } }],
+          totalCount: 1,
+        });
       });
     });
 
@@ -91,7 +94,7 @@ describe("GenreService", () => {
         (prismaMock.genre.findMany as jest.Mock).mockResolvedValue([]);
         (prismaMock.genre.count as jest.Mock).mockResolvedValue(0);
 
-        await service.findAll({ page: 1, limit: 10 }, undefined, [
+        await service.findAll({ page: 1, limit: 10 }, "en", undefined, [
           { property: "name", rule: FilterRule.LIKE, value: "Act" },
         ]);
 
@@ -110,13 +113,69 @@ describe("GenreService", () => {
         const genre = { id: "genre-1", name: "Action" };
         (prismaMock.genre.findUnique as jest.Mock).mockResolvedValue(genre);
 
-        const result = await service.findOne("genre-1");
+        const result = await service.findOne("genre-1", "en");
 
         expect(prismaMock.genre.findUnique).toHaveBeenCalledWith({
           where: { id: "genre-1" },
           include: { _count: { select: { titles: true } } },
         });
-        expect(result).toEqual(genre);
+        expect(result).toEqual({ ...genre, content: { locale: "en", fallback: false } });
+      });
+    });
+
+    describe("should serve the requested language", () => {
+      it("if the genre has a translation in it", async () => {
+        (prismaMock.genre.findUnique as jest.Mock).mockResolvedValue({
+          id: "genre-1",
+          name: "Drama",
+          translations: [{ locale: "uk", name: "Драма" }],
+        });
+
+        const result = await service.findOne("genre-1", "uk");
+
+        expect(prismaMock.genre.findUnique).toHaveBeenCalledWith({
+          where: { id: "genre-1" },
+          include: {
+            _count: { select: { titles: true } },
+            translations: { where: { locale: "uk" } },
+          },
+        });
+        expect(result).toMatchObject({ name: "Драма", content: { locale: "uk", fallback: false } });
+      });
+
+      it("if the genre has no translation, falling back to English", async () => {
+        (prismaMock.genre.findUnique as jest.Mock).mockResolvedValue({
+          id: "genre-1",
+          name: "Drama",
+          translations: [],
+        });
+
+        const result = await service.findOne("genre-1", "uk");
+
+        expect(result).toMatchObject({ name: "Drama", content: { locale: "en", fallback: true } });
+      });
+
+      it("if listing in Ukrainian, loading only the Ukrainian rows", async () => {
+        (prismaMock.genre.findMany as jest.Mock).mockResolvedValue([
+          { id: "genre-1", name: "Drama", translations: [{ locale: "uk", name: "Драма" }] },
+          { id: "genre-2", name: "Anime", translations: [] },
+        ]);
+        (prismaMock.genre.count as jest.Mock).mockResolvedValue(2);
+
+        const result = await service.findAll({ page: 1, limit: 10 }, "uk");
+
+        expect(prismaMock.genre.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            include: {
+              _count: { select: { titles: true } },
+              translations: { where: { locale: "uk" } },
+            },
+          }),
+        );
+        expect(result.items.map((genre) => [genre.name, genre.content.fallback])).toEqual([
+          ["Драма", false],
+          ["Anime", true],
+        ]);
       });
     });
 
@@ -124,7 +183,7 @@ describe("GenreService", () => {
       it("if it does not exist", async () => {
         (prismaMock.genre.findUnique as jest.Mock).mockResolvedValue(null);
 
-        const result = await service.findOne("non-existent");
+        const result = await service.findOne("non-existent", "en");
 
         expect(result).toBeNull();
       });
@@ -147,7 +206,19 @@ describe("GenreService", () => {
           where: { id: "genre-1" },
           data: { name: "Adventure" },
         });
-        expect(result).toEqual(updated);
+        expect(result).toEqual({ ...updated, content: { locale: "en", fallback: false } });
+      });
+
+      it("in English even if the genre has a Ukrainian translation", async () => {
+        (prismaMock.genre.update as jest.Mock).mockResolvedValue({
+          id: "genre-1",
+          name: "Drama",
+          translations: [{ locale: "uk", name: "Драма" }],
+        });
+
+        const result = await service.update("genre-1", { name: "Drama" });
+
+        expect(result).toMatchObject({ name: "Drama", content: { locale: "en", fallback: false } });
       });
     });
 
@@ -189,7 +260,7 @@ describe("GenreService", () => {
         const result = await service.delete("genre-1");
 
         expect(prismaMock.genre.delete).toHaveBeenCalledWith({ where: { id: "genre-1" } });
-        expect(result).toEqual(genre);
+        expect(result).toEqual({ ...genre, content: { locale: "en", fallback: false } });
       });
     });
   });

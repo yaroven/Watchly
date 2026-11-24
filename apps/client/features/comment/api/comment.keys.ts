@@ -10,6 +10,8 @@ const commentKeys = {
   repliesPrefix: () => [...commentKeys.all(), "replies"] as const,
   replyPrefix: (commentId: string) => [...commentKeys.repliesPrefix(), commentId] as const,
   reply: (commentId: string, viewerKey: ViewerKey) => [...commentKeys.replyPrefix(commentId), { viewerKey }] as const,
+  replyPage: (commentId: string, page: number, viewerKey: ViewerKey) =>
+    [...commentKeys.replyPrefix(commentId), page, { viewerKey }] as const,
 };
 
 export default commentKeys;

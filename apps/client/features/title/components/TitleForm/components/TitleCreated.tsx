@@ -69,7 +69,13 @@ export default function TitleCreated({ title, onCreateAnother }: TitleCreatedPro
           }}
         >
           <Typography
-            sx={{ fontFamily: "var(--font-display)", fontSize: "28px", lineHeight: 1.05, textTransform: "uppercase", color: "#ffffff" }}
+            sx={{
+              fontFamily: "var(--font-display)",
+              fontSize: "28px",
+              lineHeight: 1.05,
+              textTransform: "uppercase",
+              color: tokens.text.primary,
+            }}
           >
             {title.name}
           </Typography>
@@ -92,7 +98,7 @@ export default function TitleCreated({ title, onCreateAnother }: TitleCreatedPro
           >
             <CheckIcon sx={{ fontSize: 20, color: tokens.feedback.success }} />
           </Box>
-          <Typography component="h2" variant="h3" sx={{ color: "#ffffff" }}>
+          <Typography component="h2" variant="h3" sx={{ color: tokens.text.primary }}>
             {t("created.heading", { name: title.name })}
           </Typography>
         </Box>
@@ -212,7 +218,7 @@ function TodoRow({ icon, title, description, action }: { icon: ReactNode; title:
     >
       <Box sx={{ flexShrink: 0, display: "flex" }}>{icon}</Box>
       <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-        <Typography sx={{ fontSize: "14px", fontWeight: 600, color: "#ffffff" }}>{title}</Typography>
+        <Typography sx={{ fontSize: "14px", fontWeight: 600, color: tokens.text.primary }}>{title}</Typography>
         <Typography sx={{ mt: "3px", fontSize: "13px", color: "text.secondary" }}>{description}</Typography>
       </Box>
       {action}

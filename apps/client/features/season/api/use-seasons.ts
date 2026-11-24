@@ -1,17 +1,7 @@
-import { useQuery, UseQueryOptions } from "@tanstack/react-query";
-import { Season } from "../schemas/season";
-import seasonKeys from "./season.keys";
-import SeasonService from "./season.service";
+import { type LocalizedQueryOptions, useLocalizedQuery } from "@shared/api/localized-query";
+import type { Season } from "../schemas/season";
+import { seasonReads } from "./season.reads";
 
-const useSeasons = (
-  titleId: string,
-  options?: Omit<UseQueryOptions<Season[], Error, Season[], readonly unknown[]>, "queryKey" | "queryFn">,
-) => {
-  return useQuery({
-    queryKey: seasonKeys.list(titleId),
-    queryFn: () => SeasonService.getAll(titleId),
-    ...options,
-  });
-};
+const useSeasons = (titleId: string, options?: LocalizedQueryOptions<Season[]>) => useLocalizedQuery(seasonReads.list(titleId), options);
 
 export default useSeasons;

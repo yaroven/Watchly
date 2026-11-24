@@ -77,9 +77,9 @@ describe("EpisodeController", () => {
         (episodeServiceMock.findAll as jest.Mock).mockResolvedValue(episodesResponse);
         const filters = [{ property: "seasonId", rule: FilterRule.EQ, value: "season-1" }];
 
-        const result = await controller.findAll(filters);
+        const result = await controller.findAll(filters, "uk");
 
-        expect(episodeServiceMock.findAll).toHaveBeenCalledWith(filters, undefined);
+        expect(episodeServiceMock.findAll).toHaveBeenCalledWith("uk", filters, undefined);
         expect(result).toEqual(episodesResponse);
       });
 
@@ -87,9 +87,9 @@ describe("EpisodeController", () => {
         const episodesResponse = [{ id: "episode-1" }];
         (episodeServiceMock.findAll as jest.Mock).mockResolvedValue(episodesResponse);
 
-        const result = await controller.findAll([]);
+        const result = await controller.findAll([], "en");
 
-        expect(episodeServiceMock.findAll).toHaveBeenCalledWith([], undefined);
+        expect(episodeServiceMock.findAll).toHaveBeenCalledWith("en", [], undefined);
         expect(result).toEqual(episodesResponse);
       });
     });
@@ -101,9 +101,9 @@ describe("EpisodeController", () => {
         const episode = { id: "episode-1" };
         (episodeServiceMock.findOne as jest.Mock).mockResolvedValue(episode);
 
-        const result = await controller.findOne("episode-1");
+        const result = await controller.findOne("episode-1", "uk");
 
-        expect(episodeServiceMock.findOne).toHaveBeenCalledWith("episode-1");
+        expect(episodeServiceMock.findOne).toHaveBeenCalledWith("episode-1", "uk");
         expect(result).toEqual(episode);
       });
     });
@@ -112,7 +112,7 @@ describe("EpisodeController", () => {
       it("if the episode does not exist", async () => {
         (episodeServiceMock.findOne as jest.Mock).mockResolvedValue(null);
 
-        const action = controller.findOne("non-existent");
+        const action = controller.findOne("non-existent", "uk");
 
         await expect(action).rejects.toThrow(NotFoundException);
       });

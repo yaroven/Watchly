@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "@/i18n/navigation";
 import { ADMIN } from "@/shared/lib/routes";
 import AddCircleIcon from "@mui/icons-material/AddCircle";
 import DashboardIcon from "@mui/icons-material/Dashboard";
@@ -8,7 +9,6 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import GradientCard from "@shared/ui/GradientCard";
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
 
 const ACTIONS = [
   { labelKey: "dashboard.quickActions.addTitle", icon: <AddCircleIcon sx={{ fontSize: 22 }} />, to: ADMIN.TITLES_NEW },

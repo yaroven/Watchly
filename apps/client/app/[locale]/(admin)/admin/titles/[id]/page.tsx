@@ -1,8 +1,8 @@
-import SeasonService from "@features/season/api/season.service";
-import type { Season } from "@features/season/schemas/season";
-import { TitleDetails } from "@features/title";
-import TitleService from "@features/title/api/title.service";
-import { TitleType } from "@features/title/schemas/title";
+import type { Season } from "@features/season";
+import { SeasonService } from "@features/season";
+import { TitleDetails, TitleService, TitleType } from "@features/title";
+import { BASE_CONTENT_LOCALE } from "@shared/lib/content-locale";
+import { BaseContentScope } from "@shared/lib/content-locale-scope";
 import { notFound } from "next/navigation";
 
 interface PageProps {
@@ -15,14 +15,18 @@ export default async function Page({ params }: PageProps) {
   let seasons: Season[] = [];
 
   try {
-    title = await TitleService.getById(id);
+    title = await TitleService.getById(id, BASE_CONTENT_LOCALE);
     if (!title) return notFound();
 
-    if (title.type === TitleType.SERIES) seasons = await SeasonService.getAll(id);
+    if (title.type === TitleType.SERIES) seasons = await SeasonService.getAll(id, BASE_CONTENT_LOCALE);
   } catch (error) {
     console.error("Failed to fetch title details", error);
     return notFound();
   }
 
-  return <TitleDetails title={title} initialSeasons={seasons} />;
+  return (
+    <BaseContentScope>
+      <TitleDetails title={title} initialSeasons={seasons} />
+    </BaseContentScope>
+  );
 }

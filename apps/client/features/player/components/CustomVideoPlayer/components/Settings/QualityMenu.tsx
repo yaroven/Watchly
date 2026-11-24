@@ -1,6 +1,7 @@
 import Box from "@mui/material/Box";
 import { useTranslations } from "next-intl";
 
+import { tokens } from "@shared/mui/theme";
 import { usePlayerQuality } from "../../CustomVideoPlayerContext";
 import { getQualityOptionLabel } from "../../utils";
 
@@ -21,11 +22,11 @@ const menuOptionSx = {
   transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
   whiteSpace: "nowrap",
   "&:hover": { background: "rgba(255, 255, 255, 0.08)", color: "#fff" },
-  "&:focus-visible": { outline: "2px solid #e7bc0f", outlineOffset: "-2px" },
+  "&:focus-visible": { outline: `2px solid ${tokens.accent.primary}`, outlineOffset: "-2px" },
 };
 
 const menuOptionActiveSx = {
-  color: "#e7bc0f",
+  color: tokens.accent.primary,
   background: "rgba(231, 188, 15, 0.12)",
   fontWeight: 600,
 };

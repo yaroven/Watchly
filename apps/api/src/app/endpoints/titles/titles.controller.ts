@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   NotFoundException,
   Param,
   ParseUUIDPipe,
@@ -10,9 +12,14 @@ import {
   Post,
   Put,
   Query,
+  UseInterceptors,
 } from "@nestjs/common";
 import {
+  ApiBadRequestResponse,
   ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiHeader,
+  ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -21,11 +28,19 @@ import {
   ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
+import {
+  type Locale,
+  TRANSLATION_LOCALES,
+  type TranslationLocale,
+} from "../../../common/locale.const";
 import { Filter, Sorting } from "../../../common/pagination/pagination.types";
+import { TranslationLocalePipe } from "../../../common/utils/translation-locale.pipe";
+import { VaryAcceptLanguageInterceptor } from "../../../common/utils/vary-accept-language.interceptor";
 import { Auth } from "../../../decorators/auth.decorator";
 import { CurrentUserId, OptionalUserId } from "../../../decorators/current-user-id.decorator";
 import { FilteringParams } from "../../../decorators/filtering-params.decorator";
 import { OptionalAuth } from "../../../decorators/optional-auth.decorator";
+import { RequestLocale } from "../../../decorators/request-locale.decorator";
 import { AdminOnly } from "../../../decorators/roles.decorator";
 import { SortingParams } from "../../../decorators/sorting-params.decorator";
 import { TitleExistsPipe } from "../../../services/title/utils/title-exists.pipe";
@@ -33,7 +48,9 @@ import { TITLE_FILTERABLE } from "../../../services/title/utils/title-filter.que
 import { Paginated, PaginatedResponseOf } from "../../dto/paginated-response-of.util";
 import { CompleteMultipartUploadDto } from "../../dto/request/complete-multipart-upload.dto";
 import { StartMultipartUploadDto } from "../../dto/request/start-multipart-upload.dto";
+import { NameDescriptionTranslationDto } from "../../dto/request/translation.dto";
 import { MultipartUploadResponseDto } from "../../dto/response/multipart-upload-response.dto";
+import { NameDescriptionTranslationResponseDto } from "../../dto/response/translation-response.dto";
 import { UrlResponseDto } from "../../dto/url-response.dto";
 import { CreateTitleDto } from "./dto/request/create-title.dto";
 import { GetAllTitleDto } from "./dto/request/get-all-title.dto";
@@ -44,6 +61,14 @@ import { TitleResponseDto } from "./dto/response/title-response.dto";
 import { TitlesService } from "./titles.service";
 
 @ApiTags("titles")
+@ApiHeader({
+  name: "Accept-Language",
+  required: false,
+  description:
+    "Language of title and genre names and descriptions in reads (en, uk); English when absent or " +
+    "unsupported. Creates and updates always answer in English.",
+})
+@UseInterceptors(VaryAcceptLanguageInterceptor)
 @Controller("titles")
 export class TitlesController {
   constructor(private readonly titlesService: TitlesService) {}
@@ -69,11 +94,12 @@ export class TitlesController {
   @Get()
   async findAll(
     @Query() query: GetAllTitleDto,
+    @RequestLocale() locale: Locale,
     @SortingParams(["name", "createdAt", "releaseDate"]) sort?: Sorting,
     @FilteringParams(TITLE_FILTERABLE) filters?: Filter[],
     @OptionalUserId() userId?: string,
   ): Promise<Paginated<TitleResponseDto>> {
-    return this.titlesService.findAll(query, sort, filters, userId);
+    return this.titlesService.findAll(query, locale, sort, filters, userId);
   }
 
   @ApiOperation({ summary: "Get a title by id" })
@@ -84,9 +110,10 @@ export class TitlesController {
   @Get(":id")
   async findOne(
     @Param("id", ParseUUIDPipe) id: string,
+    @RequestLocale() locale: Locale,
     @OptionalUserId() userId?: string,
   ): Promise<TitleResponseDto> {
-    const title = await this.titlesService.findOne(id, userId);
+    const title = await this.titlesService.findOne(id, locale, userId);
 
     if (!title) throw new NotFoundException(`Title with id ${id} not found`);
 
@@ -215,5 +242,60 @@ export class TitlesController {
   @Get(":id/video")
   getPlaybackUrl(@Param("id", ParseUUIDPipe) id: string) {
     return this.titlesService.getPlaybackUrl(id);
+  }
+
+  @ApiOperation({ summary: "List every translation of a title" })
+  @ApiParam({ name: "id", format: "uuid" })
+  @ApiOkResponse({ type: [NameDescriptionTranslationResponseDto] })
+  @ApiUnauthorizedResponse({ description: "Not signed in" })
+  @ApiForbiddenResponse({ description: "Not an admin" })
+  @ApiNotFoundResponse({ description: "Title not found" })
+  @AdminOnly()
+  @Get(":id/translations")
+  listTranslations(
+    @Param("id", ParseUUIDPipe, TitleExistsPipe) id: string,
+  ): Promise<NameDescriptionTranslationResponseDto[]> {
+    return this.titlesService.listTranslations(id);
+  }
+
+  @ApiOperation({
+    summary: "Create or replace a title's translation",
+    description: "English is edited on the title itself; `:locale` takes only translation locales.",
+  })
+  @ApiParam({ name: "id", format: "uuid" })
+  @ApiParam({ name: "locale", enum: TRANSLATION_LOCALES })
+  @ApiOkResponse({ type: NameDescriptionTranslationResponseDto })
+  @ApiBadRequestResponse({
+    description: "Unsupported or English locale, or an incomplete translation",
+  })
+  @ApiUnauthorizedResponse({ description: "Not signed in" })
+  @ApiForbiddenResponse({ description: "Not an admin" })
+  @ApiNotFoundResponse({ description: "Title not found" })
+  @AdminOnly()
+  @Put(":id/translations/:locale")
+  upsertTranslation(
+    @Param("id", ParseUUIDPipe, TitleExistsPipe) id: string,
+    @Param("locale", TranslationLocalePipe) locale: TranslationLocale,
+    @Body() data: NameDescriptionTranslationDto,
+  ): Promise<NameDescriptionTranslationResponseDto> {
+    return this.titlesService.upsertTranslation(id, locale, data);
+  }
+
+  @ApiOperation({ summary: "Delete a title's translation; succeeds when there is none" })
+  @ApiParam({ name: "id", format: "uuid" })
+  @ApiParam({ name: "locale", enum: TRANSLATION_LOCALES })
+  @ApiNoContentResponse()
+  @ApiBadRequestResponse({ description: "Unsupported or English locale" })
+  @ApiUnauthorizedResponse({ description: "Not signed in" })
+  @ApiForbiddenResponse({ description: "Not an admin" })
+  @ApiNotFoundResponse({ description: "Title not found" })
+  @AdminOnly()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Delete(":id/translations/:locale")
+  removeTranslation(
+    @Param("id", ParseUUIDPipe, TitleExistsPipe) id: string,
+    @Param("locale", TranslationLocalePipe) locale: TranslationLocale,
+  ): Promise<void> {
+    return this.titlesService.removeTranslation(id, locale);
   }
 }

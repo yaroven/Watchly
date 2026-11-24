@@ -11,6 +11,8 @@ import MenuItem from "@mui/material/MenuItem";
 import MuiSelect, { SelectChangeEvent } from "@mui/material/Select";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
+import { useApiErrorMessage } from "@shared/api/use-api-error-message";
+import { INLINE_ERROR } from "@shared/api/write-errors";
 import { inputVariants, tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
 import ConfirmDialog from "@shared/ui/ConfirmDialog";
@@ -54,7 +56,13 @@ export default function UserDetail({ id }: UserDetailProps) {
   const { data: user, isPending: isLoadingUser, isError } = useUser(id);
 
   const [pendingRole, setPendingRole] = useState<Role | null>(null);
-  const { mutate: updateRole, isPending } = useUpdateUserRole({ onSuccess: () => setPendingRole(null) });
+  const describeError = useApiErrorMessage();
+  const {
+    mutate: updateRole,
+    isPending,
+    error: roleError,
+    reset: resetRole,
+  } = useUpdateUserRole({ meta: INLINE_ERROR, onSuccess: () => setPendingRole(null) });
 
   if (isLoadingUser) {
     return (
@@ -68,7 +76,7 @@ export default function UserDetail({ id }: UserDetailProps) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh", padding: "40px" }}>
         <GradientCard sx={{ p: "48px", display: "flex", flexDirection: "column", alignItems: "center", gap: "20px", textAlign: "center" }}>
-          <Typography component="h1" variant="h4" sx={{ color: "#ffffff" }}>
+          <Typography component="h1" variant="h4" sx={{ color: tokens.text.primary }}>
             {t("detail.notFoundTitle")}
           </Typography>
           <Typography sx={{ color: "text.secondary", maxWidth: "420px" }}>{t("detail.notFoundDescription")}</Typography>
@@ -84,13 +92,14 @@ export default function UserDetail({ id }: UserDetailProps) {
   const handleRoleChange = (event: SelectChangeEvent<unknown>) => {
     const nextRole = event.target.value as Role;
     if (nextRole === user.role) return;
+    resetRole();
     setPendingRole(nextRole);
   };
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: "28px", padding: { xs: "24px 16px 40px", md: "40px 36px 56px" } }}>
       <Box sx={{ display: "flex", flexDirection: "column" }}>
-        <Typography component="h1" variant="h2" sx={{ color: "#ffffff" }}>
+        <Typography component="h1" variant="h2" sx={{ color: tokens.text.primary }}>
           {user.email}
         </Typography>
         <Typography sx={{ mt: "14px", maxWidth: "680px", color: "text.secondary" }}>{t("detail.subtitle")}</Typography>
@@ -139,6 +148,7 @@ export default function UserDetail({ id }: UserDetailProps) {
         onClose={() => setPendingRole(null)}
         onConfirm={() => pendingRole && updateRole({ id: user.id, data: { role: pendingRole } })}
         isPending={isPending}
+        error={describeError(roleError)}
         tone="warning"
         confirmLabel={t("changeRole.confirm")}
         pendingLabel={t("changeRole.pending")}
@@ -160,7 +170,12 @@ function InfoRow({ label, value, mono }: { label: string; value: string; mono?: 
         {label}
       </Typography>
       <Typography
-        sx={{ color: "#ffffff", fontFamily: mono ? "monospace" : "inherit", fontSize: mono ? "13px" : "15px", textAlign: "right" }}
+        sx={{
+          color: tokens.text.primary,
+          fontFamily: mono ? "monospace" : "inherit",
+          fontSize: mono ? "13px" : "15px",
+          textAlign: "right",
+        }}
       >
         {value}
       </Typography>
@@ -172,7 +187,7 @@ function SectionCard({ title, description, children }: { title: string; descript
   return (
     <GradientCard sx={{ width: "100%" }}>
       <Box sx={{ px: "28px", pt: "24px" }}>
-        <Typography component="h2" variant="h4" sx={{ color: "#ffffff" }}>
+        <Typography component="h2" variant="h4" sx={{ color: tokens.text.primary }}>
           {title}
         </Typography>
         <Typography sx={{ mt: "8px", color: "text.secondary" }}>{description}</Typography>

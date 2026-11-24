@@ -2,18 +2,19 @@
 
 import { useTitleEngagement } from "@/features/title-engagement";
 import { ExternalRatingSource, type Title, TitleType } from "@/features/title/schemas/title";
+import { useRouter } from "@/i18n/navigation";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
 import Typography from "@mui/material/Typography";
 import { IMDB, Metacritic, RottenTomatoes, WMovie } from "@shared/assets/icons";
 import { APP } from "@shared/lib/routes";
+import { tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
 import CustomIcon from "@shared/ui/CustomIcon";
 import InvertedCornerBox from "@shared/ui/InvertedCornerBox";
 import { useFormatter, useTranslations } from "next-intl";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 
 interface TitleOverviewProps {
   title: Title;
@@ -47,7 +48,7 @@ export default function TitleOverview({ title }: TitleOverviewProps) {
         omitBorderSide="right"
         sx={{
           borderRadius: "36px",
-          border: "2px solid #666666",
+          border: `2px solid ${tokens.border.faint}`,
           width: "clamp(260px, 28vw, 418px)",
           aspectRatio: "418 / 611",
           flexShrink: 0,
@@ -67,7 +68,7 @@ export default function TitleOverview({ title }: TitleOverviewProps) {
           paddingX: "32px",
           paddingY: "108px",
           borderRadius: "36px",
-          border: "2px solid #666666",
+          border: `2px solid ${tokens.border.faint}`,
           backgroundColor: "transparent",
           flex: 1,
           minWidth: 0,
@@ -78,7 +79,7 @@ export default function TitleOverview({ title }: TitleOverviewProps) {
         <Box sx={{ height: "100%", display: "flex", flexDirection: "column", gap: "32px" }}>
           <Box sx={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             <Box sx={{ display: "flex", alignItems: "baseline", gap: "12px" }}>
-              <Typography component="h1" variant="h2" sx={{ color: "#ffffff" }}>
+              <Typography component="h1" variant="h2" sx={{ color: tokens.text.primary }}>
                 {title.name}
               </Typography>
               {releaseYear && (
@@ -123,7 +124,10 @@ export default function TitleOverview({ title }: TitleOverviewProps) {
 
                 return (
                   <Box key={key} sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "8px" }}>
-                    <Typography component="span" sx={{ fontSize: "16px", fontWeight: 600, color: "#ffffff", whiteSpace: "nowrap" }}>
+                    <Typography
+                      component="span"
+                      sx={{ fontSize: "16px", fontWeight: 600, color: tokens.text.primary, whiteSpace: "nowrap" }}
+                    >
                       {value === undefined ? (
                         "-"
                       ) : (

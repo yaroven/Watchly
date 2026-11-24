@@ -175,7 +175,7 @@ describe("TitleService", () => {
         (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue(titles);
         (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(1);
 
-        const result = await service.findAll({ page: 1, limit: 10 });
+        const result = await service.findAll({ page: 1, limit: 10 }, "en");
 
         expect(prismaServiceMock.title.findMany).toHaveBeenCalledWith({
           where: {},
@@ -194,7 +194,7 @@ describe("TitleService", () => {
         (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([]);
         (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(0);
 
-        await service.findAll({ page: 1, limit: 10 }, undefined, [
+        await service.findAll({ page: 1, limit: 10 }, "en", undefined, [
           { property: "name", rule: FilterRule.LIKE, value: "Test" },
         ]);
 
@@ -211,7 +211,7 @@ describe("TitleService", () => {
         (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([]);
         (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(0);
 
-        await service.findAll({ page: 1, limit: 10 }, { property: "name", direction: "asc" });
+        await service.findAll({ page: 1, limit: 10 }, "en", { property: "name", direction: "asc" });
 
         expect(prismaServiceMock.title.findMany).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -228,7 +228,7 @@ describe("TitleService", () => {
       });
 
       it("if type is MOVIE", async () => {
-        await service.findAll({ page: 1, limit: 10 }, undefined, [
+        await service.findAll({ page: 1, limit: 10 }, "en", undefined, [
           { property: "type", rule: FilterRule.EQ, value: TitleType.MOVIE },
         ]);
 
@@ -240,7 +240,7 @@ describe("TitleService", () => {
       });
 
       it("if type is SERIES", async () => {
-        await service.findAll({ page: 1, limit: 10 }, undefined, [
+        await service.findAll({ page: 1, limit: 10 }, "en", undefined, [
           { property: "type", rule: FilterRule.EQ, value: TitleType.SERIES },
         ]);
 
@@ -257,7 +257,7 @@ describe("TitleService", () => {
         (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([]);
         (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(0);
 
-        await service.findAll({ page: 1, limit: 10 }, undefined, [
+        await service.findAll({ page: 1, limit: 10 }, "en", undefined, [
           { property: "transcodingStatus", rule: FilterRule.EQ, value: "COMPLETED" },
         ]);
 
@@ -274,7 +274,7 @@ describe("TitleService", () => {
         (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([]);
         (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(0);
 
-        await service.findAll({ page: 1, limit: 10 }, undefined, [
+        await service.findAll({ page: 1, limit: 10 }, "en", undefined, [
           { property: "director", rule: FilterRule.EQ, value: "Jane Doe" },
         ]);
 
@@ -291,7 +291,7 @@ describe("TitleService", () => {
         (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([]);
         (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(0);
 
-        await service.findAll({ page: 1, limit: 10 }, undefined, [
+        await service.findAll({ page: 1, limit: 10 }, "en", undefined, [
           { property: "network", rule: FilterRule.EQ, value: "Netflix" },
         ]);
 
@@ -308,7 +308,7 @@ describe("TitleService", () => {
         (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([]);
         (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(0);
 
-        await service.findAll({ page: 1, limit: 10 }, undefined, [
+        await service.findAll({ page: 1, limit: 10 }, "en", undefined, [
           { property: "genres", rule: FilterRule.EQ, value: "genre-1" },
         ]);
 
@@ -325,7 +325,7 @@ describe("TitleService", () => {
         (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([]);
         (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(0);
 
-        await service.findAll({ page: 1, limit: 10 }, undefined, [
+        await service.findAll({ page: 1, limit: 10 }, "en", undefined, [
           { property: "genres", rule: FilterRule.IN, value: "genre-1,genre-2" },
         ]);
 
@@ -342,7 +342,7 @@ describe("TitleService", () => {
         (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([]);
         (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(0);
 
-        await service.findAll({ page: 1, limit: 10 }, undefined, [
+        await service.findAll({ page: 1, limit: 10 }, "en", undefined, [
           { property: "genres", rule: FilterRule.EQ, value: "genre-1" },
           { property: "type", rule: FilterRule.EQ, value: TitleType.MOVIE },
         ]);
@@ -368,7 +368,7 @@ describe("TitleService", () => {
         ratings: [{ score: 8 }],
       });
 
-      const result = await service.findOne("title-1", "viewer-1");
+      const result = await service.findOne("title-1", "en", "viewer-1");
 
       expect(result?.engagement.viewer).toEqual({
         score: 8,
@@ -380,7 +380,7 @@ describe("TitleService", () => {
     it("should scope the viewer's own rows to that viewer", async () => {
       (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(titleRow);
 
-      await service.findOne("title-1", "viewer-1");
+      await service.findOne("title-1", "en", "viewer-1");
 
       expect(prismaServiceMock.title.findUnique).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -395,7 +395,7 @@ describe("TitleService", () => {
       (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([titleRow]);
       (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(1);
 
-      const result = await service.findAll({ page: 1, limit: 10 }, undefined, [], "viewer-1");
+      const result = await service.findAll({ page: 1, limit: 10 }, "en", undefined, [], "viewer-1");
 
       expect(result.items[0].engagement.viewer).not.toBeNull();
     });
@@ -415,7 +415,7 @@ describe("TitleService", () => {
         reactions: [{ type: ReactionType.LIKE }],
       });
 
-      const result = await service.findOne("title-1", "viewer-1");
+      const result = await service.findOne("title-1", "en", "viewer-1");
 
       expect(result?.engagement.viewer).toMatchObject({ storedReaction: ReactionType.LIKE });
       expect(result?.engagement.viewer).not.toHaveProperty("reaction");
@@ -426,7 +426,7 @@ describe("TitleService", () => {
         { ...titleRow, ratings: [{ score: 6 }], watchlistEntries: [{ id: "w-1" }] },
       ]);
 
-      const [card] = await service.findManyByIds(["title-1"], "viewer-1");
+      const [card] = await service.findManyByIds(["title-1"], "viewer-1", "en");
 
       expect(card.engagement.viewer).toEqual({ score: 6, inWatchlist: true });
     });
@@ -434,7 +434,7 @@ describe("TitleService", () => {
     it("should answer null, not an empty viewer block, when there is no viewer", async () => {
       (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(titleRow);
 
-      const result = await service.findOne("title-1");
+      const result = await service.findOne("title-1", "en");
 
       expect(result?.engagement.viewer).toBeNull();
       const { include } = (prismaServiceMock.title.findUnique as jest.Mock).mock.calls[0][0];
@@ -459,7 +459,13 @@ describe("TitleService", () => {
       ]);
       (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(2);
 
-      const { items } = await service.findAll({ page: 1, limit: 10 }, undefined, [], undefined);
+      const { items } = await service.findAll(
+        { page: 1, limit: 10 },
+        "en",
+        undefined,
+        [],
+        undefined,
+      );
       const byId = new Map(items.map((item) => [item.id, item.engagement]));
 
       expect(byId.get("title-1")?.averageScore).toBe(6);
@@ -473,7 +479,7 @@ describe("TitleService", () => {
       (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([]);
       (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(0);
 
-      await service.findAll({ page: 1, limit: 10 }, undefined, [], undefined);
+      await service.findAll({ page: 1, limit: 10 }, "en", undefined, [], undefined);
 
       expect(prismaServiceMock.title.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -489,7 +495,7 @@ describe("TitleService", () => {
         const title = { id: "title-1", genres: [] };
         (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(title);
 
-        const result = await service.findOne("title-1");
+        const result = await service.findOne("title-1", "en");
 
         expect(prismaServiceMock.title.findUnique).toHaveBeenCalledWith({
           where: { id: "title-1" },
@@ -503,7 +509,7 @@ describe("TitleService", () => {
       it("if the title does not exist", async () => {
         (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(null);
 
-        const result = await service.findOne("non-existent");
+        const result = await service.findOne("non-existent", "en");
 
         expect(result).toBeNull();
       });
@@ -668,6 +674,132 @@ describe("TitleService", () => {
 
         await expect(action).rejects.toThrow(NotFoundException);
       });
+    });
+  });
+  describe("localized content", () => {
+    const englishRow = {
+      id: "title-1",
+      name: "Spirited Away",
+      description: "A girl in a spirit world.",
+      genres: [{ id: "genre-1", name: "Anime", translations: [{ locale: "uk", name: "Аніме" }] }],
+    };
+    const ukrainian = {
+      locale: "uk",
+      name: "Віднесені привидами",
+      description: "Дівчинка у світі духів.",
+    };
+
+    it("should serve the Ukrainian translation, and its genres in Ukrainian, for a uk read", async () => {
+      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
+        ...englishRow,
+        translations: [ukrainian],
+      });
+
+      const result = await service.findOne("title-1", "uk");
+
+      expect(result).toMatchObject({
+        name: "Віднесені привидами",
+        description: "Дівчинка у світі духів.",
+        content: { locale: "uk", fallback: false },
+        genres: [{ name: "Аніме", content: { locale: "uk", fallback: false } }],
+      });
+    });
+
+    it("should fall back to English and say so when a uk read finds no translation", async () => {
+      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue({
+        ...englishRow,
+        genres: [{ id: "genre-1", name: "Anime", translations: [] }],
+        translations: [],
+      });
+
+      const result = await service.findOne("title-1", "uk");
+
+      expect(result).toMatchObject({
+        name: "Spirited Away",
+        content: { locale: "en", fallback: true },
+        genres: [{ name: "Anime", content: { locale: "en", fallback: true } }],
+      });
+    });
+
+    it("should load only the requested locale's rows, for the title and its genres", async () => {
+      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(englishRow);
+
+      await service.findOne("title-1", "uk");
+
+      expect(prismaServiceMock.title.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: expect.objectContaining({
+            translations: { where: { locale: "uk" } },
+            genres: { include: { translations: { where: { locale: "uk" } } } },
+          }),
+        }),
+      );
+    });
+
+    it("should serve English with no translation include for an en read", async () => {
+      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(englishRow);
+
+      const result = await service.findOne("title-1", "en");
+
+      const include = (prismaServiceMock.title.findUnique as jest.Mock).mock.calls[0][0].include;
+      expect(include).not.toHaveProperty("translations");
+      expect(include.genres).toBe(true);
+      expect(result).toMatchObject({
+        name: "Spirited Away",
+        content: { locale: "en", fallback: false },
+      });
+    });
+
+    it("should serve the watchlist's cards by the same rules", async () => {
+      (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([
+        { ...englishRow, translations: [ukrainian] },
+        { ...englishRow, id: "title-2", name: "Akira", translations: [] },
+      ]);
+
+      const cards = await service.findManyByIds(["title-1", "title-2"], "viewer-1", "uk");
+
+      expect(cards.map((card) => [card.name, card.content.fallback])).toEqual([
+        ["Віднесені привидами", false],
+        ["Akira", true],
+      ]);
+    });
+
+    it("should answer an update in English even for a translated title", async () => {
+      (prismaServiceMock.title.findUnique as jest.Mock).mockResolvedValue(englishRow);
+      (prismaServiceMock.title.update as jest.Mock).mockResolvedValue({
+        ...englishRow,
+        translations: [ukrainian],
+      });
+
+      const result = await service.update("title-1", { name: "Spirited Away" } as any);
+
+      expect(result).toMatchObject({
+        name: "Spirited Away",
+        content: { locale: "en", fallback: false },
+        genres: [{ name: "Anime" }],
+      });
+    });
+
+    it("should search and sort on the English name for a uk read, serving Ukrainian text", async () => {
+      (prismaServiceMock.title.findMany as jest.Mock).mockResolvedValue([
+        { ...englishRow, translations: [ukrainian] },
+      ]);
+      (prismaServiceMock.title.count as jest.Mock).mockResolvedValue(1);
+
+      const { items } = await service.findAll(
+        { page: 1, limit: 10 },
+        "uk",
+        { property: "name", direction: "asc" },
+        [{ property: "name", rule: FilterRule.LIKE, value: "spirit" }],
+      );
+
+      expect(prismaServiceMock.title.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { name: { contains: "spirit", mode: "insensitive" } },
+          orderBy: { name: "asc" },
+        }),
+      );
+      expect(items[0].name).toBe("Віднесені привидами");
     });
   });
 });

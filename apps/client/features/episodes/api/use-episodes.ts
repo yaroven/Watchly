@@ -1,17 +1,8 @@
-import { useQuery, UseQueryOptions } from "@tanstack/react-query";
-import { Episode } from "../schemas/episode";
-import { episodeKeys } from "./episode.keys";
-import EpisodeService from "./episode.service";
+import { type LocalizedQueryOptions, useLocalizedQuery } from "@shared/api/localized-query";
+import type { Episode } from "../schemas/episode";
+import { episodeReads } from "./episode.reads";
 
-const useEpisodes = (
-  seasonId: string,
-  options?: Omit<UseQueryOptions<Episode[], Error, Episode[], readonly unknown[]>, "queryKey" | "queryFn">,
-) => {
-  return useQuery({
-    queryKey: episodeKeys.list(seasonId),
-    queryFn: () => EpisodeService.getAll(seasonId),
-    ...options,
-  });
-};
+const useEpisodes = (seasonId: string, options?: LocalizedQueryOptions<Episode[]>) =>
+  useLocalizedQuery(episodeReads.list(seasonId), options);
 
 export default useEpisodes;

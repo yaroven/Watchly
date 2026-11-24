@@ -3,6 +3,8 @@
 import { useCreateSeason, useDeleteSeason, useUpdateSeason } from "@/features/season/api/use-season-mutations";
 import { createSeasonFormSchema, Season, SeasonFormValues } from "@/features/season/schemas/season";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { INLINE_ERROR } from "@shared/api/write-errors";
+import { nextNumber } from "@shared/lib/numbering";
 import { useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 import { Resolver, useForm } from "react-hook-form";
@@ -32,18 +34,21 @@ export const useSeasonManager = ({ seasons, titleId }: UseSeasonManagerProps) =>
   });
 
   const createMutation = useCreateSeason({
+    meta: INLINE_ERROR,
     onSuccess: () => {
       closeEditor();
     },
   });
 
   const updateMutation = useUpdateSeason({
+    meta: INLINE_ERROR,
     onSuccess: () => {
       closeEditor();
     },
   });
 
   const deleteMutation = useDeleteSeason({
+    meta: INLINE_ERROR,
     onSuccess: () => {
       closeDeleteModal();
     },
@@ -51,11 +56,14 @@ export const useSeasonManager = ({ seasons, titleId }: UseSeasonManagerProps) =>
 
   const closeEditor = () => {
     setIsModalOpen(false);
+  };
+
+  const clearEditor = () => {
     setEditingSeason(null);
     reset({
       name: "",
       description: "",
-      number: seasons.length + 1,
+      number: nextNumber(seasons),
       posterFile: undefined,
     });
   };
@@ -74,7 +82,13 @@ export const useSeasonManager = ({ seasons, titleId }: UseSeasonManagerProps) =>
     return createMutation.mutate(payload);
   };
 
+  const clearSaveErrors = () => {
+    createMutation.reset();
+    updateMutation.reset();
+  };
+
   const openEdit = (season: Season) => {
+    clearSaveErrors();
     setEditingSeason(season);
     reset({
       name: season.name,
@@ -86,17 +100,19 @@ export const useSeasonManager = ({ seasons, titleId }: UseSeasonManagerProps) =>
   };
 
   const openCreate = () => {
+    clearSaveErrors();
     setEditingSeason(null);
     reset({
       name: "",
       description: "",
-      number: seasons.length + 1,
+      number: nextNumber(seasons),
       posterFile: undefined,
     });
     setIsModalOpen(true);
   };
 
   const openDelete = (season: Season) => {
+    deleteMutation.reset();
     setSeasonToDelete(season);
   };
 
@@ -110,6 +126,7 @@ export const useSeasonManager = ({ seasons, titleId }: UseSeasonManagerProps) =>
   return {
     isModalOpen,
     closeEditor,
+    clearEditor,
     editingSeason,
     register,
     handleSubmit,

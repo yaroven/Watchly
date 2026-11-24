@@ -1,3 +1,5 @@
+"use client";
+
 import { type Title, TitleType } from "@/features/title/schemas/title";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import type { SvgIconComponent } from "@mui/icons-material";
@@ -13,9 +15,10 @@ import TranslateIcon from "@mui/icons-material/Translate";
 import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
 import Typography from "@mui/material/Typography";
+import { tokens } from "@shared/mui/theme";
 import { useFormatter, useTranslations } from "next-intl";
 import Image from "next/image";
-import { getTitleOverviewFixture } from "../TitleOverview/mocks";
+import useTitleCast from "../../api/use-title-cast";
 
 interface TitleInformationProps {
   title: Title;
@@ -34,7 +37,8 @@ const CAST_AVATAR_SIZE = 96;
 export default function TitleInformation({ title }: TitleInformationProps) {
   const t = useTranslations("title.information");
   const format = useFormatter();
-  const { cast } = getTitleOverviewFixture(title.id);
+  const { data: credits = [] } = useTitleCast(title.id);
+  const cast = [...credits].sort((a, b) => a.order - b.order);
   const isSeries = title.type === TitleType.SERIES;
   const releaseDate = format.dateTime(new Date(title.releaseDate), {
     year: "numeric",
@@ -70,47 +74,61 @@ export default function TitleInformation({ title }: TitleInformationProps) {
         <InfoTableColumn rows={rightRows} />
       </Box>
 
-      <Box sx={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <GroupsIcon sx={{ color: "primary.main", fontSize: "24px" }} />
-          <Typography sx={{ fontSize: "18px", fontWeight: 600 }}>{t("stars")}</Typography>
-        </Box>
-        <Box
-          sx={{
-            display: "flex",
-            gap: "32px",
-            overflowX: "auto",
-            pb: "8px",
-            scrollbarWidth: "thin",
-            scrollbarColor: "#333333 transparent",
-          }}
-        >
-          {cast.map((member) => (
-            <Box key={member.name} sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "16px", flexShrink: 0 }}>
-              <Box
-                sx={{
-                  position: "relative",
-                  width: CAST_AVATAR_SIZE,
-                  height: CAST_AVATAR_SIZE,
-                  borderRadius: "50%",
-                  overflow: "hidden",
-                  border: "2px solid",
-                  borderColor: "primary.main",
-                }}
-              >
-                <Image
-                  src={getOptimizedImageSrc(member.avatarUrl)}
-                  alt={member.name}
-                  fill
-                  sizes={`${CAST_AVATAR_SIZE}px`}
-                  style={{ objectFit: "cover" }}
-                />
+      {cast.length > 0 && (
+        <Box sx={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <GroupsIcon sx={{ color: "primary.main", fontSize: "24px" }} />
+            <Typography sx={{ fontSize: "18px", fontWeight: 600 }}>{t("stars")}</Typography>
+          </Box>
+          <Box
+            sx={{
+              display: "flex",
+              gap: "32px",
+              overflowX: "auto",
+              pb: "8px",
+              scrollbarWidth: "thin",
+              scrollbarColor: "#333333 transparent",
+            }}
+          >
+            {cast.map((credit) => (
+              <Box key={credit.id} sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "16px", flexShrink: 0 }}>
+                <Box
+                  sx={{
+                    position: "relative",
+                    width: CAST_AVATAR_SIZE,
+                    height: CAST_AVATAR_SIZE,
+                    borderRadius: "50%",
+                    overflow: "hidden",
+                    border: "2px solid",
+                    borderColor: "primary.main",
+                  }}
+                >
+                  {credit.artist.photoUrl ? (
+                    <Image
+                      src={getOptimizedImageSrc(credit.artist.photoUrl)}
+                      alt={credit.artist.name}
+                      fill
+                      sizes={`${CAST_AVATAR_SIZE}px`}
+                      style={{ objectFit: "cover" }}
+                    />
+                  ) : (
+                    <Box
+                      aria-hidden
+                      sx={{ width: "100%", height: "100%", display: "grid", placeItems: "center", fontSize: "32px", fontWeight: 600 }}
+                    >
+                      {credit.artist.name.charAt(0).toLocaleUpperCase()}
+                    </Box>
+                  )}
+                </Box>
+                <Box sx={{ textAlign: "center", maxWidth: CAST_AVATAR_SIZE + 32 }}>
+                  <Typography sx={{ fontSize: "14px" }}>{credit.artist.name}</Typography>
+                  {credit.character && <Typography sx={{ fontSize: "12px", color: "text.secondary" }}>{credit.character}</Typography>}
+                </Box>
               </Box>
-              <Typography sx={{ fontSize: "14px", textAlign: "center" }}>{member.name}</Typography>
-            </Box>
-          ))}
+            ))}
+          </Box>
         </Box>
-      </Box>
+      )}
     </Box>
   );
 }
@@ -127,7 +145,7 @@ function InfoTableColumn({ rows }: { rows: InfoRow[] }) {
               <Typography sx={{ fontSize: "14px", color: "text.secondary" }}>{label}</Typography>
             </Box>
             <Box sx={{ display: "flex", alignItems: "center", gap: "4px" }}>
-              <Typography sx={{ fontSize: "14px", color: "#ffffff" }}>{value}</Typography>
+              <Typography sx={{ fontSize: "14px", color: tokens.text.primary }}>{value}</Typography>
               {hasChevron && <ExpandMore sx={{ color: "text.secondary", fontSize: "18px" }} />}
             </Box>
           </Box>

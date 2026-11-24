@@ -10,8 +10,10 @@ import EditIcon from "@mui/icons-material/Edit";
 import Box from "@mui/material/Box";
 import Skeleton from "@mui/material/Skeleton";
 import Typography from "@mui/material/Typography";
+import { tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
 import InvertedCornerBox from "@shared/ui/InvertedCornerBox";
+import TruncatedText from "@shared/ui/TruncatedText";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import Link from "next/link";
@@ -36,7 +38,7 @@ export default function ArtistDetail({ artist: initialArtist }: ArtistDetailProp
           omitBorderSide="right"
           sx={{
             borderRadius: "36px",
-            border: "2px solid #666666",
+            border: `2px solid ${tokens.border.faint}`,
             width: { xs: "100%", md: "clamp(220px, 22vw, 320px)" },
             aspectRatio: "3 / 4",
             flexShrink: 0,
@@ -56,7 +58,7 @@ export default function ArtistDetail({ artist: initialArtist }: ArtistDetailProp
             paddingX: "32px",
             paddingY: "40px",
             borderRadius: "36px",
-            border: "2px solid #666666",
+            border: `2px solid ${tokens.border.faint}`,
             backgroundColor: "transparent",
             flex: 1,
             minWidth: 0,
@@ -78,7 +80,7 @@ export default function ArtistDetail({ artist: initialArtist }: ArtistDetailProp
             }}
           />
 
-          <Typography component="h1" variant="h2" sx={{ color: "#ffffff" }}>
+          <Typography component="h1" variant="h2" sx={{ color: tokens.text.primary }}>
             {artist.name}
           </Typography>
 
@@ -95,7 +97,7 @@ export default function ArtistDetail({ artist: initialArtist }: ArtistDetailProp
       </Box>
 
       <Box>
-        <Typography component="h2" variant="h4" sx={{ color: "#ffffff", mb: "20px" }}>
+        <Typography component="h2" variant="h4" sx={{ color: tokens.text.primary, mb: "20px" }}>
           {t("detail.filmography")}
         </Typography>
 
@@ -142,13 +144,13 @@ export default function ArtistDetail({ artist: initialArtist }: ArtistDetailProp
                       backdropFilter: "blur(16px)",
                     }}
                   >
-                    <Typography sx={{ fontSize: 14, fontWeight: 600, color: "#ffffff", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <TruncatedText lines={2} sx={{ fontSize: 14, fontWeight: 600, color: tokens.text.primary }}>
                       {credit.name}
-                    </Typography>
+                    </TruncatedText>
                     {credit.character && (
-                      <Typography sx={{ fontSize: 12, color: "#e5e5e5", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      <TruncatedText lines={2} sx={{ fontSize: 12, color: tokens.text.field }}>
                         {t("detail.asCharacter", { character: credit.character })}
-                      </Typography>
+                      </TruncatedText>
                     )}
                   </Box>
                 </Box>

@@ -33,13 +33,18 @@
         "apple": "Continue with Apple",
         "facebook": "Continue with Facebook"
       }
+    },
+    "errors": {
+      "invalidCredentials": "Wrong email or password.",
+      "emailTaken": "An account with this email already exists."
     }
   },
   "common": {
     "confirm": "Confirm",
     "cancel": "Cancel",
     "goHome": "Go Home",
-    "tryAgain": "Try Again"
+    "tryAgain": "Try Again",
+    "uploading": "Uploading"
   },
   "shared": {
     "header": {
@@ -129,7 +134,16 @@
   },
   "errors": {
     "sessionUnusable": "Your session could not be restored. Please sign in again.",
-    "unexpected": "Something went wrong"
+    "unexpected": "Something went wrong",
+    "network": "Couldn't reach the server. Check your connection and try again.",
+    "badRequest": "The server couldn't accept this. Check the fields and try again.",
+    "unauthorized": "Your session has ended. Sign in again to continue.",
+    "forbidden": "You don't have permission to do this.",
+    "notFound": "This item no longer exists. It may have been deleted.",
+    "conflict": "This clashes with something that already exists.",
+    "tooLarge": "The file is too large to upload.",
+    "rateLimited": "Too many requests. Wait a moment and try again.",
+    "server": "Something went wrong on the server. Try again in a moment."
   },
   "title": {
     "cast": {
@@ -144,7 +158,13 @@
       "typeToSearch": "Type to search actors",
       "addActorPlaceholder": "Add an actor to the cast...",
       "saving": "Saving...",
-      "save": "Save Cast"
+      "save": "Save Cast",
+      "characterLabel": "Character for {name}",
+      "addActorLabel": "Add an actor to the cast",
+      "charactersLanguage": "Character language",
+      "characterTranslatedLabel": "Character for {name} in {language}",
+      "characterTranslatedPlaceholder": "Translation of “{character}”",
+      "characterNeedsBase": "Add the English character first"
     },
     "admin": {
       "open": "Open",
@@ -154,7 +174,8 @@
         "PROCESSING": "Processing",
         "FAILED": "Failed",
         "PENDING": "Pending"
-      }
+      },
+      "notTranslated": "Not translated"
     },
     "create": {
       "breadcrumbTitles": "Titles",
@@ -197,7 +218,8 @@
       "preview": "Preview",
       "syncingRatings": "Syncing Ratings...",
       "syncRatings": "Sync Ratings",
-      "deleteTitle": "Delete Title"
+      "deleteTitle": "Delete Title",
+      "restartFailed": "Couldn't restart transcoding."
     },
     "catalog": {
       "viewAll": "View All"
@@ -205,12 +227,8 @@
     "discover": {
       "noScore": "N/A",
       "recommended": "Recommended for you",
-      "trendingMovies": "Trending movies",
-      "trendingSeries": "Trending series",
-      "genres": "Genres",
-      "imdbTopMovies": "IMDB Top Movies",
-      "imdbTopSeries": "IMDB Top Series",
-      "trendingTvShows": "Trending TV Shows",
+      "movies": "Movies",
+      "series": "Series",
       "myWatchlist": "My Watchlist",
       "watchlistError": "Could not load your watchlist right now."
     },
@@ -493,8 +511,11 @@
         "reported": "Reported",
         "report": "Report",
         "replyPlaceholder": "Reply to {name} ...",
-        "send": "Send"
-      }
+        "send": "Send",
+        "writeError": "Could not do that: {message}",
+        "moreReplies": "Show more replies"
+      },
+      "writeError": "Could not save that: {message}"
     },
     "search": {
       "headingQuery": "The search results for \"{query}\"",
@@ -530,7 +551,9 @@
       "directorRequired": "Director is required",
       "posterImageOnly": "Only image files are supported for posters",
       "videoRequiredForMovies": "Video file is required for Movies",
-      "videoOnly": "Only video files are supported"
+      "videoOnly": "Only video files are supported",
+      "nameTooLong": "The name is too long",
+      "descriptionTooLong": "The description is too long"
     },
     "fields": {
       "name": "Name",
@@ -547,7 +570,62 @@
       "posterFile": "Poster",
       "videoFile": "Video file",
       "genreIds": "Genres"
-    }
+    },
+    "translation": {
+      "name": "Name",
+      "description": "Description",
+      "hint": "Viewers who read the site in {language} see this name and description. Every field is required; until it is translated they see the English text.",
+      "notTranslated": "No {language} translation yet.",
+      "save": "Save translation",
+      "saving": "Saving...",
+      "remove": "Remove translation",
+      "removing": "Removing...",
+      "saved": "{language} translation saved.",
+      "removed": "{language} translation removed.",
+      "required": "Required",
+      "tooLong": "At most {max} characters",
+      "loadFailed": "Couldn't load the translation. Reload the page to try again."
+    },
+    "editor": {
+      "breadcrumb": "Titles",
+      "openOnSite": "Open on site",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Saved at {time}",
+      "unsaved": "Unsaved changes",
+      "meta": {
+        "MOVIE": "Movie",
+        "SERIES": "Series",
+        "seasons": "{count, plural, one {# season} other {# seasons}}",
+        "runtime": "{minutes} min"
+      },
+      "tabs": {
+        "details": "Details",
+        "cast": "Cast",
+        "seasons": "Seasons and episodes"
+      },
+      "aside": {
+        "video": "Video",
+        "videoPerEpisode": "Uploaded for each episode, under Seasons and episodes.",
+        "poster": "Poster",
+        "posterMissing": "No poster yet",
+        "translationLoadError": "Couldn't load the translation status.",
+        "ratings": "External ratings",
+        "ratingsEmpty": "Not synced yet.",
+        "record": "Record",
+        "created": "Created",
+        "updated": "Updated",
+        "translations": "Translations",
+        "translationsSummary": "{done} of {total} translated",
+        "openLanguage": "Edit {language}"
+      },
+      "ratingSource": {
+        "IMDB": "IMDb",
+        "ROTTEN_TOMATOES": "Rotten Tomatoes",
+        "METACRITIC": "Metacritic"
+      }
+    },
+    "movieStreamUnavailable": "This film's video is not available yet."
   },
   "player": {
     "videoPlayer": "Video player",
@@ -610,7 +688,8 @@
       "videoFile": "Video File",
       "uploading": "Uploading...",
       "create": "Create",
-      "update": "Update"
+      "update": "Update",
+      "numberTaken": "An episode with this number already exists in this season."
     },
     "delete": {
       "title": "Delete Episode",
@@ -625,7 +704,28 @@
       "nameRequired": "Name is required",
       "descriptionTooLong": "Description is too long",
       "videoRequired": "Video file is required",
-      "videoType": "Only video files are supported"
+      "videoType": "Only video files are supported",
+      "nameTooLong": "The name is too long"
+    },
+    "translation": {
+      "name": "Name",
+      "description": "Description",
+      "hint": "Viewers who read the site in {language} see this episode name and description. Every field is required; until it is translated they see the English text.",
+      "notTranslated": "No {language} translation yet.",
+      "save": "Save translation",
+      "saving": "Saving...",
+      "remove": "Remove translation",
+      "removing": "Removing...",
+      "saved": "{language} translation saved.",
+      "removed": "{language} translation removed.",
+      "required": "Required",
+      "tooLong": "At most {max} characters",
+      "loadFailed": "Couldn't load the translation. Reload the page to try again."
+    },
+    "item": {
+      "preview": "Preview episode {number}: {name}",
+      "edit": "Edit episode {number}: {name}",
+      "delete": "Delete episode {number}: {name}"
     }
   },
   "season": {
@@ -659,7 +759,28 @@
       "numberPositive": "Season number must be greater than 0",
       "nameRequired": "Name is required",
       "descriptionTooLong": "Description is too long",
-      "posterType": "Only image files are supported for posters"
+      "posterType": "Only image files are supported for posters",
+      "nameTooLong": "The name is too long"
+    },
+    "translation": {
+      "name": "Name",
+      "description": "Description",
+      "hint": "Viewers who read the site in {language} see this season name and description. Every field is required; until it is translated they see the English text.",
+      "notTranslated": "No {language} translation yet.",
+      "save": "Save translation",
+      "saving": "Saving...",
+      "remove": "Remove translation",
+      "removing": "Removing...",
+      "saved": "{language} translation saved.",
+      "removed": "{language} translation removed.",
+      "required": "Required",
+      "tooLong": "At most {max} characters",
+      "loadFailed": "Couldn't load the translation. Reload the page to try again."
+    },
+    "item": {
+      "select": "Select season {number}: {name}",
+      "edit": "Edit season {number}: {name}",
+      "delete": "Delete season {number}: {name}"
     }
   },
   "admin": {
@@ -762,7 +883,8 @@
       "add": "Add Actor",
       "searchPlaceholder": "Search actors...",
       "emptyTitle": "No actors found",
-      "emptyDescription": "Try a different search or add a new actor."
+      "emptyDescription": "Try a different search or add a new actor.",
+      "searchLabel": "Search actors"
     },
     "delete": {
       "title": "Delete Actor",
@@ -784,13 +906,33 @@
       "rename": "Rename {name}",
       "deleteLabel": "Delete {name}",
       "stillAssigned": "{count, plural, one {Still assigned to # title — remove it from every title first} other {Still assigned to # titles — remove it from every title first}}",
-      "empty": "No genres yet."
+      "empty": "No genres yet.",
+      "renameField": "New name for {name}",
+      "duplicate": "A genre with this name already exists.",
+      "stillAssignedError": "This genre is still assigned to titles. Remove it from them first."
     },
     "delete": {
       "title": "Delete Genre",
       "confirm": "Confirm Delete",
       "pending": "Deleting...",
       "description": "Are you sure you want to delete <strong>{name}</strong>? This action cannot be undone."
+    },
+    "translation": {
+      "heading": "Translate genre name",
+      "english": "English: {name}",
+      "open": "Translate {name}",
+      "name": "Name",
+      "hint": "Viewers who read the site in {language} see this genre name. Until it is translated they see the English name.",
+      "notTranslated": "No {language} translation yet.",
+      "save": "Save translation",
+      "saving": "Saving...",
+      "remove": "Remove translation",
+      "removing": "Removing...",
+      "saved": "{language} translation saved.",
+      "removed": "{language} translation removed.",
+      "required": "Required",
+      "tooLong": "At most {max} characters",
+      "loadFailed": "Couldn't load the translation. Reload the page to try again."
     }
   },
   "user": {
@@ -842,5 +984,22 @@
       "pending": "Updating...",
       "description": "Change <strong>{email}</strong>'s role to <strong>{role}</strong>? This changes what they can access immediately."
     }
+  },
+  "contentLocale": {
+    "language": "Content language",
+    "baseLanguage": "base",
+    "coverage": {
+      "done": "Translated",
+      "partial": "Partly translated",
+      "none": "Not translated"
+    },
+    "findLanguage": "Find a language",
+    "noLanguageFound": "No language matches “{query}”",
+    "translations": "Translations",
+    "saveHint": "The {language} text is saved with the button in the form.",
+    "editingIn": "Editing in {language}",
+    "changeInBar": "Change the language in the page bar.",
+    "newInBase": "New items are created in {language}. Add translations after saving.",
+    "missing": "Not translated"
   }
 }

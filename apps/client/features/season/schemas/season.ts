@@ -1,5 +1,8 @@
+import type { ContentLocaleInfo, ContentTranslation } from "@shared/lib/content-locale";
 import type { useTranslations } from "next-intl";
 import { z } from "zod";
+
+export const SEASON_CONTENT_LIMITS = { name: 255, description: 2000 } as const;
 
 export interface Season {
   id: string;
@@ -11,6 +14,7 @@ export interface Season {
   posterUrl?: string;
   titleId: string;
   episodes: string[];
+  content: ContentLocaleInfo;
 }
 
 type SeasonTranslator = ReturnType<typeof useTranslations<"season">>;
@@ -23,8 +27,8 @@ export const createSeasonFormSchema = (t: SeasonTranslator) =>
       })
       .int(t("validation.numberInteger"))
       .positive(t("validation.numberPositive")),
-    name: z.string().trim().min(1, t("validation.nameRequired")),
-    description: z.string().trim().max(500, t("validation.descriptionTooLong")),
+    name: z.string().trim().min(1, t("validation.nameRequired")).max(SEASON_CONTENT_LIMITS.name, t("validation.nameTooLong")),
+    description: z.string().trim().max(SEASON_CONTENT_LIMITS.description, t("validation.descriptionTooLong")),
     posterFile: z
       .custom<FileList | undefined>((value) => value === undefined || value instanceof FileList)
       .optional()
@@ -48,3 +52,12 @@ export interface UpdateSeasonDto {
   description: string;
   titleId: string;
 }
+
+export interface SeasonTranslationInput {
+  name: string;
+  description: string;
+}
+
+export type SeasonTranslation = ContentTranslation<SeasonTranslationInput>;
+
+export const SEASON_TRANSLATION_LIMITS = SEASON_CONTENT_LIMITS;

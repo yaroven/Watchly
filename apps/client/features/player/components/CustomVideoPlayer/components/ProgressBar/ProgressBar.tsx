@@ -2,6 +2,7 @@ import Box from "@mui/material/Box";
 import { useTranslations } from "next-intl";
 import { CSSProperties, useState } from "react";
 
+import { tokens } from "@shared/mui/theme";
 import { usePlayerPlayback, usePlayerTimeline } from "../../CustomVideoPlayerContext";
 
 export default function ProgressBar() {
@@ -69,7 +70,7 @@ export default function ProgressBar() {
           transition: "height 0.2s ease, top 0.2s ease",
           width: "var(--played)",
           zIndex: 3,
-          background: "#e7bc0f",
+          background: tokens.accent.primary,
           boxShadow: "0 0 8px rgba(231, 188, 15, 0.55)",
         }}
       />
@@ -118,7 +119,7 @@ export default function ProgressBar() {
             height: "14px",
             width: "14px",
             borderRadius: "50%",
-            background: "#e7bc0f",
+            background: tokens.accent.primary,
             boxShadow: "0 2px 8px rgba(0, 0, 0, 0.4)",
             cursor: "pointer",
             marginTop: "-5px",
@@ -136,7 +137,7 @@ export default function ProgressBar() {
             width: "14px",
             border: 0,
             borderRadius: "50%",
-            background: "#e7bc0f",
+            background: tokens.accent.primary,
             boxShadow: "0 2px 8px rgba(0, 0, 0, 0.4)",
             cursor: "pointer",
             transform: "scale(0)",

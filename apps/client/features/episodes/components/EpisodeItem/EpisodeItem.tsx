@@ -3,6 +3,8 @@ import TranscodingStatus from "@/types/transcoding-status";
 import StarIcon from "@mui/icons-material/Star";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import { tokens } from "@shared/mui/theme";
+import TruncatedText from "@shared/ui/TruncatedText";
 import { useFormatter, useTranslations } from "next-intl";
 import Image from "next/image";
 
@@ -58,7 +60,7 @@ export default function EpisodeItem({ number, name, transcodingStatus, isActive,
         opacity: isAvailable ? 1 : 0.5,
         font: "inherit",
         padding: 0,
-        backgroundColor: "#333333",
+        backgroundColor: tokens.surface.fill,
       }}
     >
       <Image src={thumbnailSrc} alt="" fill sizes="195px" style={{ objectFit: "cover" }} />
@@ -75,11 +77,11 @@ export default function EpisodeItem({ number, name, transcodingStatus, isActive,
             px: "8px",
             py: "3px",
             borderRadius: "8px",
-            backgroundColor: "#333333",
+            backgroundColor: tokens.surface.fill,
           }}
         >
           <StarIcon sx={{ fontSize: "14px", color: "primary.main" }} />
-          <Typography component="span" sx={{ fontSize: "12px", fontWeight: 600, color: "#ffffff" }}>
+          <Typography component="span" sx={{ fontSize: "12px", fontWeight: 600, color: tokens.text.primary }}>
             {format.number(score, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
           </Typography>
           <Typography component="span" sx={{ fontSize: "10px", color: "text.secondary" }}>
@@ -100,7 +102,7 @@ export default function EpisodeItem({ number, name, transcodingStatus, isActive,
             backgroundColor: "rgba(0,0,0,.6)",
           }}
         >
-          <Typography component="span" sx={{ fontSize: "11px", color: "#ffffff" }}>
+          <Typography component="span" sx={{ fontSize: "11px", color: tokens.text.primary }}>
             {statusLabel}
           </Typography>
         </Box>
@@ -118,20 +120,16 @@ export default function EpisodeItem({ number, name, transcodingStatus, isActive,
           background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.85) 100%)",
         }}
       >
-        <Typography
+        <TruncatedText
           component="span"
           sx={{
-            display: "block",
             fontSize: "14px",
             fontWeight: 600,
-            color: "#ffffff",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
+            color: tokens.text.primary,
           }}
         >
           {name}
-        </Typography>
+        </TruncatedText>
       </Box>
     </Box>
   );

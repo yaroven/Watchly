@@ -1,11 +1,12 @@
 "use client";
 
+import { useRouter } from "@/i18n/navigation";
 import Role from "@/types/role";
 import Box from "@mui/material/Box";
-import { useAuthStore } from "@shared/lib/auth-store";
 import { APP } from "@shared/lib/routes";
+import { useLoginPath } from "@shared/lib/use-login-path";
+import { useViewer } from "@shared/lib/use-viewer";
 import Loader from "@shared/ui/Loader";
-import { useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 
 interface AuthorizeViewProps {
@@ -15,15 +16,16 @@ interface AuthorizeViewProps {
 
 export default function AuthorizeView({ roles, children }: AuthorizeViewProps) {
   const router = useRouter();
-  const status = useAuthStore((state) => state.status);
-  const role = useAuthStore((state) => state.role);
-  const isAuthorized = !!role && roles.includes(role);
+  const viewer = useViewer();
+  const signInPath = useLoginPath();
+  const isAuthorized = viewer.status === "signed-in" && !!viewer.role && roles.includes(viewer.role);
 
   useEffect(() => {
-    if (status === "resolved" && !isAuthorized) router.replace(APP.DISCOVER);
-  }, [status, isAuthorized, router]);
+    if (viewer.status === "anonymous") router.replace(signInPath());
+    else if (viewer.status === "signed-in" && !isAuthorized) router.replace(APP.DISCOVER);
+  }, [viewer.status, isAuthorized, signInPath, router]);
 
-  if (status !== "resolved" || !isAuthorized) {
+  if (!isAuthorized) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>
         <Loader />

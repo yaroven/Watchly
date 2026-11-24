@@ -1,8 +1,8 @@
 "use client";
 
+import { useRouter } from "@/i18n/navigation";
 import { isValidTimeZone, TIME_ZONE_COOKIE } from "@shared/lib/time-zone";
 import { useTimeZone } from "next-intl";
-import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;

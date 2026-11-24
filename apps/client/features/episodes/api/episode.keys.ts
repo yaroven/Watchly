@@ -1,8 +1,13 @@
+import type { ContentLocale } from "@shared/lib/content-locale";
+
 export const episodeKeys = {
-  all: (): string[] => ["episodes"] as const,
-  lists: (): string[] => [...episodeKeys.all(), "list"] as const,
-  list: (seasonId: string): string[] => [...episodeKeys.lists(), seasonId] as const,
-  details: (): string[] => [...episodeKeys.all(), "detail"] as const,
-  detail: (id: string): string[] => [...episodeKeys.details(), id] as const,
-  stream: (id: string): string[] => [...episodeKeys.detail(id), "stream-url"] as const,
+  all: () => ["episodes"] as const,
+  listsPrefix: () => [...episodeKeys.all(), "list"] as const,
+  listPrefix: (seasonId: string) => [...episodeKeys.listsPrefix(), seasonId] as const,
+  listFor: (seasonId: string, locale: ContentLocale) => [...episodeKeys.listPrefix(seasonId), { locale }] as const,
+  detailsPrefix: () => [...episodeKeys.all(), "detail"] as const,
+  detailPrefix: (id: string) => [...episodeKeys.detailsPrefix(), id] as const,
+  detailFor: (id: string, locale: ContentLocale) => [...episodeKeys.detailPrefix(id), { locale }] as const,
+  translations: (id: string) => [...episodeKeys.detailPrefix(id), "translations"] as const,
+  stream: (id: string) => [...episodeKeys.detailPrefix(id), "stream-url"] as const,
 };

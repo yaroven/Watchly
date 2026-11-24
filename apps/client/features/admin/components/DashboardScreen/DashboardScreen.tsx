@@ -1,12 +1,12 @@
 "use client";
 
-import useTitles from "@/features/title/api/use-titles";
-import { TitleType } from "@/features/title/schemas/title";
+import { TitleType, useTitles } from "@/features/title";
 import MovieIcon from "@mui/icons-material/Movie";
 import TheatersIcon from "@mui/icons-material/Theaters";
 import TvIcon from "@mui/icons-material/Tv";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import { tokens } from "@shared/mui/theme";
 import { useTranslations } from "next-intl";
 import QuickActions from "./components/QuickActions";
 import RecentAdditions from "./components/RecentAdditions";
@@ -50,7 +50,7 @@ export default function DashboardScreen() {
         padding: { xs: "24px 16px 40px", md: "40px 36px 56px" },
       }}
     >
-      <Box sx={{ paddingBottom: "28px", borderBottom: "1px solid #333333" }}>
+      <Box sx={{ paddingBottom: "28px", borderBottom: `1px solid ${tokens.border.subtle}` }}>
         <Typography component="h1" variant="h1" sx={{ color: "text.primary" }}>
           {t("dashboard.title")}
         </Typography>

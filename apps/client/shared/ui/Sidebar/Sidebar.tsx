@@ -5,7 +5,8 @@ import { ADMIN, APP } from "@/shared/lib/routes";
 import Role from "@/types/role";
 import { AdminPanelSettings as AdminPanelSettingsIcon, Bookmark as BookmarkIcon, Explore as ExploreIcon } from "@mui/icons-material";
 import { Box, Drawer, List, Typography } from "@mui/material";
-import { useAuthStore } from "@shared/lib/auth-store";
+import { useViewer } from "@shared/lib/use-viewer";
+import { tokens } from "@shared/mui/theme";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { ReactNode, useMemo, useRef } from "react";
@@ -33,7 +34,8 @@ const menuItems: MenuItemConfig[] = [
 export default function Sidebar() {
   const t = useTranslations("shared.sidebar");
   const pathname = usePathname();
-  const userRole = useAuthStore((state) => state.role);
+  const viewer = useViewer();
+  const userRole = viewer.status === "signed-in" ? viewer.role : null;
 
   const visibleItems = useMemo(
     () => menuItems.filter((item) => !item.roles || (userRole !== null && item.roles.includes(userRole))),
@@ -70,7 +72,7 @@ export default function Sidebar() {
         "& .MuiDrawer-paper": {
           width,
           boxSizing: "border-box",
-          backgroundColor: "#191919",
+          backgroundColor: tokens.surface.default,
           color: "text.primary",
           border: "none",
           transition: "width 0.3s ease",
@@ -103,7 +105,7 @@ export default function Sidebar() {
           px: 3,
           pb: 1,
           fontSize: "14px",
-          color: "#666666",
+          color: tokens.text.placeholder,
           fontWeight: "700",
           overflow: "hidden",
           opacity: collapsed ? 0 : 1,

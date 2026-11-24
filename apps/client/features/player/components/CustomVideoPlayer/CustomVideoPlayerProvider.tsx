@@ -5,8 +5,9 @@ import { useStore } from "zustand";
 import { PlayerStoreContext } from "./CustomVideoPlayerContext";
 import useControlsVisibility from "./hooks/useControlsVisibility";
 import useFullscreenMode from "./hooks/useFullscreenMode";
+import useHlsPlayer from "./hooks/useHlsPlayer";
 import usePlayerKeyboard from "./hooks/usePlayerKeyboard";
-import useVideoPlayer from "./hooks/useVideoPlayer";
+import useVideoElementEvents from "./hooks/useVideoElementEvents";
 import { usePlayerSettingsStore } from "./store/playerSettingsStore";
 import { createPlayerStore } from "./store/playerStore";
 
@@ -15,9 +16,10 @@ interface CustomVideoPlayerProviderProps {
   videoRef: RefObject<HTMLVideoElement | null>;
   src: string;
   onEnded?: () => void;
+  startAt?: number;
 }
 
-export default function CustomVideoPlayerProvider({ children, videoRef, src, onEnded }: CustomVideoPlayerProviderProps) {
+export default function CustomVideoPlayerProvider({ children, videoRef, src, onEnded, startAt }: CustomVideoPlayerProviderProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // eslint-disable-next-line react-hooks/refs
@@ -27,7 +29,8 @@ export default function CustomVideoPlayerProvider({ children, videoRef, src, onE
   const playbackRate = usePlayerSettingsStore((s) => s.playbackRate);
   const volumeStore = usePlayerSettingsStore();
 
-  useVideoPlayer(videoRef, src, store, onEnded);
+  const playback = useVideoElementEvents(videoRef, store, { onEnded, startAt });
+  useHlsPlayer(videoRef, src, store, playback);
   useFullscreenMode(containerRef, store);
 
   const isPlaying = useStore(store, (s) => s.isPlaying);

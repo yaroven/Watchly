@@ -3,6 +3,7 @@
 import { useCreateArtistWithUpload, useUpdateArtistWithUpload } from "@/features/artist/api/use-artist-mutations";
 import { Artist, ArtistFormValues } from "@/features/artist/schemas/artist";
 import { ApiError } from "@/shared/api/api-error";
+import { INLINE_ERROR } from "@shared/api/write-errors";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
@@ -12,19 +13,16 @@ interface UseArtistSubmissionWorkflowProps {
 
 export function useArtistSubmissionWorkflow({ initialData }: UseArtistSubmissionWorkflowProps) {
   const t = useTranslations("artist");
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [actionError, setActionError] = useState<Error | null>(null);
 
-  const { mutateAsync: createArtist, isPending: isCreating } = useCreateArtistWithUpload({
-    onUploadProgress: setUploadProgress,
-  });
-  const { mutateAsync: updateArtist, isPending: isUpdating } = useUpdateArtistWithUpload({
-    onUploadProgress: setUploadProgress,
-  });
+  const create = useCreateArtistWithUpload({ meta: INLINE_ERROR });
+  const update = useUpdateArtistWithUpload({ meta: INLINE_ERROR });
+  const { mutateAsync: createArtist, isPending: isCreating } = create;
+  const { mutateAsync: updateArtist, isPending: isUpdating } = update;
+  const uploadProgress = Math.max(create.uploadProgress, update.uploadProgress);
 
   const submit = async (data: ArtistFormValues) => {
     setActionError(null);
-    setUploadProgress(0);
 
     try {
       if (initialData) {
@@ -32,10 +30,8 @@ export function useArtistSubmissionWorkflow({ initialData }: UseArtistSubmission
       } else {
         await createArtist(data);
       }
-      setUploadProgress(0);
     } catch (error: unknown) {
       const normalizedError = error instanceof Error ? error : new ApiError(t("form.saveFailed"));
-      setUploadProgress(0);
       setActionError(normalizedError);
       throw normalizedError;
     }
@@ -44,7 +40,7 @@ export function useArtistSubmissionWorkflow({ initialData }: UseArtistSubmission
   return {
     submit,
     uploadProgress,
-    isUploading: uploadProgress > 0 && uploadProgress < 100,
+    isUploading: create.isUploading || update.isUploading,
     isPending: isCreating || isUpdating,
     actionError,
   };

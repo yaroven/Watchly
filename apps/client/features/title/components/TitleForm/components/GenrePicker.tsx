@@ -1,6 +1,6 @@
 "use client";
 
-import useGenres from "@/features/genre/api/use-genres";
+import { useAllGenres } from "@/features/genre";
 import { ADMIN } from "@/shared/lib/routes";
 import Box from "@mui/material/Box";
 import Skeleton from "@mui/material/Skeleton";
@@ -17,7 +17,7 @@ interface GenrePickerProps {
 
 export default function GenrePicker({ value, onChange }: GenrePickerProps) {
   const t = useTranslations("title");
-  const { data, isPending } = useGenres({ limit: 100 });
+  const { data, isPending } = useAllGenres();
   const genres = data?.items ?? [];
 
   const toggle = (id: string) => onChange(value.includes(id) ? value.filter((genreId) => genreId !== id) : [...value, id]);

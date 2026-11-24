@@ -90,9 +90,15 @@ describe("TitlesController", () => {
         const titlesResponse = { items: [{ id: "title-1" }], totalCount: 1 };
         (titleServiceMock.findAll as jest.Mock).mockResolvedValue(titlesResponse);
 
-        const result = await controller.findAll(query, sort, filters);
+        const result = await controller.findAll(query, "uk", sort, filters);
 
-        expect(titleServiceMock.findAll).toHaveBeenCalledWith(query, sort, filters, undefined);
+        expect(titleServiceMock.findAll).toHaveBeenCalledWith(
+          query,
+          "uk",
+          sort,
+          filters,
+          undefined,
+        );
         expect(result).toEqual(titlesResponse);
       });
     });
@@ -104,9 +110,9 @@ describe("TitlesController", () => {
         const title = { id: "title-1" };
         (titleServiceMock.findOne as jest.Mock).mockResolvedValue(title);
 
-        const result = await controller.findOne("title-1");
+        const result = await controller.findOne("title-1", "uk");
 
-        expect(titleServiceMock.findOne).toHaveBeenCalledWith("title-1", undefined);
+        expect(titleServiceMock.findOne).toHaveBeenCalledWith("title-1", "uk", undefined);
         expect(result).toEqual(title);
       });
     });
@@ -115,7 +121,7 @@ describe("TitlesController", () => {
       it("if the title does not exist", async () => {
         (titleServiceMock.findOne as jest.Mock).mockResolvedValue(null);
 
-        const action = controller.findOne("non-existent");
+        const action = controller.findOne("non-existent", "en");
 
         await expect(action).rejects.toThrow(NotFoundException);
       });

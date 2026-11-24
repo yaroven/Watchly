@@ -1,10 +1,7 @@
-import EpisodeService from "@features/episodes/api/episode.service";
-import SeasonService from "@features/season/api/season.service";
-import { MovieStream, SeriesStream } from "@features/title";
-import TitleService from "@features/title/api/title.service";
-import { TitleType } from "@features/title/schemas/title";
+import { getTitleForRequest, loadWatchPage, MovieStream, SeriesStream, type WatchPageData } from "@features/title";
+import type { ContentLocale } from "@shared/lib/content-locale";
 import { Metadata } from "next";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 
 interface PageProps {
@@ -14,8 +11,9 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
+  const locale = (await getLocale()) as ContentLocale;
   try {
-    const title = await TitleService.getById(id);
+    const title = await getTitleForRequest(id, locale);
     const t = await getTranslations("pages.metadata");
     return {
       title: t("title", { name: title.name }),
@@ -28,70 +26,29 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
-const byNumberDesc = <T extends { number: number }>(a: T, b: T) => b.number - a.number;
-
 export default async function Page({ params, searchParams }: PageProps) {
   const { id } = await params;
-  const { episode: episodeParam } = await searchParams;
+  const locale = (await getLocale()) as ContentLocale;
+  const { episode } = await searchParams;
 
-  let title: Awaited<ReturnType<typeof TitleService.getById>>;
-  let movieUrl = "";
-  let season: Awaited<ReturnType<typeof SeasonService.getAll>>[number] | undefined;
-  let episodes: Awaited<ReturnType<typeof EpisodeService.getAll>> = [];
-  let currentEpisodeId = "";
-  let episodeUrl = "";
-
+  let data: WatchPageData | null;
   try {
-    title = await TitleService.getById(id);
-
-    if (title.type === TitleType.MOVIE) {
-      movieUrl = await TitleService.getStreamUrl(id);
-    } else {
-      const seasons = await SeasonService.getAll(id);
-      if (!seasons.length) return notFound();
-
-      const seasonsByNumberDesc = [...seasons].sort(byNumberDesc);
-      season = seasonsByNumberDesc[0];
-
-      if (episodeParam) {
-        try {
-          const requestedEpisode = await EpisodeService.getById(episodeParam);
-          const matchingSeason = seasons.find((candidate) => candidate.id === requestedEpisode.seasonId);
-          if (matchingSeason) season = matchingSeason;
-        } catch {}
-      }
-
-      episodes = await EpisodeService.getAll(season.id);
-
-      if (!episodes.length && !episodeParam) {
-        for (const candidate of seasonsByNumberDesc) {
-          if (candidate.id === season.id) continue;
-          const candidateEpisodes = await EpisodeService.getAll(candidate.id);
-          if (candidateEpisodes.length) {
-            season = candidate;
-            episodes = candidateEpisodes;
-            break;
-          }
-        }
-      }
-
-      if (!episodes.length) return notFound();
-
-      const currentEpisode =
-        (episodeParam && episodes.find((episode) => episode.id === episodeParam)) || [...episodes].sort(byNumberDesc)[0];
-      currentEpisodeId = currentEpisode.id;
-      episodeUrl = await EpisodeService.getStreamUrl(currentEpisode.id);
-    }
+    data = await loadWatchPage(id, locale, episode);
   } catch (error) {
     console.error("Failed to fetch title stream", error);
     return notFound();
   }
 
-  if (title.type === TitleType.MOVIE) {
-    return <MovieStream title={title} streamUrl={movieUrl} />;
-  }
+  if (!data) return notFound();
+  if (data.kind === "movie") return <MovieStream title={data.title} streamUrl={data.streamUrl} />;
 
   return (
-    <SeriesStream title={title} season={season!} episodes={episodes} initialEpisodeUrl={episodeUrl} initialEpisodeId={currentEpisodeId} />
+    <SeriesStream
+      title={data.title}
+      season={data.season}
+      episodes={data.episodes}
+      initialEpisodeUrl={data.streamUrl}
+      initialEpisodeId={data.episodeId}
+    />
   );
 }

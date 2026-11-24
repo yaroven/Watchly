@@ -1,6 +1,7 @@
 import { parseApiDate } from "@/shared/lib/parse-api-date";
 import api from "@shared/api/axios";
-import { CreateGenreDto, Genre, GetAllGenresDto, UpdateGenreDto } from "../schemas/genre";
+import { type ContentLocale, inLocale, type TranslationLocale } from "@shared/lib/content-locale";
+import { CreateGenreDto, Genre, GenreTranslation, GenreTranslationInput, GetAllGenresDto, UpdateGenreDto } from "../schemas/genre";
 
 const prefix = "genres";
 
@@ -16,12 +17,16 @@ const mapGenre = (genre: ApiGenre): Genre => ({
 });
 
 const GenreService = {
-  getAll: async ({ page = 1, limit = 100 }: GetAllGenresDto = {}): Promise<{
+  getAll: async (
+    { page = 1, limit = 100 }: GetAllGenresDto = {},
+    locale: ContentLocale,
+  ): Promise<{
     items: Genre[];
     totalCount: number;
   }> => {
     const { data } = await api.get<{ items: ApiGenre[]; totalCount: number }>(`/${prefix}`, {
       params: { page, limit },
+      ...inLocale(locale),
     });
     return {
       ...data,
@@ -41,6 +46,20 @@ const GenreService = {
 
   delete: async (id: string): Promise<void> => {
     await api.delete(`/${prefix}/${id}`);
+  },
+
+  getTranslations: async (id: string): Promise<GenreTranslation[]> => {
+    const { data } = await api.get<GenreTranslation[]>(`/${prefix}/${id}/translations`);
+    return data;
+  },
+
+  saveTranslation: async (id: string, locale: TranslationLocale, translation: GenreTranslationInput): Promise<GenreTranslation> => {
+    const { data } = await api.put<GenreTranslation>(`/${prefix}/${id}/translations/${locale}`, translation);
+    return data;
+  },
+
+  deleteTranslation: async (id: string, locale: TranslationLocale): Promise<void> => {
+    await api.delete(`/${prefix}/${id}/translations/${locale}`);
   },
 };
 

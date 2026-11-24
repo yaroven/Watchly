@@ -11,6 +11,7 @@ import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
+import { tokens } from "@shared/mui/theme";
 import GradientCard from "@shared/ui/GradientCard";
 import { useTranslations } from "next-intl";
 
@@ -78,7 +79,7 @@ export default function TitlesTable({ titles, loading }: TitlesTableProps) {
             ) : (
               <TableRow>
                 <TableCell colSpan={5} sx={{ textAlign: "center", py: "56px", border: "none" }}>
-                  <Typography variant="h4" sx={{ color: "#ffffff", mb: "10px" }}>
+                  <Typography variant="h4" sx={{ color: tokens.text.primary, mb: "10px" }}>
                     {t("emptyTitle")}
                   </Typography>
                   <Typography sx={{ color: "text.secondary" }}>{t("emptyDescription")}</Typography>

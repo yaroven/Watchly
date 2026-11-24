@@ -1,12 +1,12 @@
 "use client";
 
-import type { Episode } from "@/features/episodes/schemas/episode";
-import { getEpisodeScore, getEpisodeThumbnail } from "@features/title/components/TitleOverview/mocks";
-import StarIcon from "@mui/icons-material/Star";
+import type { Episode } from "@/features/episodes";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { getOptimizedImageSrc } from "@shared/lib/get-optimized-image-src";
+import { tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
+import TruncatedText from "@shared/ui/TruncatedText";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 
@@ -52,16 +52,10 @@ export default function StreamEpisodesSidebar({
               cursor: "pointer",
               padding: 0,
               font: "inherit",
-              backgroundColor: "#333333",
+              backgroundColor: tokens.surface.fill,
             }}
           >
-            <Image
-              src={getOptimizedImageSrc(getEpisodeThumbnail(episode.id, posterUrl))}
-              alt=""
-              fill
-              sizes="341px"
-              style={{ objectFit: "cover" }}
-            />
+            <Image src={getOptimizedImageSrc(posterUrl)} alt="" fill sizes="341px" style={{ objectFit: "cover" }} />
 
             <Box
               sx={{
@@ -82,24 +76,15 @@ export default function StreamEpisodesSidebar({
                 <Typography sx={{ fontSize: "12px", color: "text.secondary" }}>
                   {t("shortCode", { season: seasonNumber, episode: episode.number })}
                 </Typography>
-                <Typography
+                <TruncatedText
                   sx={{
                     fontSize: "16px",
                     fontWeight: 700,
-                    color: "#ffffff",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
+                    color: tokens.text.primary,
                   }}
                 >
                   {episode.name}
-                </Typography>
-              </Box>
-              <Box sx={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
-                <StarIcon sx={{ fontSize: "16px", color: "primary.main" }} />
-                <Typography sx={{ fontSize: "13px", fontWeight: 600, color: "#ffffff" }}>
-                  {getEpisodeScore(episode.number).toFixed(1)}
-                </Typography>
+                </TruncatedText>
               </Box>
             </Box>
           </Box>

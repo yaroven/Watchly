@@ -67,15 +67,16 @@ function CustomVideoPlayerContent() {
 interface CustomVideoPlayerProps {
   src: string;
   onEnded?: () => void;
+  startAt?: number;
 }
 
-const CustomVideoPlayer = forwardRef<HTMLVideoElement, CustomVideoPlayerProps>(function CustomVideoPlayer({ src, onEnded }, ref) {
+const CustomVideoPlayer = forwardRef<HTMLVideoElement, CustomVideoPlayerProps>(function CustomVideoPlayer({ src, onEnded, startAt }, ref) {
   const videoRef = useRef<HTMLVideoElement>(null);
   useImperativeHandle(ref, () => videoRef.current as HTMLVideoElement, []);
 
   return (
     <ShortcutProvider>
-      <CustomVideoPlayerProvider videoRef={videoRef} src={src} onEnded={onEnded}>
+      <CustomVideoPlayerProvider videoRef={videoRef} src={src} onEnded={onEnded} startAt={startAt}>
         <CustomVideoPlayerContent />
       </CustomVideoPlayerProvider>
     </ShortcutProvider>

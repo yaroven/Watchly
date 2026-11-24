@@ -1,19 +1,19 @@
+import { catalogueCopies, ownedBy } from "@/features/title/api/catalogue-copies";
 import createMutationHook from "@/shared/api/createMutationHook";
-import { uploadMultipartFile } from "@/shared/api/upload-media";
+import { createWithMedia, multipartAsset } from "@/shared/api/media-backed-write";
+import { useUploadProgress, withUploadProgress } from "@/shared/api/use-upload-progress";
+import { BASE_CONTENT_LOCALE } from "@shared/lib/content-locale";
 import { UseMutationOptions } from "@tanstack/react-query";
 import { CreateEpisodeDto, Episode, UpdateEpisodeDto } from "../schemas/episode";
-import { episodeKeys } from "./episode.keys";
 import EpisodeService from "./episode.service";
 
 type CreateEpisodeWithUploadPayload = CreateEpisodeDto;
-type CreateEpisodeWithUploadOptions = Omit<UseMutationOptions<Episode, Error, CreateEpisodeWithUploadPayload>, "mutationFn"> & {
-  onUploadProgress?: (progress: number) => void;
-};
+type CreateEpisodeWithUploadOptions = Omit<UseMutationOptions<Episode, Error, CreateEpisodeWithUploadPayload>, "mutationFn"> & {};
 
 export const useCreateEpisode = (options?: Omit<UseMutationOptions<Episode, Error, CreateEpisodeDto>, "mutationFn">) => {
   const useCreateEpisodeMutation = createMutationHook({
     mutationFn: (data: CreateEpisodeDto) => EpisodeService.create(data),
-    getInvalidateKeys: () => [episodeKeys.all()],
+    getInvalidateKeys: () => catalogueCopies.anyEpisode(),
   });
   return useCreateEpisodeMutation(options);
 };
@@ -23,7 +23,7 @@ export const useUpdateEpisode = (
 ) => {
   const useUpdateEpisodeMutation = createMutationHook({
     mutationFn: ({ id, payload }: { id: string; payload: UpdateEpisodeDto }) => EpisodeService.update(id, payload),
-    getInvalidateKeys: ({ id }) => [episodeKeys.all(), episodeKeys.detail(id)],
+    getInvalidateKeys: ({ id }) => catalogueCopies.episode(id),
   });
   return useUpdateEpisodeMutation(options);
 };
@@ -31,28 +31,30 @@ export const useUpdateEpisode = (
 export const useDeleteEpisode = (options?: Omit<UseMutationOptions<void, Error, string>, "mutationFn">) => {
   const useDeleteEpisodeMutation = createMutationHook({
     mutationFn: (id: string) => EpisodeService.delete(id),
-    getRemoveKeys: (id) => [episodeKeys.detail(id)],
-    getInvalidateKeys: () => [episodeKeys.all()],
+    getRemoveKeys: (id) => ownedBy.episode(id),
+    getInvalidateKeys: () => catalogueCopies.anyEpisode(),
   });
   return useDeleteEpisodeMutation(options);
 };
 
 export const useCreateEpisodeWithUpload = (options?: CreateEpisodeWithUploadOptions) => {
+  const progress = useUploadProgress();
   const useCreateEpisodeWithUpload = createMutationHook({
-    mutationFn: async ({ videoFile, ...payload }: CreateEpisodeWithUploadPayload) => {
-      const episode = await EpisodeService.create(payload);
-      await uploadMultipartFile({
-        files: videoFile,
-        startUpload: (fileSize) => EpisodeService.startUpload(episode.id, fileSize),
-        completeUpload: (uploadId, parts) => EpisodeService.completeUpload(episode.id, uploadId, parts),
-        abortUpload: (uploadId) => EpisodeService.abortUpload(episode.id, uploadId),
-        uploadPartToUrl: EpisodeService.uploadPartToS3,
-        onProgress: options?.onUploadProgress,
-      });
-
-      return episode;
-    },
-    getInvalidateKeys: () => [episodeKeys.all()],
+    mutationFn: ({ videoFile, ...payload }: CreateEpisodeWithUploadPayload) =>
+      createWithMedia({
+        create: () => EpisodeService.create(payload),
+        assets: ({ id }) => [
+          multipartAsset(videoFile, {
+            startUpload: (fileSize) => EpisodeService.startUpload(id, fileSize),
+            completeUpload: (uploadId, parts) => EpisodeService.completeUpload(id, uploadId, parts),
+            abortUpload: (uploadId) => EpisodeService.abortUpload(id, uploadId),
+          }),
+        ],
+        remove: ({ id }) => EpisodeService.delete(id),
+        reload: ({ id }) => EpisodeService.getById(id, BASE_CONTENT_LOCALE),
+        onProgress: progress.report,
+      }),
+    getInvalidateKeys: () => catalogueCopies.anyEpisode(),
   });
-  return useCreateEpisodeWithUpload(options);
+  return withUploadProgress(useCreateEpisodeWithUpload(options), progress);
 };

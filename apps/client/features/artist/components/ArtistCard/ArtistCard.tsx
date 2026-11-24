@@ -5,8 +5,9 @@ import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
+import { tokens } from "@shared/mui/theme";
 import InvertedCornerBox from "@shared/ui/InvertedCornerBox";
+import TruncatedText from "@shared/ui/TruncatedText";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 
@@ -45,7 +46,7 @@ export default function ArtistCard({ artist, onOpen, onEdit, onDelete }: ArtistC
           position: "relative",
           overflow: "hidden",
           borderRadius: "16px",
-          border: "1px solid #333333",
+          border: `1px solid ${tokens.border.subtle}`,
           aspectRatio: "3 / 4",
         }}
       >
@@ -97,18 +98,15 @@ export default function ArtistCard({ artist, onOpen, onEdit, onDelete }: ArtistC
             backdropFilter: "blur(16px)",
           }}
         >
-          <Typography
+          <TruncatedText
             sx={{
               fontSize: 14,
               fontWeight: 600,
-              color: "#ffffff",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
+              color: tokens.text.primary,
             }}
           >
             {artist.name}
-          </Typography>
+          </TruncatedText>
         </Box>
       </InvertedCornerBox>
     </Box>
@@ -140,7 +138,7 @@ function IconAction({
         alignItems: "center",
         justifyContent: "center",
         bgcolor: "rgba(25,25,25,.72)",
-        color: danger ? "#f64e34" : "#ffffff",
+        color: danger ? "#f64e34" : tokens.text.primary,
         backdropFilter: "blur(12px)",
         "&:hover": { bgcolor: danger ? "rgba(246,78,52,.24)" : "rgba(231,188,15,.24)" },
       }}

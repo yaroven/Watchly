@@ -86,7 +86,11 @@ describe("SeasonService", () => {
         const result = await service.create(createData as any);
 
         expect(prismaMock.season.create).toHaveBeenCalledWith({ data: createData });
-        expect(result).toEqual({ ...createdSeason, posterUrl: null });
+        expect(result).toEqual({
+          ...createdSeason,
+          posterUrl: null,
+          content: { locale: "en", fallback: false },
+        });
       });
     });
   });
@@ -97,7 +101,7 @@ describe("SeasonService", () => {
         const seasons = [{ id: "season-1" }, { id: "season-2" }];
         (prismaMock.season.findMany as jest.Mock).mockResolvedValue(seasons);
 
-        const result = await service.findAll([
+        const result = await service.findAll("en", [
           { property: "titleId", rule: FilterRule.EQ, value: "title-1" },
         ]);
 
@@ -105,20 +109,32 @@ describe("SeasonService", () => {
           where: { titleId: "title-1" },
           orderBy: { number: "asc" },
         });
-        expect(result).toEqual(seasons.map((season) => ({ ...season, posterUrl: null })));
+        expect(result).toEqual(
+          seasons.map((season) => ({
+            ...season,
+            posterUrl: null,
+            content: { locale: "en", fallback: false },
+          })),
+        );
       });
 
       it("if no filters are provided", async () => {
         const seasons = [{ id: "season-1" }, { id: "season-2" }];
         (prismaMock.season.findMany as jest.Mock).mockResolvedValue(seasons);
 
-        const result = await service.findAll();
+        const result = await service.findAll("en");
 
         expect(prismaMock.season.findMany).toHaveBeenCalledWith({
           where: {},
           orderBy: { number: "asc" },
         });
-        expect(result).toEqual(seasons.map((season) => ({ ...season, posterUrl: null })));
+        expect(result).toEqual(
+          seasons.map((season) => ({
+            ...season,
+            posterUrl: null,
+            content: { locale: "en", fallback: false },
+          })),
+        );
       });
     });
   });
@@ -129,12 +145,16 @@ describe("SeasonService", () => {
         const season = { id: "season-1" };
         (prismaMock.season.findUnique as jest.Mock).mockResolvedValue(season);
 
-        const result = await service.findOne("season-1");
+        const result = await service.findOne("season-1", "en");
 
         expect(prismaMock.season.findUnique).toHaveBeenCalledWith({
           where: { id: "season-1" },
         });
-        expect(result).toEqual({ ...season, posterUrl: null });
+        expect(result).toEqual({
+          ...season,
+          posterUrl: null,
+          content: { locale: "en", fallback: false },
+        });
       });
     });
 
@@ -142,7 +162,7 @@ describe("SeasonService", () => {
       it("if the season does not exist", async () => {
         (prismaMock.season.findUnique as jest.Mock).mockResolvedValue(null);
 
-        const result = await service.findOne("non-existent");
+        const result = await service.findOne("non-existent", "en");
 
         expect(prismaMock.season.findUnique).toHaveBeenCalledWith({
           where: { id: "non-existent" },
@@ -193,7 +213,12 @@ describe("SeasonService", () => {
           where: { id: "season-1" },
           data: updateData,
         });
-        expect(result).toEqual({ ...season, name: "New Title", posterUrl: null });
+        expect(result).toEqual({
+          ...season,
+          name: "New Title",
+          posterUrl: null,
+          content: { locale: "en", fallback: false },
+        });
       });
     });
   });
@@ -239,7 +264,74 @@ describe("SeasonService", () => {
         id: season.id,
         titleId: season.titleId,
         posterUrl: "https://cdn.example.com/posters/seasons/season-1/v1.webp",
+        content: { locale: "en", fallback: false },
       });
+    });
+  });
+  describe("localized content", () => {
+    const englishRow = {
+      id: "season-1",
+      name: "Pilot",
+      description: "Where it starts.",
+    };
+    const ukrainian = { locale: "uk", name: "Пілот", description: "Звідки все починається." };
+
+    it("should serve the Ukrainian translation for a uk read", async () => {
+      (prismaMock.season.findUnique as jest.Mock).mockResolvedValue({
+        ...englishRow,
+        translations: [ukrainian],
+      });
+
+      const result = await service.findOne("season-1", "uk");
+
+      expect(prismaMock.season.findUnique).toHaveBeenCalledWith({
+        where: { id: "season-1" },
+        include: { translations: { where: { locale: "uk" } } },
+      });
+      expect(result).toMatchObject({
+        name: "Пілот",
+        description: "Звідки все починається.",
+        content: { locale: "uk", fallback: false },
+      });
+    });
+
+    it("should fall back to English and say so when a uk read finds no translation", async () => {
+      (prismaMock.season.findMany as jest.Mock).mockResolvedValue([
+        { ...englishRow, translations: [ukrainian] },
+        { ...englishRow, id: "season-2", name: "Finale", translations: [] },
+      ]);
+
+      const result = await service.findAll("uk");
+
+      expect(result.map((item) => [item.name, item.content])).toEqual([
+        ["Пілот", { locale: "uk", fallback: false }],
+        ["Finale", { locale: "en", fallback: true }],
+      ]);
+    });
+
+    it("should serve English with no include for an en read", async () => {
+      (prismaMock.season.findUnique as jest.Mock).mockResolvedValue(englishRow);
+
+      const result = await service.findOne("season-1", "en");
+
+      expect(prismaMock.season.findUnique).toHaveBeenCalledWith({ where: { id: "season-1" } });
+      expect(result).toMatchObject({ name: "Pilot", content: { locale: "en", fallback: false } });
+    });
+
+    it("should answer an update in English even when the season is translated", async () => {
+      (prismaMock.season.update as jest.Mock).mockResolvedValue({
+        ...englishRow,
+        translations: [ukrainian],
+      });
+
+      const result = await service.update("season-1", {
+        number: 1,
+        name: "Pilot",
+        description: "Where it starts.",
+        titleId: "title-1",
+      });
+
+      expect(result).toMatchObject({ name: "Pilot", content: { locale: "en", fallback: false } });
     });
   });
 });

@@ -1,17 +1,7 @@
-import { useQuery, UseQueryOptions } from "@tanstack/react-query";
-import { CastCredit } from "../schemas/title";
-import titleKeys from "./title.keys";
-import titleService from "./title.service";
+import { type LocalizedQueryOptions, useLocalizedQuery } from "@shared/api/localized-query";
+import type { CastCredit } from "../schemas/title";
+import { titleReads } from "./title.reads";
 
-const useTitleCast = (
-  id: string,
-  options?: Omit<UseQueryOptions<CastCredit[], Error, CastCredit[], readonly unknown[]>, "queryKey" | "queryFn">,
-) => {
-  return useQuery({
-    queryKey: titleKeys.cast(id),
-    queryFn: () => titleService.getCast(id),
-    ...options,
-  });
-};
+const useTitleCast = (id: string, options?: LocalizedQueryOptions<CastCredit[]>) => useLocalizedQuery(titleReads.cast(id), options);
 
 export default useTitleCast;

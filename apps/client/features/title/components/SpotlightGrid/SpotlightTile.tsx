@@ -3,6 +3,7 @@
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import { Play } from "@shared/assets/icons";
+import { tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
 import CustomIcon from "@shared/ui/CustomIcon";
 import GenreList from "@shared/ui/GenreList";
@@ -115,7 +116,7 @@ export default function SpotlightTile({ title, variant, actionPosition, titleSca
               fontSize: `clamp(26px, ${titleScale}cqw, 96px)`,
               fontWeight: 400,
               lineHeight: 1.0,
-              color: editorial ? "primary.main" : "#ffffff",
+              color: editorial ? "primary.main" : tokens.text.primary,
             }}
           >
             {name}

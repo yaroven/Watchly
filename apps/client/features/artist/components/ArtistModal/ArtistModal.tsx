@@ -1,7 +1,6 @@
 "use client";
 
 import { Artist, ArtistFormValues, createArtistFormSchema } from "@/features/artist/schemas/artist";
-import ProgressBar from "@/features/transcoding/components/ProgressBar";
 import FormField from "@/shared/ui/FormField";
 import FormFileInput from "@/shared/ui/FormFileInput";
 import Modal from "@/shared/ui/Modal";
@@ -9,7 +8,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import { useApiErrorMessage } from "@shared/api/use-api-error-message";
+import { tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
+import UploadProgress from "@shared/ui/UploadProgress";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo } from "react";
 import { Resolver, useForm, useWatch } from "react-hook-form";
@@ -44,6 +46,7 @@ export default function ArtistModal({ isOpen, onClose, artist }: ArtistModalProp
   }, [isOpen, artist, reset]);
 
   const selectedPhotoFile = useWatch({ control, name: "photoFile" });
+  const describeError = useApiErrorMessage();
   const { submit, uploadProgress, isUploading, isPending, actionError } = useArtistSubmissionWorkflow({ initialData: artist });
 
   const onSubmit = async (data: ArtistFormValues) => {
@@ -56,7 +59,7 @@ export default function ArtistModal({ isOpen, onClose, artist }: ArtistModalProp
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="sm">
       <Box sx={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-        <Typography sx={{ fontSize: "24px", fontWeight: 700, color: "#ffffff" }}>
+        <Typography sx={{ fontSize: "24px", fontWeight: 700, color: tokens.text.primary }}>
           {isEditing ? t("form.editTitle") : t("form.addTitle")}
         </Typography>
 
@@ -82,8 +85,8 @@ export default function ArtistModal({ isOpen, onClose, artist }: ArtistModalProp
             id="artist-photo-file"
           />
 
-          {isUploading && <ProgressBar progress={uploadProgress} />}
-          {actionError && <Alert severity="error">{t("form.error", { message: actionError.message })}</Alert>}
+          {isUploading && <UploadProgress progress={uploadProgress} />}
+          {actionError && <Alert severity="error">{t("form.error", { message: describeError(actionError) ?? "" })}</Alert>}
 
           <Button disabled={isPending || (!isDirty && !isEditing)} type="submit">
             {isPending

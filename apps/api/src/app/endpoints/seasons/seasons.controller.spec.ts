@@ -72,16 +72,16 @@ describe("SeasonsController", () => {
       it("if a titleId filter is provided", async () => {
         const filters = [{ property: "titleId", rule: FilterRule.EQ, value: "title-1" }];
 
-        const result = await controller.findAll(filters);
+        const result = await controller.findAll(filters, "uk");
 
-        expect(seasonServiceMock.findAll).toHaveBeenCalledWith(filters, undefined);
+        expect(seasonServiceMock.findAll).toHaveBeenCalledWith("uk", filters, undefined);
         expect(result).toEqual(seasonsResponse);
       });
 
       it("if no filters are provided", async () => {
-        const result = await controller.findAll([]);
+        const result = await controller.findAll([], "en");
 
-        expect(seasonServiceMock.findAll).toHaveBeenCalledWith([], undefined);
+        expect(seasonServiceMock.findAll).toHaveBeenCalledWith("en", [], undefined);
         expect(result).toEqual(seasonsResponse);
       });
     });
@@ -93,9 +93,9 @@ describe("SeasonsController", () => {
         const season = { id: "season-1" };
         (seasonServiceMock.findOne as jest.Mock).mockResolvedValue(season);
 
-        const result = await controller.findOne("season-1");
+        const result = await controller.findOne("season-1", "uk");
 
-        expect(seasonServiceMock.findOne).toHaveBeenCalledWith("season-1");
+        expect(seasonServiceMock.findOne).toHaveBeenCalledWith("season-1", "uk");
         expect(result).toEqual(season);
       });
     });
@@ -104,7 +104,7 @@ describe("SeasonsController", () => {
       it("if the season does not exist", async () => {
         (seasonServiceMock.findOne as jest.Mock).mockResolvedValue(null);
 
-        const action = controller.findOne("non-existent");
+        const action = controller.findOne("non-existent", "uk");
 
         await expect(action).rejects.toThrow(NotFoundException);
       });

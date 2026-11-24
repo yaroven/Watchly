@@ -1,7 +1,7 @@
 import { StartMultipartUpload } from "@/shared/api/upload-media";
 import { parseApiDate } from "@/shared/lib/parse-api-date";
 import api from "@shared/api/axios";
-import axios from "axios";
+import { type ContentLocale, inLocale, type TranslationLocale } from "@shared/lib/content-locale";
 import {
   CardTitle,
   CastCredit,
@@ -10,6 +10,8 @@ import {
   ExternalRating,
   GetAllTitlesDto,
   Title,
+  TitleTranslation,
+  TitleTranslationInput,
   UpdateTitleDto,
 } from "../schemas/title";
 
@@ -43,16 +45,10 @@ const TitleService = {
     return mapTitle(data);
   },
 
-  getAll: async ({
-    searchString = "",
-    page = 1,
-    limit = 10,
-    type,
-    transcodingStatus,
-    director,
-    network,
-    genreId,
-  }: GetAllTitlesDto = {}): Promise<{
+  getAll: async (
+    { searchString = "", page = 1, limit = 10, type, transcodingStatus, director, network, genreId }: GetAllTitlesDto = {},
+    locale: ContentLocale,
+  ): Promise<{
     items: Title[];
     totalCount: number;
   }> => {
@@ -67,6 +63,7 @@ const TitleService = {
     const { data } = await api.get<{ items: ApiTitle[]; totalCount: number }>(`/${prefix}`, {
       params: { page, limit, filter: filter.length ? filter : undefined },
       paramsSerializer: { indexes: null },
+      ...inLocale(locale),
     });
     return {
       ...data,
@@ -74,8 +71,8 @@ const TitleService = {
     };
   },
 
-  getById: async (id: string): Promise<Title> => {
-    const { data } = await api.get<ApiTitle>(`/${prefix}/${id}`);
+  getById: async (id: string, locale: ContentLocale): Promise<Title> => {
+    const { data } = await api.get<ApiTitle>(`/${prefix}/${id}`, inLocale(locale));
     return mapTitle(data);
   },
 
@@ -97,15 +94,6 @@ const TitleService = {
     await api.delete(`/${prefix}/${id}/upload-url/${uploadId}`);
   },
 
-  uploadPartToS3: async (url: string, chunk: Blob, onLoaded: (loaded: number) => void): Promise<string> => {
-    const response = await axios.put(url, chunk, {
-      onUploadProgress: (progressEvent) => onLoaded(progressEvent.loaded),
-    });
-    const eTag = response.headers.etag as string | undefined;
-    if (!eTag) throw new Error("S3 did not return an ETag for the uploaded part");
-    return eTag;
-  },
-
   getPosterUploadUrl: async (id: string, contentType: string): Promise<{ uploadUrl: string; rawKey: string }> => {
     const { data } = await api.post<{ uploadUrl: string; rawKey: string }>(`/${prefix}/${id}/poster/upload-url`, { contentType });
     return data;
@@ -113,19 +101,6 @@ const TitleService = {
 
   completePosterUpload: async (id: string, rawKey: string): Promise<void> => {
     await api.post(`/${prefix}/${id}/poster/upload-url/complete`, { rawKey });
-  },
-
-  async uploadToS3(url: string, file: File, onProgress: (percent: number) => void): Promise<void> {
-    await axios.put(url, file, {
-      headers: {
-        "Content-Type": file.type,
-      },
-      onUploadProgress: (progressEvent) => {
-        const total = progressEvent.total || file.size;
-        const percentCompleted = Math.round((progressEvent.loaded * 100) / total);
-        onProgress(percentCompleted);
-      },
-    });
   },
 
   update: async (id: string, titleData: TitleUpdatePayload): Promise<Title> => {
@@ -151,14 +126,28 @@ const TitleService = {
     return data;
   },
 
-  getCast: async (id: string): Promise<CastCredit[]> => {
-    const { data } = await api.get<CastCredit[]>(`/${prefix}/${id}/cast`);
+  getCast: async (id: string, locale: ContentLocale): Promise<CastCredit[]> => {
+    const { data } = await api.get<CastCredit[]>(`/${prefix}/${id}/cast`, inLocale(locale));
     return data;
   },
 
   setCast: async (id: string, credits: CastCreditInput[]): Promise<CastCredit[]> => {
     const { data } = await api.put<CastCredit[]>(`/${prefix}/${id}/cast`, { credits });
     return data;
+  },
+
+  getTranslations: async (id: string): Promise<TitleTranslation[]> => {
+    const { data } = await api.get<TitleTranslation[]>(`/${prefix}/${id}/translations`);
+    return data;
+  },
+
+  saveTranslation: async (id: string, locale: TranslationLocale, translation: TitleTranslationInput): Promise<TitleTranslation> => {
+    const { data } = await api.put<TitleTranslation>(`/${prefix}/${id}/translations/${locale}`, translation);
+    return data;
+  },
+
+  deleteTranslation: async (id: string, locale: TranslationLocale): Promise<void> => {
+    await api.delete(`/${prefix}/${id}/translations/${locale}`);
   },
 };
 

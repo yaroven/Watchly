@@ -1,12 +1,15 @@
 import {
   EngagementCounters,
   ExternalRatings,
-  Genre,
   Prisma,
   ReactionType,
   Title,
   TitleEngagement,
+  TitleTranslation,
 } from "@prisma/client";
+import { BASE_LOCALE, Locale } from "../../../common/locale.const";
+import { translationsInclude } from "../../../common/utils/localize.util";
+import { GenreWithTranslations } from "../../genre/genre.types";
 
 export type EngagementRelations = {
   engagement: TitleEngagement | null;
@@ -17,10 +20,19 @@ export type EngagementRelations = {
 };
 
 export type TitleWithEngagement = Title &
-  EngagementRelations & { genres: Genre[]; externalRatings: ExternalRatings[] };
+  EngagementRelations & {
+    genres: GenreWithTranslations[];
+    externalRatings: ExternalRatings[];
+    translations?: TitleTranslation[];
+  };
 
 const titleQuery = {
-  base: () => ({ genres: true, externalRatings: true }) satisfies Prisma.TitleInclude,
+  base: (locale: Locale) =>
+    ({
+      genres: locale === BASE_LOCALE ? true : { include: translationsInclude(locale) },
+      externalRatings: true,
+      ...translationsInclude(locale),
+    }) satisfies Prisma.TitleInclude,
 
   engagement: (viewerId: string | null) =>
     ({
@@ -35,8 +47,11 @@ const titleQuery = {
         : {}),
     }) satisfies Prisma.TitleInclude,
 
-  withEngagement: (viewerId: string | null) =>
-    ({ ...titleQuery.base(), ...titleQuery.engagement(viewerId) }) satisfies Prisma.TitleInclude,
+  withEngagement: (viewerId: string | null, locale: Locale) =>
+    ({
+      ...titleQuery.base(locale),
+      ...titleQuery.engagement(viewerId),
+    }) satisfies Prisma.TitleInclude,
 
   engagementOnly: (viewerId: string | null) =>
     ({ id: true, ...titleQuery.engagement(viewerId) }) satisfies Prisma.TitleSelect,

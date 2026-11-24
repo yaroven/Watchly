@@ -58,9 +58,13 @@ describe("WatchlistController (viewer propagation)", () => {
   it("should scope the list to the signed-in viewer", async () => {
     viewerId = "user-1";
 
-    await request(app.getHttpServer()).get("/watchlist").expect(200);
+    const response = await request(app.getHttpServer())
+      .get("/watchlist")
+      .set("Accept-Language", "uk")
+      .expect(200);
 
-    expect(watchlistService.findAll).toHaveBeenCalledWith("user-1", expect.anything());
+    expect(watchlistService.findAll).toHaveBeenCalledWith("user-1", expect.anything(), "uk");
+    expect(response.headers.vary).toContain("Accept-Language");
   });
 
   it("should refuse rather than listing without a viewer filter", async () => {

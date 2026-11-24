@@ -2,6 +2,7 @@
 
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import { IconButton } from "@mui/material";
+import { tokens } from "@shared/mui/theme";
 import { useTranslations } from "next-intl";
 
 const TOP = 110;
@@ -21,7 +22,7 @@ const baseSx = {
   border: "1px solid",
   borderColor: BORDER_COLOR,
   zIndex: 3,
-  color: "#ffffff",
+  color: tokens.text.primary,
   padding: 0,
   transition:
     "right 0.3s ease, border-radius 0.3s ease, width 0.3s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease",

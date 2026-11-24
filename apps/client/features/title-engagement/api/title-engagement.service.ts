@@ -1,6 +1,7 @@
 import { type ApiOf, mapTitle } from "@/features/title/api/title.service";
 import type { CardTitle } from "@/features/title/schemas/title";
 import api from "@shared/api/axios";
+import { type ContentLocale, inLocale } from "@shared/lib/content-locale";
 import { ReactionResult, ReactionType, TitleEngagement } from "../schemas/title-engagement";
 
 const TitleEngagementService = {
@@ -36,8 +37,14 @@ const TitleEngagementService = {
     return data;
   },
 
-  getWatchlist: async (params: { page?: number; limit?: number } = {}): Promise<{ items: CardTitle[]; totalCount: number }> => {
-    const { data } = await api.get<{ items: ApiOf<CardTitle>[]; totalCount: number }>("/watchlist", { params });
+  getWatchlist: async (
+    params: { page?: number; limit?: number } = {},
+    locale: ContentLocale,
+  ): Promise<{ items: CardTitle[]; totalCount: number }> => {
+    const { data } = await api.get<{ items: ApiOf<CardTitle>[]; totalCount: number }>("/watchlist", {
+      params,
+      ...inLocale(locale),
+    });
     return { items: data.items.map((item) => mapTitle<CardTitle>(item)), totalCount: data.totalCount };
   },
 };

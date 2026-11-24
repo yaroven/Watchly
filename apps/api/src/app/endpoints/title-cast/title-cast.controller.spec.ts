@@ -54,9 +54,13 @@ describe("TitleCastController", () => {
 
   describe("findForTitle", () => {
     it("should forward the title id", async () => {
-      await request(app.getHttpServer()).get(`/titles/${TITLE_ID}/cast`).expect(200);
+      const response = await request(app.getHttpServer())
+        .get(`/titles/${TITLE_ID}/cast`)
+        .set("Accept-Language", "uk")
+        .expect(200);
 
-      expect(titleCastService.findForTitle).toHaveBeenCalledWith(TITLE_ID);
+      expect(titleCastService.findForTitle).toHaveBeenCalledWith(TITLE_ID, "uk");
+      expect(response.headers.vary).toContain("Accept-Language");
     });
 
     it("should answer 404 for a title that does not exist, without reading the cast", async () => {

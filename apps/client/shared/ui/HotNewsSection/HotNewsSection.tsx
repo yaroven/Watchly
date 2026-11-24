@@ -3,6 +3,7 @@
 import { Box } from "@mui/material";
 import Typography from "@mui/material/Typography";
 import { Verified } from "@shared/assets/icons";
+import { tokens } from "@shared/mui/theme";
 import CustomIcon from "@shared/ui/CustomIcon";
 import SliderArrows from "@shared/ui/SliderArrows";
 import { useFormatter, useTranslations } from "next-intl";
@@ -63,7 +64,7 @@ export default function HotNewsSection({ news }: HotNewsSectionProps) {
           height: "100%",
           borderRadius: "20px",
           p: { xs: "14px", lg: "16px", xl: "20px", xxl: "24px" },
-          background: "#000000",
+          background: tokens.surface.paper,
           zIndex: 2,
           display: "flex",
           flexDirection: "column",

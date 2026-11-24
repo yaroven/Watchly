@@ -3,7 +3,7 @@
 import { Search as SearchIcon, Tune as TuneIcon } from "@mui/icons-material";
 import Input, { InputProps } from "@mui/material/Input";
 import InputAdornment from "@mui/material/InputAdornment";
-import { inputVariants } from "@shared/mui/theme";
+import { inputVariants, tokens } from "@shared/mui/theme";
 import { useTranslations } from "next-intl";
 
 interface SearchBarProps extends Pick<InputProps, "value" | "onChange" | "onKeyDown"> {
@@ -18,12 +18,12 @@ export default function SearchBar({ placeholder, ...rest }: SearchBarProps) {
       placeholder={placeholder ?? t("searchPlaceholder")}
       startAdornment={
         <InputAdornment position="start">
-          <SearchIcon sx={{ color: "#999999" }} />
+          <SearchIcon sx={{ color: tokens.text.secondary }} />
         </InputAdornment>
       }
       endAdornment={
         <InputAdornment position="end">
-          <TuneIcon sx={{ fontSize: 20, color: "#e5e5e5" }} />
+          <TuneIcon sx={{ fontSize: 20, color: tokens.text.field }} />
         </InputAdornment>
       }
       sx={{
@@ -32,7 +32,7 @@ export default function SearchBar({ placeholder, ...rest }: SearchBarProps) {
         width: 320,
         borderRadius: "16px",
         backgroundColor: "#141414",
-        border: "1px solid #333333",
+        border: `1px solid ${tokens.border.subtle}`,
         gap: "10px",
       }}
       {...rest}

@@ -73,12 +73,12 @@ export default function MediaFields({ form, showVideoField, disabled }: MediaFie
               alignItems: "flex-start",
               p: "12px 14px",
               borderRadius: "10px",
-              backgroundColor: alpha(tokens.feedback.info, 0.1),
-              border: `1px solid ${alpha(tokens.feedback.info, 0.45)}`,
+              backgroundColor: alpha(tokens.surface.fill, 0.5),
+              border: `1px solid ${tokens.border.subtle}`,
             }}
           >
-            <InfoOutlinedIcon sx={{ fontSize: 16, color: "#7aa2f7", flexShrink: 0, mt: "1px" }} />
-            <Typography sx={{ fontSize: "12px", lineHeight: 1.5, color: "#b9c6e3" }}>{t("videoNote")}</Typography>
+            <InfoOutlinedIcon sx={{ fontSize: 16, color: tokens.accent.primary, flexShrink: 0, mt: "1px" }} />
+            <Typography sx={{ fontSize: "12px", lineHeight: 1.5, color: tokens.text.secondary }}>{t("videoNote")}</Typography>
           </Box>
         </Box>
       </Activity>

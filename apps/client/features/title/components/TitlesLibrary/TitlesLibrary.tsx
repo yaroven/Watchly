@@ -2,12 +2,15 @@
 
 import { useSyncAllRatings } from "@/features/title/api/use-title-mutations";
 import useTitles from "@/features/title/api/use-titles";
+import { transcodingPollInterval } from "@/features/transcoding";
+import { useRouter } from "@/i18n/navigation";
 import { ADMIN } from "@/shared/lib/routes";
 import Pagination from "@/shared/ui/Pagination";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
+import { useApiErrorMessage } from "@shared/api/use-api-error-message";
+import { useClampedPage } from "@shared/lib/list-state";
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import TitlesFiltersPanel from "./components/TitlesFiltersPanel";
 import TitlesPageHero from "./components/TitlesPageHero";
@@ -22,22 +25,29 @@ export default function TitlesLibrary() {
   const { searchString, typeFilter, statusFilter, page, hasActiveFilters, updateFilters, resetFilters } = useTitlesFilters();
   const [syncResultMessage, setSyncResultMessage] = useState<string | null>(null);
 
-  const { data, isPending, isFetching } = useTitles({
-    page,
-    limit: LIMIT,
-    searchString,
-    type: typeFilter || undefined,
-    transcodingStatus: statusFilter || undefined,
-  });
+  const { data, isPending, isFetching } = useTitles(
+    {
+      page,
+      limit: LIMIT,
+      searchString,
+      type: typeFilter || undefined,
+      transcodingStatus: statusFilter || undefined,
+    },
+    {
+      refetchInterval: (query) => transcodingPollInterval((query.state.data?.items ?? []).map((item) => item.transcodingStatus)),
+    },
+  );
 
+  const describeError = useApiErrorMessage();
   const { mutate: syncAllRatings, isPending: isSyncingAllRatings } = useSyncAllRatings({
     onSuccess: ({ total, synced }) => setSyncResultMessage(t("syncAllResult", { synced, total })),
-    onError: (error) => setSyncResultMessage(error.message || t("syncAllFailed")),
+    onError: (error) => setSyncResultMessage(`${t("syncAllFailed")} ${describeError(error)}`),
   });
 
   const titles = data?.items || [];
   const totalCount = data?.totalCount || 0;
   const totalPages = Math.ceil(totalCount / LIMIT);
+  useClampedPage(page, data?.totalCount, LIMIT, (next) => updateFilters({ page: next }));
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", width: "100%", gap: "28px", p: { xs: "24px 16px 40px", md: "40px 36px 56px" } }}>

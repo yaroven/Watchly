@@ -3,6 +3,7 @@
 import { Box, Divider } from "@mui/material";
 import Typography from "@mui/material/Typography";
 import { IMDB } from "@shared/assets/icons";
+import { tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
 import CustomIcon from "@shared/ui/CustomIcon";
 import SliderArrows from "@shared/ui/SliderArrows";
@@ -46,7 +47,7 @@ export default function HeroSlider({ titles }: HeroSliderProps) {
         flexGrow: 1,
         width: "100%",
         height: { xs: 280, sm: 340, lg: 400, xl: 480, xxl: 560 },
-        backgroundColor: "#111111",
+        backgroundColor: tokens.surface.dropzone,
         borderRadius: "20px",
         p: "15px",
         display: "flex",

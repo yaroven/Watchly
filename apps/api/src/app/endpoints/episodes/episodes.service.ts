@@ -1,5 +1,7 @@
 import { Injectable } from "@nestjs/common";
+import { Locale, TranslationLocale } from "../../../common/locale.const";
 import { Filter, Sorting } from "../../../common/pagination/pagination.types";
+import { NameDescriptionTranslation, TranslationView } from "../../../common/translation.types";
 import { Logged } from "../../../decorators/logged.decorator";
 import { EpisodeService } from "../../../services/episode/episode.service";
 import { EpisodeInput, EpisodeUpdate, EpisodeView } from "../../../services/episode/episode.types";
@@ -20,13 +22,13 @@ export class EpisodesService {
   }
 
   @Logged()
-  async findAll(filters?: Filter[], sort?: Sorting): Promise<EpisodeView[]> {
-    return this.episodeService.findAll(filters, sort);
+  async findAll(locale: Locale, filters?: Filter[], sort?: Sorting): Promise<EpisodeView[]> {
+    return this.episodeService.findAll(locale, filters, sort);
   }
 
   @Logged()
-  async findOne(id: string): Promise<EpisodeView | null> {
-    return this.episodeService.findOne(id);
+  async findOne(id: string, locale: Locale): Promise<EpisodeView | null> {
+    return this.episodeService.findOne(id, locale);
   }
 
   @Logged()
@@ -62,5 +64,24 @@ export class EpisodesService {
   @Logged()
   async scheduleTranscode(id: string): Promise<void> {
     await this.mediaAssetService.scheduleTranscode(id, VideoType.EPISODE);
+  }
+
+  @Logged()
+  async listTranslations(id: string): Promise<TranslationView<NameDescriptionTranslation>[]> {
+    return this.episodeService.listTranslations(id);
+  }
+
+  @Logged()
+  async upsertTranslation(
+    id: string,
+    locale: TranslationLocale,
+    data: NameDescriptionTranslation,
+  ): Promise<TranslationView<NameDescriptionTranslation>> {
+    return this.episodeService.upsertTranslation(id, locale, data);
+  }
+
+  @Logged()
+  async removeTranslation(id: string, locale: TranslationLocale): Promise<void> {
+    return this.episodeService.removeTranslation(id, locale);
   }
 }

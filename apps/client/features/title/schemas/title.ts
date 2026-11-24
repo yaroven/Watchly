@@ -1,5 +1,6 @@
-import type { CardTitleEngagement, TitleEngagement } from "@/features/title-engagement/schemas/title-engagement";
+import type { CardTitleEngagement, TitleEngagement } from "@/features/title-engagement";
 import TranscodingStatus from "@/types/transcoding-status";
+import type { ContentLocaleInfo, ContentTranslation, TranslationLocale } from "@shared/lib/content-locale";
 import { z } from "zod";
 
 export enum TitleType {
@@ -29,6 +30,7 @@ export interface ExternalRating {
 export interface TitleGenre {
   id: string;
   name: string;
+  content: ContentLocaleInfo;
 }
 
 export interface CastCreditArtist {
@@ -37,16 +39,21 @@ export interface CastCreditArtist {
   photoUrl?: string | null;
 }
 
+export type CharacterTranslations = Partial<Record<TranslationLocale, string>>;
+
 export interface CastCredit {
   id: string;
   character?: string | null;
+  characterTranslations: CharacterTranslations;
   order: number;
   artist: CastCreditArtist;
+  content: ContentLocaleInfo;
 }
 
 export interface CastCreditInput {
   artistId: string;
   character?: string;
+  characterTranslations?: CharacterTranslations;
   order?: number;
 }
 
@@ -72,6 +79,7 @@ export interface Title {
   externalRatings: ExternalRating[];
   genres: TitleGenre[];
   engagement: TitleEngagement;
+  content: ContentLocaleInfo;
 }
 
 export interface CardTitle extends Omit<Title, "engagement"> {
@@ -89,20 +97,22 @@ export interface GetAllTitlesDto {
   genreId?: string;
 }
 
+export const TITLE_CONTENT_LIMITS = { name: 255, description: 2000, trailerUrl: 2048 } as const;
+
 const PosterFileSchema = z.custom<FileList | undefined>((value) => value === undefined || value instanceof FileList).optional();
 
 type SchemaTranslator = (key: string) => string;
 
 export const createBaseTitleSchema = (t: SchemaTranslator) =>
   z.object({
-    name: z.string().min(1, t("nameRequired")),
-    description: z.string().max(500),
+    name: z.string().trim().min(1, t("nameRequired")).max(TITLE_CONTENT_LIMITS.name, t("nameTooLong")),
+    description: z.string().max(TITLE_CONTENT_LIMITS.description, t("descriptionTooLong")),
     type: z.enum(TitleType),
     ageRating: z.enum(AgeRating, { error: t("ageRatingRequired") }),
     country: z.string().min(1, t("countryRequired")).max(100),
     releaseDate: z.iso.date({ error: t("releaseDateRequired") }),
     language: z.string().min(1, t("languageRequired")).max(100),
-    trailerUrl: z.url({ error: t("trailerUrlInvalid") }),
+    trailerUrl: z.url({ error: t("trailerUrlInvalid") }).max(TITLE_CONTENT_LIMITS.trailerUrl, t("trailerUrlInvalid")),
     runtime: z.number(t("runtimeRequired")).int(t("runtimeWhole")).min(0, t("runtimeMin")),
     network: z.string().min(1, t("networkRequired")).max(100),
     director: z.string().min(1, t("directorRequired")).max(255),
@@ -155,10 +165,15 @@ export const createCreateTitleSchema = (t: SchemaTranslator) =>
     );
 
 export const createUpdateTitleSchema = (t: SchemaTranslator) =>
-  createBaseTitleSchema(t).extend({
-    videoFile: z.custom<FileList>().optional(),
-    posterFile: PosterFileSchema,
-  });
+  createBaseTitleSchema(t)
+    .extend({
+      videoFile: z.custom<FileList>().optional(),
+      posterFile: PosterFileSchema,
+    })
+    .refine((data) => !data.posterFile?.[0] || data.posterFile[0].type.startsWith("image/"), {
+      message: t("posterImageOnly"),
+      path: ["posterFile"],
+    });
 
 export type TitleFormValues = z.infer<ReturnType<typeof createCreateTitleSchema>>;
 
@@ -193,3 +208,12 @@ export interface UpdateTitleDto {
   closedCaption: boolean;
   genreIds?: string[];
 }
+
+export interface TitleTranslationInput {
+  name: string;
+  description: string;
+}
+
+export type TitleTranslation = ContentTranslation<TitleTranslationInput>;
+
+export const TITLE_TRANSLATION_LIMITS = { name: TITLE_CONTENT_LIMITS.name, description: TITLE_CONTENT_LIMITS.description } as const;

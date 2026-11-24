@@ -1,5 +1,5 @@
-import type { Episode } from "@features/episodes/schemas/episode";
-import type { Season } from "@features/season/schemas/season";
+import type { Episode } from "@features/episodes";
+import type { Season } from "@features/season";
 import TitleInformation from "@features/title/components/TitleInformation";
 import TitleMoreLikeThis from "@features/title/components/TitleMoreLikeThis";
 import TitleOverview from "@features/title/components/TitleOverview";

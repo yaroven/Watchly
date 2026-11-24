@@ -6,20 +6,37 @@ import EditIcon from "@mui/icons-material/Edit";
 import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
 import Typography from "@mui/material/Typography";
+import { tokens } from "@shared/mui/theme";
+import { MissingTranslation } from "@shared/ui/LocalePicker";
+import { useTranslations } from "next-intl";
 import { useSeasonManagerContext } from "../../context/SeasonManagerContext";
 
 interface SeasonItemProps {
   season: Season;
   isSelected: boolean;
   onSelect: (seasonId: string) => void;
+  isUntranslated?: boolean;
 }
 
-export default function SeasonItem({ season, isSelected, onSelect }: SeasonItemProps) {
+export default function SeasonItem({ season, isSelected, onSelect, isUntranslated = false }: SeasonItemProps) {
   const { openEdit, openDelete } = useSeasonManagerContext();
+  const t = useTranslations("season.item");
+  const label = { number: season.number, name: season.name };
 
   return (
     <Box
+      role="button"
+      tabIndex={0}
+      aria-pressed={isSelected}
+      aria-label={t("select", label)}
       onClick={() => onSelect(season.id)}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect(season.id);
+        }
+      }}
       sx={{
         position: "relative",
         overflow: "hidden",
@@ -30,28 +47,18 @@ export default function SeasonItem({ season, isSelected, onSelect }: SeasonItemP
         borderRadius: "12px",
         cursor: "pointer",
         border: "1px solid",
-        borderColor: isSelected ? "primary.main" : "#333333",
+        borderColor: isSelected ? "primary.main" : tokens.border.subtle,
         backgroundColor: isSelected ? "rgba(231, 188, 15, 0.12)" : "rgba(255, 255, 255, 0.02)",
-        transition: "background-color .15s ease-out, border-color .15s ease-out, transform .15s ease-out",
+        transition: "background-color .15s ease-out, border-color .15s ease-out",
         "&:hover": {
           backgroundColor: isSelected ? "rgba(231, 188, 15, 0.16)" : "rgba(255, 255, 255, 0.05)",
-          transform: "translateX(2px)",
+        },
+        "&:focus-visible": {
+          outline: `2px solid ${tokens.accent.primary}`,
+          outlineOffset: "2px",
         },
       }}
     >
-      {isSelected && (
-        <Box
-          sx={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: "4px",
-            backgroundColor: "primary.main",
-            borderRadius: "0 6px 6px 0",
-          }}
-        />
-      )}
       <Box sx={{ display: "flex", alignItems: "center", gap: "10px" }}>
         <Box
           sx={{
@@ -70,7 +77,8 @@ export default function SeasonItem({ season, isSelected, onSelect }: SeasonItemP
         >
           #{season.number}
         </Box>
-        <Typography sx={{ fontWeight: 500, color: "#ffffff" }}>{season.name}</Typography>
+        <Typography sx={{ fontWeight: 500, color: tokens.text.primary }}>{season.name}</Typography>
+        {isUntranslated && <MissingTranslation />}
       </Box>
       <Box
         sx={{
@@ -88,7 +96,8 @@ export default function SeasonItem({ season, isSelected, onSelect }: SeasonItemP
             e.stopPropagation();
             openEdit(season);
           }}
-          sx={{ color: "text.secondary", "&:hover": { color: "#ffffff" } }}
+          aria-label={t("edit", label)}
+          sx={{ color: "text.secondary", "&:hover": { color: tokens.text.primary } }}
         >
           <EditIcon sx={{ fontSize: 16 }} />
         </IconButton>
@@ -99,6 +108,7 @@ export default function SeasonItem({ season, isSelected, onSelect }: SeasonItemP
             e.stopPropagation();
             openDelete(season);
           }}
+          aria-label={t("delete", label)}
         >
           <DeleteIcon sx={{ fontSize: 16 }} />
         </IconButton>

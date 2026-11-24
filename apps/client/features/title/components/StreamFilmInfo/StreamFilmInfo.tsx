@@ -3,6 +3,7 @@
 import { FeatureGate } from "@/features/feature-flags";
 import { ReactionType, useSetTitleReaction, useSetTitleWatchlist, useTitleEngagement } from "@/features/title-engagement";
 import type { Title } from "@/features/title/schemas/title";
+import { useRouter } from "@/i18n/navigation";
 import { getOptimizedImageSrc } from "@/shared/lib/get-optimized-image-src";
 import AddIcon from "@mui/icons-material/Add";
 import IosShareIcon from "@mui/icons-material/IosShare";
@@ -13,13 +14,15 @@ import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
 import Typography from "@mui/material/Typography";
+import { INLINE_ERROR } from "@shared/api/write-errors";
 import { formatCount } from "@shared/lib/format-count";
-import { APP } from "@shared/lib/routes";
+import { useLoginPath } from "@shared/lib/use-login-path";
 import { useViewer } from "@shared/lib/use-viewer";
+import { nextVote, viewerControl } from "@shared/lib/viewer-control";
+import { tokens } from "@shared/mui/theme";
 import Button from "@shared/ui/Button";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 interface StreamFilmInfoProps {
@@ -31,6 +34,7 @@ interface StreamFilmInfoProps {
 export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFilmInfoProps) {
   const t = useTranslations("title.engagement");
   const router = useRouter();
+  const signInPath = useLoginPath();
   const viewer = useViewer();
   const [expanded, setExpanded] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
@@ -42,19 +46,23 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
   const engagement = liveEngagement ?? title.engagement;
   const viewerEngagement = engagement.viewer;
 
-  const react = useSetTitleReaction(title.id);
-  const setWatchlist = useSetTitleWatchlist(title.id);
+  const react = useSetTitleReaction(title.id, { meta: INLINE_ERROR });
+  const setWatchlist = useSetTitleWatchlist(title.id, { meta: INLINE_ERROR });
   const writeError = react.error ?? setWatchlist.error;
 
-  const viewerStateUnknown = viewer.status === "signed-in" && (viewerEngagement === null || engagementFailed);
-  const togglesDisabled = viewer.status !== "signed-in" || viewerStateUnknown;
-
-  const handleToggleWhileAnonymous = () => router.push(APP.LOGIN);
+  const known = viewerEngagement !== null;
+  const reactControl = viewerControl({ viewer: viewer.status, known, refreshFailed: engagementFailed, busy: react.isPending });
+  const watchlistControl = viewerControl({ viewer: viewer.status, known, refreshFailed: engagementFailed, busy: setWatchlist.isPending });
+  const viewerStateUnknown = reactControl.state === "unknown";
 
   const handleReact = (type: ReactionType) => {
-    if (viewer.status === "anonymous") return handleToggleWhileAnonymous();
-    if (togglesDisabled || react.isPending) return;
-    react.mutate(viewerEngagement?.reaction === type ? null : type);
+    if (reactControl.intent === "sign-in") return router.push(signInPath());
+    if (reactControl.intent === "write") react.mutate(nextVote(viewerEngagement?.reaction ?? null, type));
+  };
+
+  const handleWatchlist = () => {
+    if (watchlistControl.intent === "sign-in") return router.push(signInPath());
+    if (watchlistControl.intent === "write" && viewerEngagement) setWatchlist.mutate(!viewerEngagement.inWatchlist);
   };
 
   const flashShareState = (next: "copied" | "failed") => {
@@ -96,7 +104,7 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
             alignItems: "center",
             gap: "16px",
             borderRadius: "999px",
-            backgroundColor: "#111111",
+            backgroundColor: tokens.surface.dropzone,
             px: "16px",
             py: "8px",
           }}
@@ -107,9 +115,9 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
               type="button"
               aria-label={viewerEngagement?.reaction === ReactionType.LIKE ? t("removeLike") : t("like")}
               aria-pressed={viewerEngagement ? viewerEngagement.reaction === ReactionType.LIKE : undefined}
-              disabled={viewerStateUnknown || viewer.status === "pending" || react.isPending}
+              disabled={reactControl.disabled}
               onClick={() => handleReact(ReactionType.LIKE)}
-              sx={{ ...actionButtonSx, color: viewerEngagement?.reaction === ReactionType.LIKE ? "primary.main" : "#ffffff" }}
+              sx={{ ...actionButtonSx, color: viewerEngagement?.reaction === ReactionType.LIKE ? "primary.main" : tokens.text.primary }}
             >
               <ThumbUpIcon sx={{ fontSize: "18px" }} />
               <Typography component="span" sx={{ fontSize: "13px" }}>
@@ -121,9 +129,9 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
               type="button"
               aria-label={viewerEngagement?.reaction === ReactionType.DISLIKE ? t("removeDislike") : t("dislike")}
               aria-pressed={viewerEngagement ? viewerEngagement.reaction === ReactionType.DISLIKE : undefined}
-              disabled={viewerStateUnknown || viewer.status === "pending" || react.isPending}
+              disabled={reactControl.disabled}
               onClick={() => handleReact(ReactionType.DISLIKE)}
-              sx={{ ...actionButtonSx, color: viewerEngagement?.reaction === ReactionType.DISLIKE ? "primary.main" : "#ffffff" }}
+              sx={{ ...actionButtonSx, color: viewerEngagement?.reaction === ReactionType.DISLIKE ? "primary.main" : tokens.text.primary }}
             >
               <ThumbDownIcon sx={{ fontSize: "18px" }} />
             </Box>
@@ -161,25 +169,22 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
           >
             <Image src={getOptimizedImageSrc(title.posterUrl)} alt={title.name} fill sizes="56px" style={{ objectFit: "cover" }} />
           </Box>
-          <Typography sx={{ fontSize: "22px", fontWeight: 600, color: "#e5e5e5" }}>{title.name}</Typography>
+          <Typography sx={{ fontSize: "22px", fontWeight: 600, color: tokens.text.field }}>{title.name}</Typography>
         </Box>
 
         <Box
           component="button"
           type="button"
           aria-pressed={viewerEngagement ? viewerEngagement.inWatchlist : undefined}
-          disabled={viewerStateUnknown || viewer.status === "pending" || setWatchlist.isPending}
-          onClick={() => {
-            if (viewer.status === "anonymous") return handleToggleWhileAnonymous();
-            if (viewerEngagement) setWatchlist.mutate(!viewerEngagement.inWatchlist);
-          }}
+          disabled={watchlistControl.disabled}
+          onClick={handleWatchlist}
           sx={{
             display: "flex",
             alignItems: "center",
             gap: "10px",
             border: "none",
-            cursor: togglesDisabled ? "default" : "pointer",
-            opacity: togglesDisabled ? 0.6 : 1,
+            cursor: watchlistControl.intent === "write" ? "pointer" : "default",
+            opacity: watchlistControl.state === "ready" ? 1 : 0.6,
             borderRadius: "12px",
             backgroundColor: "primary.main",
             px: "18px",
@@ -192,19 +197,19 @@ export default function StreamFilmInfo({ title, episodeLabel, rating }: StreamFi
               width: "22px",
               height: "22px",
               borderRadius: "6px",
-              border: "1.5px solid #191919",
+              border: `1.5px solid ${tokens.surface.default}`,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <AddIcon sx={{ fontSize: "16px", color: "#191919" }} />
+            <AddIcon sx={{ fontSize: "16px", color: tokens.surface.default }} />
           </Box>
           <Box sx={{ textAlign: "left" }}>
-            <Typography sx={{ fontSize: "14px", fontWeight: 700, color: "#191919", lineHeight: 1.2 }}>
+            <Typography sx={{ fontSize: "14px", fontWeight: 700, color: tokens.surface.default, lineHeight: 1.2 }}>
               {viewerEngagement ? (viewerEngagement.inWatchlist ? t("inWatchlist") : t("addToWatchlist")) : t("watchlist")}
             </Typography>
-            <Typography sx={{ fontSize: "11px", color: "#191919", opacity: 0.75, lineHeight: 1.2 }}>
+            <Typography sx={{ fontSize: "11px", color: tokens.surface.default, opacity: 0.75, lineHeight: 1.2 }}>
               {t("addedBy", { count: engagement.watchlistCount, formatted: formatCount(engagement.watchlistCount) })}
             </Typography>
           </Box>
@@ -273,7 +278,7 @@ const actionButtonSx = {
   font: "inherit",
   cursor: "pointer",
   padding: 0,
-  color: "#ffffff",
+  color: tokens.text.primary,
   transition: "color .15s ease-out",
   ":hover": { color: "primary.main" },
 } as const;

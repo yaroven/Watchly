@@ -1,20 +1,20 @@
+import { usePagedRead } from "@shared/api/paged-read";
 import { useViewer } from "@shared/lib/use-viewer";
-import { useQuery, UseQueryOptions } from "@tanstack/react-query";
 import commentKeys from "./comment.keys";
-import commentService, { CommentPage } from "./comment.service";
+import commentService from "./comment.service";
 
-const useCommentReplies = (
-  commentId: string,
-  options?: Omit<UseQueryOptions<CommentPage, Error, CommentPage, readonly unknown[]>, "queryKey" | "queryFn">,
-) => {
+export const REPLIES_PAGE_SIZE = 20;
+
+const useCommentReplies = (commentId: string, { enabled = true }: { enabled?: boolean } = {}) => {
   const viewer = useViewer();
 
-  return useQuery({
-    queryKey: commentKeys.reply(commentId, viewer.viewerKey),
-    queryFn: () => commentService.getReplies(commentId),
-    ...options,
-    enabled: viewer.status !== "pending" && (options?.enabled ?? true),
-  });
+  return usePagedRead(
+    (page) => ({
+      queryKey: commentKeys.replyPage(commentId, page, viewer.viewerKey),
+      queryFn: () => commentService.getReplies(commentId, { page, limit: REPLIES_PAGE_SIZE }),
+    }),
+    { enabled: viewer.status !== "pending" && enabled },
+  );
 };
 
 export default useCommentReplies;

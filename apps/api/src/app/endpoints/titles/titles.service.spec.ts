@@ -52,7 +52,7 @@ describe("TitlesService", () => {
       totalCount: 2,
     });
 
-    await service.findAll({ page: 1, limit: 10 }, undefined, [], "viewer-1");
+    await service.findAll({ page: 1, limit: 10 }, "en", undefined, [], "viewer-1");
 
     expect(voteState.forTitles).toHaveBeenCalledWith(
       [
@@ -67,7 +67,7 @@ describe("TitlesService", () => {
     titleService.findOne.mockResolvedValue(stored("t-1", ReactionType.LIKE));
     voteState.forTitles.mockResolvedValue(new Map([["t-1", ReactionType.DISLIKE]]));
 
-    const result = await service.findOne("t-1", "viewer-1");
+    const result = await service.findOne("t-1", "en", "viewer-1");
 
     expect(result?.engagement.viewer).toEqual({
       score: 7,
@@ -88,7 +88,7 @@ describe("TitlesService", () => {
   it("should keep an unknown viewer unknown and ask the cache for nobody", async () => {
     titleService.findOne.mockResolvedValue(stored("t-1", null, false));
 
-    const result = await service.findOne("t-1");
+    const result = await service.findOne("t-1", "en");
 
     expect(result?.engagement.viewer).toBeNull();
     expect(voteState.forTitles).toHaveBeenCalledWith(expect.anything(), null);
@@ -97,7 +97,7 @@ describe("TitlesService", () => {
   it("should answer null for a title that does not exist", async () => {
     titleService.findOne.mockResolvedValue(null);
 
-    await expect(service.findOne("gone", "viewer-1")).resolves.toBeNull();
+    await expect(service.findOne("gone", "en", "viewer-1")).resolves.toBeNull();
     expect(voteState.forTitles).not.toHaveBeenCalled();
   });
 
